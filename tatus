@@ -1,0 +1,20 @@
+* [33m29df56b[m[33m ([m[1;32mbackup-before-nexora-merge[m[33m)[m Merge Nexora frontend into PLCM repository
+* [33mf796cbf[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/v0/waqarmehboob-c232cc99[m[33m)[m Bug fix
+* [33m95c3727[m bug fix
+* [33me384b4d[m Issues fixed
+* [33md4ebfb7[m custome and order pages updated
+* [33m8eb3fc9[m Customer page unde updaion
+* [33m17008d4[m project page updated
+* [33me2de643[m Bug fixed
+* [33med67468[m parent children fault update batch processing completed
+* [33mf2a023c[m Refactor code structure for improved readability and maintainability
+* [33m120735f[m reformating entity look up
+* [33mc876521[m Refactor maintenance components to use updated lookup response structure and enhance UI elements
+* [33m17481a1[m Bug fix an Maintenance dashboard errors fixed
+* [33mdbec1ea[m Refactor maintenance and project components to use updated API structure and improve data handling
+* [33me7c65c3[m Caselook up by partnumber operational
+* [33m77e1ff1[m Maintenance cases Added
+* [33m4c9982d[m Updated project
+[31m|[m * [33mf792957[m[33m ([m[1;31mnexora/main[m[33m, [m[1;31mnexora/HEAD[m[33m)[m Refactor project and login page titles; update sidebar navigation items
+[31m|[m * [33m685bdcb[m Added Status History for each entity and also updated EntityCards component to support editing and deleting entities
+[31m|[m * [33ma2a3ebb[m Base Version Commit
