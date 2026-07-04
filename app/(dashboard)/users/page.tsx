@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
 import * as api from '@/lib/api';
 import type * as Models from '@/lib/models';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
@@ -40,6 +41,10 @@ export default function UsersPage() {
     role_id: '',
   });
   const [usersWithRoles, setUsersWithRoles] = useState<any[]>([]);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({
+    open: false,
+    id: null,
+  });
 
   // Fetch available roles and user roles from API
   useEffect(() => {
@@ -158,18 +163,19 @@ export default function UsersPage() {
     }
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm('Are you sure you want to delete this user?')) return;
+  async function confirmDelete() {
+    if (deleteConfirm.id === null) return;
     try {
-      await api.auth.deregister(id);
+      await api.auth.deregister(deleteConfirm.id);
       toast.success('User deleted successfully');
-      // Smart reload: refetch users
       if (typeof window !== 'undefined') {
         window.location.reload();
       }
     } catch (err) {
       console.error('Failed to delete user:', err);
       toast.error('Failed to delete user');
+    } finally {
+      setDeleteConfirm({ open: false, id: null });
     }
   }
 
@@ -317,7 +323,7 @@ export default function UsersPage() {
                           <Button
                             size="sm"
                             variant="destructive"
-                            onClick={() => handleDelete(user.id)}
+                            onClick={() => setDeleteConfirm({ open: true, id: user.id })}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -397,6 +403,16 @@ export default function UsersPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteConfirm.open}
+        onOpenChange={(open) =>
+          setDeleteConfirm((prev) => ({ ...prev, open, id: open ? prev.id : null }))
+        }
+        title="Delete User"
+        description="Are you sure you want to delete this user? This action cannot be undone."
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

@@ -60,9 +60,9 @@ export default function ComponentDetailPage() {
       </Breadcrumb>
 
       <div className="flex items-center gap-4">
-        <Link href="/components">
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <ArrowLeft className="h-4 w-4" />
+        <Link href={unit ? `/units/${unit.id}` : '/components'}>
+          <Button variant="ghost" size="icon" className="h-10 w-10">
+            <ArrowLeft className="h-6 w-6" />
           </Button>
         </Link>
         <div>

@@ -1,13 +1,13 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import { Search, X } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDataStore } from '@/lib/data-store';
 import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { HierarchySearchCombobox } from '@/components/hierarchy-dashboard/hierarchy-search-combobox';
+import { HierarchyDashboardControls } from '@/components/hierarchy-dashboard/hierarchy-dashboard-controls';
 import { ProjectHierarchyFlow } from '@/components/hierarchy-dashboard/project-hierarchy-flow';
 import {
   getComponentsForUnit,
@@ -80,9 +80,6 @@ export default function HierarchyDashboardPage() {
   );
 
   const systemOptions = useMemo(() => {
-    console.log(projects);
-    console.log(systems);
-    console.log(selection.projectId);
     if (!selection.projectId) return [];
     return getSystemsForProject(systems, selection.projectId).map((system) => ({
       value: String(system.id),
@@ -158,15 +155,6 @@ export default function HierarchyDashboardPage() {
       setSelection(resolved);
     },
     [systems, subsystems, modules, units, components, runningProjectIds]
-  );
-
-  const hasSelection = Boolean(
-      selection.projectId ||
-      selection.systemId ||
-      selection.subsystemId ||
-      selection.moduleId ||
-      selection.unitId ||
-      selection.componentId
   );
 
   const handleClearSelection = () => {
@@ -246,96 +234,24 @@ export default function HierarchyDashboardPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="grid min-w-0 flex-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-          <HierarchySearchCombobox
-            label="Project"
-            placeholder="Select running project"
-            value={selection.projectId ? String(selection.projectId) : undefined}
-            options={projectOptions}
-            onChange={(value) => updateSelection('projectId', Number(value))}
-            onClear={() => updateSelection('projectId', undefined)}
-          />
-
-          {selection.projectId ? (
-            <HierarchySearchCombobox
-              label="System"
-              placeholder="Select system"
-              value={selection.systemId ? String(selection.systemId) : undefined}
-              options={systemOptions}
-              onChange={(value) => updateSelection('systemId', Number(value))}
-              onClear={() => updateSelection('systemId', undefined)}
-            />
-          ) : null}
-
-          {selection.systemId ? (
-            <HierarchySearchCombobox
-              label="Subsystem"
-              placeholder="Select subsystem"
-              value={selection.subsystemId ? String(selection.subsystemId) : undefined}
-              options={subsystemOptions}
-              onChange={(value) => updateSelection('subsystemId', Number(value))}
-              onClear={() => updateSelection('subsystemId', undefined)}
-            />
-          ) : null}
-
-          {selection.subsystemId ? (
-            <HierarchySearchCombobox
-              label="Module"
-              placeholder="Select module"
-              value={selection.moduleId ? String(selection.moduleId) : undefined}
-              options={moduleOptions}
-              onChange={(value) => updateSelection('moduleId', Number(value))}
-              onClear={() => updateSelection('moduleId', undefined)}
-            />
-          ) : null}
-
-          {selection.moduleId ? (
-            <HierarchySearchCombobox
-              label="Unit"
-              placeholder="Select unit"
-              value={selection.unitId ? String(selection.unitId) : undefined}
-              options={unitOptions}
-              onChange={(value) => updateSelection('unitId', Number(value))}
-              onClear={() => updateSelection('unitId', undefined)}
-            />
-          ) : null}
-
-          {selection.unitId ? (
-            <HierarchySearchCombobox
-              label="Component"
-              placeholder="Select component"
-              value={selection.componentId ? String(selection.componentId) : undefined}
-              options={componentOptions}
-              onChange={(value) => updateSelection('componentId', Number(value))}
-              onClear={() => updateSelection('componentId', undefined)}
-            />
-          ) : null}
-        </div>
-
-        {hasSelection ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="shrink-0 gap-1.5"
-            onClick={handleClearSelection}
-          >
-            <X className="h-3.5 w-3.5" />
-            Clear all
-          </Button>
-        ) : null}
-      </div>
-
-      {selectedProject ? (
-        <p className="text-sm text-muted-foreground">
-          Viewing <span className="font-medium text-foreground">{selectedProject.name}</span>
-          {selectedProject.status_name ? ` · ${selectedProject.status_name}` : ''}
-        </p>
-      ) : null}
+      <HierarchyDashboardControls
+        selection={selection}
+        onSelectionChange={setSelection}
+        onClearAll={handleClearSelection}
+        updateSelection={updateSelection}
+        projectOptions={projectOptions}
+        systemOptions={systemOptions}
+        subsystemOptions={subsystemOptions}
+        moduleOptions={moduleOptions}
+        unitOptions={unitOptions}
+        componentOptions={componentOptions}
+        selectedProject={selectedProject}
+      />
 
       <ProjectHierarchyFlow
         selection={selection}
+        onSelectionChange={setSelection}
+        updateSelection={updateSelection}
         systems={systems}
         subsystems={subsystems}
         modules={modules}

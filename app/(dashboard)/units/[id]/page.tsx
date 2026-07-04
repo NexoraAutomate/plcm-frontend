@@ -242,9 +242,9 @@ export default function UnitDetailPage() {
       </Breadcrumb>
 
       <div className="flex items-center gap-4">
-        <Link href="/units">
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <ArrowLeft className="h-4 w-4" />
+        <Link href={module ? `/modules/${module.id}` : '/units'}>
+          <Button variant="ghost" size="icon" className="h-10 w-10">
+            <ArrowLeft className="h-6 w-6" />
           </Button>
         </Link>
         <div>

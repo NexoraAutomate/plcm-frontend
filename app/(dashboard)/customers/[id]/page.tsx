@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ import * as api from '@/lib/api';
 import * as Models from '@/lib/models';
 import { Badge } from '@/components/ui/badge';
 import { CustomerMiniDashboard } from '@/components/customers/customer-mini-dashboard';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 
 type OrderForm = {
   order_number?: string
@@ -56,6 +57,7 @@ const emptyOrderForm: OrderForm = {
 
 export default function CustomerDetailPage(){
     const params = useParams();
+    const router = useRouter();
     const customerID = params.id as string;
     const { customers, projects, deleteOrder, updateOrder, createOrder, systems, orders, loading, createSystem, deleteSystem, updateSystem } = useDataStore();
     const customer = customers.find((c) => String(c.id) === customerID);
@@ -72,6 +74,10 @@ export default function CustomerDetailPage(){
     
     const [statuses, setStatuses] = useState<Models.Status[]>([]);
     const [loadingStatuses, setLoadingStatuses] = useState(true);
+    const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({
+      open: false,
+      id: null,
+    });
  
     const filtered = customerOrders.filter((o) => {
     const matchesSearch =
@@ -131,19 +137,16 @@ export default function CustomerDetailPage(){
     }
   }
 
-  async function handleDelete(id: number) {
-    if (
-      !confirm(
-        'Are you sure you want to delete this order? All related Projects will also get deleted.'
-      )
-    )
-      return;
+  async function confirmDelete() {
+    if (deleteConfirm.id === null) return;
 
     try {
-      await deleteOrder(id);
+      await deleteOrder(deleteConfirm.id);
       toast.success('Order deleted successfully');
     } catch (error) {
       console.error(error);
+    } finally {
+      setDeleteConfirm({ open: false, id: null });
     }
   }
 
@@ -527,7 +530,11 @@ export default function CustomerDetailPage(){
                             const customer = customers.find((c) => c.id === order.customer_id);
                             const status = statuses.find((s) => s.id === order.status_id);
                             return (
-                            <TableRow key={order.id} >
+                            <TableRow
+                              key={order.id}
+                              className="cursor-pointer hover:bg-muted/50"
+                              onClick={() => router.push(`/orders/${order.id}`)}
+                            >
                                 <TableCell className="font-medium">
                                 {order.order_number}
                             </TableCell>
@@ -599,11 +606,14 @@ export default function CustomerDetailPage(){
                             <TableCell className="text-right">
                                 <div className="flex justify-end gap-2 text-accent">
                                     <Pencil  className='w-4.5 text-accent-foreground hover:text-blue-600'
-                                    onClick={() => openEdit(order)}
+                                    onClick={(e) => { e.stopPropagation(); openEdit(order); }}
                                     />
                                     |
                                     <Trash2 className='w-4.5 text-accent-foreground hover:text-red-600'
-                                    onClick={() => handleDelete(order.id)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeleteConfirm({ open: true, id: order.id });
+                                    }}
                                     />
                                 </div>
                             </TableCell>
@@ -866,6 +876,16 @@ export default function CustomerDetailPage(){
                 </div>
                 </DialogContent>
             </Dialog>
+
+            <ConfirmDialog
+              open={deleteConfirm.open}
+              onOpenChange={(open) =>
+                setDeleteConfirm((prev) => ({ ...prev, open, id: open ? prev.id : null }))
+              }
+              title="Delete Order"
+              description="Are you sure you want to delete this order? All related projects will also be deleted. This action cannot be undone."
+              onConfirm={confirmDelete}
+            />
             
             </div>
 

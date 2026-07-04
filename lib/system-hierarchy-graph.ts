@@ -70,7 +70,7 @@ const DETAIL_PATH: Record<HierarchyEntityType, (id: number) => string> = {
 };
 
 const NODE_WIDTH = 220;
-const NODE_HEIGHT = 88;
+const NODE_HEIGHT = 118;
 const HORIZONTAL_GAP = 48;
 const VERTICAL_GAP = 120;
 

@@ -23,9 +23,14 @@ import { getSystemCountByProjectId, getCount } from '@/lib/entity-counts';
 import { EntityCountCell } from '@/components/entity-count-cell';
 import { Progress } from '@/components/ui/progress';
 import { ProjectProgressDialog } from '@/components/projects/project-progress-dialog';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 
 export default function ProjectsPage(){
   const router = useRouter();
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({
+    open: false,
+    id: null,
+  });
   const searchParams = useSearchParams();
   const { projects, users, orders, systems, loading, createProject, updateProject, deleteProject, getEntityMaintenanceLogs } = useDataStore();
   const faultMap = useEntityFaultMap();
@@ -51,6 +56,13 @@ export default function ProjectsPage(){
   });
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
+
+  useEffect(() => {
+    if (searchParams.get('action') === 'create') {
+      setIsCreateOpen(true);
+      router.replace('/projects', { scroll: false });
+    }
+  }, [searchParams, router]);
 
   const orderScopedProjects = useMemo(
     () =>
@@ -122,12 +134,14 @@ export default function ProjectsPage(){
     }
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm('Are you sure? This will delete associated systems.')) return;
+  async function confirmDelete() {
+    if (deleteConfirm.id === null) return;
     try {
-      await deleteProject(id);  
+      await deleteProject(deleteConfirm.id);
     } catch {
       // Error handled by DataStore
+    } finally {
+      setDeleteConfirm({ open: false, id: null });
     }
   }
 
@@ -429,7 +443,7 @@ export default function ProjectsPage(){
                               className="rounded p-1 hover:bg-muted"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleDelete(project.id);
+                                setDeleteConfirm({ open: true, id: project.id });
                               }}
                             >
                               <Trash2 className="h-4 w-4 text-accent-foreground hover:text-red-600" />
@@ -540,6 +554,16 @@ export default function ProjectsPage(){
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteConfirm.open}
+        onOpenChange={(open) =>
+          setDeleteConfirm((prev) => ({ ...prev, open, id: open ? prev.id : null }))
+        }
+        title="Delete Project"
+        description="Are you sure? This will delete associated systems. This action cannot be undone."
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

@@ -62,6 +62,13 @@ export default function MaintenancePage() {
     loadPartNumber();
   }, [isLookupOpen]);
 
+  useEffect(() => {
+    if (searchParams.get('lookup') === 'true') {
+      setIsLookupOpen(true);
+      router.replace('/maintenance', { scroll: false });
+    }
+  }, [searchParams, router]);
+
   const loadMaintenanceCases = async () => {
     try {
       setIsLoadingData(true);

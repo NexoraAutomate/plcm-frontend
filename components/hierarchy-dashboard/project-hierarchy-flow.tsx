@@ -10,7 +10,11 @@ import {
   useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { useHierarchyEntityActions } from '@/components/hierarchy-dashboard/use-hierarchy-entity-actions';
+import type { DashboardLevelKey } from '@/lib/hierarchy-dashboard-entity-config';
 import {
   buildProjectHierarchyFlow,
   collectSubtreeFromNode,
@@ -53,6 +57,8 @@ import type {
 
 interface ProjectHierarchyFlowProps {
   selection: HierarchyDashboardSelection;
+  onSelectionChange: (selection: HierarchyDashboardSelection) => void;
+  updateSelection: (key: DashboardLevelKey, value?: number) => void;
   systems: System[];
   subsystems: Subsystem[];
   modules: Module[];
@@ -82,6 +88,8 @@ function FitViewOnSelectionChange({ dependencyKey }: { dependencyKey: string }) 
 
 export function ProjectHierarchyFlow({
   selection,
+  onSelectionChange,
+  updateSelection,
   systems,
   subsystems,
   modules,
@@ -92,6 +100,12 @@ export function ProjectHierarchyFlow({
   className,
   onNodeSelect,
 }: ProjectHierarchyFlowProps) {
+  const { entityActionHandlers, entityActionDialogs } = useHierarchyEntityActions({
+    selection,
+    onSelectionChange,
+    updateSelection,
+  });
+
   const [panel, setPanel] = useState<{
     open: boolean;
     selection: HierarchyEntitySelection | null;
@@ -300,20 +314,33 @@ export function ProjectHierarchyFlow({
 
   if (nodes.length === 0) {
     return (
-      <div
-        className={cn(
-          'flex h-full min-h-[420px] items-center justify-center rounded-lg border border-dashed bg-muted/20',
-          className
-        )}
-      >
-        <p className="text-sm text-muted-foreground">
-          No systems found for this project. Add systems to build the hierarchy graph.
-        </p>
-      </div>
+      <>
+        <div
+          className={cn(
+            'flex h-full min-h-[420px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-muted/20',
+            className
+          )}
+        >
+          <p className="text-sm text-muted-foreground">
+            No systems found for this project. Add a system to build the hierarchy graph.
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => entityActionHandlers.onAddRootSystem(selection.projectId!)}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add system
+          </Button>
+        </div>
+        {entityActionDialogs}
+      </>
     );
   }
 
   return (
+    <>
     <div
       className={cn(
         'flex h-full min-h-[420px] w-full overflow-hidden rounded-lg border bg-muted/10',
@@ -330,6 +357,7 @@ export function ProjectHierarchyFlow({
             onToggleDetails={handleToggleDetails}
             onNavigate={handleNavigate}
             onViewResolutionHistory={handleViewResolutionHistory}
+            entityActions={entityActionHandlers}
           >
             <ReactFlow
               nodes={nodes}
@@ -391,5 +419,7 @@ export function ProjectHierarchyFlow({
         />
       ) : null}
     </div>
+    {entityActionDialogs}
+    </>
   );
 }

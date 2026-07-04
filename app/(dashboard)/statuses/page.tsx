@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { toast } from "sonner";
 import * as api from "@/lib/api";
 import * as Models from "@/lib/models";
@@ -269,27 +270,16 @@ export default function StatusesPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Confirm delete</DialogTitle>
-            <DialogDescription>
-              Delete "{deleteTarget?.status_name}" and remove it from the status registry.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <p className="text-sm text-muted-foreground">This action cannot be undone. Continue?</p>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
-                Cancel
-              </Button>
-              <Button variant="destructive" onClick={confirmDelete}>
-                Delete
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={(open) => {
+          setDeleteConfirmOpen(open);
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Confirm delete"
+        description={`Delete "${deleteTarget?.status_name ?? "status"}" and remove it from the status registry. This action cannot be undone.`}
+        onConfirm={confirmDelete}
+      />
 
       <Dialog open={editOpen} onOpenChange={(open) => {
         setEditOpen(open);

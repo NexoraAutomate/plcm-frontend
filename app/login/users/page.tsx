@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Edit, Trash2, Search, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
@@ -19,6 +20,10 @@ export default function UsersPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({
+    open: false,
+    id: null,
+  });
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -75,12 +80,14 @@ export default function UsersPage() {
     }
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm('Are you sure you want to delete this user?')) return;
+  async function confirmDelete() {
+    if (deleteConfirm.id === null) return;
     try {
-      await deleteUser(id);
+      await deleteUser(deleteConfirm.id);
     } catch {
       // Error handled by DataStore
+    } finally {
+      setDeleteConfirm({ open: false, id: null });
     }
   }
 
@@ -216,7 +223,7 @@ export default function UsersPage() {
                           <Button
                             size="sm"
                             variant="destructive"
-                            onClick={() => handleDelete(user.id)}
+                            onClick={() => setDeleteConfirm({ open: true, id: user.id })}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -277,6 +284,16 @@ export default function UsersPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteConfirm.open}
+        onOpenChange={(open) =>
+          setDeleteConfirm((prev) => ({ ...prev, open, id: open ? prev.id : null }))
+        }
+        title="Delete User"
+        description="Are you sure you want to delete this user? This action cannot be undone."
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

@@ -1,8 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
+import { CommonTasksStrip } from '@/components/dashboard/CommonTasksStrip';
+import { GlobalSearchDialog } from '@/components/global-search-dialog';
 import { KPICard } from '@/components/kpi-card';
 import { MaintenanceMiniDashboard } from '@/components/maintenance/MaintenanceMiniDashboard';
 import { StatusBadge } from '@/components/status-badge';
@@ -23,6 +26,9 @@ import {
   Network,
   AlertCircle,
   ArrowRight,
+  GitBranch,
+  ScanSearch,
+  Search,
 } from 'lucide-react';
 import {
   PieChart,
@@ -85,6 +91,7 @@ const ORDER_STATUS_COLORS: Record<string, 'blue' | 'green' | 'red' | 'amber' | '
 
 export default function DashboardPage() {
   const router = useRouter();
+  const [searchOpen, setSearchOpen] = useState(false);
   const {
     customers,
     orders,
@@ -209,6 +216,45 @@ export default function DashboardPage() {
   const customerStatusItems = Object.entries(customerStatuses).filter(([, count]) => count > 0);
   const orderStatusItems = Object.entries(orderStatuses).filter(([, count]) => count > 0);
 
+  const commonTasks = [
+    {
+      label: 'Add Customer',
+      icon: Users,
+      onClick: () => router.push('/customers?action=create'),
+    },
+    {
+      label: 'Create Order',
+      icon: ShoppingCart,
+      onClick: () => router.push('/orders?action=create'),
+    },
+    {
+      label: 'New Project',
+      icon: Rocket,
+      onClick: () => router.push('/projects?action=create'),
+    },
+    {
+      label: 'Lookup Part Number',
+      icon: Search,
+      onClick: () => router.push('/maintenance?lookup=true'),
+    },
+    {
+      label: 'View Open Cases',
+      icon: AlertCircle,
+      onClick: () => router.push('/maintenance?status=open'),
+      badge: openMaintenanceCases,
+    },
+    {
+      label: 'Search Everything',
+      icon: ScanSearch,
+      onClick: () => setSearchOpen(true),
+    },
+    {
+      label: 'Explore Hierarchy',
+      icon: GitBranch,
+      onClick: () => router.push('/hierarchy-dashboard'),
+    },
+  ];
+
   return (
     <div className="space-y-8">
       <div>
@@ -217,6 +263,9 @@ export default function DashboardPage() {
           Overview of customers, projects, maintenance, and fleet operations
         </p>
       </div>
+
+      <CommonTasksStrip tasks={commonTasks} />
+      <GlobalSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
 
       {/* Executive KPI strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

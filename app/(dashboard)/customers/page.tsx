@@ -5,7 +5,7 @@ import { Search, Plus, Edit,UserRoundPen ,Check,X, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ import * as api from '@/lib/api';
 import { getOrderCountByCustomerId, getProjectCountByCustomerId, getCount } from '@/lib/entity-counts';
 import { EntityCountCell } from '@/components/entity-count-cell';
 import { CustomersListDashboard } from '@/components/customers/customers-list-dashboard';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 
 const emptyCustomerForm: CustomerForm = {
   customer_code: '',
@@ -57,6 +58,14 @@ export default function CustomersPage() {
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [formData, setFormData] = useState<CustomerForm>(emptyCustomerForm);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get('action') === 'create') {
+      setIsCreateOpen(true);
+      router.replace('/customers', { scroll: false });
+    }
+  }, [searchParams, router]);
 
 
   const getStatusValue = (status: Models.Status) => status.status_name ?? (status as any).status_name ?? String(status.id);
@@ -735,31 +744,16 @@ export default function CustomersPage() {
       </DialogContent>
       </Dialog>
 
-      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Confirm delete</DialogTitle>
-            <DialogDescription>
-              Delete Customer detail.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <p className="text-sm text-muted-foreground">
-              This action cannot be undone. Are you sure you want to continue?
-            </p>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
-                Cancel
-              </Button>
-              <Button variant="destructive" onClick={() => handleDelete()}>
-                Delete
-                <Trash2 />
-              </Button>
-               
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={(open) => {
+          setDeleteConfirmOpen(open);
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Confirm delete"
+        description="Delete customer detail. This action cannot be undone."
+        onConfirm={handleDelete}
+      />
 
     </div>  
   );

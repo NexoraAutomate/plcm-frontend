@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,6 +20,7 @@ import { EntityCountCell } from '@/components/entity-count-cell';
 import { EntityNameWithFault } from '@/components/entity-fault-ping';
 import { useEntityFaultMap } from '@/hooks/use-entity-fault-map';
 import { OrdersMiniDashboard } from '@/components/orders/orders-mini-dashboard';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 
 type OrderForm = {
   order_number?: string
@@ -55,6 +56,7 @@ const emptyOrderForm: OrderForm = {
 
 export default function OrdersPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const {orders, customers, projects, loading, createOrder, updateOrder, deleteOrder} = useDataStore();
   const faultMap = useEntityFaultMap();
   const [search, setSearch] = useState('');
@@ -67,6 +69,17 @@ export default function OrdersPage() {
   const [formData, setFormData] = useState<OrderForm>(emptyOrderForm);
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({
+    open: false,
+    id: null,
+  });
+
+  useEffect(() => {
+    if (searchParams.get('action') === 'create') {
+      setIsCreateOpen(true);
+      router.replace('/orders', { scroll: false });
+    }
+  }, [searchParams, router]);
 
   const projectCountByOrder = useMemo(
     () => getProjectCountByOrderId(projects),
@@ -138,19 +151,16 @@ export default function OrdersPage() {
     }
   }
 
-  async function handleDelete(id: number) {
-    if (
-      !confirm(
-        'Are you sure you want to delete this order? All related Projects will also get deleted.'
-      )
-    )
-      return;
+  async function confirmDelete() {
+    if (deleteConfirm.id === null) return;
 
     try {
-      await deleteOrder(id);
+      await deleteOrder(deleteConfirm.id);
       toast.success('Order deleted successfully');
     } catch (error) {
       console.error(error);
+    } finally {
+      setDeleteConfirm({ open: false, id: null });
     }
   }
 
@@ -595,7 +605,10 @@ export default function OrdersPage() {
                             />
                             |
                             <Trash2 className='w-4.5 text-accent-foreground hover:text-red-600'
-                              onClick={(e) => { e.stopPropagation(); handleDelete(order.id); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteConfirm({ open: true, id: order.id });
+                              }}
                             />
                         </div>
                       </TableCell>
@@ -915,6 +928,16 @@ export default function OrdersPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteConfirm.open}
+        onOpenChange={(open) =>
+          setDeleteConfirm((prev) => ({ ...prev, open, id: open ? prev.id : null }))
+        }
+        title="Delete Order"
+        description="Are you sure you want to delete this order? All related projects will also be deleted. This action cannot be undone."
+        onConfirm={confirmDelete}
+      />
       
     </div>
   );

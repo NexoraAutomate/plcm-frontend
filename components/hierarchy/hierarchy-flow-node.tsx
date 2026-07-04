@@ -2,10 +2,12 @@
 
 import { createContext, useContext } from 'react';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
-import { ChevronRight, History } from 'lucide-react';
+import { ChevronRight, CornerDownRight, Edit, History, Plus, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { HierarchyNodeFieldLines } from '@/components/hierarchy-node-legend';
+import { CHILD_ENTITY_TYPE, getEntityLabel } from '@/lib/hierarchy-dashboard-entity-config';
+import type { HierarchyEntityActionHandlers } from '@/components/hierarchy-dashboard/use-hierarchy-entity-actions';
 import type { HierarchyEntityType, HierarchyNodeData } from '@/lib/system-hierarchy-graph';
 
 const LEVEL_STYLES: Record<
@@ -43,6 +45,7 @@ type HierarchyFlowActions = {
   onToggleDetails: (entityId: number, type: HierarchyEntityType) => void;
   onNavigate?: (entityId: number, type: HierarchyEntityType) => void;
   onViewResolutionHistory?: (entityId: number, type: HierarchyEntityType) => void;
+  entityActions?: HierarchyEntityActionHandlers;
 };
 
 const HierarchyFlowActionsContext = createContext<HierarchyFlowActions | null>(null);
@@ -56,15 +59,17 @@ export function HierarchyFlowActionsProvider({
   onToggleDetails,
   onNavigate,
   onViewResolutionHistory,
+  entityActions,
 }: {
   children: React.ReactNode;
   onToggleDetails: HierarchyFlowActions['onToggleDetails'];
   onNavigate?: HierarchyFlowActions['onNavigate'];
   onViewResolutionHistory?: HierarchyFlowActions['onViewResolutionHistory'];
+  entityActions?: HierarchyEntityActionHandlers;
 }) {
   return (
     <HierarchyFlowActionsContext.Provider
-      value={{ onToggleDetails, onNavigate, onViewResolutionHistory }}
+      value={{ onToggleDetails, onNavigate, onViewResolutionHistory, entityActions }}
     >
       {children}
     </HierarchyFlowActionsContext.Provider>
@@ -98,6 +103,38 @@ function HierarchyFlowNode({ data }: NodeProps<Node<HierarchyNodeData>>) {
 
   const showBuildTimeline = Boolean(actions?.onViewResolutionHistory);
   const hasReplacements = Boolean(data.hasResolutionHistory);
+  const entityActions = actions?.entityActions;
+  const childType = CHILD_ENTITY_TYPE[data.type];
+  const typeLabel = getEntityLabel(data.type).toLowerCase();
+
+  const stopEvent = (event: React.SyntheticEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const renderEntityAction = (
+    label: string,
+    icon: React.ReactNode,
+    onClick: () => void,
+    className?: string
+  ) => (
+    <button
+      type="button"
+      className={cn(
+        'nodrag nopan nowheel flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+        className
+      )}
+      title={label}
+      aria-label={label}
+      onPointerDown={stopEvent}
+      onClick={(event) => {
+        stopEvent(event);
+        onClick();
+      }}
+    >
+      {icon}
+    </button>
+  );
 
   return (
     <>
@@ -111,7 +148,8 @@ function HierarchyFlowNode({ data }: NodeProps<Node<HierarchyNodeData>>) {
           canNavigate && 'cursor-pointer hover:bg-accent/30',
           highlightState === 'selected' &&
             'ring-2 ring-primary shadow-md scale-[1.02] z-10',
-          highlightState === 'dimmed' && 'opacity-45 saturate-50'
+          highlightState === 'dimmed' && 'opacity-45 saturate-50',
+          entityActions && 'pb-2'
         )}
         onPointerDown={canNavigate ? (event) => event.stopPropagation() : undefined}
         onClick={canNavigate ? handleNavigate : undefined}
@@ -167,6 +205,37 @@ function HierarchyFlowNode({ data }: NodeProps<Node<HierarchyNodeData>>) {
           {data.label}
         </p>
         <HierarchyNodeFieldLines data={data} />
+        {entityActions ? (
+          <div
+            className="mt-2 flex items-center gap-0.5 border-t border-border/60 pt-1.5"
+            onPointerDown={stopEvent}
+            onClick={stopEvent}
+          >
+            {renderEntityAction(
+              `Add sibling ${typeLabel}`,
+              <Plus className="pointer-events-none h-3 w-3" aria-hidden="true" />,
+              () => entityActions.onAddSibling(data.entityId, data.type)
+            )}
+            {childType
+              ? renderEntityAction(
+                  `Add ${getEntityLabel(childType).toLowerCase()}`,
+                  <CornerDownRight className="pointer-events-none h-3 w-3" aria-hidden="true" />,
+                  () => entityActions.onAddChild(data.entityId, data.type)
+                )
+              : null}
+            {renderEntityAction(
+              `Edit ${typeLabel}`,
+              <Edit className="pointer-events-none h-3 w-3" aria-hidden="true" />,
+              () => entityActions.onEdit(data.entityId, data.type)
+            )}
+            {renderEntityAction(
+              `Delete ${typeLabel}`,
+              <Trash2 className="pointer-events-none h-3 w-3 text-destructive" aria-hidden="true" />,
+              () => entityActions.onDelete(data.entityId, data.type, data.label),
+              'hover:text-destructive'
+            )}
+          </div>
+        ) : null}
       </div>
       <Handle type="source" position={Position.Bottom} className="bg-muted-foreground/40!"/>
     </>

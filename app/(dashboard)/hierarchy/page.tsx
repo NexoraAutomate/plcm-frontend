@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
 import * as api from "@/lib/api";
@@ -647,29 +648,16 @@ export default function HierarchyPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Confirm delete</DialogTitle>
-            <DialogDescription>
-              Delete "{deleteTarget?.name}" and all its descendants from the hierarchy.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <p className="text-sm text-muted-foreground">
-              This action cannot be undone. Are you sure you want to continue?
-            </p>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
-                Cancel
-              </Button>
-              <Button variant="destructive" onClick={confirmDelete}>
-                Delete
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={(open) => {
+          setDeleteConfirmOpen(open);
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Confirm delete"
+        description={`Delete "${deleteTarget?.name ?? "item"}" and all its descendants from the hierarchy. This action cannot be undone.`}
+        onConfirm={confirmDelete}
+      />
 
       <Dialog open={editOpen} onOpenChange={(open) => {
         setEditOpen(open);
