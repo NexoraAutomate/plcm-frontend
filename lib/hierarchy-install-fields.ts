@@ -30,7 +30,7 @@ export function parseHierarchyInstallPayload(
       ? new Date(String(data.installation_date)).toISOString()
       : undefined,
     installed_by_id: Number.isFinite(installedById) ? installedById : undefined,
-    picture_url: String(data.picture_url || '') || undefined,
+    picture_url: data.remove_picture === true ? null : String(data.picture_url || '') || undefined,
   };
 }
 
@@ -46,10 +46,16 @@ export function hierarchyInstallInitialValues(entity: HierarchyInstallFields) {
     installation_date: toDateInputValue(entity.installation_date),
     installed_by_id: entity.installed_by_id ?? '',
     picture_url: entity.picture_url ?? '',
+    picture_file: null,
+    remove_picture: false,
   };
 }
 
-export function hierarchyInstallFormFields({ users }: HierarchyInstallFieldOptions) {
+export function hierarchyInstallFormFields({
+  users,
+  ownerType,
+  ownerId,
+}: HierarchyInstallFieldOptions & { ownerType?: string; ownerId?: number }) {
   return [
     {
       name: 'installation_date',
@@ -69,10 +75,12 @@ export function hierarchyInstallFormFields({ users }: HierarchyInstallFieldOptio
     },
     {
       name: 'picture_url',
-      label: 'Picture URL',
-      type: 'text' as const,
+      label: 'Picture',
+      type: 'picture' as const,
       required: false,
       placeholder: 'Path or URL to entity photo',
+      ownerType,
+      ownerId,
     },
   ];
 }
@@ -103,9 +111,10 @@ export function inventoryExtendedFormFields({ users }: HierarchyInstallFieldOpti
     },
     {
       name: 'picture_url',
-      label: 'Picture URL',
-      type: 'text' as const,
+      label: 'Picture',
+      type: 'picture' as const,
       required: false,
+      placeholder: 'Path or URL to item photo',
     },
   ];
 }

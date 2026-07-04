@@ -10,6 +10,7 @@ import type { Status } from '@/lib/models';
 import Link from 'next/link';
 import { ConfirmDialog } from './confirm-dialog';
 import { EntityStatusHistorySheet } from './entity-status-history-sheet';
+import { EntityPicture } from './entity-picture';
 import type { HardwareEntityType } from '@/lib/entity-resolver';
 
 interface EntityCardsProps {
@@ -97,11 +98,12 @@ export function EntityCards({
                             ) : null}
                           </div>
                           {entity.picture_url ? (
-                            /* eslint-disable-next-line @next/next/no-img-element */
-                            <img
+                            <EntityPicture
                               src={entity.picture_url}
+                              ownerType={childEntityType}
+                              ownerId={entity.id}
                               alt=""
-                              className="h-10 w-10 shrink-0 rounded object-cover border"
+                              className="h-10 w-10 shrink-0 rounded border object-cover"
                             />
                           ) : null}
                           <div className="flex shrink-0 items-center gap-1">

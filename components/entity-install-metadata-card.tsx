@@ -11,13 +11,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { AttachmentUploadDialog } from '@/components/attachment-upload-dialog';
 import { EntityForm } from '@/components/entity-form';
 import { useDataStore } from '@/lib/data-store';
 import { hierarchyInstallFormFields, parseHierarchyInstallPayload, hierarchyInstallInitialValues } from '@/lib/hierarchy-install-fields';
+import { syncEntityPicture } from '@/lib/entity-picture-upload';
+import { attachmentDisplayTitle, attachmentTypeLabel } from '@/lib/attachment-types';
 import type { EntityAttachment, HierarchyInstallFields } from '@/lib/models';
 import * as api from '@/lib/api';
 import { formatUserRef } from '@/lib/user-display';
 import { toast } from 'sonner';
+import { EntityPicture } from '@/components/entity-picture';
 
 type HardwareOwnerType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
 
@@ -39,7 +43,8 @@ export function EntityInstallMetadataCard({
   const { users } = useDataStore();
   const [editOpen, setEditOpen] = useState(false);
   const [attachments, setAttachments] = useState<EntityAttachment[]>([]);
-  const [uploading, setUploading] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [editingAttachment, setEditingAttachment] = useState<EntityAttachment | null>(null);
 
   const installerLabel = useMemo(() => {
     if (!entity.installed_by_id) return undefined;
@@ -48,8 +53,8 @@ export function EntityInstallMetadataCard({
   }, [entity.installed_by_id, users]);
 
   const formFields = useMemo(
-    () => hierarchyInstallFormFields({ users }),
-    [users]
+    () => hierarchyInstallFormFields({ users, ownerType, ownerId: entity.id }),
+    [users, ownerType, entity.id]
   );
 
   const loadAttachments = useCallback(async () => {
@@ -67,7 +72,14 @@ export function EntityInstallMetadataCard({
 
   const handleSave = async (data: Record<string, unknown>) => {
     try {
-      await onUpdate(normalizeInstallPayload(data));
+      const payload = normalizeInstallPayload(data);
+      const pictureResult = await syncEntityPicture(ownerType, entity.id, data);
+      if (pictureResult === null) {
+        payload.picture_url = null;
+      } else if (typeof pictureResult === 'string') {
+        payload.picture_url = pictureResult;
+      }
+      await onUpdate(payload);
       toast.success('Installation metadata saved');
       setEditOpen(false);
     } catch {
@@ -75,16 +87,52 @@ export function EntityInstallMetadataCard({
     }
   };
 
-  const handleUpload = async (file: File) => {
-    setUploading(true);
+  const handleRemovePicture = async () => {
     try {
-      await api.attachments.upload(ownerType, entity.id, file);
+      await api.pictures.remove(ownerType, entity.id);
+      await onUpdate({ picture_url: null });
+      toast.success('Photo removed');
+    } catch {
+      toast.error('Failed to remove photo');
+    }
+  };
+
+  const handleUpload = async (payload: {
+    attachment_type: string;
+    description?: string;
+    file?: File;
+  }) => {
+    if (!payload.file) return;
+
+    try {
+      await api.attachments.upload(ownerType, entity.id, payload.file, {
+        attachment_type: payload.attachment_type,
+        description: payload.description,
+      });
       await loadAttachments();
       toast.success('Attachment uploaded');
     } catch {
       toast.error('Failed to upload attachment');
-    } finally {
-      setUploading(false);
+      throw new Error('upload failed');
+    }
+  };
+
+  const handleUpdateAttachment = async (payload: {
+    attachment_type: string;
+    description?: string;
+  }) => {
+    if (!editingAttachment) return;
+
+    try {
+      await api.attachments.update(editingAttachment.id, {
+        attachment_type: payload.attachment_type,
+        description: payload.description,
+      });
+      await loadAttachments();
+      toast.success('Attachment updated');
+    } catch {
+      toast.error('Failed to update attachment');
+      throw new Error('update failed');
     }
   };
 
@@ -139,10 +187,22 @@ export function EntityInstallMetadataCard({
 
           {entity.picture_url ? (
             <div>
-              <p className="mb-2 text-xs text-muted-foreground">Primary Photo</p>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">Primary Photo</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void handleRemovePicture()}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Remove
+                </Button>
+              </div>
+              <EntityPicture
                 src={entity.picture_url}
+                ownerType={ownerType}
+                ownerId={entity.id}
                 alt={`${entity.name} photo`}
                 className="max-h-40 rounded-md border object-cover"
               />
@@ -152,24 +212,10 @@ export function EntityInstallMetadataCard({
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-medium">Attachments</p>
-              <label className="inline-flex cursor-pointer items-center">
-                <input
-                  type="file"
-                  className="hidden"
-                  disabled={uploading}
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) void handleUpload(file);
-                    event.target.value = '';
-                  }}
-                />
-                <Button type="button" variant="outline" size="sm" disabled={uploading} asChild>
-                  <span>
-                    <Upload className="mr-2 h-4 w-4" />
-                    {uploading ? 'Uploading…' : 'Upload'}
-                  </span>
-                </Button>
-              </label>
+              <Button type="button" variant="outline" size="sm" onClick={() => setUploadOpen(true)}>
+                <Upload className="mr-2 h-4 w-4" />
+                Upload
+              </Button>
             </div>
             {attachments.length === 0 ? (
               <p className="text-sm text-muted-foreground">No attachments yet.</p>
@@ -180,24 +226,40 @@ export function EntityInstallMetadataCard({
                     key={attachment.id}
                     className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
                   >
-                    <button
-                      type="button"
-                      className="truncate text-left text-primary hover:underline"
-                      onClick={() =>
-                        void api.attachments.download(attachment.id, attachment.file_name)
-                      }
-                    >
-                      {attachment.file_name}
-                    </button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0"
-                      onClick={() => void handleDeleteAttachment(attachment.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="min-w-0 flex-1">
+                      <button
+                        type="button"
+                        className="truncate text-left font-medium text-primary hover:underline"
+                        onClick={() =>
+                          void api.attachments.download(attachment.id, attachment.file_name)
+                        }
+                      >
+                        {attachmentDisplayTitle(attachment)}
+                      </button>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {attachmentTypeLabel(attachment.attachment_type)} · {attachment.file_name}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setEditingAttachment(attachment)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => void handleDeleteAttachment(attachment.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -223,6 +285,24 @@ export function EntityInstallMetadataCard({
           />
         </DialogContent>
       </Dialog>
+
+      <AttachmentUploadDialog
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        onSubmit={handleUpload}
+      />
+
+      <AttachmentUploadDialog
+        open={editingAttachment !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditingAttachment(null);
+        }}
+        title="Edit Attachment"
+        description="Update the attachment type or descriptive name."
+        requireFile={false}
+        attachment={editingAttachment ?? undefined}
+        onSubmit={handleUpdateAttachment}
+      />
     </>
   );
 }

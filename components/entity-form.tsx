@@ -1,20 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { EntityPicture } from '@/components/entity-picture';
+import { isExternalPictureUrl } from '@/lib/picture-url';
 
 interface FormField {
   name: string;
   label: string;
-  type: 'text' | 'textarea' | 'select' | 'number' | 'date' | 'file';
+  type: 'text' | 'textarea' | 'select' | 'number' | 'date' | 'file' | 'picture';
   required: boolean;
   placeholder?: string;
   options?: Array<{ label: string; value: number | string }>;
   accept?: string;
+  ownerType?: string;
+  ownerId?: number;
 }
 
 interface EntityFormProps {
@@ -34,9 +39,35 @@ export function EntityForm({
   initialValues = {},
   submitLabel = 'Save',
 }: EntityFormProps) {
-  const [formData, setFormData] = useState<Record<string, any>>(initialValues);
+  const [formData, setFormData] = useState<Record<string, any>>({
+    picture_file: null,
+    remove_picture: false,
+    ...initialValues,
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
+
+  const picturePreviewSrc =
+    !formData.remove_picture &&
+    typeof formData.picture_url === 'string' &&
+    formData.picture_url
+      ? formData.picture_url
+      : null;
+
+  const hasPicturePreview = Boolean(filePreviewUrl || picturePreviewSrc);
+
+  useEffect(() => {
+    const file = formData.picture_file;
+    if (!(file instanceof File)) {
+      setFilePreviewUrl(null);
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setFilePreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [formData.picture_file]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -148,7 +179,85 @@ export function EntityForm({
             />
           )}
 
-          {field.name === 'picture_url' && typeof formData.picture_url === 'string' && formData.picture_url ? (
+          {field.type === 'picture' && (
+            <div className="space-y-3">
+              <Input
+                id={field.name}
+                placeholder={field.placeholder || 'Path or URL to entity photo'}
+                value={formData.picture_url || ''}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    picture_url: e.target.value,
+                    remove_picture: false,
+                  })
+                }
+                className={errors[field.name] ? 'border-red-500' : ''}
+              />
+              <div className="space-y-2">
+                <Label htmlFor={`${field.name}-file`} className="text-sm font-normal text-muted-foreground">
+                  Or upload a photo
+                </Label>
+                <Input
+                  id={`${field.name}-file`}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      picture_file: e.target.files?.[0] ?? null,
+                      remove_picture: false,
+                    })
+                  }
+                />
+              </div>
+              {hasPicturePreview ? (
+                <div className="space-y-2">
+                  {filePreviewUrl ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={filePreviewUrl}
+                      alt="Selected photo preview"
+                      className="max-h-32 rounded-md border object-cover"
+                    />
+                  ) : picturePreviewSrc && isExternalPictureUrl(picturePreviewSrc) ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={picturePreviewSrc}
+                      alt="Preview"
+                      className="max-h-32 rounded-md border object-cover"
+                    />
+                  ) : picturePreviewSrc && field.ownerType && field.ownerId ? (
+                    <EntityPicture
+                      src={picturePreviewSrc}
+                      ownerType={field.ownerType}
+                      ownerId={field.ownerId}
+                      alt="Preview"
+                      className="max-h-32 rounded-md border object-cover"
+                    />
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        picture_url: '',
+                        picture_file: null,
+                        remove_picture: true,
+                      })
+                    }
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Remove photo
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          )}
+
+          {field.name === 'picture_url' && field.type === 'text' && typeof formData.picture_url === 'string' && formData.picture_url ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
               src={formData.picture_url}

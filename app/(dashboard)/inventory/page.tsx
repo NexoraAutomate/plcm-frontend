@@ -11,7 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Edit, Trash2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
-import type { Hierarchy, Inventory } from '@/lib/models';
+import { ATTACHMENT_TYPES, type AttachmentType } from '@/lib/attachment-types';
+import type { EntityAttachmentMetadata, Hierarchy, Inventory } from '@/lib/models';
 import { useDataStore } from '@/lib/data-store';
 
 type EntityType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
@@ -58,6 +59,12 @@ export default function InventoryPage() {
     picture_url: '',
   });
   const [pendingAttachment, setPendingAttachment] = useState<File | null>(null);
+  const [pendingPictureFile, setPendingPictureFile] = useState<File | null>(null);
+  const [removePicture, setRemovePicture] = useState(false);
+  const [pendingAttachmentMeta, setPendingAttachmentMeta] = useState<EntityAttachmentMetadata>({
+    attachment_type: 'other',
+    description: '',
+  });
 
   useEffect(() => {
     const fetchHierarchyCategories = async () => {
@@ -116,6 +123,9 @@ export default function InventoryPage() {
       picture_url: '',
     });
     setPendingAttachment(null);
+    setPendingPictureFile(null);
+    setRemovePicture(false);
+    setPendingAttachmentMeta({ attachment_type: 'other', description: '' });
     setSelectedEntityType('component');
   };
 
@@ -135,7 +145,7 @@ export default function InventoryPage() {
     shelf_life_expires_at: formData.shelf_life_expires_at
       ? new Date(formData.shelf_life_expires_at).toISOString()
       : undefined,
-    picture_url: formData.picture_url || undefined,
+    picture_url: removePicture ? null : formData.picture_url || undefined,
   });
 
   async function handleCreate() {
@@ -148,8 +158,18 @@ export default function InventoryPage() {
       const payload = buildInventoryPayload();
 
       const created = await api.inventory.create(payload);
-      if (pendingAttachment && created.data?.id) {
-        await api.attachments.upload('inventory', created.data.id, pendingAttachment);
+      if (created.data?.id) {
+        if (removePicture) {
+          await api.pictures.remove('inventory', created.data.id);
+        } else if (pendingPictureFile) {
+          await api.pictures.upload('inventory', created.data.id, pendingPictureFile);
+        }
+        if (pendingAttachment) {
+          await api.attachments.upload('inventory', created.data.id, pendingAttachment, {
+            attachment_type: pendingAttachmentMeta.attachment_type,
+            description: pendingAttachmentMeta.description,
+          });
+        }
       }
       toast.success('Inventory item created');
       
@@ -176,8 +196,16 @@ export default function InventoryPage() {
       const payload = buildInventoryPayload();
 
       await api.inventory.update(editingId, payload);
+      if (removePicture) {
+        await api.pictures.remove('inventory', editingId);
+      } else if (pendingPictureFile) {
+        await api.pictures.upload('inventory', editingId, pendingPictureFile);
+      }
       if (pendingAttachment) {
-        await api.attachments.upload('inventory', editingId, pendingAttachment);
+        await api.attachments.upload('inventory', editingId, pendingAttachment, {
+          attachment_type: pendingAttachmentMeta.attachment_type,
+          description: pendingAttachmentMeta.description,
+        });
       }
       toast.success('Inventory item updated');
 
@@ -224,6 +252,8 @@ export default function InventoryPage() {
     setEditingId(item.id);
     setSelectedEntityType(item.inventory_type as EntityType);
     setPendingAttachment(null);
+    setPendingPictureFile(null);
+    setRemovePicture(false);
     setFormData({
       name: item.name || '',
       inventory_type: item.inventory_type,
@@ -285,16 +315,87 @@ export default function InventoryPage() {
       </div>
 
       <div>
-        <Label>Picture URL</Label>
+        <Label>Picture</Label>
         <Input
           value={formData.picture_url}
-          onChange={(e) => setFormData({ ...formData, picture_url: e.target.value })}
+          onChange={(e) => {
+            setFormData({ ...formData, picture_url: e.target.value });
+            setRemovePicture(false);
+          }}
           placeholder="Path or URL to item photo"
         />
       </div>
 
       <div>
-        <Label>Attachment</Label>
+        <Label>Or Upload Photo</Label>
+        <Input
+          type="file"
+          accept="image/*"
+          onChange={(e) => {
+            setPendingPictureFile(e.target.files?.[0] ?? null);
+            setRemovePicture(false);
+          }}
+        />
+      </div>
+
+      {(formData.picture_url || pendingPictureFile) && !removePicture ? (
+        <div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setFormData({ ...formData, picture_url: '' });
+              setPendingPictureFile(null);
+              setRemovePicture(true);
+            }}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Remove photo
+          </Button>
+        </div>
+      ) : null}
+
+      <div>
+        <Label>Attachment Type</Label>
+        <Select
+          value={pendingAttachmentMeta.attachment_type}
+          onValueChange={(value) =>
+            setPendingAttachmentMeta((prev) => ({
+              ...prev,
+              attachment_type: value as AttachmentType,
+            }))
+          }
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select attachment type" />
+          </SelectTrigger>
+          <SelectContent>
+            {ATTACHMENT_TYPES.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label>Attachment Name / Description</Label>
+        <Input
+          value={pendingAttachmentMeta.description ?? ''}
+          onChange={(e) =>
+            setPendingAttachmentMeta((prev) => ({
+              ...prev,
+              description: e.target.value,
+            }))
+          }
+          placeholder="e.g. Test Report for VSWR"
+        />
+      </div>
+
+      <div>
+        <Label>Attachment File</Label>
         <Input
           type="file"
           onChange={(e) => setPendingAttachment(e.target.files?.[0] ?? null)}

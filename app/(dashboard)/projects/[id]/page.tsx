@@ -28,6 +28,7 @@ import {
   hierarchyInstallInitialValues,
   parseHierarchyInstallPayload,
 } from '@/lib/hierarchy-install-fields';
+import { syncEntityPicture } from '@/lib/entity-picture-upload';
 
 export default function ProjectDetailPage() {
   const params = useParams();
@@ -89,9 +90,13 @@ export default function ProjectDetailPage() {
         required: true,
         options: statuses.map((s) => ({ label: s.status_name, value: s.id })),
       },
-      ...hierarchyInstallFormFields({ users }),
+      ...hierarchyInstallFormFields({
+        users,
+        ownerType: editingId ? 'system' : undefined,
+        ownerId: editingId ?? undefined,
+      }),
     ],
-    [systemHierarchyNames, projects, statuses, users]
+    [systemHierarchyNames, projects, statuses, users, editingId]
   );
 
   async function handleAddSystem(formData: Record<string, any>) {
@@ -106,7 +111,7 @@ export default function ProjectDetailPage() {
     setIsSubmitting(true);
     try {
       console.log("my project ID is ", project.id)
-      await createSystem({
+      const created = await createSystem({
         name: formData.name,
         description: formData.description || '',
         project_id: formData.project_id ? Number(formData.project_id) : project.id,
@@ -118,6 +123,7 @@ export default function ProjectDetailPage() {
         configuration_item: formData.partnumber || formData.name,
         ...parseHierarchyInstallPayload(formData),
       });
+      await syncEntityPicture('system', created.id, formData);
       setIsAddOpen(false);
       toast.success('System added successfully');
     } catch (error) {
@@ -154,13 +160,20 @@ export default function ProjectDetailPage() {
     }
     setIsSubmitting(true);
     try {
+      const payload = parseHierarchyInstallPayload(formData);
+      const pictureResult = await syncEntityPicture('system', editingId, formData);
+      if (pictureResult === null) {
+        payload.picture_url = null;
+      } else if (typeof pictureResult === 'string') {
+        payload.picture_url = pictureResult;
+      }
       await updateSystem(editingId, {
         name: formData.name,
         description: formData.description || '',
         project_id: formData.project_id ? Number(formData.project_id) : project.id,
         status_id: Number(formData.id),
         part_number: formData.partnumber,
-        ...parseHierarchyInstallPayload(formData),
+        ...payload,
       });
       setIsEditOpen(false);
       setEditingId(null);

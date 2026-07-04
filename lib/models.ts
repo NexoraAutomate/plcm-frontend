@@ -135,8 +135,15 @@ export interface EntityAttachment {
   file_name: string
   file_path: string
   mime_type?: string
+  attachment_type: string
+  description?: string
   uploaded_by_id?: number
   uploaded_at: string
+}
+
+export interface EntityAttachmentMetadata {
+  attachment_type: string
+  description?: string
 }
 
 // System (top level in hierarchy)

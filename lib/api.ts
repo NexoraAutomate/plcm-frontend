@@ -302,15 +302,26 @@ export const attachments = {
     api.get<Models.EntityAttachment[]>('/attachments/', {
       params: buildQueryParams({ owner_type: ownerType, owner_id: ownerId }),
     }),
-  upload: async (ownerType: string, ownerId: number, file: File) => {
+  upload: async (
+    ownerType: string,
+    ownerId: number,
+    file: File,
+    metadata?: Models.EntityAttachmentMetadata
+  ) => {
     const formData = new FormData();
     formData.append('owner_type', ownerType);
     formData.append('owner_id', String(ownerId));
     formData.append('file', file);
+    formData.append('attachment_type', metadata?.attachment_type ?? 'other');
+    if (metadata?.description?.trim()) {
+      formData.append('description', metadata.description.trim());
+    }
     return api.post<Models.EntityAttachment>('/attachments/', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+  update: (attachmentId: number, data: Models.EntityAttachmentMetadata) =>
+    api.patch<Models.EntityAttachment>(`/attachments/${attachmentId}/`, data),
   delete: (attachmentId: number) => api.delete(`/attachments/${attachmentId}/`),
   download: async (attachmentId: number, fileName: string) => {
     const res = await api.get<Blob>(`/attachments/${attachmentId}/download/`, {
@@ -323,6 +334,27 @@ export const attachments = {
     anchor.click();
     URL.revokeObjectURL(url);
   },
+};
+
+export const pictures = {
+  upload: async (ownerType: string, ownerId: number, file: File) => {
+    const formData = new FormData();
+    formData.append('owner_type', ownerType);
+    formData.append('owner_id', String(ownerId));
+    formData.append('file', file);
+    return api.post<{ picture_url: string }>('/pictures/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  fetchBlob: (ownerType: string, ownerId: number) =>
+    api.get<Blob>('/pictures/', {
+      params: buildQueryParams({ owner_type: ownerType, owner_id: ownerId }),
+      responseType: 'blob',
+    }),
+  remove: (ownerType: string, ownerId: number) =>
+    api.delete('/pictures/', {
+      params: buildQueryParams({ owner_type: ownerType, owner_id: ownerId }),
+    }),
 };
 
 export default api;
