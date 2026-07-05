@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,8 +13,14 @@ import { Plus, Edit, Trash2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import { ATTACHMENT_TYPES, type AttachmentType } from '@/lib/attachment-types';
-import type { EntityAttachmentMetadata, Hierarchy, Inventory } from '@/lib/models';
+import type { EntityAttachmentMetadata, Inventory } from '@/lib/models';
 import { useDataStore } from '@/lib/data-store';
+import { useHierarchiesQuery } from '@/hooks/queries';
+import { fetchInventoryPage } from '@/hooks/queries/fetchers';
+import { queryKeys } from '@/hooks/queries/query-keys';
+import { usePaginatedList } from '@/hooks/use-paginated-list';
+import { EntityListPagination } from '@/components/entity-list-pagination';
+import { PageLoader } from '@/components/page-loader';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 
 type EntityType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
@@ -36,10 +42,18 @@ function enrichInventoryItems(items: Inventory[]): InventoryItem[] {
 
 export default function InventoryPage() {
   const { users } = useDataStore();
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [entityTypeFilter, setEntityTypeFilter] = useState<EntityType | 'all'>('all');
+  const inventoryTypeParam = entityTypeFilter !== 'all' ? entityTypeFilter : undefined;
+  const pagination = usePaginatedList({
+    queryKey: queryKeys.inventoryPage(inventoryTypeParam),
+    fetchPage: (skip, limit) => fetchInventoryPage(skip, limit, inventoryTypeParam),
+  });
+  const inventory = useMemo(
+    () => enrichInventoryItems(pagination.items),
+    [pagination.items]
+  );
+  const loading = pagination.loading;
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -49,7 +63,7 @@ export default function InventoryPage() {
   });
 
   const [selectedEntityType, setSelectedEntityType] = useState<EntityType>('component');
-  const [hierarchyCategories, setHierarchyCategories] = useState<Hierarchy[]>([]);
+  const { data: hierarchyCategories = [] } = useHierarchiesQuery(selectedEntityType);
   const [formData, setFormData] = useState({
     name: '',
     inventory_type: 'component',
@@ -74,35 +88,8 @@ export default function InventoryPage() {
   const [formTab, setFormTab] = useState('general');
 
   useEffect(() => {
-    const fetchHierarchyCategories = async () => {
-      try {
-        const res = await api.hierarchies.list(selectedEntityType);
-        setHierarchyCategories(res.data);
-      } catch (err) {
-        console.error('Failed to load hierarchy categories:', err);
-        setHierarchyCategories([]);
-      }
-    };
-
-    fetchHierarchyCategories();
-  }, [selectedEntityType]);
-
-  useEffect(() => {
-    const fetchInventory = async () => {
-      try {
-        const res = await api.inventory.list(0, 1000);
-        const enrichedItems = enrichInventoryItems(res.data);
-        setInventory(enrichedItems);
-        setLoading(false);
-      } catch (err) {
-        console.error('Failed to fetch inventory:', err);
-        toast.error('Failed to load inventory');
-        setLoading(false);
-      }
-    };
-
-    fetchInventory();
-  }, []);
+    pagination.setPage(0);
+  }, [search, entityTypeFilter]);
 
   const filtered = inventory.filter((item) => {
     const matchesType = entityTypeFilter === 'all' || item.inventory_type === entityTypeFilter;
@@ -180,10 +167,7 @@ export default function InventoryPage() {
         }
       }
       toast.success('Inventory item created');
-      
-      // Refresh inventory
-      const res = await api.inventory.list(0, 1000);
-      setInventory(enrichInventoryItems(res.data));
+      pagination.invalidate();
       
       resetForm();
       setIsCreateOpen(false);
@@ -216,23 +200,7 @@ export default function InventoryPage() {
         });
       }
       toast.success('Inventory item updated');
-
-      const updatedItem: InventoryItem = {
-        ...(inventory.find((item) => item.id === editingId) as InventoryItem),
-        ...payload,
-        entityName: payload.name,
-        serialNumber: payload.serial_number || '',
-        partNumber: payload.manufacturer_part_number || '',
-      };
-
-      setInventory((prev) => prev.map((item) => (item.id === editingId ? updatedItem : item)));
-
-      try {
-        const res = await api.inventory.list(0, 1000);
-        setInventory(enrichInventoryItems(res.data));
-      } catch (refreshErr) {
-        console.error('Failed to refresh inventory after update:', refreshErr);
-      }
+      pagination.invalidate();
 
       resetForm();
       setEditingId(null);
@@ -249,7 +217,7 @@ export default function InventoryPage() {
     try {
       await api.inventory.delete(deleteConfirm.id);
       toast.success('Inventory item deleted');
-      setInventory(inventory.filter((item) => item.id !== deleteConfirm.id));
+      pagination.invalidate();
     } catch (err) {
       console.error('Failed to delete inventory item:', err);
       toast.error('Failed to delete inventory item');
@@ -564,7 +532,7 @@ export default function InventoryPage() {
     return entityType.charAt(0).toUpperCase() + entityType.slice(1);
   };
 
-  if (loading) return <div className="p-8 text-center">Loading...</div>;
+  if (loading) return <PageLoader />;
 
   return (
     <div className="space-y-8">
@@ -633,7 +601,9 @@ export default function InventoryPage() {
       <Card>
         <CardHeader>
           <CardTitle>Inventory Items</CardTitle>
-          <CardDescription>Total items: {filtered.length}</CardDescription>
+          <CardDescription>
+            Showing {filtered.length} on this page · {pagination.total} total in database
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -681,6 +651,17 @@ export default function InventoryPage() {
               </TableBody>
             </Table>
           </div>
+          <EntityListPagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            rangeLabel={pagination.rangeLabel}
+            hasPrev={pagination.hasPrev}
+            hasNext={pagination.hasNext}
+            onPrev={pagination.prevPage}
+            onNext={pagination.nextPage}
+            loading={pagination.fetching}
+          />
         </CardContent>
       </Card>
 

@@ -3,6 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useDataStore } from '@/lib/data-store';
+import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -199,7 +200,7 @@ export default function CustomerDetailPage(){
       );
     }
 
-    if (loading) return <div className="p-8 text-center">Loading...</div>;
+    if (loading) return <PageLoader />;
     
         return (
     <div className="space-y-6">

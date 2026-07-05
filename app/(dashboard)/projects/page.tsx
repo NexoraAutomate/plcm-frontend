@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,17 @@ import * as api from '@/lib/api';
 import * as Models from '@/lib/models';
 import { EntityNameWithFault } from '@/components/entity-fault-ping';
 import { useEntityFaultMap } from '@/hooks/use-entity-fault-map';
+import { useStatusesByTypeQuery } from '@/hooks/queries';
+import { fetchProjectsPage } from '@/hooks/queries/fetchers';
+import { queryKeys } from '@/hooks/queries/query-keys';
+import { usePaginatedList } from '@/hooks/use-paginated-list';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { EntityListPagination } from '@/components/entity-list-pagination';
+import { PageLoader } from '@/components/page-loader';
+import { ListPageError } from '@/components/list-page-error';
+import { useListPageLoader } from '@/hooks/use-list-page-loader';
 import { ProjectsMiniDashboard } from '@/components/projects/projects-mini-dashboard';
+import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { getSystemCountByProjectId, getCount } from '@/lib/entity-counts';
 import { EntityCountCell } from '@/components/entity-count-cell';
 import { Progress } from '@/components/ui/progress';
@@ -32,9 +42,10 @@ export default function ProjectsPage(){
     id: null,
   });
   const searchParams = useSearchParams();
-  const { projects, users, orders, systems, loading, createProject, updateProject, deleteProject, getEntityMaintenanceLogs } = useDataStore();
+  const { users, orders, systems, projects: storeProjects, createProject, updateProject, deleteProject, getEntityMaintenanceLogs } = useDataStore();
   const faultMap = useEntityFaultMap();
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   
   const statusFilterParam = searchParams.get('status');
   const orderFilterParam = searchParams.get('order_id');
@@ -54,8 +65,7 @@ export default function ProjectsPage(){
     order_id: 0,
     status_id: 0,
   });
-  const [statuses, setStatuses] = useState<Models.Status[]>([]);
-  const [loadingStatuses, setLoadingStatuses] = useState(true);
+  const { data: statuses = [] } = useStatusesByTypeQuery('projects');
 
   useEffect(() => {
     if (searchParams.get('action') === 'create') {
@@ -64,29 +74,40 @@ export default function ProjectsPage(){
     }
   }, [searchParams, router]);
 
-  const orderScopedProjects = useMemo(
+  const listFilters = useMemo(
     () =>
-      orderFilterId
-        ? projects.filter((p) => p.order_id === orderFilterId)
-        : projects,
-    [projects, orderFilterId]
+      buildListFilters({
+        search: debouncedSearch,
+        statusName: statusFilter,
+        statuses,
+        allStatusValue: 'Total',
+        orderId: orderFilterId,
+      }),
+    [debouncedSearch, statusFilter, statuses, orderFilterId]
   );
+
+  const pagination = usePaginatedList({
+    queryKey: queryKeys.projectsPage(listFilters),
+    fetchPage: fetchProjectsPage,
+    filters: listFilters,
+  });
+  const hasPaginatedResult = !pagination.loading && !pagination.error;
+  const projects =
+    pagination.items.length > 0 || hasPaginatedResult
+      ? pagination.items
+      : storeProjects;
+  const showLoader = useListPageLoader(pagination, {
+    debouncedSearch,
+    filtersActive: statusFilter !== 'Total' || orderFilterId != null,
+    hasData: projects.length > 0,
+  });
+
+  const orderScopedProjects = projects;
 
   const systemCountByProject = useMemo(
     () => getSystemCountByProjectId(systems),
     [systems]
   );
-
-  const filtered = projects.filter((p) => {
-    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) 
-                        || p.description.toLowerCase().includes(search.toLowerCase()) 
-                        || p.start_date.toLowerCase().includes(search.toLowerCase()) 
-                        || p.end_date.toLowerCase().includes(search.toLowerCase())  
-                        || p.status_name?.toLowerCase().includes(search.toLowerCase()) 
-    const matchesStatus = statusFilter === 'Total' || p.status_name === statusFilter;
-    const matchesOrder = !orderFilterId || p.order_id === orderFilterId;
-    return matchesSearch && matchesStatus && matchesOrder;
-  });
 
   async function handleCreate() {
     if (!formData.name.trim() || !formData.owner_id  || !formData.order_id || !formData.start_date || !formData.end_date) {
@@ -95,6 +116,7 @@ export default function ProjectsPage(){
     }
     try {
       await createProject(formData);
+      pagination.invalidate();
       setFormData({
         name: '',
         description: '',
@@ -118,6 +140,7 @@ export default function ProjectsPage(){
     }
     try {
       await updateProject(editingId, formData);
+      pagination.invalidate();
       setFormData({
         name: '',
         description: '',
@@ -138,6 +161,7 @@ export default function ProjectsPage(){
     if (deleteConfirm.id === null) return;
     try {
       await deleteProject(deleteConfirm.id);
+      pagination.invalidate();
     } catch {
       // Error handled by DataStore
     } finally {
@@ -155,6 +179,7 @@ export default function ProjectsPage(){
     data: { progress: number; status_id?: number }
   ) {
     await updateProject(projectId, data);
+    pagination.invalidate();
   }
 
   function openEdit(project: typeof projects[0]) {
@@ -171,23 +196,18 @@ export default function ProjectsPage(){
     setIsEditOpen(true);
   }
 
-  useEffect(() => {
-      const fetchStatuses = async () => {
-        try {
-          const res = await api.statuses.list("projects"); // 👈 filter here
-          setStatuses(res.data);
-        } catch (err) {
-          console.error("Failed to fetch statuses", err);
-        } finally {
-          setLoadingStatuses(false);
-        }
-      };
 
-      fetchStatuses();
-    }, []);
+  if (showLoader) return <PageLoader />;
 
+  if (pagination.error) {
+    return (
+      <ListPageError
+        message={pagination.error instanceof Error ? pagination.error.message : undefined}
+        onRetry={() => void pagination.refetch()}
+      />
+    );
+  }
 
-  if (loading) return <div className="p-8 text-center">Loading...</div>;
   const filteredOrder = orderFilterId ? orders.find((o) => o.id === orderFilterId) : null;
 
   return (
@@ -214,6 +234,7 @@ export default function ProjectsPage(){
         activeStatusFilter={statusFilter}
         onStatusFilter={setStatusFilter}
         filteredOrder={filteredOrder}
+        totalCount={pagination.total}
       />
 
       {statusFilter !== 'Total' && (
@@ -354,7 +375,9 @@ export default function ProjectsPage(){
       <Card>
         <CardHeader>
           <CardTitle>All Projects</CardTitle>
-          <CardDescription>Total: {filtered.length}</CardDescription>
+          <CardDescription>
+            Showing {projects.length} on this page · {pagination.total} matching
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -372,14 +395,14 @@ export default function ProjectsPage(){
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.length === 0 ? (
+                {projects.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                       No projects found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((project) => {
+                  projects.map((project) => {
                     const owner = users.find((u) => u.id === project.owner_id);
                     const status = statuses.find((s) => s.id === project.status_id);
                     return (
@@ -457,6 +480,17 @@ export default function ProjectsPage(){
               </TableBody>
             </Table>
           </div>
+          <EntityListPagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            rangeLabel={pagination.rangeLabel}
+            hasPrev={pagination.hasPrev}
+            hasNext={pagination.hasNext}
+            onPrev={pagination.prevPage}
+            onNext={pagination.nextPage}
+            loading={pagination.fetching}
+          />
         </CardContent>
       </Card>
 

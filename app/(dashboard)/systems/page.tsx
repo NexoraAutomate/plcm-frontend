@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
@@ -24,7 +24,17 @@ import { EntityCountCell } from '@/components/entity-count-cell';
 import { EntityNameWithFault } from '@/components/entity-fault-ping';
 import { useEntityFaultMap } from '@/hooks/use-entity-fault-map';
 import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
+import { useHierarchiesQuery, useStatusesByTypeQuery } from '@/hooks/queries';
+import { fetchSystemsPage } from '@/hooks/queries/fetchers';
+import { queryKeys } from '@/hooks/queries/query-keys';
+import { usePaginatedList } from '@/hooks/use-paginated-list';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { EntityListPagination } from '@/components/entity-list-pagination';
+import { PageLoader } from '@/components/page-loader';
+import { ListPageError } from '@/components/list-page-error';
+import { useListPageLoader } from '@/hooks/use-list-page-loader';
 import { SystemsListDashboard } from '@/components/systems/systems-list-dashboard';
+import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { ParentEntityLink } from '@/components/entity-link';
 
 
@@ -35,9 +45,10 @@ export default function SystemsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { pageLoading } = useEntityHierarchyGate();
-  const { systems, projects, subsystems, createSystem, updateSystem, deleteSystem, statuses: storeStatuses, users } = useDataStore();
+  const { projects, subsystems, createSystem, updateSystem, deleteSystem, statuses: storeStatuses, users } = useDataStore();
   const faultMap = useEntityFaultMap();
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -46,9 +57,32 @@ export default function SystemsPage() {
   const projectFilterParam = searchParams.get('project_id');
   const [statusFilter, setStatusFilter] = useState<string>(statusFilterParam || 'all');
   const [projectFilter, setProjectFilter] = useState<string>(projectFilterParam || 'all');
-  const [statuses, setStatuses] = useState<Models.Status[]>([]);
-  const [loadingStatuses, setLoadingStatuses] = useState(true);
-  const [systemHierarchyNames, setSystemHierarchyNames] = useState<Hierarchy[]>([]);
+  const { data: statuses = [] } = useStatusesByTypeQuery('systems');
+  const { data: systemHierarchyNames = [] } = useHierarchiesQuery('system');
+
+  const listFilters = useMemo(
+    () =>
+      buildListFilters({
+        search: debouncedSearch,
+        statusName: statusFilter,
+        statuses,
+        projectId: projectFilter !== 'all' ? Number(projectFilter) : null,
+      }),
+    [debouncedSearch, statusFilter, statuses, projectFilter]
+  );
+
+  const pagination = usePaginatedList({
+    queryKey: queryKeys.systemsPage(listFilters),
+    fetchPage: fetchSystemsPage,
+    filters: listFilters,
+  });
+  const systems = pagination.items;
+  const showLoader = useListPageLoader(pagination, {
+    pageLoading,
+    debouncedSearch,
+    filtersActive: statusFilter !== 'all' || projectFilter !== 'all',
+    hasData: systems.length > 0,
+  });
 
   const [formData, setFormData] = useState({
     name: '',
@@ -67,15 +101,6 @@ export default function SystemsPage() {
   const allStatuses = statuses.length ? statuses : storeStatuses;
   const getStatusName = (system: (typeof systems)[0]) =>
     resolveStatusName(system, allStatuses);
-
-  const filtered = systems.filter((s) => {
-    const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.description.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || getStatusName(s) === statusFilter;
-    const matchesProject =
-      projectFilter === 'all' || s.project_id?.toString() === projectFilter;
-    return matchesSearch && matchesStatus && matchesProject;
-  });
 
   const filteredProject = useMemo(
     () => (projectFilter === 'all' ? null : projects.find((p) => String(p.id) === projectFilter)),
@@ -113,6 +138,7 @@ export default function SystemsPage() {
         status_id: formData.status_id,
         ...parseHierarchyInstallPayload(formData),
       });
+      pagination.invalidate();
       setFormData({
         name: '',
         description: '',
@@ -141,6 +167,7 @@ export default function SystemsPage() {
         status_id: formData.status_id,
         ...parseHierarchyInstallPayload(formData),
       });
+      pagination.invalidate();
       setFormData({
         name: '',
         description: '',
@@ -159,6 +186,7 @@ export default function SystemsPage() {
   async function handleDelete(id: number) {
     try {
       await deleteSystem(id);
+      pagination.invalidate();
       toast.success('System deleted successfully');
     } catch {
       toast.error('Failed to delete system');
@@ -186,35 +214,33 @@ export default function SystemsPage() {
     return user?.full_name || user?.username || `User #${userId}`;
   };
 
+  const statusDefaultAppliedRef = useRef(false);
+
   useEffect(() => {
     setStatusFilter(statusFilterParam || 'all');
     setProjectFilter(projectFilterParam || 'all');
   }, [statusFilterParam, projectFilterParam]);
 
   useEffect(() => {
-        const fetchStatuses = async () => {
-          try {
-            const [statusRes, hierarchyRes] = await Promise.all([
-              api.statuses.list("systems"),
-              api.hierarchies.list("system"),
-            ]);
-            setStatuses(statusRes.data);
-            setSystemHierarchyNames(hierarchyRes.data);
-            const defaultStatus = statusRes.data.find((s) => s.status_name === 'Design') ?? statusRes.data[0];
-            if (defaultStatus) {
-              setFormData((prev) => ({ ...prev, status_id: defaultStatus.id }));
-            }
-          } catch (err) {
-            console.error("Failed to fetch statuses or hierarchy names", err);
-          } finally {
-            setLoadingStatuses(false);
-          }
-        };
-  
-        fetchStatuses();
-      }, []);
+    if (statusDefaultAppliedRef.current || statuses.length === 0) return;
+    const defaultStatus = statuses.find((s) => s.status_name === 'Design') ?? statuses[0];
+    if (!defaultStatus) return;
+    statusDefaultAppliedRef.current = true;
+    setFormData((prev) =>
+      prev.status_id !== 0 ? prev : { ...prev, status_id: defaultStatus.id }
+    );
+  }, [statuses]);
 
-  if (pageLoading) return <div className="p-8 text-center">Loading...</div>;
+  if (showLoader) return <PageLoader />;
+
+  if (pagination.error) {
+    return (
+      <ListPageError
+        message={pagination.error instanceof Error ? pagination.error.message : undefined}
+        onRetry={() => void pagination.refetch()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -234,6 +260,7 @@ export default function SystemsPage() {
         onStatusFilter={applyStatusFilter}
         onProjectFilter={applyProjectFilter}
         getStatusName={getStatusName}
+        totalCount={pagination.total}
       />
 
       {(statusFilter !== 'all' || projectFilter !== 'all') && (
@@ -417,7 +444,9 @@ export default function SystemsPage() {
       <Card>
         <CardHeader>
           <CardTitle>All Systems</CardTitle>
-          <CardDescription>Total: {filtered.length}</CardDescription>
+          <CardDescription>
+            Showing {systems.length} on this page · {pagination.total} matching
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -434,14 +463,14 @@ export default function SystemsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.length === 0 ? (
+                {systems.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                       No systems found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((system) => {
+                  systems.map((system) => {
                     const project = projects.find((p) => p.id === system.project_id);
                     return (
                       <TableRow
@@ -517,6 +546,17 @@ export default function SystemsPage() {
               </TableBody>
             </Table>
           </div>
+          <EntityListPagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            rangeLabel={pagination.rangeLabel}
+            hasPrev={pagination.hasPrev}
+            hasNext={pagination.hasNext}
+            onPrev={pagination.prevPage}
+            onNext={pagination.nextPage}
+            loading={pagination.fetching}
+          />
         </CardContent>
       </Card>
 

@@ -45,6 +45,7 @@ interface ProjectsMiniDashboardProps {
   activeStatusFilter: string;
   onStatusFilter: (status: string) => void;
   filteredOrder?: Order | null;
+  totalCount?: number;
 }
 
 function KpiTile({
@@ -93,6 +94,7 @@ export function ProjectsMiniDashboard({
   activeStatusFilter,
   onStatusFilter,
   filteredOrder,
+  totalCount,
 }: ProjectsMiniDashboardProps) {
   const router = useRouter();
   const [activeChart, setActiveChart] = useState<'status' | 'progress' | 'systems' | 'timeline'>(
@@ -185,7 +187,7 @@ export function ProjectsMiniDashboard({
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiTile
           label="Total Projects"
-          value={projects.length}
+          value={totalCount ?? projects.length}
           sub={scopeLabel}
           icon={Rocket}
           active={activeStatusFilter === 'Total'}

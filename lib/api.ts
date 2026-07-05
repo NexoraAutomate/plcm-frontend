@@ -1,23 +1,42 @@
 import axios from "axios";
 import type * as Models from "./models";
+import type { ListFilterParams } from "./list-filters";
+import { normalizeListFilters } from "./list-filters";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
+export type ListRequestOptions = { includeTotal?: boolean };
+
 export function buildQueryParams(
-  params: Record<string, string | number | undefined | null>
+  params: Record<string, string | number | boolean | undefined | null>
 ) {
   const cleaned = Object.fromEntries(
     Object.entries(params).filter(
       ([, value]) => value !== undefined && value !== null && value !== ''
     )
-  ) as Record<string, string | number>;
+  ) as Record<string, string | number | boolean>;
 
   return Object.keys(cleaned).length > 0 ? cleaned : undefined;
 }
 
+function listParams(
+  skip: number,
+  limit: number,
+  options?: ListRequestOptions,
+  filters?: ListFilterParams
+) {
+  const normalized = normalizeListFilters(filters);
+  return buildQueryParams({
+    skip,
+    limit,
+    include_total: options?.includeTotal === false ? false : true,
+    ...normalized,
+  });
+}
+
 const api = axios.create({
   baseURL: API_BASE,
-  timeout: 20_000,
+  timeout: 45_000,
 });
 
 api.interceptors.request.use((config) => {
@@ -59,7 +78,8 @@ export const auth = {
 
 // Users
 export const users = {
-  list: (skip = 0, limit = 100) => api.get<Models.User[]>("/users/", { params: { skip, limit } }),
+  list: (skip = 0, limit = 100, filters?: ListFilterParams) =>
+    api.get<Models.User[]>("/users/", { params: listParams(skip, limit, undefined, filters) }),
   usersWithRoles: () => api.get("/users/with-roles/"),
   get: (id: number) => api.get<Models.User>(`/users/${id}/`),
   create: (data: Partial<Models.User>) => api.post<Models.User>("/users/", data),
@@ -69,7 +89,8 @@ export const users = {
 
 // Customers
 export const customers = {
-  list: (skip = 0, limit = 100) => api.get<Models.Customer[]>("/customers/", { params: { skip, limit } }),
+  list: (skip = 0, limit = 100, filters?: ListFilterParams) =>
+    api.get<Models.Customer[]>("/customers/", { params: listParams(skip, limit, undefined, filters) }),
   get: (id: number) => api.get<Models.Customer>(`/customers/${id}/`),
   create: (data: Partial<Models.Customer>) => api.post<Models.Customer>("/customers/", data),
   update: (id: number, data: Partial<Models.Customer>) => api.put<Models.Customer>(`/customers/${id}/`, data),
@@ -78,7 +99,8 @@ export const customers = {
 
 // Orders
 export const orders = {
-  list: (skip = 0, limit = 100) => api.get<Models.Order[]>("/orders/", { params: { skip, limit } }),
+  list: (skip = 0, limit = 100, filters?: ListFilterParams) =>
+    api.get<Models.Order[]>("/orders/", { params: listParams(skip, limit, undefined, filters) }),
   get: (id: number) => api.get<Models.Order>(`/orders/${id}/`),
   create: (data: Partial<Models.Order>) => api.post<Models.Order>("/orders/", data),
   update: (id: number, data: Partial<Models.Order>) => api.put<Models.Order>(`/orders/${id}/`, data),
@@ -87,7 +109,8 @@ export const orders = {
 
 // Projects
 export const projects = {
-  list: (skip = 0, limit = 100) => api.get<Models.Project[]>("/projects/", { params: { skip, limit } }),
+  list: (skip = 0, limit = 100, options?: ListRequestOptions, filters?: ListFilterParams) =>
+    api.get<Models.Project[]>("/projects/", { params: listParams(skip, limit, options, filters) }),
   get: (id: number) => api.get<Models.Project>(`/projects/${id}/`),
   create: (data: Partial<Models.Project>) => api.post<Models.Project>("/projects/", data),
   update: (id: number, data: Partial<Models.Project>) => api.put<Models.Project>(`/projects/${id}/`, data),
@@ -97,7 +120,8 @@ export const projects = {
 
 // Systems
 export const systems = {
-  list: (skip = 0, limit = 100) => api.get<Models.System[]>("/systems/", { params: { skip, limit } }),
+  list: (skip = 0, limit = 100, options?: ListRequestOptions, filters?: ListFilterParams) =>
+    api.get<Models.System[]>("/systems/", { params: listParams(skip, limit, options, filters) }),
   get: (id: number) => api.get<Models.System>(`/systems/${id}/`),
   create: (data: Partial<Models.System>) => api.post<Models.System>("/systems/", data),
   update: (id: number, data: Partial<Models.System>) => api.put<Models.System>(`/systems/${id}/`, data),
@@ -107,7 +131,8 @@ export const systems = {
 
 // Subsystems
 export const subsystems = {
-  list: (skip = 0, limit = 100) => api.get<Models.Subsystem[]>("/subsystems/", { params: { skip, limit } }),
+  list: (skip = 0, limit = 100, options?: ListRequestOptions, filters?: ListFilterParams) =>
+    api.get<Models.Subsystem[]>("/subsystems/", { params: listParams(skip, limit, options, filters) }),
   get: (id: number) => api.get<Models.Subsystem>(`/subsystems/${id}/`),
   create: (data: Partial<Models.Subsystem>) => api.post<Models.Subsystem>("/subsystems/", data),
   update: (id: number, data: Partial<Models.Subsystem>) => api.put<Models.Subsystem>(`/subsystems/${id}/`, data),
@@ -117,7 +142,8 @@ export const subsystems = {
 
 // Modules
 export const modules = {
-  list: (skip = 0, limit = 100) => api.get<Models.Module[]>("/modules/", { params: { skip, limit } }),
+  list: (skip = 0, limit = 100, options?: ListRequestOptions, filters?: ListFilterParams) =>
+    api.get<Models.Module[]>("/modules/", { params: listParams(skip, limit, options, filters) }),
   get: (id: number) => api.get<Models.Module>(`/modules/${id}/`),
   create: (data: Partial<Models.Module>) => api.post<Models.Module>("/modules/", data),
   update: (id: number, data: Partial<Models.Module>) => api.put<Models.Module>(`/modules/${id}/`, data),
@@ -127,7 +153,8 @@ export const modules = {
 
 // Units
 export const units = {
-  list: (skip = 0, limit = 100) => api.get<Models.Unit[]>("/units/", { params: { skip, limit } }),
+  list: (skip = 0, limit = 100, options?: ListRequestOptions, filters?: ListFilterParams) =>
+    api.get<Models.Unit[]>("/units/", { params: listParams(skip, limit, options, filters) }),
   get: (id: number) => api.get<Models.Unit>(`/units/${id}/`),
   create: (data: Partial<Models.Unit>) => api.post<Models.Unit>("/units/", data),
   update: (id: number, data: Partial<Models.Unit>) => api.put<Models.Unit>(`/units/${id}/`, data),
@@ -137,7 +164,8 @@ export const units = {
 
 // Components
 export const components = {
-  list: (skip = 0, limit = 100) => api.get<Models.Component[]>("/components/", { params: { skip, limit } }),
+  list: (skip = 0, limit = 100, options?: ListRequestOptions, filters?: ListFilterParams) =>
+    api.get<Models.Component[]>("/components/", { params: listParams(skip, limit, options, filters) }),
   get: (id: number) => api.get<Models.Component>(`/components/${id}/`),
   create: (data: Partial<Models.Component>) => api.post<Models.Component>("/components/", data),
   update: (id: number, data: Partial<Models.Component>) => api.put<Models.Component>(`/components/${id}/`, data),
@@ -158,9 +186,12 @@ export const hierarchies = {
 
 // Inventory
 export const inventory = {
-  list: (skip = 0, limit = 100, inventoryType?: string) =>
+  list: (skip = 0, limit = 100, inventoryType?: string, filters?: ListFilterParams) =>
     api.get<Models.Inventory[]>('/inventory/', {
-      params: buildQueryParams({ skip, limit, inventory_type: inventoryType }),
+      params: listParams(skip, limit, undefined, {
+        ...filters,
+        inventory_type: inventoryType ?? filters?.inventory_type,
+      }),
     }),
   get: (id: number) => api.get<Models.Inventory>(`/inventory/${id}/`),
   create: (data: Partial<Models.Inventory>) => api.post<Models.Inventory>("/inventory/", data),
@@ -170,9 +201,9 @@ export const inventory = {
 
 // Statuses
 export const statuses = {
-  list: (status_type?: string) =>
+  list: (skip = 0, limit = 100, status_type?: string) =>
     api.get<Models.Status[]>("/statuses/", {
-      params: buildQueryParams({ status_type }),
+      params: buildQueryParams({ skip, limit, status_type }),
     }),
   get: (id: number) => api.get<Models.Status>(`/statuses/${id}/`),
   create: (data: Partial<Models.Status>) => api.post<Models.Status>("/statuses/", data),

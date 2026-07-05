@@ -395,8 +395,7 @@ export function searchEntityBySerialNumber(
   subsystems: Subsystem[],
   modules: Module[],
   units: Unit[],
-  components: Component[],
-  runningProjectIds: Set<number>
+  components: Component[]
 ): SerialSearchMatch | null {
   const query = serialQuery.trim().toLowerCase();
   if (!query) return null;
@@ -417,7 +416,7 @@ export function searchEntityBySerialNumber(
       units,
       components
     );
-    if (!selection?.projectId || !runningProjectIds.has(selection.projectId)) return;
+    if (!selection?.projectId) return;
 
     candidates.push({
       type,

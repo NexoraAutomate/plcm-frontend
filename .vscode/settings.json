@@ -1,3 +1,7 @@
 {
-    "editor.fontSize": 14
+  "editor.fontSize": 14,
+  "css.lint.unknownAtRules": "ignore",
+  "files.associations": {
+    "*.css": "tailwindcss"
+  }
 }

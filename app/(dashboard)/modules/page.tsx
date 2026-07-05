@@ -21,18 +21,29 @@ import { EntityCountCell } from '@/components/entity-count-cell';
 import { EntityNameWithFault } from '@/components/entity-fault-ping';
 import { useEntityFaultMap } from '@/hooks/use-entity-fault-map';
 import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
+import { useHierarchiesQuery, useStatusesByTypeQuery } from '@/hooks/queries';
+import { fetchModulesPage } from '@/hooks/queries/fetchers';
+import { queryKeys } from '@/hooks/queries/query-keys';
+import { usePaginatedList } from '@/hooks/use-paginated-list';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { EntityListPagination } from '@/components/entity-list-pagination';
+import { PageLoader } from '@/components/page-loader';
+import { ListPageError } from '@/components/list-page-error';
+import { useListPageLoader } from '@/hooks/use-list-page-loader';
 import { HierarchyListDashboard } from '@/components/hierarchy/hierarchy-list-dashboard';
 import { ParentEntityLink } from '@/components/entity-link';
 import { buildHierarchyPageUrl } from '@/lib/hierarchy-page-filters';
+import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { MODULES_DASHBOARD_CONFIG, MODULE_STATUS_NAMES } from '@/lib/hierarchy-dashboard-configs';
 
 export default function ModulesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { pageLoading } = useEntityHierarchyGate();
-  const { modules, subsystems, units, createModule, updateModule, deleteModule } = useDataStore();
+  const { subsystems, units, createModule, updateModule, deleteModule } = useDataStore();
   const faultMap = useEntityFaultMap();
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -41,8 +52,34 @@ export default function ModulesPage() {
   const parentFilterParam = searchParams.get('subsystem_id');
   const [statusFilter, setStatusFilter] = useState<string>(statusFilterParam || 'all');
   const [parentFilter, setParentFilter] = useState<string>(parentFilterParam || 'all');
-  const [subsystemHierarchyNames, setSubsystemHierarchyNames] = useState<Hierarchy[]>([]);
-  const [moduleHierarchyNames, setModuleHierarchyNames] = useState<Hierarchy[]>([]);
+  const { data: subsystemHierarchyNames = [] } = useHierarchiesQuery('subsystem');
+  const { data: moduleHierarchyNamesAll = [] } = useHierarchiesQuery('module');
+  const { data: statuses = [] } = useStatusesByTypeQuery('modules');
+
+  const listFilters = useMemo(
+    () =>
+      buildListFilters({
+        search: debouncedSearch,
+        statusName: statusFilter,
+        statuses,
+        subsystemId: parentFilter !== 'all' ? Number(parentFilter) : null,
+      }),
+    [debouncedSearch, statusFilter, statuses, parentFilter]
+  );
+
+  const pagination = usePaginatedList({
+    queryKey: queryKeys.modulesPage(listFilters),
+    fetchPage: fetchModulesPage,
+    filters: listFilters,
+  });
+  const modules = pagination.items;
+  const showLoader = useListPageLoader(pagination, {
+    pageLoading,
+    debouncedSearch,
+    filtersActive: statusFilter !== 'all' || parentFilter !== 'all',
+    hasData: modules.length > 0,
+  });
+  const [parentScopedModuleNames, setParentScopedModuleNames] = useState<Hierarchy[] | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -50,45 +87,38 @@ export default function ModulesPage() {
   });
 
   useEffect(() => {
-    const fetchHierarchyNames = async () => {
-      try {
-        const subsystemsRes = await api.hierarchies.list('subsystem');
-        setSubsystemHierarchyNames(subsystemsRes.data);
-      } catch (err) {
-        console.error('Failed to load subsystem hierarchy names', err);
-      }
+    if (!formData.subsystem_id) {
+      setParentScopedModuleNames(null);
+      return;
+    }
+
+    const selectedSubsystem = subsystems.find((s) => s.id === formData.subsystem_id);
+    const parentHierarchyId = selectedSubsystem
+      ? subsystemHierarchyNames.find((hierarchy) => hierarchy.name === selectedSubsystem.name)?.id
+      : undefined;
+
+    if (!parentHierarchyId) {
+      setParentScopedModuleNames(null);
+      return;
+    }
+
+    let cancelled = false;
+    void api.hierarchies.list('module', parentHierarchyId).then((res) => {
+      if (!cancelled) setParentScopedModuleNames(res.data ?? []);
+    }).catch((err) => {
+      console.error('Failed to load module hierarchy names', err);
+      if (!cancelled) setParentScopedModuleNames(null);
+    });
+
+    return () => {
+      cancelled = true;
     };
-
-    fetchHierarchyNames();
-  }, []);
-
-  useEffect(() => {
-    const fetchModuleNames = async () => {
-      if (!formData.subsystem_id) {
-        setModuleHierarchyNames([]);
-        return;
-      }
-
-      const selectedSubsystem = subsystems.find((s) => s.id === formData.subsystem_id);
-      const parentHierarchyId = selectedSubsystem
-        ? subsystemHierarchyNames.find((hierarchy) => hierarchy.name === selectedSubsystem.name)?.id
-        : undefined;
-
-      if (!parentHierarchyId) {
-        setModuleHierarchyNames([]);
-        return;
-      }
-
-      try {
-        const res = await api.hierarchies.list('module', parentHierarchyId);
-        setModuleHierarchyNames(res.data);
-      } catch (err) {
-        console.error('Failed to load module hierarchy names', err);
-      }
-    };
-
-    fetchModuleNames();
   }, [formData.subsystem_id, subsystemHierarchyNames, subsystems]);
+
+  const moduleHierarchyNames =
+    formData.subsystem_id && parentScopedModuleNames
+      ? parentScopedModuleNames
+      : moduleHierarchyNamesAll;
 
   const unitCountByModule = useMemo(
     () => getUnitCountByModuleId(units),
@@ -96,15 +126,6 @@ export default function ModulesPage() {
   );
 
   const getStatusName = (module: Module) => module.status?.status_name || 'Unknown';
-
-  const filtered = modules.filter((m) => {
-    const matchesSearch = m.name.toLowerCase().includes(search.toLowerCase()) ||
-      m.description?.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || getStatusName(m) === statusFilter;
-    const matchesParent =
-      parentFilter === 'all' || m.subsystem_id?.toString() === parentFilter;
-    return matchesSearch && matchesStatus && matchesParent;
-  });
 
   const filteredParent = useMemo(
     () => (parentFilter === 'all' ? null : subsystems.find((s) => String(s.id) === parentFilter)),
@@ -133,6 +154,7 @@ export default function ModulesPage() {
     }
     try {
       await createModule(formData);
+      pagination.invalidate();
       setFormData({ name: '', description: '', subsystem_id: 0 });
       setIsCreateOpen(false);
     } catch {
@@ -148,6 +170,7 @@ export default function ModulesPage() {
     }
     try {
       await updateModule(editingId, formData);
+      pagination.invalidate();
       setFormData({ name: '', description: '', subsystem_id: 0 });
       setEditingId(null);
       setIsEditOpen(false);
@@ -159,6 +182,7 @@ export default function ModulesPage() {
   async function handleDelete(id: number) {
     try {
       await deleteModule(id);
+      pagination.invalidate();
       toast.success('Module deleted successfully');
     } catch {
       toast.error('Failed to delete module');
@@ -175,24 +199,16 @@ export default function ModulesPage() {
     setIsEditOpen(true);
   }
 
-  useEffect(() => {
-    const fetchHierarchyNames = async () => {
-      try {
-        const [subsystemsRes, modulesRes] = await Promise.all([
-          api.hierarchies.list('subsystem'),
-          api.hierarchies.list('module'),
-        ]);
-        setSubsystemHierarchyNames(subsystemsRes.data);
-        setModuleHierarchyNames(modulesRes.data);
-      } catch (err) {
-        console.error('Failed to load module hierarchy names', err);
-      }
-    };
+  if (showLoader) return <PageLoader />;
 
-    fetchHierarchyNames();
-  }, []);
-
-  if (pageLoading) return <div className="p-8 text-center">Loading...</div>;
+  if (pagination.error) {
+    return (
+      <ListPageError
+        message={pagination.error instanceof Error ? pagination.error.message : undefined}
+        onRetry={() => void pagination.refetch()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -214,6 +230,7 @@ export default function ModulesPage() {
         activeParentId={parentFilter}
         onStatusFilter={applyStatusFilter}
         onParentFilter={applyParentFilter}
+        totalCount={pagination.total}
       />
 
       {(statusFilter !== 'all' || parentFilter !== 'all') && (
@@ -349,7 +366,9 @@ export default function ModulesPage() {
       <Card>
         <CardHeader>
           <CardTitle>All Modules</CardTitle>
-          <CardDescription>Total: {filtered.length}</CardDescription>
+          <CardDescription>
+            Showing {modules.length} on this page · {pagination.total} matching
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -364,14 +383,14 @@ export default function ModulesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.length === 0 ? (
+                {modules.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                       No modules found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((module) => {
+                  modules.map((module) => {
                     const subsystem = subsystems.find((s) => s.id === module.subsystem_id);
                     return (
                       <TableRow
@@ -441,6 +460,17 @@ export default function ModulesPage() {
               </TableBody>
             </Table>
           </div>
+          <EntityListPagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            rangeLabel={pagination.rangeLabel}
+            hasPrev={pagination.hasPrev}
+            hasNext={pagination.hasNext}
+            onPrev={pagination.prevPage}
+            onNext={pagination.nextPage}
+            loading={pagination.fetching}
+          />
         </CardContent>
       </Card>
 

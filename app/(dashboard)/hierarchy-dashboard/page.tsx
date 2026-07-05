@@ -1,26 +1,30 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDataStore } from '@/lib/data-store';
 import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PageLoader } from '@/components/page-loader';
 import { HierarchyDashboardControls } from '@/components/hierarchy-dashboard/hierarchy-dashboard-controls';
 import { ProjectHierarchyFlow } from '@/components/hierarchy-dashboard/project-hierarchy-flow';
+import { fetchAllProjects } from '@/hooks/queries/fetchers';
+import { queryKeys } from '@/hooks/queries/query-keys';
+import * as api from '@/lib/api';
 import {
   getComponentsForUnit,
   getModulesForSubsystem,
-  getRunningProjects,
   getSubsystemsForSystem,
-  getSystemsForProject,
   getUnitsForModule,
   resolveSelectionFromEntity,
   searchEntityBySerialNumber,
   type HierarchyDashboardSelection,
 } from '@/lib/project-hierarchy-dashboard';
 import type { HierarchyEntityType } from '@/lib/system-hierarchy-graph';
+import type { System } from '@/lib/models';
 
 const CHILD_CLEAR_MAP: Record<
   keyof HierarchyDashboardSelection,
@@ -46,10 +50,10 @@ function clearChildSelections(
 }
 
 export default function HierarchyDashboardPage() {
-  const { pageLoading } = useEntityHierarchyGate();
+  const { pageLoading, hierarchyLoading, hierarchyAttempted } = useEntityHierarchyGate();
   const {
-    projects,
-    systems,
+    projects: storeProjects,
+    systems: storeSystems,
     subsystems,
     modules,
     units,
@@ -57,36 +61,54 @@ export default function HierarchyDashboardPage() {
     statuses,
   } = useDataStore();
 
+  const { data: fetchedProjects, isLoading: projectsQueryLoading } = useQuery({
+    queryKey: queryKeys.allProjects(),
+    queryFn: fetchAllProjects,
+  });
+  const allProjects =
+    fetchedProjects && fetchedProjects.length > 0 ? fetchedProjects : storeProjects;
+
   const [selection, setSelection] = useState<HierarchyDashboardSelection>({});
   const [serialQuery, setSerialQuery] = useState('');
   const [serialSearching, setSerialSearching] = useState(false);
+  const [projectSystems, setProjectSystems] = useState<System[]>([]);
+  const [systemsLoading, setSystemsLoading] = useState(false);
 
-  const runningProjects = useMemo(() => getRunningProjects(projects), [projects]);
-  const runningProjectIds = useMemo(
-    () => new Set(runningProjects.map((project) => project.id)),
-    [runningProjects]
-  );
-
-  const selectedProject = runningProjects.find((project) => project.id === selection.projectId);
+  const selectedProject = allProjects.find((project) => project.id === selection.projectId);
 
   const projectOptions = useMemo(
     () =>
-      runningProjects.map((project) => ({
+      allProjects.map((project) => ({
         value: String(project.id),
         label: project.name,
         description: project.status_name,
       })),
-    [runningProjects]
+    [allProjects]
   );
+
+  const loadProjectSystems = useCallback(async (projectId: number) => {
+    setSystemsLoading(true);
+    try {
+      const res = await api.projects.getSystems(projectId);
+      setProjectSystems(res.data ?? []);
+    } catch {
+      setProjectSystems([]);
+      toast.error('Failed to load systems for this project.');
+    } finally {
+      setSystemsLoading(false);
+    }
+  }, []);
+
+  const systemsForSelection = selection.projectId ? projectSystems : storeSystems;
 
   const systemOptions = useMemo(() => {
     if (!selection.projectId) return [];
-    return getSystemsForProject(systems, selection.projectId).map((system) => ({
+    return systemsForSelection.map((system) => ({
       value: String(system.id),
       label: system.name,
       description: system.serial_number || system.part_number,
     }));
-  }, [selection.projectId, systems]);
+  }, [selection.projectId, systemsForSelection]);
 
   const subsystemOptions = useMemo(() => {
     if (!selection.systemId) return [];
@@ -133,8 +155,15 @@ export default function HierarchyDashboardPage() {
         }
         return clearChildSelections(next, key);
       });
+
+      if (key === 'projectId' && value) {
+        void loadProjectSystems(value);
+      }
+      if (key === 'projectId' && !value) {
+        setProjectSystems([]);
+      }
     },
-    []
+    [loadProjectSystems]
   );
 
   const handleNodeSelect = useCallback(
@@ -142,24 +171,26 @@ export default function HierarchyDashboardPage() {
       const resolved = resolveSelectionFromEntity(
         type,
         entityId,
-        systems,
+        storeSystems,
         subsystems,
         modules,
         units,
         components
       );
-      if (!resolved?.projectId || !runningProjectIds.has(resolved.projectId)) {
-        toast.error('Selected entity is not part of a running project.');
+      if (!resolved?.projectId) {
+        toast.error('Selected entity is not linked to a project.');
         return;
       }
+      void loadProjectSystems(resolved.projectId);
       setSelection(resolved);
     },
-    [systems, subsystems, modules, units, components, runningProjectIds]
+    [storeSystems, subsystems, modules, units, components, loadProjectSystems]
   );
 
   const handleClearSelection = () => {
     setSelection({});
     setSerialQuery('');
+    setProjectSystems([]);
   };
 
   const handleSerialSearch = async () => {
@@ -172,19 +203,21 @@ export default function HierarchyDashboardPage() {
     try {
       const match = searchEntityBySerialNumber(
         serialQuery,
-        systems,
+        storeSystems,
         subsystems,
         modules,
         units,
-        components,
-        runningProjectIds
+        components
       );
 
       if (!match) {
-        toast.error('No entity found with that serial number in a running project.');
+        toast.error('No entity found with that serial number.');
         return;
       }
 
+      if (match.selection.projectId) {
+        await loadProjectSystems(match.selection.projectId);
+      }
       setSelection(match.selection);
       toast.success(`Found ${match.type}: ${match.name}`);
     } finally {
@@ -192,8 +225,13 @@ export default function HierarchyDashboardPage() {
     }
   };
 
-  if (pageLoading) {
-    return <div className="p-8 text-center">Loading...</div>;
+  const dataLoading =
+    pageLoading ||
+    (projectsQueryLoading && allProjects.length === 0) ||
+    (hierarchyLoading && !hierarchyAttempted);
+
+  if (dataLoading || serialSearching || systemsLoading) {
+    return <PageLoader />;
   }
 
   return (
@@ -252,7 +290,7 @@ export default function HierarchyDashboardPage() {
         selection={selection}
         onSelectionChange={setSelection}
         updateSelection={updateSelection}
-        systems={systems}
+        systems={systemsForSelection}
         subsystems={subsystems}
         modules={modules}
         units={units}

@@ -6,6 +6,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDataStore } from '@/lib/data-store';
 import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
+import { PageLoader } from '@/components/page-loader';
 import { SystemHierarchyFlow } from '@/components/system-hierarchy-flow';
 
 export default function SystemHierarchyPage() {
@@ -23,7 +24,7 @@ export default function SystemHierarchyPage() {
   );
 
   if (pageLoading) {
-    return <div className="p-8 text-center">Loading...</div>;
+    return <PageLoader />;
   }
 
   if (!project || !system) {

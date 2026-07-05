@@ -48,6 +48,7 @@ interface SystemsListDashboardProps {
   onStatusFilter: (statusName: string) => void;
   onProjectFilter: (projectId: string) => void;
   getStatusName: (system: System) => string;
+  totalCount?: number;
 }
 
 function KpiTile({
@@ -100,6 +101,7 @@ export function SystemsListDashboard({
   onStatusFilter,
   onProjectFilter,
   getStatusName,
+  totalCount,
 }: SystemsListDashboardProps) {
   const router = useRouter();
   const [activeChart, setActiveChart] = useState<'status' | 'projects' | 'hierarchy' | 'timeline'>(
@@ -168,12 +170,14 @@ export function SystemsListDashboard({
     systems.some((s) => s.id === sub.system_id)
   ).length;
 
+  const dbTotal = totalCount ?? systems.length;
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiTile
           label="Total Systems"
-          value={systems.length}
+          value={dbTotal}
           sub="Click chart to filter"
           icon={Server}
           active={activeStatusName === 'all' && activeProjectId === 'all'}
@@ -187,8 +191,8 @@ export function SystemsListDashboard({
           value={operationalCount}
           sub={
             systems.length
-              ? `${Math.round((operationalCount / systems.length) * 100)}% fleet ready`
-              : 'No systems'
+              ? `${Math.round((operationalCount / systems.length) * 100)}% ready on this page`
+              : 'No systems on this page'
           }
           icon={CheckCircle2}
           active={activeStatusName === 'Operational'}
@@ -197,7 +201,7 @@ export function SystemsListDashboard({
         <KpiTile
           label="Subsystems"
           value={totalSubsystems}
-          sub="Linked to systems"
+          sub="On this page · linked to systems"
           icon={Network}
           onClick={() => router.push('/subsystems')}
         />

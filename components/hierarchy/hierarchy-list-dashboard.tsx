@@ -56,6 +56,7 @@ interface HierarchyListDashboardProps<
   activeParentId: string;
   onStatusFilter: (statusName: string) => void;
   onParentFilter: (parentId: string) => void;
+  totalCount?: number;
 }
 
 function KpiTile({
@@ -117,6 +118,7 @@ export function HierarchyListDashboard<
   activeParentId,
   onStatusFilter,
   onParentFilter,
+  totalCount,
 }: HierarchyListDashboardProps<T, C>) {
   const router = useRouter();
   const [activeChart, setActiveChart] = useState<'status' | 'parent' | 'hierarchy' | 'timeline'>(
@@ -187,13 +189,14 @@ export function HierarchyListDashboard<
   const childCount = children.filter((child) =>
     items.some((item) => getChildParentId(child) === item.id)
   ).length;
+  const dbTotal = totalCount ?? items.length;
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiTile
           label={`Total ${config.entityPlural}`}
-          value={items.length}
+          value={dbTotal}
           sub="Click chart to filter"
           icon={Layers}
           active={activeStatusName === 'all' && activeParentId === 'all'}
@@ -207,8 +210,8 @@ export function HierarchyListDashboard<
           value={readyCount}
           sub={
             items.length
-              ? `${Math.round((readyCount / items.length) * 100)}% ready`
-              : `No ${config.entityPlural.toLowerCase()}`
+              ? `${Math.round((readyCount / items.length) * 100)}% ready on this page`
+              : `No ${config.entityPlural.toLowerCase()} on this page`
           }
           icon={CheckCircle2}
           active={activeStatusName === config.readyStatusName}
@@ -217,7 +220,7 @@ export function HierarchyListDashboard<
         <KpiTile
           label={config.childKpi.label}
           value={childCount}
-          sub={`Linked to ${config.entityPlural.toLowerCase()}`}
+          sub={`On this page · linked to ${config.entityPlural.toLowerCase()}`}
           icon={Network}
           onClick={() => router.push(config.childKpi.route)}
         />

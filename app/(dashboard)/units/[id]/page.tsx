@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useDataStore } from '@/lib/data-store';
 import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
+import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -205,7 +206,7 @@ export default function UnitDetailPage() {
 
     fetchData();
   }, [unit]);
-  if (pageLoading) return <div className="p-8 text-center">Loading...</div>;
+  if (pageLoading) return <PageLoader />;
 
 
   if (!unit) {

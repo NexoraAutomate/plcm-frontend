@@ -1,9 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type * as Models from '@/lib/models';
 import { entities } from '@/lib/api';
 import { useDataStore } from '@/lib/data-store';
+import { fetchMaintenanceLogsPage } from '@/hooks/queries/fetchers';
+import { queryKeys } from '@/hooks/queries/query-keys';
+import { usePaginatedList } from '@/hooks/use-paginated-list';
+import { EntityListPagination } from '@/components/entity-list-pagination';
+import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -15,7 +20,13 @@ import { Plus, Eye, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function MaintenancePage() {
-  const { maintenanceLogs, users, loading, createMaintenanceLog } = useDataStore();
+  const { users, createMaintenanceLog } = useDataStore();
+  const pagination = usePaginatedList({
+    queryKey: queryKeys.maintenanceLogsPage(),
+    fetchPage: fetchMaintenanceLogsPage,
+  });
+  const maintenanceLogs = pagination.items;
+  const loading = pagination.loading;
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -34,6 +45,10 @@ export default function MaintenancePage() {
   const [lookupResult, setLookupResult] = useState<LookupEntity | null>(null);
   const [lookupError, setLookupError] = useState('');
   const [isLookupLoading, setIsLookupLoading] = useState(false);
+
+  useEffect(() => {
+    pagination.setPage(0);
+  }, [search, statusFilter]);
 
   const filtered = maintenanceLogs.filter((log) => {
     const entityName = log.entity?.display_name || `Entity #${log.entity_id}`;
@@ -56,6 +71,7 @@ export default function MaintenancePage() {
         notes: formData.notes,
         maintenance_type: formData.maintenance_type,
       });
+      pagination.invalidate();
       setFormData({
         part_number: '',
         entity_id: 0,
@@ -100,7 +116,7 @@ export default function MaintenancePage() {
     }
   };
 
-  if (loading) return <div className="p-8 text-center">Loading...</div>;
+  if (loading) return <PageLoader />;
 
   return (
     <div className="space-y-8">
@@ -253,7 +269,9 @@ export default function MaintenancePage() {
       <Card>
         <CardHeader>
           <CardTitle>maintenanceLogs History</CardTitle>
-          <CardDescription>Total records: {filtered.length}</CardDescription>
+          <CardDescription>
+            Showing {filtered.length} on this page · {pagination.total} total in database
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -302,6 +320,17 @@ export default function MaintenancePage() {
               </TableBody>
             </Table>
           </div>
+          <EntityListPagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            rangeLabel={pagination.rangeLabel}
+            hasPrev={pagination.hasPrev}
+            hasNext={pagination.hasNext}
+            onPrev={pagination.prevPage}
+            onNext={pagination.nextPage}
+            loading={pagination.fetching}
+          />
         </CardContent>
       </Card>
 

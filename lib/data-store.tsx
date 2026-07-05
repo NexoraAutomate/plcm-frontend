@@ -1,18 +1,27 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
-import type { AxiosResponse } from 'axios';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo, ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import * as api from './api';
 import { useAuth } from './auth-context';
+import { queryKeys } from '@/hooks/queries/query-keys';
+import {
+  fetchCustomers,
+  fetchFaultyEntities,
+  fetchHierarchyEntities,
+  fetchInventory,
+  fetchMaintenanceCases,
+  fetchMaintenanceLogs,
+  fetchOrders,
+  fetchProjects,
+  fetchStatuses,
+  fetchUsers,
+} from '@/hooks/queries/fetchers';
 // import * as maintenanceApi from '@/lib/maintenance';
 import * as Models from './models';
 import * as MaintenanceTypes from '@/lib/models';
 import { enrichEntitiesWithStatus, enrichEntityWithStatus } from './entity-status';
-import {
-  fetchCappedPages,
-  HIERARCHY_TYPE_CAP,
-  LIST_PAGE_SIZE,
-} from './data-loading';
+import { LIST_BOOTSTRAP_SIZE, LIST_PAGE_SIZE } from './data-loading';
 import { toast } from 'sonner';
 
 interface DataStoreContextType {
@@ -166,7 +175,8 @@ interface DataStoreContextType {
 const DataStoreContext = createContext<DataStoreContextType | undefined>(undefined);
 
 export function DataStoreProvider({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, authReady } = useAuth();
+  const queryClient = useQueryClient();
   const [users, setUsers] = useState<Models.User[]>([]);
   const [customers, setCustomers] = useState<Models.Customer[]>([]);
   const [orders, setOrders] = useState<Models.Order[]>([]);
@@ -220,27 +230,23 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const loadHierarchyData = useCallback(async () => {
-    const [systemsData, subsystemsData, modulesData, unitsData, componentsData] =
-      await Promise.all([
-        fetchCappedPages(api.systems.list, { maxItems: HIERARCHY_TYPE_CAP }),
-        fetchCappedPages(api.subsystems.list, { maxItems: HIERARCHY_TYPE_CAP }),
-        fetchCappedPages(api.modules.list, { maxItems: HIERARCHY_TYPE_CAP }),
-        fetchCappedPages(api.units.list, { maxItems: HIERARCHY_TYPE_CAP }),
-        fetchCappedPages(api.components.list, { maxItems: HIERARCHY_TYPE_CAP }),
-      ]);
+    const results = await queryClient.fetchQuery<
+      Awaited<ReturnType<typeof fetchHierarchyEntities>>
+    >({
+      queryKey: queryKeys.hierarchyEntities(),
+      queryFn: fetchHierarchyEntities,
+    });
 
     const statusList =
       statusesRef.current.length > 0
         ? statusesRef.current
-        : (await api.statuses.list()).data ?? [];
-    applyEntityResults(statusList, {
-      systems: systemsData,
-      subsystems: subsystemsData,
-      modules: modulesData,
-      units: unitsData,
-      components: componentsData,
-    });
-  }, [applyEntityResults]);
+        : await queryClient.fetchQuery({
+            queryKey: queryKeys.statuses(),
+            queryFn: fetchStatuses,
+          });
+
+    applyEntityResults(statusList, results);
+  }, [applyEntityResults, queryClient]);
 
   const ensureHierarchyLoaded = useCallback(
     async (options?: { force?: boolean }) => {
@@ -273,82 +279,133 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   ensureHierarchyLoadedRef.current = ensureHierarchyLoaded;
 
   const refreshLightweight = useCallback(async () => {
-    try {
-      const [maintenanceCasesRes, faultyEntitiesRes, projectsRes, customersRes] =
-        await Promise.allSettled([
-          api.maintenanceCases.list(0, LIST_PAGE_SIZE),
-          api.faultyEntities.list(0, LIST_PAGE_SIZE),
-          api.projects.list(0, LIST_PAGE_SIZE),
-          api.customers.list(0, LIST_PAGE_SIZE),
-        ]);
+    const limit = LIST_BOOTSTRAP_SIZE;
+    const results = await Promise.allSettled([
+      queryClient.fetchQuery<Models.MaintenanceCase[]>({
+        queryKey: queryKeys.maintenanceCases(0, limit),
+        queryFn: () => fetchMaintenanceCases(0, limit),
+        retry: false,
+      }),
+      queryClient.fetchQuery<Models.FaultyEntity[]>({
+        queryKey: queryKeys.faultyEntities(0, limit),
+        queryFn: () => fetchFaultyEntities(0, limit),
+        retry: false,
+      }),
+      queryClient.fetchQuery<Models.Project[]>({
+        queryKey: queryKeys.projects(0, limit),
+        queryFn: () => fetchProjects(0, limit),
+        retry: false,
+      }),
+      queryClient.fetchQuery<Models.Customer[]>({
+        queryKey: queryKeys.customers(0, limit),
+        queryFn: () => fetchCustomers(0, limit),
+        retry: false,
+      }),
+    ]);
 
-      if (maintenanceCasesRes.status === 'fulfilled') {
-        setMaintenanceCases(maintenanceCasesRes.value.data);
-      }
-      if (faultyEntitiesRes.status === 'fulfilled') {
-        setFaultyEntities(faultyEntitiesRes.value.data);
-      }
-      if (projectsRes.status === 'fulfilled') {
-        setProjects(projectsRes.value.data);
-      }
-      if (customersRes.status === 'fulfilled') {
-        setCustomers(customersRes.value.data);
-      }
-    } catch (err) {
-      console.warn('Lightweight refresh failed:', err);
+    if (results[0].status === 'fulfilled') {
+      setMaintenanceCases(results[0].value);
+      queryClient.setQueryData(queryKeys.maintenanceCases(0, limit), results[0].value);
     }
-  }, []);
+    if (results[1].status === 'fulfilled') {
+      setFaultyEntities(results[1].value);
+      queryClient.setQueryData(queryKeys.faultyEntities(0, limit), results[1].value);
+    }
+    if (results[2].status === 'fulfilled') {
+      setProjects(results[2].value);
+      queryClient.setQueryData(queryKeys.projects(0, limit), results[2].value);
+    }
+    if (results[3].status === 'fulfilled') {
+      setCustomers(results[3].value);
+      queryClient.setQueryData(queryKeys.customers(0, limit), results[3].value);
+    }
+  }, [queryClient]);
 
   const refreshData = useCallback(async (options?: { silent?: boolean }) => {
     const silent = options?.silent ?? false;
-    const setResult = <T,>(
-      result: PromiseSettledResult<AxiosResponse<T>>,
-      setter: React.Dispatch<React.SetStateAction<T>>,
-      name: string
-    ) => {
-      if (result.status === 'fulfilled') {
-        setter(result.value.data);
-      } else {
-        console.warn(`Failed to refresh ${name}:`, result.reason);
-      }
-    };
+    const limit = LIST_BOOTSTRAP_SIZE;
 
     try {
       if (!silent) setLoading(true);
 
-      const [
-        usersRes,
-        customersRes,
-        ordersRes,
-        projectsRes,
-        inventoryRes,
-        statusesRes,
-        maintenanceLogsRes,
-        maintenanceCasesRes,
-        faultyEntitiesRes,
-      ] = await Promise.allSettled([
-        api.users.list(0, LIST_PAGE_SIZE),
-        api.customers.list(0, LIST_PAGE_SIZE),
-        api.orders.list(0, LIST_PAGE_SIZE),
-        api.projects.list(0, LIST_PAGE_SIZE),
-        api.inventory.list(0, LIST_PAGE_SIZE),
-        api.statuses.list(),
-        api.maintenanceLogs.list(0, LIST_PAGE_SIZE),
-        api.maintenanceCases.list(0, LIST_PAGE_SIZE),
-        api.faultyEntities.list(0, LIST_PAGE_SIZE),
-      ]);
+      const results = await Promise.allSettled([
+        queryClient.fetchQuery<Models.User[]>({
+          queryKey: queryKeys.users(0, limit),
+          queryFn: () => fetchUsers(0, limit),
+          retry: false,
+        }),
+        queryClient.fetchQuery<Models.Customer[]>({
+          queryKey: queryKeys.customers(0, limit),
+          queryFn: () => fetchCustomers(0, limit),
+          retry: false,
+        }),
+        queryClient.fetchQuery<Models.Order[]>({
+          queryKey: queryKeys.orders(0, limit),
+          queryFn: () => fetchOrders(0, limit),
+          retry: false,
+        }),
+        queryClient.fetchQuery<Models.Project[]>({
+          queryKey: queryKeys.projects(0, limit),
+          queryFn: () => fetchProjects(0, limit),
+          retry: false,
+        }),
+        queryClient.fetchQuery<Models.Inventory[]>({
+          queryKey: queryKeys.inventory(0, limit),
+          queryFn: () => fetchInventory(0, limit),
+          retry: false,
+        }),
+        queryClient.fetchQuery<Models.Status[]>({
+          queryKey: queryKeys.statuses(),
+          queryFn: fetchStatuses,
+          retry: false,
+        }),
+        queryClient.fetchQuery<Models.MaintenanceLog[]>({
+          queryKey: queryKeys.maintenanceLogs(0, limit),
+          queryFn: () => fetchMaintenanceLogs(0, limit),
+          retry: false,
+        }),
+        queryClient.fetchQuery<Models.MaintenanceCase[]>({
+          queryKey: queryKeys.maintenanceCases(0, limit),
+          queryFn: () => fetchMaintenanceCases(0, limit),
+          retry: false,
+        }),
+        queryClient.fetchQuery<Models.FaultyEntity[]>({
+          queryKey: queryKeys.faultyEntities(0, limit),
+          queryFn: () => fetchFaultyEntities(0, limit),
+          retry: false,
+        }),
+      ] as const);
 
-      setResult(usersRes, setUsers, 'users');
-      setResult(customersRes, setCustomers, 'customers');
-      setResult(ordersRes, setOrders, 'orders');
-      setResult(projectsRes, setProjects, 'projects');
-      setResult(inventoryRes, setInventory, 'inventory');
-      setResult(statusesRes, setStatuses, 'statuses');
-      setResult(maintenanceLogsRes, setMaintenanceLogs, 'maintenanceLogs');
-      setResult(maintenanceCasesRes, setMaintenanceCases, 'maintenanceCases');
-      setResult(faultyEntitiesRes, setFaultyEntities, 'faultyEntities');
+      const applyResult = <T,>(
+        result: PromiseSettledResult<T>,
+        setter: React.Dispatch<React.SetStateAction<T>>,
+        queryKey: readonly unknown[],
+        label: string
+      ) => {
+        if (result.status === 'fulfilled') {
+          setter(result.value);
+          queryClient.setQueryData(queryKey, result.value);
+        } else {
+          console.warn(`Failed to refresh ${label}:`, result.reason);
+        }
+      };
 
-      setError(null);
+      applyResult(results[0], setUsers, queryKeys.users(0, limit), 'users');
+      applyResult(results[1], setCustomers, queryKeys.customers(0, limit), 'customers');
+      applyResult(results[2], setOrders, queryKeys.orders(0, limit), 'orders');
+      applyResult(results[3], setProjects, queryKeys.projects(0, limit), 'projects');
+      applyResult(results[4], setInventory, queryKeys.inventory(0, limit), 'inventory');
+      applyResult(results[5], setStatuses, queryKeys.statuses(), 'statuses');
+      applyResult(results[6], setMaintenanceLogs, queryKeys.maintenanceLogs(0, limit), 'maintenanceLogs');
+      applyResult(results[7], setMaintenanceCases, queryKeys.maintenanceCases(0, limit), 'maintenanceCases');
+      applyResult(results[8], setFaultyEntities, queryKeys.faultyEntities(0, limit), 'faultyEntities');
+
+      if (results.every((r) => r.status === 'rejected')) {
+        setError('Failed to load data');
+        if (!silent) toast.error('Failed to load data');
+      } else {
+        setError(null);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load data';
       setError(message);
@@ -356,20 +413,15 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     } finally {
       if (!silent) setLoading(false);
     }
-
-    // Hierarchy + heavy maintenance load in background — never block first paint.
-    if (!silent) {
-      void ensureHierarchyLoadedRef.current();
-    }
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      setLoading(false);
+    if (!authReady || !isAuthenticated) {
+      if (authReady) setLoading(false);
       return;
     }
     void refreshData();
-  }, [isAuthenticated, refreshData]);
+  }, [authReady, isAuthenticated, refreshData]);
 
 
   // Users
@@ -1282,7 +1334,8 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const value: DataStoreContextType = {
+  const value: DataStoreContextType = useMemo(
+    () => ({
     users,
     customers,
     orders,
@@ -1388,7 +1441,35 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     refreshData,
     refreshLightweight,
     ensureHierarchyLoaded,
-  };
+    }),
+    [
+      users,
+      customers,
+      orders,
+      projects,
+      systems,
+      subsystems,
+      modules,
+      units,
+      components,
+      inventory,
+      statuses,
+      maintenanceLogs,
+      maintenanceCases,
+      faultyEntities,
+      maintenanceActions,
+      maintenanceDeliveries,
+      configurationHistory,
+      loading,
+      hierarchyLoading,
+      hierarchyReady,
+      hierarchyAttempted,
+      error,
+      refreshData,
+      refreshLightweight,
+      ensureHierarchyLoaded,
+    ]
+  );
 
   return <DataStoreContext.Provider value={value}>{children}</DataStoreContext.Provider>;
 }

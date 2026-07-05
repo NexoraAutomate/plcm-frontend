@@ -21,9 +21,19 @@ import { EntityCountCell } from '@/components/entity-count-cell';
 import { EntityNameWithFault } from '@/components/entity-fault-ping';
 import { useEntityFaultMap } from '@/hooks/use-entity-fault-map';
 import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
+import { useHierarchiesQuery, useStatusesByTypeQuery } from '@/hooks/queries';
+import { fetchSubsystemsPage } from '@/hooks/queries/fetchers';
+import { queryKeys } from '@/hooks/queries/query-keys';
+import { usePaginatedList } from '@/hooks/use-paginated-list';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { EntityListPagination } from '@/components/entity-list-pagination';
+import { PageLoader } from '@/components/page-loader';
+import { ListPageError } from '@/components/list-page-error';
+import { useListPageLoader } from '@/hooks/use-list-page-loader';
 import { HierarchyListDashboard } from '@/components/hierarchy/hierarchy-list-dashboard';
 import { ParentEntityLink } from '@/components/entity-link';
 import { buildHierarchyPageUrl } from '@/lib/hierarchy-page-filters';
+import { buildListFilters } from '@/lib/list-page-filter-utils';
 import {
   SUBSYSTEMS_DASHBOARD_CONFIG,
   SUBSYSTEM_STATUS_NAMES,
@@ -33,9 +43,10 @@ export default function SubsystemsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { pageLoading } = useEntityHierarchyGate();
-  const { subsystems, systems, modules, createSubsystem, updateSubsystem, deleteSubsystem } = useDataStore();
+  const { systems, modules, createSubsystem, updateSubsystem, deleteSubsystem } = useDataStore();
   const faultMap = useEntityFaultMap();
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -44,8 +55,34 @@ export default function SubsystemsPage() {
   const parentFilterParam = searchParams.get('system_id');
   const [statusFilter, setStatusFilter] = useState<string>(statusFilterParam || 'all');
   const [parentFilter, setParentFilter] = useState<string>(parentFilterParam || 'all');
-  const [systemHierarchyNames, setSystemHierarchyNames] = useState<Hierarchy[]>([]);
-  const [subsystemHierarchyNames, setSubsystemHierarchyNames] = useState<Hierarchy[]>([]);
+  const { data: systemHierarchyNames = [] } = useHierarchiesQuery('system');
+  const { data: subsystemHierarchyNamesAll = [] } = useHierarchiesQuery('subsystem');
+  const { data: statuses = [] } = useStatusesByTypeQuery('subsystems');
+
+  const listFilters = useMemo(
+    () =>
+      buildListFilters({
+        search: debouncedSearch,
+        statusName: statusFilter,
+        statuses,
+        systemId: parentFilter !== 'all' ? Number(parentFilter) : null,
+      }),
+    [debouncedSearch, statusFilter, statuses, parentFilter]
+  );
+
+  const pagination = usePaginatedList({
+    queryKey: queryKeys.subsystemsPage(listFilters),
+    fetchPage: fetchSubsystemsPage,
+    filters: listFilters,
+  });
+  const subsystems = pagination.items;
+  const showLoader = useListPageLoader(pagination, {
+    pageLoading,
+    debouncedSearch,
+    filtersActive: statusFilter !== 'all' || parentFilter !== 'all',
+    hasData: subsystems.length > 0,
+  });
+  const [parentScopedSubsystemNames, setParentScopedSubsystemNames] = useState<Hierarchy[] | null>(null);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -54,45 +91,38 @@ export default function SubsystemsPage() {
   });
 
   useEffect(() => {
-    const fetchHierarchyNames = async () => {
-      try {
-        const systemsRes = await api.hierarchies.list('system');
-        setSystemHierarchyNames(systemsRes.data);
-      } catch (err) {
-        console.error('Failed to load system hierarchy names', err);
-      }
+    if (!formData.system_id) {
+      setParentScopedSubsystemNames(null);
+      return;
+    }
+
+    const selectedSystem = systems.find((s) => s.id === formData.system_id);
+    const parentHierarchyId = selectedSystem
+      ? systemHierarchyNames.find((hierarchy) => hierarchy.name === selectedSystem.name)?.id
+      : undefined;
+
+    if (!parentHierarchyId) {
+      setParentScopedSubsystemNames(null);
+      return;
+    }
+
+    let cancelled = false;
+    void api.hierarchies.list('subsystem', parentHierarchyId).then((res) => {
+      if (!cancelled) setParentScopedSubsystemNames(res.data ?? []);
+    }).catch((err) => {
+      console.error('Failed to load subsystem hierarchy names', err);
+      if (!cancelled) setParentScopedSubsystemNames(null);
+    });
+
+    return () => {
+      cancelled = true;
     };
-
-    fetchHierarchyNames();
-  }, []);
-
-  useEffect(() => {
-    const fetchSubsystemNames = async () => {
-      if (!formData.system_id) {
-        setSubsystemHierarchyNames([]);
-        return;
-      }
-
-      const selectedSystem = systems.find((s) => s.id === formData.system_id);
-      const parentHierarchyId = selectedSystem
-        ? systemHierarchyNames.find((hierarchy) => hierarchy.name === selectedSystem.name)?.id
-        : undefined;
-
-      if (!parentHierarchyId) {
-        setSubsystemHierarchyNames([]);
-        return;
-      }
-
-      try {
-        const res = await api.hierarchies.list('subsystem', parentHierarchyId);
-        setSubsystemHierarchyNames(res.data);
-      } catch (err) {
-        console.error('Failed to load subsystem hierarchy names', err);
-      }
-    };
-
-    fetchSubsystemNames();
   }, [formData.system_id, systemHierarchyNames, systems]);
+
+  const subsystemHierarchyNames =
+    formData.system_id && parentScopedSubsystemNames
+      ? parentScopedSubsystemNames
+      : subsystemHierarchyNamesAll;
 
   const moduleCountBySubsystem = useMemo(
     () => getModuleCountBySubsystemId(modules),
@@ -100,15 +130,6 @@ export default function SubsystemsPage() {
   );
 
   const getStatusName = (subsystem: Subsystem) => subsystem.status?.status_name || 'Unknown';
-
-  const filtered = subsystems.filter((s) => {
-    const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.description?.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || getStatusName(s) === statusFilter;
-    const matchesParent =
-      parentFilter === 'all' || s.system_id?.toString() === parentFilter;
-    return matchesSearch && matchesStatus && matchesParent;
-  });
 
   const filteredParent = useMemo(
     () => (parentFilter === 'all' ? null : systems.find((s) => String(s.id) === parentFilter)),
@@ -137,6 +158,7 @@ export default function SubsystemsPage() {
     }
     try {
       await createSubsystem(formData);
+      pagination.invalidate();
       setFormData({ name: '', description: '', system_id: 0 });
       setIsCreateOpen(false);
       toast.success('Subsystem created successfully');
@@ -153,6 +175,7 @@ export default function SubsystemsPage() {
     }
     try {
       await updateSubsystem(editingId, formData);
+      pagination.invalidate();
       setFormData({ name: '', description: '', system_id: 0 });
       setEditingId(null);
       setIsEditOpen(false);
@@ -165,6 +188,7 @@ export default function SubsystemsPage() {
   async function handleDelete(id: number) {
     try {
       await deleteSubsystem(id);
+      pagination.invalidate();
       toast.success('Subsystem deleted successfully');
     } catch {
       toast.error('Failed to delete subsystem');
@@ -181,24 +205,16 @@ export default function SubsystemsPage() {
     setIsEditOpen(true);
   }
 
-  useEffect(() => {
-    const fetchHierarchyNames = async () => {
-      try {
-        const [systemsRes, subsystemsRes] = await Promise.all([
-          api.hierarchies.list('system'),
-          api.hierarchies.list('subsystem'),
-        ]);
-        setSystemHierarchyNames(systemsRes.data);
-        setSubsystemHierarchyNames(subsystemsRes.data);
-      } catch (err) {
-        console.error('Failed to load hierarchy names', err);
-      }
-    };
+  if (showLoader) return <PageLoader />;
 
-    fetchHierarchyNames();
-  }, []);
-
-  if (pageLoading) return <div className="p-8 text-center">Loading...</div>;
+  if (pagination.error) {
+    return (
+      <ListPageError
+        message={pagination.error instanceof Error ? pagination.error.message : undefined}
+        onRetry={() => void pagination.refetch()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -220,6 +236,7 @@ export default function SubsystemsPage() {
         activeParentId={parentFilter}
         onStatusFilter={applyStatusFilter}
         onParentFilter={applyParentFilter}
+        totalCount={pagination.total}
       />
 
       {(statusFilter !== 'all' || parentFilter !== 'all') && (
@@ -355,7 +372,9 @@ export default function SubsystemsPage() {
       <Card>
         <CardHeader>
           <CardTitle>All Subsystems</CardTitle>
-          <CardDescription>Total: {filtered.length}</CardDescription>
+          <CardDescription>
+            Showing {subsystems.length} on this page · {pagination.total} matching
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -370,14 +389,14 @@ export default function SubsystemsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.length === 0 ? (
+                {subsystems.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                       No subsystems found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((subsystem) => {
+                  subsystems.map((subsystem) => {
                     const system = systems.find((s) => s.id === subsystem.system_id);
                     return (
                       <TableRow
@@ -447,6 +466,17 @@ export default function SubsystemsPage() {
               </TableBody>
             </Table>
           </div>
+          <EntityListPagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            rangeLabel={pagination.rangeLabel}
+            hasPrev={pagination.hasPrev}
+            hasNext={pagination.hasNext}
+            onPrev={pagination.prevPage}
+            onNext={pagination.nextPage}
+            loading={pagination.fetching}
+          />
         </CardContent>
       </Card>
 

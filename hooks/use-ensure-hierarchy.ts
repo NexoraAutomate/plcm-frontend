@@ -17,7 +17,7 @@ export function useEnsureHierarchy() {
 
 /**
  * For list/detail pages that depend on systems → components in the store.
- * Blocks render until bootstrap and hierarchy sync complete.
+ * Blocks render until store bootstrap completes; hierarchy loads in background.
  */
 export function useEntityHierarchyGate() {
   const { loading, hierarchyLoading, hierarchyReady, hierarchyAttempted, ensureHierarchyLoaded } =
@@ -27,8 +27,7 @@ export function useEntityHierarchyGate() {
     void ensureHierarchyLoaded();
   }, [ensureHierarchyLoaded]);
 
-  const pageLoading =
-    loading || hierarchyLoading || (!hierarchyReady && !hierarchyAttempted);
+  const pageLoading = loading;
 
   return { pageLoading, loading, hierarchyLoading, hierarchyReady, hierarchyAttempted };
 }

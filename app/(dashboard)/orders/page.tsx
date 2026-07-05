@@ -19,8 +19,18 @@ import { getProjectCountByOrderId, getCount } from '@/lib/entity-counts';
 import { EntityCountCell } from '@/components/entity-count-cell';
 import { EntityNameWithFault } from '@/components/entity-fault-ping';
 import { useEntityFaultMap } from '@/hooks/use-entity-fault-map';
+import { useStatusesByTypeQuery } from '@/hooks/queries';
+import { fetchOrdersPage } from '@/hooks/queries/fetchers';
+import { queryKeys } from '@/hooks/queries/query-keys';
+import { usePaginatedList } from '@/hooks/use-paginated-list';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { EntityListPagination } from '@/components/entity-list-pagination';
+import { PageLoader } from '@/components/page-loader';
+import { ListPageError } from '@/components/list-page-error';
+import { useListPageLoader } from '@/hooks/use-list-page-loader';
 import { OrdersMiniDashboard } from '@/components/orders/orders-mini-dashboard';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { buildListFilters } from '@/lib/list-page-filter-utils';
 
 type OrderForm = {
   order_number?: string
@@ -57,9 +67,10 @@ const emptyOrderForm: OrderForm = {
 export default function OrdersPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const {orders, customers, projects, loading, createOrder, updateOrder, deleteOrder} = useDataStore();
+  const { customers, projects, createOrder, updateOrder, deleteOrder } = useDataStore();
   const faultMap = useEntityFaultMap();
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [customerFilter, setCustomerFilter] = useState<string>('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -67,8 +78,7 @@ export default function OrdersPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   
   const [formData, setFormData] = useState<OrderForm>(emptyOrderForm);
-  const [statuses, setStatuses] = useState<Models.Status[]>([]);
-  const [loadingStatuses, setLoadingStatuses] = useState(true);
+  const { data: statuses = [] } = useStatusesByTypeQuery('orders');
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({
     open: false,
     id: null,
@@ -81,21 +91,32 @@ export default function OrdersPage() {
     }
   }, [searchParams, router]);
 
+  const listFilters = useMemo(
+    () =>
+      buildListFilters({
+        search: debouncedSearch,
+        statusId: statusFilter !== 'all' ? Number(statusFilter) : null,
+        customerId: customerFilter !== 'all' ? Number(customerFilter) : null,
+      }),
+    [debouncedSearch, statusFilter, customerFilter]
+  );
+
+  const pagination = usePaginatedList({
+    queryKey: queryKeys.ordersPage(listFilters),
+    fetchPage: fetchOrdersPage,
+    filters: listFilters,
+  });
+  const orders = pagination.items;
+  const showLoader = useListPageLoader(pagination, {
+    debouncedSearch,
+    filtersActive: statusFilter !== 'all' || customerFilter !== 'all',
+    hasData: orders.length > 0,
+  });
+
   const projectCountByOrder = useMemo(
     () => getProjectCountByOrderId(projects),
     [projects]
   );
-
-  const filtered = orders.filter((o) => {
-    const matchesSearch =
-      !search.trim() ||
-      o.order_number?.toLowerCase().includes(search.toLowerCase()) ||
-      o.title?.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || o.status_id?.toString() === statusFilter;
-    const matchesCustomer =
-      customerFilter === 'all' || o.customer_id?.toString() === customerFilter;
-    return matchesSearch && matchesStatus && matchesCustomer;
-  });
 
   const filteredCustomer = useMemo(
     () => (customerFilter === 'all' ? null : customers.find((c) => String(c.id) === customerFilter)),
@@ -115,6 +136,7 @@ export default function OrdersPage() {
 
     try {
       await createOrder(formData);
+      pagination.invalidate();
 
       setFormData(emptyOrderForm);
       setIsCreateOpen(false);
@@ -140,6 +162,7 @@ export default function OrdersPage() {
 
     try {
       await updateOrder(editingId, formData);
+      pagination.invalidate();
 
       setFormData(emptyOrderForm);
       setEditingId(null);
@@ -156,6 +179,7 @@ export default function OrdersPage() {
 
     try {
       await deleteOrder(deleteConfirm.id);
+      pagination.invalidate();
       toast.success('Order deleted successfully');
     } catch (error) {
       console.error(error);
@@ -186,29 +210,17 @@ export default function OrdersPage() {
     setIsEditOpen(true);
   }
 
-  useEffect(() => {
-    const fetchStatuses = async () => {
-      try {
-        const res = await api.statuses.list("orders"); //
-        
-        // const cus = await api.customers.list( 0, 100);
-        // console.log("customer", customers)
-        // console.log("orders", orders)
-        // console.log(res.data) 
-        setStatuses(res.data);
-        // setcustomer(cus.data);
-      } catch (err) {
-        console.error("Failed to fetch statuses", err);
-      } finally {
-        setLoadingStatuses(false);
-        // console.log("customer", customers)
-      }
-    };
 
-    fetchStatuses();
-  }, []);
+  if (showLoader) return <PageLoader />;
 
-  if (loading) return <div className="p-8 text-center">Loading...</div>;
+  if (pagination.error) {
+    return (
+      <ListPageError
+        message={pagination.error instanceof Error ? pagination.error.message : undefined}
+        onRetry={() => void pagination.refetch()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -226,6 +238,7 @@ export default function OrdersPage() {
         activeCustomerId={customerFilter}
         onOrderStatusFilter={setStatusFilter}
         onCustomerFilter={setCustomerFilter}
+        totalCount={pagination.total}
       />
 
       {(statusFilter !== 'all' || customerFilter !== 'all') && (
@@ -485,7 +498,9 @@ export default function OrdersPage() {
       <Card>
         <CardHeader>
           <CardTitle>All Orders</CardTitle>
-          <CardDescription>Total: {filtered.length}</CardDescription>
+          <CardDescription>
+            Showing {orders.length} on this page · {pagination.total} matching
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -505,14 +520,14 @@ export default function OrdersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.length === 0 ? (
+                {orders.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                       No orders found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((order) => {
+                  orders.map((order) => {
                     const customer = customers.find((c) => c.id === order.customer_id);
                     const status = statuses.find((s) => s.id === order.status_id);
                     return (
@@ -619,6 +634,17 @@ export default function OrdersPage() {
               </TableBody>
             </Table>
           </div>
+          <EntityListPagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            rangeLabel={pagination.rangeLabel}
+            hasPrev={pagination.hasPrev}
+            hasNext={pagination.hasNext}
+            onPrev={pagination.prevPage}
+            onNext={pagination.nextPage}
+            loading={pagination.fetching}
+          />
         </CardContent>
       </Card>
       

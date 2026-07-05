@@ -46,6 +46,7 @@ interface OrdersMiniDashboardProps {
   activeCustomerId: string;
   onOrderStatusFilter: (statusId: string) => void;
   onCustomerFilter: (customerId: string) => void;
+  totalCount?: number;
 }
 
 function KpiTile({
@@ -96,6 +97,7 @@ export function OrdersMiniDashboard({
   activeCustomerId,
   onOrderStatusFilter,
   onCustomerFilter,
+  totalCount,
 }: OrdersMiniDashboardProps) {
   const router = useRouter();
   const [activeChart, setActiveChart] = useState<'orders' | 'projects' | 'customers' | 'timeline'>(
@@ -185,7 +187,7 @@ export function OrdersMiniDashboard({
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiTile
           label="Total Orders"
-          value={orders.length}
+          value={totalCount ?? orders.length}
           sub="Click chart to filter"
           icon={ShoppingCart}
           active={activeOrderStatusId === 'all' && activeCustomerId === 'all'}

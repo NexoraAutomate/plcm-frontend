@@ -15,7 +15,14 @@ import {
   Settings,
   RefreshCw,
 } from 'lucide-react';
-import { useDataStore } from '@/lib/data-store';
+import {
+  useCustomersQuery,
+  useOrdersQuery,
+  useProjectsQuery,
+  useStatusesQuery,
+  useUsersQuery,
+} from '@/hooks/queries';
+import { LIST_BOOTSTRAP_SIZE } from '@/lib/data-loading';
 import { useExecutiveDashboard } from '@/hooks/use-executive-dashboard';
 import { DashboardFilterBar } from '@/components/dashboard/DashboardFilterBar';
 import { DashboardSection } from '@/components/dashboard/DashboardSection';
@@ -60,7 +67,11 @@ const KPI_META: Record<
 
 export default function ExecutiveDashboardPage() {
   const router = useRouter();
-  const { customers, orders, projects, users, statuses, loading: storeLoading } = useDataStore();
+  const { data: customers = [] } = useCustomersQuery(0, LIST_BOOTSTRAP_SIZE);
+  const { data: orders = [] } = useOrdersQuery(0, LIST_BOOTSTRAP_SIZE);
+  const { data: projects = [] } = useProjectsQuery(0, LIST_BOOTSTRAP_SIZE);
+  const { data: users = [] } = useUsersQuery(0, LIST_BOOTSTRAP_SIZE);
+  const { data: statuses = [] } = useStatusesQuery();
   const [searchOpen, setSearchOpen] = useState(false);
   const {
     data,
@@ -83,7 +94,7 @@ export default function ExecutiveDashboardPage() {
     [customers, orders, projects, users]
   );
 
-  if (storeLoading || (loading && !data)) {
+  if (loading && !data) {
     return <DashboardSkeleton />;
   }
 
