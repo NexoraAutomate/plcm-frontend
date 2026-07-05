@@ -201,10 +201,15 @@ export const inventory = {
 
 // Statuses
 export const statuses = {
-  list: (skip = 0, limit = 100, status_type?: string) =>
-    api.get<Models.Status[]>("/statuses/", {
-      params: buildQueryParams({ skip, limit, status_type }),
-    }),
+  /** Paginated list, or pass a status type string as the first arg (legacy). */
+  list: (skipOrStatusType: number | string = 0, limit = 100, status_type?: string) => {
+    const skip = typeof skipOrStatusType === 'string' ? 0 : skipOrStatusType;
+    const resolvedStatusType =
+      typeof skipOrStatusType === 'string' ? skipOrStatusType : status_type;
+    return api.get<Models.Status[]>('/statuses/', {
+      params: buildQueryParams({ skip, limit, status_type: resolvedStatusType }),
+    });
+  },
   get: (id: number) => api.get<Models.Status>(`/statuses/${id}/`),
   create: (data: Partial<Models.Status>) => api.post<Models.Status>("/statuses/", data),
   update: (id: number, data: Partial<Models.Status>) => api.put<Models.Status>(`/statuses/${id}/`, data),
