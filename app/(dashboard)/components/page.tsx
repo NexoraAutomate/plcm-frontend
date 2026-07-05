@@ -21,9 +21,18 @@ import { EntityCountCell } from '@/components/entity-count-cell';
 import { EntityNameWithFault } from '@/components/entity-fault-ping';
 import { useEntityFaultMap } from '@/hooks/use-entity-fault-map';
 import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
+import { useHierarchiesQuery, useStatusesByTypeQuery } from '@/hooks/queries';
+import { fetchComponentsPage } from '@/hooks/queries/fetchers';
+import { queryKeys } from '@/hooks/queries/query-keys';
+import { usePaginatedList } from '@/hooks/use-paginated-list';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { EntityListPagination } from '@/components/entity-list-pagination';
+import { PageLoader } from '@/components/page-loader';
+import { ListPageError } from '@/components/list-page-error';
 import { HierarchyListDashboard } from '@/components/hierarchy/hierarchy-list-dashboard';
 import { ParentEntityLink } from '@/components/entity-link';
 import { buildHierarchyPageUrl } from '@/lib/hierarchy-page-filters';
+import { buildListFilters } from '@/lib/list-page-filter-utils';
 import {
   COMPONENTS_DASHBOARD_CONFIG,
   COMPONENT_STATUS_NAMES,
@@ -33,18 +42,39 @@ export default function ComponentsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { pageLoading } = useEntityHierarchyGate();
-  const { components, units, inventory, createComponent, updateComponent, deleteComponent } = useDataStore();
+  const { units, inventory, createComponent, updateComponent, deleteComponent } = useDataStore();
   const faultMap = useEntityFaultMap();
   const statusFilterParam = searchParams.get('status');
   const parentFilterParam = searchParams.get('unit_id');
   const [statusFilter, setStatusFilter] = useState<string>(statusFilterParam || 'all');
   const [parentFilter, setParentFilter] = useState<string>(parentFilterParam || 'all');
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [unitHierarchyNames, setUnitHierarchyNames] = useState<Hierarchy[]>([]);
-  const [componentHierarchyNames, setComponentHierarchyNames] = useState<Hierarchy[]>([]);
+  const { data: unitHierarchyNames = [] } = useHierarchiesQuery('unit');
+  const { data: componentHierarchyNamesAll = [] } = useHierarchiesQuery('component');
+  const { data: statuses = [] } = useStatusesByTypeQuery('components');
+
+  const listFilters = useMemo(
+    () =>
+      buildListFilters({
+        search: debouncedSearch,
+        statusName: statusFilter,
+        statuses,
+        unitId: parentFilter !== 'all' ? Number(parentFilter) : null,
+      }),
+    [debouncedSearch, statusFilter, statuses, parentFilter]
+  );
+
+  const pagination = usePaginatedList({
+    queryKey: queryKeys.componentsPage(listFilters),
+    fetchPage: fetchComponentsPage,
+    filters: listFilters,
+  });
+  const components = pagination.items;
+  const [parentScopedComponentNames, setParentScopedComponentNames] = useState<Hierarchy[] | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -52,45 +82,38 @@ export default function ComponentsPage() {
   });
 
   useEffect(() => {
-    const fetchHierarchyNames = async () => {
-      try {
-        const unitsRes = await api.hierarchies.list('unit');
-        setUnitHierarchyNames(unitsRes.data);
-      } catch (err) {
-        console.error('Failed to load unit hierarchy names', err);
-      }
+    if (!formData.unit_id) {
+      setParentScopedComponentNames(null);
+      return;
+    }
+
+    const selectedUnit = units.find((u) => u.id === formData.unit_id);
+    const parentHierarchyId = selectedUnit
+      ? unitHierarchyNames.find((hierarchy) => hierarchy.name === selectedUnit.name)?.id
+      : undefined;
+
+    if (!parentHierarchyId) {
+      setParentScopedComponentNames(null);
+      return;
+    }
+
+    let cancelled = false;
+    void api.hierarchies.list('component', parentHierarchyId).then((res) => {
+      if (!cancelled) setParentScopedComponentNames(res.data ?? []);
+    }).catch((err) => {
+      console.error('Failed to load component hierarchy names', err);
+      if (!cancelled) setParentScopedComponentNames(null);
+    });
+
+    return () => {
+      cancelled = true;
     };
-
-    fetchHierarchyNames();
-  }, []);
-
-  useEffect(() => {
-    const fetchComponentNames = async () => {
-      if (!formData.unit_id) {
-        setComponentHierarchyNames([]);
-        return;
-      }
-
-      const selectedUnit = units.find((u) => u.id === formData.unit_id);
-      const parentHierarchyId = selectedUnit
-        ? unitHierarchyNames.find((hierarchy) => hierarchy.name === selectedUnit.name)?.id
-        : undefined;
-
-      if (!parentHierarchyId) {
-        setComponentHierarchyNames([]);
-        return;
-      }
-
-      try {
-        const res = await api.hierarchies.list('component', parentHierarchyId);
-        setComponentHierarchyNames(res.data);
-      } catch (err) {
-        console.error('Failed to load component hierarchy names', err);
-      }
-    };
-
-    fetchComponentNames();
   }, [formData.unit_id, unitHierarchyNames, units]);
+
+  const componentHierarchyNames =
+    formData.unit_id && parentScopedComponentNames
+      ? parentScopedComponentNames
+      : componentHierarchyNamesAll;
 
   const inventoryQtyByComponent = useMemo(
     () => getInventoryQuantityByComponentId(inventory),
@@ -98,15 +121,6 @@ export default function ComponentsPage() {
   );
 
   const getStatusName = (component: Component) => component.status?.status_name || 'Unknown';
-
-  const filtered = components.filter((c) => {
-    const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.description?.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || getStatusName(c) === statusFilter;
-    const matchesParent =
-      parentFilter === 'all' || c.unit_id?.toString() === parentFilter;
-    return matchesSearch && matchesStatus && matchesParent;
-  });
 
   const filteredParent = useMemo(
     () => (parentFilter === 'all' ? null : units.find((u) => String(u.id) === parentFilter)),
@@ -135,6 +149,7 @@ export default function ComponentsPage() {
     }
     try {
       await createComponent(formData);
+      pagination.invalidate();
       setFormData({ name: '', description: '', unit_id: 0 });
       setIsCreateOpen(false);
     } catch {
@@ -150,6 +165,7 @@ export default function ComponentsPage() {
     }
     try {
       await updateComponent(editingId, formData);
+      pagination.invalidate();
       setFormData({ name: '', description: '', unit_id: 0 });
       setEditingId(null);
       setIsEditOpen(false);
@@ -161,6 +177,7 @@ export default function ComponentsPage() {
   async function handleDelete(id: number) {
     try {
       await deleteComponent(id);
+      pagination.invalidate();
       toast.success('Component deleted successfully');
     } catch {
       toast.error('Failed to delete component');
@@ -177,24 +194,16 @@ export default function ComponentsPage() {
     setIsEditOpen(true);
   }
 
-  useEffect(() => {
-    const fetchHierarchyNames = async () => {
-      try {
-        const [unitRes, componentRes] = await Promise.all([
-          api.hierarchies.list('unit'),
-          api.hierarchies.list('component'),
-        ]);
-        setUnitHierarchyNames(unitRes.data);
-        setComponentHierarchyNames(componentRes.data);
-      } catch (err) {
-        console.error('Failed to load component hierarchy names', err);
-      }
-    };
+  if (pageLoading || pagination.loading) return <PageLoader />;
 
-    fetchHierarchyNames();
-  }, []);
-
-  if (pageLoading) return <div className="p-8 text-center">Loading...</div>;
+  if (pagination.error) {
+    return (
+      <ListPageError
+        message={pagination.error instanceof Error ? pagination.error.message : undefined}
+        onRetry={() => void pagination.refetch()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -216,6 +225,7 @@ export default function ComponentsPage() {
         activeParentId={parentFilter}
         onStatusFilter={applyStatusFilter}
         onParentFilter={applyParentFilter}
+        totalCount={pagination.total}
       />
 
       {(statusFilter !== 'all' || parentFilter !== 'all') && (
@@ -351,7 +361,9 @@ export default function ComponentsPage() {
       <Card>
         <CardHeader>
           <CardTitle>All Components</CardTitle>
-          <CardDescription>Total: {filtered.length}</CardDescription>
+          <CardDescription>
+            Showing {components.length} on this page · {pagination.total} matching
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -366,14 +378,14 @@ export default function ComponentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.length === 0 ? (
+                {components.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                       No components found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((component) => {
+                  components.map((component) => {
                     const unit = units.find((u) => u.id === component.unit_id);
                     return (
                       <TableRow
@@ -443,6 +455,17 @@ export default function ComponentsPage() {
               </TableBody>
             </Table>
           </div>
+          <EntityListPagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            rangeLabel={pagination.rangeLabel}
+            hasPrev={pagination.hasPrev}
+            hasNext={pagination.hasNext}
+            onPrev={pagination.prevPage}
+            onNext={pagination.nextPage}
+            loading={pagination.fetching}
+          />
         </CardContent>
       </Card>
 

@@ -42,6 +42,7 @@ interface CustomersListDashboardProps {
   customerStatuses: Status[];
   activeStatusId: string;
   onStatusFilter: (statusId: string) => void;
+  totalCount?: number;
 }
 
 function KpiTile({
@@ -90,6 +91,7 @@ export function CustomersListDashboard({
   customerStatuses,
   activeStatusId,
   onStatusFilter,
+  totalCount,
 }: CustomersListDashboardProps) {
   const router = useRouter();
   const [activeChart, setActiveChart] = useState<'status' | 'engagement' | 'projects' | 'timeline'>(
@@ -180,12 +182,14 @@ export function CustomersListDashboard({
   const totalOrders = orders.length;
   const totalProjects = projects.length;
 
+  const dbTotal = totalCount ?? customers.length;
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiTile
           label="Total Customers"
-          value={customers.length}
+          value={dbTotal}
           sub="Click chart to filter"
           icon={Users}
           active={activeStatusId === 'all'}

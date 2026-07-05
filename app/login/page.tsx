@@ -14,14 +14,15 @@ export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, authReady } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
+    if (!authReady) return;
     if (isAuthenticated) {
-      router.replace('/dashboard');
+      router.replace('/executive-dashboard');
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, authReady, router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -34,7 +35,7 @@ export default function LoginPage() {
     try {
       await login(username, password);
       toast.success('Logged in successfully');
-      router.push('/dashboard');
+      router.push('/executive-dashboard');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Authentication failed';
       toast.error(message);

@@ -23,6 +23,7 @@ import {
 } from '@/lib/project-hierarchy-dashboard';
 import type { HierarchyEntityType } from '@/lib/system-hierarchy-graph';
 import * as api from '@/lib/api';
+import { ABSOLUTE_FETCH_CAP, fetchCappedPages } from '@/lib/data-loading';
 import { resolveEntityId } from '@/lib/entity-resolver';
 import { formatUserRef } from '@/lib/user-display';
 
@@ -674,43 +675,34 @@ function maintenanceCaseToHistoryRecord(
 }
 
 export async function loadAllConfigurationHistory() {
-  const all: ConfigurationHistory[] = [];
-  const pageSize = 500;
-  let skip = 0;
-
-  while (true) {
-    const res = await api.configurationHistory.list(skip, pageSize);
-    const page = res.data ?? [];
-    all.push(...page);
-    if (page.length < pageSize) break;
-    skip += pageSize;
-  }
-
-  return all;
+  return fetchCappedPages(
+    (skip, limit) => api.configurationHistory.list(skip, limit),
+    { pageSize: 500, maxItems: ABSOLUTE_FETCH_CAP }
+  );
 }
 
-async function loadAllMaintenanceCases() {
-  const all = [];
+async function loadMaintenanceCasesForProject(projectId: number) {
+  const matched: MaintenanceCase[] = [];
   const pageSize = 500;
   let skip = 0;
 
-  while (true) {
-    const res = await api.maintenanceCases.list(skip, pageSize);
+  while (skip < ABSOLUTE_FETCH_CAP) {
+    const remaining = ABSOLUTE_FETCH_CAP - skip;
+    const limit = Math.min(pageSize, remaining);
+    const res = await api.maintenanceCases.list(skip, limit);
     const page = res.data ?? [];
-    all.push(...page);
-    if (page.length < pageSize) break;
-    skip += pageSize;
+    matched.push(...page.filter((maintenanceCase) => maintenanceCase.project_id === projectId));
+    if (page.length < limit) break;
+    skip += page.length;
   }
 
-  return all;
+  return matched;
 }
 
 async function loadConfigurationHistoryForProjectCases(projectId?: number) {
   if (!projectId) return [];
 
-  const cases = (await loadAllMaintenanceCases()).filter(
-    (maintenanceCase) => maintenanceCase.project_id === projectId
-  );
+  const cases = await loadMaintenanceCasesForProject(projectId);
 
   const pages = await Promise.all(
     cases.map(async (maintenanceCase) => {
@@ -738,9 +730,7 @@ async function loadProjectMaintenanceFromCases(
     };
   }
 
-  const cases = (await loadAllMaintenanceCases()).filter(
-    (maintenanceCase) => maintenanceCase.project_id === projectId
-  );
+  const cases = await loadMaintenanceCasesForProject(projectId);
 
   const pendingFaultyEntities: Array<{ faultyEntity: FaultyEntity; ref: SubtreeEntityRef }> = [];
   const caseRecords: ConfigurationHistory[] = [];

@@ -1,22 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { fetchExecutiveDashboard } from '@/lib/api/dashboard';
+import { useCallback, useMemo, useState } from 'react';
 import type {
   DashboardSectionKey,
   ExecutiveDashboardFilters,
-  ExecutiveDashboardResponse,
 } from '@/lib/types/dashboard';
 import { KPI_SECTION_MAP } from '@/lib/dashboard-chart-theme';
+import { useExecutiveDashboardQuery } from '@/hooks/queries';
 
 const DEFAULT_FILTERS: ExecutiveDashboardFilters = {};
 
 export function useExecutiveDashboard() {
   const [filters, setFilters] = useState<ExecutiveDashboardFilters>(DEFAULT_FILTERS);
   const [kpiFilter, setKpiFilter] = useState<string | null>(null);
-  const [data, setData] = useState<ExecutiveDashboardResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const activeFilters = useMemo(
     () => ({
@@ -26,25 +22,8 @@ export function useExecutiveDashboard() {
     [filters, kpiFilter]
   );
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetchExecutiveDashboard(activeFilters);
-      setData(response);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to load executive dashboard';
-      setError(message);
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [activeFilters]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const { data, isLoading, isFetching, error, refetch } =
+    useExecutiveDashboardQuery(activeFilters);
 
   const updateFilters = useCallback((patch: Partial<ExecutiveDashboardFilters>) => {
     setFilters((prev) => {
@@ -79,15 +58,17 @@ export function useExecutiveDashboard() {
   );
 
   return {
-    data,
-    loading,
-    error,
+    data: data ?? null,
+    loading: isLoading || isFetching,
+    error: error instanceof Error ? error.message : error ? String(error) : null,
     filters,
     kpiFilter,
     updateFilters,
     clearFilters,
     selectKpi,
-    refetch: load,
+    refetch: () => {
+      void refetch();
+    },
     isSectionHighlighted,
   };
 }

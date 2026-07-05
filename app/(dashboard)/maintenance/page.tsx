@@ -25,11 +25,21 @@ import { MaintenanceLookupDialog } from '@/components/maintenance/MaintenanceLoo
 import { MaintenanceCaseDialog } from '@/components/maintenance/MaintenanceCaseDialog';
 import { MaintenanceTable } from '@/components/maintenance/MaintenanceTable';
 import { loadAllPartNumbers } from '@/lib/part-numbers';
+import { fetchMaintenanceCasesPage } from '@/hooks/queries/fetchers';
+import { queryKeys } from '@/hooks/queries/query-keys';
+import { usePaginatedList } from '@/hooks/use-paginated-list';
+import { EntityListPagination } from '@/components/entity-list-pagination';
+import { PageLoader } from '@/components/page-loader';
 
 export default function MaintenancePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const {maintenanceCases,projects,loading,createMaintenanceCase,updateMaintenanceCase,deleteMaintenanceCase,lookupEntityByPartNumber,suspectChildren,confirmFault} = useDataStore();
+  const {maintenanceCases,projects,loading,createMaintenanceCase,updateMaintenanceCase,deleteMaintenanceCase,lookupEntityByPartNumber,suspectChildren,confirmFault,refreshData} = useDataStore();
+  const pagination = usePaginatedList({
+    queryKey: queryKeys.maintenanceCasesPage(),
+    fetchPage: fetchMaintenanceCasesPage,
+  });
+  const paginatedCases = pagination.items;
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>(searchParams.get('status') || 'all');
@@ -51,24 +61,10 @@ export default function MaintenancePage() {
   // const [statuses, setStatuses] = useState<Models.Status[]>([]);
 
 
-  // Load maintenance cases on mount
-  useEffect(() => {
-    loadMaintenanceCases();
-    loadPartNumber();
-  }, []);
-
-  useEffect(() => {
-    if (!isLookupOpen) return;
-    loadPartNumber();
-  }, [isLookupOpen]);
-
   const loadMaintenanceCases = async () => {
     try {
       setIsLoadingData(true);
-      const res = await maintenanceApi.maintenanceCases.list(0, 100);
-      // console.log('Loaded maintenance cases:', res.data);
-      // Note: This data would typically be managed by the data store
-      // For now, we're managing it locally in the component
+      await refreshData({ silent: true });
     } catch (err) {
       console.error('Failed to load maintenance cases:', err);
       toast.error('Failed to load maintenance cases');
@@ -76,6 +72,12 @@ export default function MaintenancePage() {
       setIsLoadingData(false);
     }
   };
+
+  // Load part numbers when lookup dialog opens
+  useEffect(() => {
+    if (!isLookupOpen) return;
+    loadPartNumber();
+  }, [isLookupOpen]);
 
   const loadPartNumber = async () => {
     try {
@@ -88,7 +90,11 @@ export default function MaintenancePage() {
   };
 
 
-  const filtered = maintenanceCases.filter((c) => {
+  useEffect(() => {
+    pagination.setPage(0);
+  }, [search, statusFilter, projectFilter]);
+
+  const filtered = paginatedCases.filter((c) => {
     const matchesSearch =
       c.case_number.toLowerCase().includes(search.toLowerCase()) ||
       c.description.toLowerCase().includes(search.toLowerCase());
@@ -106,6 +112,7 @@ export default function MaintenancePage() {
     try {
       // console.log('Creating case with data:', data);
       await createMaintenanceCase(data);
+      pagination.invalidate();
       await loadMaintenanceCases();
     } catch (err) {
       // Error handled by data store
@@ -116,6 +123,7 @@ export default function MaintenancePage() {
     if (!editingCase) return;
     try {
       await updateMaintenanceCase(editingCase.id, data);
+      pagination.invalidate();
       setEditingCase(null);
       await loadMaintenanceCases();
     } catch (err) {
@@ -170,6 +178,7 @@ export default function MaintenancePage() {
     // console.log('Creating case with payload:', payload)
     try {
       const created = await createMaintenanceCase(payload);
+      pagination.invalidate();
       setLookupCaseId(created.id);
       // console.log(lookupCaseId);
       await loadMaintenanceCases();
@@ -226,6 +235,7 @@ export default function MaintenancePage() {
     }
     try {
       await deleteMaintenanceCase(caseItem.id);
+      pagination.invalidate();
       await loadMaintenanceCases();
     } catch (err) {
       // Error handled by data store
@@ -280,7 +290,7 @@ export default function MaintenancePage() {
   };
 
   if (loading) {
-    return <div className="p-8 text-center">Loading...</div>;
+    return <PageLoader />;
   }
 
   return (
@@ -379,16 +389,32 @@ export default function MaintenancePage() {
       </div>
 
       {/* Main Table */}
-      <MaintenanceTable
-        cases={filtered}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onView={handleView}
-        isLoading={isLoadingData}
-        getFaultyEntities={getFaultyEntities}
-        getMaintenanceActions={getMaintenanceActions}
-        getMaintenanceDeliveries={getMaintenanceDeliveries}
-      />
+      <div className="space-y-2">
+        <p className="text-sm text-muted-foreground">
+          Showing {filtered.length} on this page · {pagination.total} total in database
+        </p>
+        <MaintenanceTable
+          cases={filtered}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onView={handleView}
+          isLoading={isLoadingData || pagination.loading}
+          getFaultyEntities={getFaultyEntities}
+          getMaintenanceActions={getMaintenanceActions}
+          getMaintenanceDeliveries={getMaintenanceDeliveries}
+        />
+        <EntityListPagination
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          total={pagination.total}
+          rangeLabel={pagination.rangeLabel}
+          hasPrev={pagination.hasPrev}
+          hasNext={pagination.hasNext}
+          onPrev={pagination.prevPage}
+          onNext={pagination.nextPage}
+          loading={pagination.fetching}
+        />
+      </div>
 
       {/* Lookup Dialog */}
       <MaintenanceLookupDialog

@@ -15,10 +15,20 @@ import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
 import * as api from '@/lib/api';
 import type * as Models from '@/lib/models';
+import { fetchUsersPage } from '@/hooks/queries/fetchers';
+import { queryKeys } from '@/hooks/queries/query-keys';
+import { usePaginatedList } from '@/hooks/use-paginated-list';
+import { PageLoader } from '@/components/page-loader';
 
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
-  const { users, loading, createUser, updateUser, deleteUser } = useDataStore();
+  const { createUser, updateUser, deleteUser } = useDataStore();
+  const pagination = usePaginatedList({
+    queryKey: queryKeys.usersPage(),
+    fetchPage: fetchUsersPage,
+  });
+  const users = pagination.items;
+  const loading = pagination.loading;
   const [search, setSearch] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -39,22 +49,15 @@ export default function UsersPage() {
     email: '',
     role_id: '',
   });
-  const [usersWithRoles, setUsersWithRoles] = useState<any[]>([]);
 
-  // Fetch available roles and user roles from API
+  // Fetch available roles from API
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoadingRoles(true);
 
         const rolesRes = await api.auth.listRoles();
-        // console.log("rolesRes OK", rolesRes.data);
-
-        const usersRes = await api.users.usersWithRoles();
-        // console.log("usersRes OK", usersRes.data);
-
         setRoles(rolesRes.data);
-        setUsersWithRoles(usersRes.data);
 
       } catch (err) {
         console.error("API ERROR:", err);
@@ -67,18 +70,16 @@ export default function UsersPage() {
     fetchData();
   }, []);
 
-  const filtered = usersWithRoles.filter(
+  useEffect(() => {
+    pagination.setPage(0);
+  }, [search]);
+
+  const filtered = users.filter(
     (u) =>
       u.full_name.toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase()) ||
       u.username.toLowerCase().includes(search.toLowerCase())
   );
-
-  // Debug logging
-  useEffect(() => {
-    // console.log('Users data:', users);
-    // console.log('Roles data:', roles);
-  }, [users, roles]);
 
   // Admin-only access
   if (currentUser?.roles?.includes('Admin') === false && currentUser?.roles?.length === 0) {
@@ -109,10 +110,7 @@ export default function UsersPage() {
       setFormData({ username: '', password: '', full_name: '', email: '', role_id: '' });
       setIsCreateOpen(false);
       toast.success('User created successfully');
-      // Smart reload: refetch users
-      if (typeof window !== 'undefined') {
-        window.location.reload();
-      }
+      pagination.invalidate();
     } catch (err) {
       console.error('Failed to create user:', err);
       toast.error('Failed to create user');
@@ -148,10 +146,7 @@ export default function UsersPage() {
       setEditingId(null);
       setIsEditOpen(false);
       toast.success('User updated successfully');
-      // Smart reload: refetch users
-      if (typeof window !== 'undefined') {
-        window.location.reload();
-      }
+      pagination.invalidate();
     } catch (err) {
       console.error('Failed to update user:', err);
       toast.error('Failed to update user');
@@ -163,10 +158,7 @@ export default function UsersPage() {
     try {
       await api.auth.deregister(id);
       toast.success('User deleted successfully');
-      // Smart reload: refetch users
-      if (typeof window !== 'undefined') {
-        window.location.reload();
-      }
+      pagination.invalidate();
     } catch (err) {
       console.error('Failed to delete user:', err);
       toast.error('Failed to delete user');
@@ -197,7 +189,7 @@ export default function UsersPage() {
     setIsEditOpen(true);
   }
 
-  if (loading) return <div className="p-8 text-center">Loading...</div>;
+  if (loading) return <PageLoader />;
 
   return (
     <div className="space-y-8">
@@ -277,7 +269,9 @@ export default function UsersPage() {
       <Card>
         <CardHeader>
           <CardTitle>All Users</CardTitle>
-          <CardDescription>Total: {filtered.length}</CardDescription>
+          <CardDescription>
+            Showing {filtered.length} on this page · {pagination.total} total in database
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -329,6 +323,17 @@ export default function UsersPage() {
               </TableBody>
             </Table>
           </div>
+          <EntityListPagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            rangeLabel={pagination.rangeLabel}
+            hasPrev={pagination.hasPrev}
+            hasNext={pagination.hasNext}
+            onPrev={pagination.prevPage}
+            onNext={pagination.nextPage}
+            loading={pagination.fetching}
+          />
         </CardContent>
       </Card>
 

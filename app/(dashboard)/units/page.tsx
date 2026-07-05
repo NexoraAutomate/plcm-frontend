@@ -21,22 +21,58 @@ import { EntityCountCell } from '@/components/entity-count-cell';
 import { EntityNameWithFault } from '@/components/entity-fault-ping';
 import { useEntityFaultMap } from '@/hooks/use-entity-fault-map';
 import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
+import { useStatusesByTypeQuery } from '@/hooks/queries';
 import { HierarchyListDashboard } from '@/components/hierarchy/hierarchy-list-dashboard';
+import { fetchUnitsPage } from '@/hooks/queries/fetchers';
+import { queryKeys } from '@/hooks/queries/query-keys';
+import { usePaginatedList } from '@/hooks/use-paginated-list';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { EntityListPagination } from '@/components/entity-list-pagination';
+import { PageLoader } from '@/components/page-loader';
+import { ListPageError } from '@/components/list-page-error';
+import { useListPageLoader } from '@/hooks/use-list-page-loader';
 import { ParentEntityLink } from '@/components/entity-link';
 import { buildHierarchyPageUrl } from '@/lib/hierarchy-page-filters';
+import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { UNITS_DASHBOARD_CONFIG, UNIT_STATUS_NAMES } from '@/lib/hierarchy-dashboard-configs';
 
 export default function UnitsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { pageLoading } = useEntityHierarchyGate();
-  const { units, modules, components, createUnit, updateUnit, deleteUnit } = useDataStore();
+  const { modules, components, createUnit, updateUnit, deleteUnit } = useDataStore();
   const faultMap = useEntityFaultMap();
   const statusFilterParam = searchParams.get('status');
   const parentFilterParam = searchParams.get('module_id');
   const [statusFilter, setStatusFilter] = useState<string>(statusFilterParam || 'all');
   const [parentFilter, setParentFilter] = useState<string>(parentFilterParam || 'all');
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
+  const { data: statuses = [] } = useStatusesByTypeQuery('units');
+
+  const listFilters = useMemo(
+    () =>
+      buildListFilters({
+        search: debouncedSearch,
+        statusName: statusFilter,
+        statuses,
+        moduleId: parentFilter !== 'all' ? Number(parentFilter) : null,
+      }),
+    [debouncedSearch, statusFilter, statuses, parentFilter]
+  );
+
+  const pagination = usePaginatedList({
+    queryKey: queryKeys.unitsPage(listFilters),
+    fetchPage: fetchUnitsPage,
+    filters: listFilters,
+  });
+  const units = pagination.items;
+  const showLoader = useListPageLoader(pagination, {
+    pageLoading,
+    debouncedSearch,
+    filtersActive: statusFilter !== 'all' || parentFilter !== 'all',
+    hasData: units.length > 0,
+  });
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -96,15 +132,6 @@ export default function UnitsPage() {
 
   const getStatusName = (unit: Unit) => unit.status?.status_name || 'Unknown';
 
-  const filtered = units.filter((u) => {
-    const matchesSearch = u.name.toLowerCase().includes(search.toLowerCase()) ||
-      u.description?.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || getStatusName(u) === statusFilter;
-    const matchesParent =
-      parentFilter === 'all' || u.module_id?.toString() === parentFilter;
-    return matchesSearch && matchesStatus && matchesParent;
-  });
-
   const filteredParent = useMemo(
     () => (parentFilter === 'all' ? null : modules.find((m) => String(m.id) === parentFilter)),
     [parentFilter, modules]
@@ -132,6 +159,7 @@ export default function UnitsPage() {
     }
     try {
       await createUnit(formData);
+      pagination.invalidate();
       setFormData({ name: '', description: '', module_id: 0 });
       setIsCreateOpen(false);
     } catch {
@@ -147,6 +175,7 @@ export default function UnitsPage() {
     }
     try {
       await updateUnit(editingId, formData);
+      pagination.invalidate();
       setFormData({ name: '', description: '', module_id: 0 });
       setEditingId(null);
       setIsEditOpen(false);
@@ -158,6 +187,7 @@ export default function UnitsPage() {
   async function handleDelete(id: number) {
     try {
       await deleteUnit(id);
+      pagination.invalidate();
       toast.success('Unit deleted successfully');
     } catch {
       toast.error('Failed to delete unit');
@@ -175,7 +205,16 @@ export default function UnitsPage() {
   }
 
 
-  if (pageLoading) return <div className="p-8 text-center">Loading...</div>;
+  if (showLoader) return <PageLoader />;
+
+  if (pagination.error) {
+    return (
+      <ListPageError
+        message={pagination.error instanceof Error ? pagination.error.message : undefined}
+        onRetry={() => void pagination.refetch()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -197,6 +236,7 @@ export default function UnitsPage() {
         activeParentId={parentFilter}
         onStatusFilter={applyStatusFilter}
         onParentFilter={applyParentFilter}
+        totalCount={pagination.total}
       />
 
       {(statusFilter !== 'all' || parentFilter !== 'all') && (
@@ -332,7 +372,9 @@ export default function UnitsPage() {
       <Card>
         <CardHeader>
           <CardTitle>All Units</CardTitle>
-          <CardDescription>Total: {filtered.length}</CardDescription>
+          <CardDescription>
+            Showing {units.length} on this page · {pagination.total} matching
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -347,14 +389,14 @@ export default function UnitsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.length === 0 ? (
+                {units.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                       No units found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((unit) => {
+                  units.map((unit) => {
                     const module = modules.find((m) => m.id === unit.module_id);
                     return (
                       <TableRow
@@ -424,6 +466,17 @@ export default function UnitsPage() {
               </TableBody>
             </Table>
           </div>
+          <EntityListPagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            rangeLabel={pagination.rangeLabel}
+            hasPrev={pagination.hasPrev}
+            hasNext={pagination.hasNext}
+            onPrev={pagination.prevPage}
+            onNext={pagination.nextPage}
+            loading={pagination.fetching}
+          />
         </CardContent>
       </Card>
 

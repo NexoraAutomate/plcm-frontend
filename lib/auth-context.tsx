@@ -6,6 +6,8 @@ import * as Models from './models';
 interface AuthContextType {
   user: Models.User | null;
   isAuthenticated: boolean;
+  /** True after localStorage session hydration completes (avoids redirect churn). */
+  authReady: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   hasAccess: (roles?: string[], permissions?: string[]) => boolean;
@@ -15,6 +17,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Models.User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem('sat-user');
@@ -26,6 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('token');
       }
     }
+    setAuthReady(true);
   }, []);
 
   const login = useCallback(async (username: string, password: string) => {
@@ -92,7 +96,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasAccess = () => true; // Placeholder for actual access control logic
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, logout, hasAccess }}>
+    <AuthContext.Provider
+      value={{ user, isAuthenticated: !!user, authReady, login, logout, hasAccess }}
+    >
       {children}
     </AuthContext.Provider>
   );

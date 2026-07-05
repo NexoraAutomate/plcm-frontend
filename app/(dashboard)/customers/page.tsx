@@ -1,6 +1,6 @@
 'use client';
 
-import { useState,useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Search, Plus, Edit,UserRoundPen ,Check,X, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,14 +14,22 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { useDataStore } from '@/lib/data-store';
+import { useStatusesByTypeQuery } from '@/hooks/queries';
+import { fetchCustomersPage } from '@/hooks/queries/fetchers';
+import { queryKeys } from '@/hooks/queries/query-keys';
+import { usePaginatedList } from '@/hooks/use-paginated-list';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { EntityListPagination } from '@/components/entity-list-pagination';
+import { PageLoader } from '@/components/page-loader';
+import { ListPageError } from '@/components/list-page-error';
+import { useListPageLoader } from '@/hooks/use-list-page-loader';
 import { toast } from 'sonner';
 import { Customer } from '@/lib/models';
-import { stringify } from 'querystring';
 import * as Models from '@/lib/models';
-import * as api from '@/lib/api';
 import { getOrderCountByCustomerId, getProjectCountByCustomerId, getCount } from '@/lib/entity-counts';
 import { EntityCountCell } from '@/components/entity-count-cell';
 import { CustomersListDashboard } from '@/components/customers/customers-list-dashboard';
+import { buildListFilters } from '@/lib/list-page-filter-utils';
 
 const emptyCustomerForm: CustomerForm = {
   customer_code: '',
@@ -46,17 +54,45 @@ type CustomerForm = {
 };
 
 export default function CustomersPage() {
-  const { customers, orders, projects, loading, createCustomer, updateCustomer, deleteCustomer } = useDataStore();
+  const {
+    orders,
+    projects,
+    createCustomer,
+    updateCustomer,
+    deleteCustomer,
+  } = useDataStore();
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number| null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Customer| null>(null);
-  const [statuses, setStatuses] = useState<Models.Status[]>([]);
+  const { data: statuses = [] } = useStatusesByTypeQuery('customers');
   const [formData, setFormData] = useState<CustomerForm>(emptyCustomerForm);
   const router = useRouter();
+
+  const listFilters = useMemo(
+    () =>
+      buildListFilters({
+        search: debouncedSearch,
+        statusId: statusFilter !== 'all' ? Number(statusFilter) : null,
+      }),
+    [debouncedSearch, statusFilter]
+  );
+
+  const pagination = usePaginatedList({
+    queryKey: queryKeys.customersPage(listFilters),
+    fetchPage: fetchCustomersPage,
+    filters: listFilters,
+  });
+  const customers = pagination.items;
+  const showLoader = useListPageLoader(pagination, {
+    debouncedSearch,
+    filtersActive: statusFilter !== 'all',
+    hasData: customers.length > 0,
+  });
 
 
   const getStatusValue = (status: Models.Status) => status.status_name ?? (status as any).status_name ?? String(status.id);
@@ -83,20 +119,6 @@ export default function CustomersPage() {
     [orders, projects]
   );
 
-  const filtered = customers.filter((c) => {
-    const term = search.toLowerCase();
-    const matchesSearch =
-      !term ||
-      c.customer_code?.toLowerCase().includes(term) ||
-      c.name.toLowerCase().includes(term) ||
-      c.primary_contact_name?.toLowerCase().includes(term) ||
-      c.email?.toLowerCase().includes(term) ||
-      c.phone?.toLowerCase().includes(term);
-    const matchesStatus =
-      statusFilter === 'all' || c.status_id?.toString() === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
   const filteredStatusLabel = useMemo(
     () =>
       statusFilter === 'all'
@@ -112,6 +134,7 @@ export default function CustomersPage() {
     try {
       console.log("formData  :", formData)
       await createCustomer(formData);
+      pagination.invalidate();
       setFormData(emptyCustomerForm);
       setIsCreateOpen(false);
     } catch {
@@ -129,6 +152,7 @@ export default function CustomersPage() {
     // if (!confirm('Are you sure you want to delete this customer?')) return;
     try {
       await deleteCustomer(deleteTarget.id);
+      pagination.invalidate();
     } catch (err) {
       console.error("Failed to delete hierarchy item", err);
       toast.error("Failed to delete hierarchy item");
@@ -169,6 +193,7 @@ export default function CustomersPage() {
           payload: formData,
         });
       await updateCustomer(editingId, formData);
+      pagination.invalidate();
       console.log('Current formData.status:', formData.status_id);
 
       setFormData({
@@ -191,24 +216,18 @@ export default function CustomersPage() {
     }
   }
 
-  useEffect(() => {
-        const fetchStatuses = async () => {
-          try {
-            const [statusRes] = await Promise.all([
-              api.statuses.list("customers"),
-            ]);
-            console.log("FetchResponse", statusRes)
-            setStatuses(statusRes.data);
-          } catch (err) {
-            console.error("Failed to fetch statuses or hierarchy names", err);
-          } finally {
-          }
-        };
-  
-        fetchStatuses();
-      }, []);
 
-  if (loading) return <div className="p-8 text-center">Loading...</div>;
+  if (showLoader) return <PageLoader />;
+
+
+  if (pagination.error) {
+    return (
+      <ListPageError
+        message={pagination.error instanceof Error ? pagination.error.message : undefined}
+        onRetry={() => void pagination.refetch()}
+      />
+    );
+  }
 
   return (
     
@@ -225,6 +244,7 @@ export default function CustomersPage() {
         customerStatuses={statuses}
         activeStatusId={statusFilter}
         onStatusFilter={setStatusFilter}
+        totalCount={pagination.total}
       />
 
       {statusFilter !== 'all' && filteredStatusLabel && (
@@ -432,7 +452,9 @@ export default function CustomersPage() {
       <Card>
         <CardHeader>
           <CardTitle>All Customers</CardTitle>
-          <CardDescription>Total: {filtered.length}</CardDescription>
+          <CardDescription>
+            Showing {customers.length} on this page · {pagination.total} matching
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -449,14 +471,14 @@ export default function CustomersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.length === 0 ? (
+                {customers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                       No customers found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((customer) => (
+                  customers.map((customer) => (
                     <TableRow
                       key={customer.id}
                       className="cursor-pointer hover:bg-muted/50"
@@ -564,6 +586,17 @@ export default function CustomersPage() {
               </TableBody>
             </Table>
           </div>
+          <EntityListPagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            rangeLabel={pagination.rangeLabel}
+            hasPrev={pagination.hasPrev}
+            hasNext={pagination.hasNext}
+            onPrev={pagination.prevPage}
+            onNext={pagination.nextPage}
+            loading={pagination.fetching}
+          />
         </CardContent>
       </Card>
 
