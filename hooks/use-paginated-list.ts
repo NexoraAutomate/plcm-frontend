@@ -34,10 +34,11 @@ export function usePaginatedList<T>({
   const skip = page * pageSize;
 
   const { data, isLoading, isFetching, error, refetch } = useQuery({
-    queryKey: [...queryKey, { page, pageSize, filters: normalizedFilters }],
+    queryKey: [...queryKey, page, pageSize],
     queryFn: () => fetchPage(skip, pageSize, normalizedFilters),
     enabled,
     placeholderData: (previous) => previous,
+    retry: 1,
   });
 
   const items = data?.items ?? [];

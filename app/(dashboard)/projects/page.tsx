@@ -29,6 +29,7 @@ import { ListPageError } from '@/components/list-page-error';
 import { useListPageLoader } from '@/hooks/use-list-page-loader';
 import { ProjectsMiniDashboard } from '@/components/projects/projects-mini-dashboard';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
+import { toDateInputValue } from '@/lib/hierarchy-install-fields';
 import { getSystemCountByProjectId, getCount } from '@/lib/entity-counts';
 import { EntityCountCell } from '@/components/entity-count-cell';
 import { Progress } from '@/components/ui/progress';
@@ -91,15 +92,16 @@ export default function ProjectsPage(){
     fetchPage: fetchProjectsPage,
     filters: listFilters,
   });
-  const hasPaginatedResult = !pagination.loading && !pagination.error;
   const projects =
-    pagination.items.length > 0 || hasPaginatedResult
+    pagination.items.length > 0
       ? pagination.items
-      : storeProjects;
+      : storeProjects.length > 0 && !pagination.loading
+        ? storeProjects
+        : pagination.items;
   const showLoader = useListPageLoader(pagination, {
     debouncedSearch,
     filtersActive: statusFilter !== 'Total' || orderFilterId != null,
-    hasData: projects.length > 0,
+    hasData: projects.length > 0 || storeProjects.length > 0,
   });
 
   const orderScopedProjects = projects;
@@ -187,8 +189,8 @@ export default function ProjectsPage(){
     setFormData({
       name: project.name,
       description: project.description,
-      start_date: project.start_date,
-      end_date: project.end_date,
+      start_date: toDateInputValue(project.start_date),
+      end_date: toDateInputValue(project.end_date),
       owner_id: project.owner_id,
       order_id: project.order_id,
       status_id: project.status_id,

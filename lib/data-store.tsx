@@ -293,7 +293,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       }),
       queryClient.fetchQuery<Models.Project[]>({
         queryKey: queryKeys.projects(0, limit),
-        queryFn: () => fetchProjects(0, limit),
+        queryFn: () => fetchProjects(0, limit, { includeTotal: false }),
         retry: false,
       }),
       queryClient.fetchQuery<Models.Customer[]>({
@@ -346,7 +346,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
         }),
         queryClient.fetchQuery<Models.Project[]>({
           queryKey: queryKeys.projects(0, limit),
-          queryFn: () => fetchProjects(0, limit),
+          queryFn: () => fetchProjects(0, limit, { includeTotal: false }),
           retry: false,
         }),
         queryClient.fetchQuery<Models.Inventory[]>({
@@ -592,7 +592,25 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
 
   const updateProject = async (id: number, data: Partial<Models.Project>) => {
     try {
-      const res = await api.projects.update(id, data);
+      const payload: Partial<Models.Project> = {};
+      if (data.name !== undefined) payload.name = data.name;
+      if (data.description !== undefined) payload.description = data.description;
+      if (data.owner_id !== undefined && data.owner_id > 0) payload.owner_id = data.owner_id;
+      if (data.order_id !== undefined && data.order_id > 0) payload.order_id = data.order_id;
+      if (data.status_id !== undefined && data.status_id > 0) payload.status_id = data.status_id;
+      if (data.progress !== undefined) payload.progress = data.progress;
+      if (data.start_date) {
+        payload.start_date = data.start_date.includes('T')
+          ? data.start_date
+          : `${data.start_date}T00:00:00`;
+      }
+      if (data.end_date) {
+        payload.end_date = data.end_date.includes('T')
+          ? data.end_date
+          : `${data.end_date}T00:00:00`;
+      }
+
+      const res = await api.projects.update(id, payload);
       setProjects(projects.map((p) => (p.id === id ? res.data : p)));
       toast.success('Project updated successfully');
       return res.data;

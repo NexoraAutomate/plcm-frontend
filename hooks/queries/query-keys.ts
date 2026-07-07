@@ -1,4 +1,9 @@
 import type { ExecutiveDashboardFilters } from '@/lib/types/dashboard';
+import { normalizeListFilters, type ListFilterParams } from '@/lib/list-filters';
+
+function stableFiltersKey(filters?: ListFilterParams) {
+  return JSON.stringify(normalizeListFilters(filters) ?? {});
+}
 
 export const queryKeys = {
   statuses: () => ['statuses'] as const,
@@ -20,27 +25,26 @@ export const queryKeys = {
     ['dashboard', 'executive', filters] as const,
   hierarchies: (hierarchyType?: string) =>
     ['hierarchies', { hierarchyType: hierarchyType ?? null }] as const,
-  customersPage: (filters?: import('@/lib/list-filters').ListFilterParams) =>
-    ['customers', 'page', filters ?? null] as const,
-  ordersPage: (filters?: import('@/lib/list-filters').ListFilterParams) =>
-    ['orders', 'page', filters ?? null] as const,
-  projectsPage: (filters?: import('@/lib/list-filters').ListFilterParams) =>
-    ['projects', 'page', filters ?? null] as const,
-  usersPage: (filters?: import('@/lib/list-filters').ListFilterParams) =>
-    ['users', 'page', filters ?? null] as const,
-  inventoryPage: (type?: string, filters?: import('@/lib/list-filters').ListFilterParams) =>
-    ['inventory', 'page', { type: type ?? null, filters: filters ?? null }] as const,
-  systemsPage: (filters?: import('@/lib/list-filters').ListFilterParams) =>
-    ['systems', 'page', filters ?? null] as const,
-  subsystemsPage: (filters?: import('@/lib/list-filters').ListFilterParams) =>
-    ['subsystems', 'page', filters ?? null] as const,
-  modulesPage: (filters?: import('@/lib/list-filters').ListFilterParams) =>
-    ['modules', 'page', filters ?? null] as const,
-  unitsPage: (filters?: import('@/lib/list-filters').ListFilterParams) =>
-    ['units', 'page', filters ?? null] as const,
-  componentsPage: (filters?: import('@/lib/list-filters').ListFilterParams) =>
-    ['components', 'page', filters ?? null] as const,
-  allProjects: () => ['projects', 'all'] as const,
+  customersPage: (filters?: ListFilterParams) =>
+    ['customers', 'page', stableFiltersKey(filters)] as const,
+  ordersPage: (filters?: ListFilterParams) =>
+    ['orders', 'page', stableFiltersKey(filters)] as const,
+  projectsPage: (filters?: ListFilterParams) =>
+    ['projects', 'page', stableFiltersKey(filters)] as const,
+  usersPage: (filters?: ListFilterParams) =>
+    ['users', 'page', stableFiltersKey(filters)] as const,
+  inventoryPage: (type?: string, filters?: ListFilterParams) =>
+    ['inventory', 'page', { type: type ?? null, filters: stableFiltersKey(filters) }] as const,
+  systemsPage: (filters?: ListFilterParams) =>
+    ['systems', 'page', stableFiltersKey(filters)] as const,
+  subsystemsPage: (filters?: ListFilterParams) =>
+    ['subsystems', 'page', stableFiltersKey(filters)] as const,
+  modulesPage: (filters?: ListFilterParams) =>
+    ['modules', 'page', stableFiltersKey(filters)] as const,
+  unitsPage: (filters?: ListFilterParams) =>
+    ['units', 'page', stableFiltersKey(filters)] as const,
+  componentsPage: (filters?: ListFilterParams) =>
+    ['components', 'page', stableFiltersKey(filters)] as const,
   maintenanceLogsPage: () => ['maintenanceLogs', 'page'] as const,
   maintenanceCasesPage: () => ['maintenanceCases', 'page'] as const,
   statusesPage: (statusType?: string) => ['statuses', 'page', { statusType: statusType ?? null }] as const,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
 import { toast } from 'sonner';
@@ -13,6 +13,7 @@ import { HierarchyDashboardControls } from '@/components/hierarchy-dashboard/hie
 import { ProjectHierarchyFlow } from '@/components/hierarchy-dashboard/project-hierarchy-flow';
 import { fetchAllProjects } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
+import { LIST_BOOTSTRAP_SIZE } from '@/lib/data-loading';
 import * as api from '@/lib/api';
 import {
   getComponentsForUnit,
@@ -62,17 +63,22 @@ export default function HierarchyDashboardPage() {
   } = useDataStore();
 
   const { data: fetchedProjects, isLoading: projectsQueryLoading } = useQuery({
-    queryKey: queryKeys.allProjects(),
+    queryKey: queryKeys.projects(0, LIST_BOOTSTRAP_SIZE),
     queryFn: fetchAllProjects,
+    enabled: storeProjects.length === 0,
+    staleTime: 30_000,
   });
   const allProjects =
-    fetchedProjects && fetchedProjects.length > 0 ? fetchedProjects : storeProjects;
+    storeProjects.length > 0
+      ? storeProjects
+      : (fetchedProjects ?? []);
 
   const [selection, setSelection] = useState<HierarchyDashboardSelection>({});
   const [serialQuery, setSerialQuery] = useState('');
   const [serialSearching, setSerialSearching] = useState(false);
   const [projectSystems, setProjectSystems] = useState<System[]>([]);
   const [systemsLoading, setSystemsLoading] = useState(false);
+  const loadedProjectIdRef = useRef<number | null>(null);
 
   const selectedProject = allProjects.find((project) => project.id === selection.projectId);
 
@@ -87,11 +93,15 @@ export default function HierarchyDashboardPage() {
   );
 
   const loadProjectSystems = useCallback(async (projectId: number) => {
+    if (loadedProjectIdRef.current === projectId) return;
+
+    loadedProjectIdRef.current = projectId;
     setSystemsLoading(true);
     try {
       const res = await api.projects.getSystems(projectId);
       setProjectSystems(res.data ?? []);
     } catch {
+      loadedProjectIdRef.current = null;
       setProjectSystems([]);
       toast.error('Failed to load systems for this project.');
     } finally {
@@ -160,6 +170,7 @@ export default function HierarchyDashboardPage() {
         void loadProjectSystems(value);
       }
       if (key === 'projectId' && !value) {
+        loadedProjectIdRef.current = null;
         setProjectSystems([]);
       }
     },
@@ -168,10 +179,11 @@ export default function HierarchyDashboardPage() {
 
   const handleNodeSelect = useCallback(
     (entityId: number, type: HierarchyEntityType) => {
+      const systemsPool = selection.projectId ? projectSystems : storeSystems;
       const resolved = resolveSelectionFromEntity(
         type,
         entityId,
-        storeSystems,
+        systemsPool,
         subsystems,
         modules,
         units,
@@ -181,15 +193,18 @@ export default function HierarchyDashboardPage() {
         toast.error('Selected entity is not linked to a project.');
         return;
       }
-      void loadProjectSystems(resolved.projectId);
+      if (resolved.projectId !== selection.projectId) {
+        void loadProjectSystems(resolved.projectId);
+      }
       setSelection(resolved);
     },
-    [storeSystems, subsystems, modules, units, components, loadProjectSystems]
+    [selection.projectId, projectSystems, storeSystems, subsystems, modules, units, components, loadProjectSystems]
   );
 
   const handleClearSelection = () => {
     setSelection({});
     setSerialQuery('');
+    loadedProjectIdRef.current = null;
     setProjectSystems([]);
   };
 
@@ -227,10 +242,10 @@ export default function HierarchyDashboardPage() {
 
   const dataLoading =
     pageLoading ||
-    (projectsQueryLoading && allProjects.length === 0) ||
+    (projectsQueryLoading && storeProjects.length === 0 && allProjects.length === 0) ||
     (hierarchyLoading && !hierarchyAttempted);
 
-  if (dataLoading || serialSearching || systemsLoading) {
+  if (dataLoading || serialSearching) {
     return <PageLoader />;
   }
 
@@ -298,6 +313,7 @@ export default function HierarchyDashboardPage() {
         project={selectedProject}
         statuses={statuses}
         onNodeSelect={handleNodeSelect}
+        systemsLoading={systemsLoading}
         className="min-h-0 flex-1 border-0"
       />
     </div>

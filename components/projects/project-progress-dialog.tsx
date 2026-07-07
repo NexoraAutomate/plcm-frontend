@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -73,10 +72,9 @@ export function ProjectProgressDialog({
         payload.status_id = completedStatus.id;
       }
       await onSave(project.id, payload);
-      toast.success('Project progress updated');
       onOpenChange(false);
     } catch {
-      toast.error('Failed to update progress');
+      // Error toast handled by DataStore updateProject
     } finally {
       setSaving(false);
     }

@@ -1,33 +1,10 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { toast } from 'sonner';
-import { useAppNotifications } from '@/hooks/use-app-notifications';
-
-/** Show toast notifications when new items appear in the store-derived list. */
+/**
+ * Notification bell data is provided by useAppNotifications in the navbar.
+ * Passive store-driven alerts are not shown as toasts — only explicit user
+ * actions (create/update/delete) should surface toast feedback.
+ */
 export function useNotificationSync() {
-  const { notifications } = useAppNotifications();
-  const seenIdsRef = useRef<Set<string>>(new Set());
-  const readyRef = useRef(false);
-
-  useEffect(() => {
-    const currentIds = new Set(notifications.map((n) => n.id));
-
-    if (!readyRef.current) {
-      seenIdsRef.current = currentIds;
-      readyRef.current = true;
-      return;
-    }
-
-    for (const notification of notifications) {
-      if (!seenIdsRef.current.has(notification.id)) {
-        toast(notification.title, {
-          description: notification.message,
-          duration: 6000,
-        });
-      }
-    }
-
-    seenIdsRef.current = currentIds;
-  }, [notifications]);
+  // Intentionally no-op: avoids hundreds of toasts when bootstrap data loads.
 }

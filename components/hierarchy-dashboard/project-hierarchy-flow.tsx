@@ -68,6 +68,7 @@ interface ProjectHierarchyFlowProps {
   statuses?: Status[];
   className?: string;
   onNodeSelect?: (entityId: number, type: HierarchyEntityType) => void;
+  systemsLoading?: boolean;
 }
 
 function FitViewOnSelectionChange({ dependencyKey }: { dependencyKey: string }) {
@@ -99,6 +100,7 @@ export function ProjectHierarchyFlow({
   statuses = [],
   className,
   onNodeSelect,
+  systemsLoading = false,
 }: ProjectHierarchyFlowProps) {
   const { entityActionHandlers, entityActionDialogs } = useHierarchyEntityActions({
     selection,
@@ -348,6 +350,11 @@ export function ProjectHierarchyFlow({
       )}
     >
       <div className="relative min-w-0 flex-1">
+        {systemsLoading ? (
+          <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-background/60 backdrop-blur-[1px]">
+            <p className="text-sm text-muted-foreground">Loading project systems…</p>
+          </div>
+        ) : null}
         <HierarchyNodeLegend
           visibility={fieldVisibility}
           onChange={setFieldVisibility}

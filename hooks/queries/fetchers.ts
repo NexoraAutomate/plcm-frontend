@@ -36,8 +36,12 @@ export async function fetchOrders(skip = 0, limit = LIST_PAGE_SIZE): Promise<Ord
   return unwrapListItems<Order>(res.data);
 }
 
-export async function fetchProjects(skip = 0, limit = LIST_PAGE_SIZE): Promise<Project[]> {
-  const res = await api.projects.list(skip, limit);
+export async function fetchProjects(
+  skip = 0,
+  limit = LIST_PAGE_SIZE,
+  options?: { includeTotal?: boolean }
+): Promise<Project[]> {
+  const res = await api.projects.list(skip, limit, options);
   return unwrapListItems<Project>(res.data);
 }
 
@@ -109,7 +113,7 @@ export async function fetchHierarchies(hierarchyType?: string) {
 }
 
 export async function fetchAllProjects(): Promise<Project[]> {
-  return fetchProjects(0, LIST_BOOTSTRAP_SIZE);
+  return fetchProjects(0, LIST_BOOTSTRAP_SIZE, { includeTotal: false });
 }
 
 export const fetchCustomersPage = (skip: number, limit: number, filters?: ListFilterParams) =>
