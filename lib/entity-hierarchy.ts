@@ -1,4 +1,5 @@
 import type { Inventory, InventoryInstance } from '@/lib/models';
+import { inventoryPartNumber } from '@/lib/inventory-entity-fields';
 
 export type HierarchyEntityType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
 
@@ -60,8 +61,8 @@ export function serialNumberFromInventory(
   let base: string;
   if (item.serial_number?.trim()) {
     base = item.serial_number;
-  } else if (item.manufacturer_part_number?.trim()) {
-    base = `${item.name}-${item.manufacturer_part_number}`;
+  } else if (inventoryPartNumber(item)) {
+    base = `${item.name}-${inventoryPartNumber(item)}`;
   } else {
     base = item.name;
   }

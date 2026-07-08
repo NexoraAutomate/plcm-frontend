@@ -23,6 +23,7 @@ import {
 } from '@/lib/hierarchy-install-fields';
 import type { HierarchyDashboardSelection } from '@/lib/project-hierarchy-dashboard';
 import { syncEntityPicture } from '@/lib/entity-picture-upload';
+import { inventoryPartNumber } from '@/lib/inventory-entity-fields';
 import type { Hierarchy, Inventory, Status, System } from '@/lib/models';
 import type { HierarchyEntityType } from '@/lib/system-hierarchy-graph';
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -94,13 +95,13 @@ function resolveInstallIdentity(
 ) {
   const partNumber = String(formData.partnumber || '').trim();
   const inventoryMatch =
-    inventoryItems.find((item) => item.manufacturer_part_number?.trim() === partNumber) ??
+    inventoryItems.find((item) => inventoryPartNumber(item) === partNumber) ??
     inventoryItems.find((item) => item.name?.trim() === name);
 
   if (inventoryMatch) {
     const serial = buildSerialNumber(
       name,
-      inventoryMatch.manufacturer_part_number || partNumber
+      inventoryPartNumber(inventoryMatch) || partNumber
     );
     return {
       payload: inventoryToHierarchyCreatePayload(inventoryMatch, serial),
@@ -569,7 +570,7 @@ export function useHierarchyEntityActions({
   const partNumberOptions = useMemo(() => {
     const options = new Map<string, string>();
     for (const item of inventoryItems) {
-      const partNumber = item.manufacturer_part_number?.trim();
+      const partNumber = inventoryPartNumber(item);
       if (!partNumber) continue;
       const label = item.name ? `${partNumber} — ${item.name}` : partNumber;
       options.set(partNumber, label);

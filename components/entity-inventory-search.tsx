@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Search, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
+import { inventoryPartNumber, mergeInventoryWithInstance } from '@/lib/inventory-entity-fields';
 import type { Inventory } from '@/lib/models';
 import { getInventoryTypeLabel, type HierarchyEntityType } from '@/lib/entity-hierarchy';
 
@@ -72,7 +73,7 @@ export function EntityInventorySearch({
       (item) =>
         item.name?.toLowerCase().includes(searchLower) ||
         item.serial_number?.toLowerCase().includes(searchLower) ||
-        item.manufacturer_part_number?.toLowerCase().includes(searchLower) ||
+        item.part_number?.toLowerCase().includes(searchLower) ||
         item.oem_name?.toLowerCase().includes(searchLower)
     );
     setFilteredItems(filtered);
@@ -89,11 +90,13 @@ export function EntityInventorySearch({
       const consumeRes = await api.inventory.consume(item.id);
       const consumedInstance = consumeRes.data?.consumed_instance;
       const updatedInventory = consumeRes.data?.inventory ?? item;
-      const itemForInstall: Inventory = {
-        ...item,
-        ...updatedInventory,
-        serial_number: consumedInstance?.serial_number ?? item.serial_number,
-      };
+      const itemForInstall = mergeInventoryWithInstance(
+        {
+          ...item,
+          ...updatedInventory,
+        },
+        consumedInstance
+      );
 
       await onUseInventory(itemForInstall);
 
@@ -181,7 +184,7 @@ export function EntityInventorySearch({
                       <TableRow key={item.id}>
                         <TableCell className="font-medium">{item.name}</TableCell>
                         <TableCell className="text-sm">{item.serial_number || '—'}</TableCell>
-                        <TableCell className="text-sm">{item.manufacturer_part_number || '—'}</TableCell>
+                        <TableCell className="text-sm">{item.part_number || '—'}</TableCell>
                         <TableCell className="text-sm">{item.oem_name || '—'}</TableCell>
                         <TableCell className="text-right font-medium">
                           <span

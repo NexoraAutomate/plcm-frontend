@@ -236,25 +236,29 @@ export interface Hierarchy {
   updated_at?: string
 }
 
-// Inventory
-export interface InventoryInstance {
+// Inventory — fields mirror hierarchy entities for install-from-stock
+export interface InventoryInstance extends HierarchyInstallFields {
   id: number
   inventory_id: number
   serial_number?: string
+  configuration_item?: string
+  status_id?: number
   holder_user_id?: number
   location?: string
   added_date?: string
   shelf_life_expires_at?: string
-  picture_url?: string
   updated_at?: string
 }
 
-export interface Inventory {
+export interface Inventory extends HierarchyInstallFields {
   id: number
   name: string
   inventory_type: string
   serial_number?: string
-  manufacturer_part_number?: string
+  part_number?: string
+  configuration_item?: string
+  status_id?: number
+  sku?: string
   quantity: number
   location?: string
   description?: string
@@ -263,7 +267,6 @@ export interface Inventory {
   holder_user_id?: number
   added_date?: string
   shelf_life_expires_at?: string
-  picture_url?: string
   created_at?: string
   updated_at?: string
   instances?: InventoryInstance[]

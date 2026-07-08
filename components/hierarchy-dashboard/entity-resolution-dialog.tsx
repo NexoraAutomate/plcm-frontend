@@ -34,6 +34,7 @@ import type { HierarchyEntityType } from '@/lib/system-hierarchy-graph';
 import { ReplacementHistoryDialog } from '@/components/hierarchy-dashboard/replacement-history-dialog';
 import { maintenanceService } from '@/services/maintenance';
 import { filterInventoryForReplacement } from '@/lib/inventory-filter';
+import { inventoryPartNumber } from '@/lib/inventory-entity-fields';
 import { invalidateProjectResolutionCache } from '@/components/hierarchy-dashboard/use-project-resolution-history';
 import * as api from '@/lib/api';
 import { toast } from 'sonner';
@@ -140,8 +141,9 @@ export function EntityResolutionDialog({
   useEffect(() => {
     if (!selectedInventoryId) return;
     const item = inventoryItems.find((entry) => String(entry.id) === selectedInventoryId);
-    if (item?.manufacturer_part_number) {
-      setNewPartNumber(item.manufacturer_part_number);
+    if (item) {
+      const part = inventoryPartNumber(item);
+      if (part) setNewPartNumber(part);
     }
   }, [selectedInventoryId, inventoryItems]);
 
@@ -286,7 +288,7 @@ export function EntityResolutionDialog({
                   <SelectContent>
                     {inventoryItems.map((item) => (
                       <SelectItem key={item.id} value={String(item.id)}>
-                        {item.manufacturer_part_number || item.name} (qty {item.quantity})
+                        {inventoryPartNumber(item) || item.name} (qty {item.quantity})
                       </SelectItem>
                     ))}
                   </SelectContent>

@@ -1,4 +1,5 @@
 import type { EntityType, Inventory } from '@/lib/models';
+import { inventoryPartNumber } from '@/lib/inventory-entity-fields';
 
 export function filterInventoryForReplacement(
   items: Inventory[],
@@ -18,15 +19,15 @@ export function filterInventoryForReplacement(
         item.quantity > 0
     )
     .sort((a, b) => {
-      const partA = a.manufacturer_part_number ?? a.name ?? '';
-      const partB = b.manufacturer_part_number ?? b.name ?? '';
+      const partA = inventoryPartNumber(a) || a.name || '';
+      const partB = inventoryPartNumber(b) || b.name || '';
       return partA.localeCompare(partB);
     });
 }
 
 export function inventoryPartNumberLabel(item: Inventory): string {
   return (
-    item.manufacturer_part_number?.trim() ||
+    inventoryPartNumber(item) ||
     item.serial_number?.trim() ||
     item.name?.trim() ||
     `Item #${item.id}`

@@ -1,14 +1,19 @@
 import type { User, HierarchyInstallFields, Inventory } from '@/lib/models';
+import { inventoryPartNumber } from '@/lib/inventory-entity-fields';
 
-/** Part/serial + immutable originals when creating hierarchy rows from inventory. */
+/** Part/serial + install metadata when creating hierarchy rows from inventory. */
 export function inventoryToHierarchyCreatePayload(item: Inventory, serialNumber: string) {
-  const partNumber = item.manufacturer_part_number || '';
+  const partNumber = inventoryPartNumber(item);
   return {
     part_number: partNumber,
     serial_number: serialNumber,
-    original_part_number: partNumber,
-    original_serial_number: serialNumber,
-    installation_date: new Date().toISOString(),
+    configuration_item: item.configuration_item || partNumber || item.name,
+    original_part_number: item.original_part_number || partNumber,
+    original_serial_number: item.original_serial_number || serialNumber,
+    installation_date: item.installation_date || new Date().toISOString(),
+    installed_by_id: item.installed_by_id,
+    picture_url: item.picture_url,
+    ...(item.inventory_type === 'component' && item.sku ? { sku: item.sku } : {}),
   };
 }
 

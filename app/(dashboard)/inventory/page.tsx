@@ -9,11 +9,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Search } from 'lucide-react';
+import Link from 'next/link';
+import { Plus, Edit, Trash2, Search, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
-import { ATTACHMENT_TYPES, type AttachmentType } from '@/lib/attachment-types';
-import type { EntityAttachmentMetadata, Inventory, InventoryInstance } from '@/lib/models';
+import { EntityAttachmentsSection, type PendingAttachmentUpload } from '@/components/entity-attachments-section';
+import {
+  emptyInventoryEntityForm,
+  inventoryFormFromInstance,
+  inventoryFormFromItem,
+  inventoryGroupFieldsFromForm,
+  inventoryInstanceFieldsFromForm,
+  inventoryPartNumber,
+} from '@/lib/inventory-entity-fields';
+import type { Inventory, InventoryInstance, User } from '@/lib/models';
+import { formatUserRef } from '@/lib/user-display';
 import { useDataStore } from '@/lib/data-store';
 import { useHierarchiesQuery } from '@/hooks/queries';
 import { fetchInventoryPage } from '@/hooks/queries/fetchers';
@@ -28,6 +38,7 @@ import {
   inventoryUsesInstances,
   resolveInventoryQuantity,
 } from '@/lib/entity-hierarchy';
+import { canAddInventoryChildren } from '@/lib/inventory-child-install';
 
 type EntityType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
 
@@ -35,19 +46,42 @@ interface InventoryItem extends Inventory {
   entityName?: string;
   serialNumber?: string;
   partNumber?: string;
+  holderName?: string;
+  displayLocation?: string;
 }
 
-function enrichInventoryItems(items: Inventory[]): InventoryItem[] {
-  return items.map((item) => ({
-    ...item,
-    entityName: item.name,
-    serialNumber: formatInventorySerialNumbers(item),
-    partNumber: item.manufacturer_part_number || '',
-  }));
+function resolveInventoryHolderId(item: Inventory): number | undefined {
+  if (item.holder_user_id) return item.holder_user_id;
+  return item.instances?.find((instance) => instance.holder_user_id)?.holder_user_id;
+}
+
+function resolveInventoryLocation(item: Inventory): string {
+  if (item.location?.trim()) return item.location;
+  const locations = (item.instances ?? [])
+    .map((instance) => instance.location?.trim())
+    .filter((location): location is string => Boolean(location));
+  if (locations.length === 0) return '—';
+  return [...new Set(locations)].join(', ');
+}
+
+function enrichInventoryItems(items: Inventory[], users: User[]): InventoryItem[] {
+  return items.map((item) => {
+    const holderId = resolveInventoryHolderId(item);
+    const holder = holderId ? users.find((user) => user.id === holderId) : undefined;
+
+    return {
+      ...item,
+      entityName: item.name,
+      serialNumber: formatInventorySerialNumbers(item),
+      partNumber: inventoryPartNumber(item),
+      holderName: holder ? formatUserRef(holder) : '—',
+      displayLocation: resolveInventoryLocation(item),
+    };
+  });
 }
 
 export default function InventoryPage() {
-  const { users } = useDataStore();
+  const { users, statuses } = useDataStore();
   const [search, setSearch] = useState('');
   const [entityTypeFilter, setEntityTypeFilter] = useState<EntityType | 'all'>('all');
   const inventoryTypeParam = entityTypeFilter !== 'all' ? entityTypeFilter : undefined;
@@ -56,14 +90,15 @@ export default function InventoryPage() {
     fetchPage: (skip, limit) => fetchInventoryPage(skip, limit, inventoryTypeParam),
   });
   const inventory = useMemo(
-    () => enrichInventoryItems(pagination.items),
-    [pagination.items]
+    () => enrichInventoryItems(pagination.items, users),
+    [pagination.items, users]
   );
   const loading = pagination.loading;
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingInstanceId, setEditingInstanceId] = useState<number | null>(null);
+  const [editingGroup, setEditingGroup] = useState<Inventory | null>(null);
   const [instances, setInstances] = useState<InventoryInstance[]>([]);
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({
     open: false,
@@ -72,27 +107,10 @@ export default function InventoryPage() {
 
   const [selectedEntityType, setSelectedEntityType] = useState<EntityType>('component');
   const { data: hierarchyCategories = [] } = useHierarchiesQuery(selectedEntityType);
-  const [formData, setFormData] = useState({
-    name: '',
-    inventory_type: 'component',
-    serial_number: '',
-    quantity: 0,
-    description: '',
-    oem_name: '',
-    manufacturer_part_number: '',
-    location: '',
-    holder_user_id: '',
-    added_date: '',
-    shelf_life_expires_at: '',
-    picture_url: '',
-  });
-  const [pendingAttachment, setPendingAttachment] = useState<File | null>(null);
+  const [formData, setFormData] = useState({ ...emptyInventoryEntityForm });
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachmentUpload[]>([]);
   const [pendingPictureFile, setPendingPictureFile] = useState<File | null>(null);
   const [removePicture, setRemovePicture] = useState(false);
-  const [pendingAttachmentMeta, setPendingAttachmentMeta] = useState<EntityAttachmentMetadata>({
-    attachment_type: 'other',
-    description: '',
-  });
   const [formTab, setFormTab] = useState('general');
 
   useEffect(() => {
@@ -110,65 +128,22 @@ export default function InventoryPage() {
   });
 
   const resetForm = () => {
-    setFormData({
-      name: '',
-      inventory_type: 'component',
-      serial_number: '',
-      quantity: 0,
-      description: '',
-      oem_name: '',
-      manufacturer_part_number: '',
-      location: '',
-      holder_user_id: '',
-      added_date: '',
-      shelf_life_expires_at: '',
-      picture_url: '',
-    });
-    setPendingAttachment(null);
+    setFormData({ ...emptyInventoryEntityForm });
+    setPendingAttachments([]);
     setPendingPictureFile(null);
     setRemovePicture(false);
-    setPendingAttachmentMeta({ attachment_type: 'other', description: '' });
     setSelectedEntityType('component');
     setEditingInstanceId(null);
+    setEditingGroup(null);
     setInstances([]);
     setFormTab('general');
   };
 
-  const buildGroupPayload = () => ({
-    name: formData.name,
-    inventory_type: selectedEntityType,
-    description: formData.description,
-    oem_name: formData.oem_name,
-    manufacturer_part_number: formData.manufacturer_part_number,
-    ...(inventorySupportsQuantity(selectedEntityType)
-      ? {
-          serial_number: formData.serial_number,
-          quantity: resolveInventoryQuantity(selectedEntityType, formData.quantity),
-          location: formData.location,
-          holder_user_id: formData.holder_user_id ? Number(formData.holder_user_id) : undefined,
-          added_date: formData.added_date
-            ? new Date(formData.added_date).toISOString()
-            : undefined,
-          shelf_life_expires_at: formData.shelf_life_expires_at
-            ? new Date(formData.shelf_life_expires_at).toISOString()
-            : undefined,
-          picture_url: removePicture ? undefined : formData.picture_url || undefined,
-        }
-      : {}),
-  });
+  const buildGroupPayload = () =>
+    inventoryGroupFieldsFromForm(formData, selectedEntityType, removePicture);
 
-  const buildInstancePayload = () => ({
-    serial_number: formData.serial_number,
-    location: formData.location,
-    holder_user_id: formData.holder_user_id ? Number(formData.holder_user_id) : undefined,
-    added_date: formData.added_date
-      ? new Date(formData.added_date).toISOString()
-      : undefined,
-    shelf_life_expires_at: formData.shelf_life_expires_at
-      ? new Date(formData.shelf_life_expires_at).toISOString()
-      : undefined,
-    picture_url: removePicture ? undefined : formData.picture_url || undefined,
-  });
+  const buildInstancePayload = () =>
+    inventoryInstanceFieldsFromForm(formData, removePicture);
 
   const getLatestInstanceId = (item: Inventory) => {
     const itemInstances = item.instances ?? [];
@@ -181,11 +156,13 @@ export default function InventoryPage() {
     } else if (pendingPictureFile) {
       await api.pictures.upload(ownerType, ownerId, pendingPictureFile);
     }
-    if (pendingAttachment) {
-      await api.attachments.upload(ownerType, ownerId, pendingAttachment, {
-        attachment_type: pendingAttachmentMeta.attachment_type,
-        description: pendingAttachmentMeta.description,
-      });
+    if (pendingAttachments.length > 0) {
+      for (const attachment of pendingAttachments) {
+        await api.attachments.upload(ownerType, ownerId, attachment.file, {
+          attachment_type: attachment.attachment_type,
+          description: attachment.description,
+        });
+      }
     }
   }
 
@@ -205,8 +182,8 @@ export default function InventoryPage() {
       );
       return;
     }
-    if (usesInstances && !formData.manufacturer_part_number.trim()) {
-      toast.error('Manufacturer part number is required for serialized inventory');
+    if (usesInstances && !formData.part_number.trim()) {
+      toast.error('Part number is required for serialized inventory');
       return;
     }
     if (usesInstances && !formData.location.trim()) {
@@ -281,6 +258,7 @@ export default function InventoryPage() {
       resetForm();
       setEditingId(null);
       setEditingInstanceId(null);
+      setEditingGroup(null);
       setInstances([]);
       setIsEditOpen(false);
     } catch (err) {
@@ -304,22 +282,12 @@ export default function InventoryPage() {
     }
   }
 
-  function loadInstanceIntoForm(instance: InventoryInstance) {
+  function loadInstanceIntoForm(instance: InventoryInstance, group: Inventory) {
     setEditingInstanceId(instance.id);
-    setPendingAttachment(null);
+    setPendingAttachments([]);
     setPendingPictureFile(null);
     setRemovePicture(false);
-    setFormData((prev) => ({
-      ...prev,
-      serial_number: instance.serial_number || '',
-      location: instance.location || '',
-      holder_user_id: instance.holder_user_id ? String(instance.holder_user_id) : '',
-      added_date: instance.added_date ? instance.added_date.slice(0, 10) : '',
-      shelf_life_expires_at: instance.shelf_life_expires_at
-        ? instance.shelf_life_expires_at.slice(0, 10)
-        : '',
-      picture_url: instance.picture_url || '',
-    }));
+    setFormData(inventoryFormFromInstance(instance, group));
   }
 
   async function handleAddInstance() {
@@ -338,7 +306,7 @@ export default function InventoryPage() {
       const nextInstances = refreshed.data?.instances ?? [];
       setInstances(nextInstances);
       if (created.data) {
-        loadInstanceIntoForm(created.data);
+        loadInstanceIntoForm(created.data, refreshed.data ?? undefined);
       }
       toast.success('Serialized unit added');
       pagination.invalidate();
@@ -362,8 +330,8 @@ export default function InventoryPage() {
       }
       const nextInstances = refreshed.data.instances ?? [];
       setInstances(nextInstances);
-      if (nextInstances.length > 0) {
-        loadInstanceIntoForm(nextInstances[0]);
+      if (nextInstances.length > 0 && refreshed.data) {
+        loadInstanceIntoForm(nextInstances[0], refreshed.data);
       } else {
         setEditingInstanceId(null);
       }
@@ -379,34 +347,20 @@ export default function InventoryPage() {
     setEditingId(item.id);
     setFormTab('general');
     setSelectedEntityType(item.inventory_type as EntityType);
-    setPendingAttachment(null);
+    setPendingAttachments([]);
     setPendingPictureFile(null);
     setRemovePicture(false);
 
     try {
       const res = await api.inventory.get(item.id);
       const fullItem = res.data ?? item;
+      setEditingGroup(fullItem);
       const itemInstances = fullItem.instances ?? [];
       setInstances(itemInstances);
-      setFormData({
-        name: fullItem.name || '',
-        inventory_type: fullItem.inventory_type,
-        serial_number: fullItem.serial_number || '',
-        quantity: fullItem.quantity,
-        description: fullItem.description || '',
-        oem_name: fullItem.oem_name || '',
-        manufacturer_part_number: fullItem.manufacturer_part_number || '',
-        location: fullItem.location || '',
-        holder_user_id: fullItem.holder_user_id ? String(fullItem.holder_user_id) : '',
-        added_date: fullItem.added_date ? fullItem.added_date.slice(0, 10) : '',
-        shelf_life_expires_at: fullItem.shelf_life_expires_at
-          ? fullItem.shelf_life_expires_at.slice(0, 10)
-          : '',
-        picture_url: fullItem.picture_url || '',
-      });
+      setFormData(inventoryFormFromItem(fullItem));
 
       if (inventoryUsesInstances(fullItem.inventory_type as EntityType) && itemInstances.length > 0) {
-        loadInstanceIntoForm(itemInstances[0]);
+        loadInstanceIntoForm(itemInstances[0], fullItem);
       } else {
         setEditingInstanceId(null);
       }
@@ -431,6 +385,9 @@ export default function InventoryPage() {
         </TabsTrigger>
         <TabsTrigger value="holder" className="min-w-0 flex-1 px-2 text-xs sm:text-sm">
           Holder
+        </TabsTrigger>
+        <TabsTrigger value="install" className="min-w-0 flex-1 px-2 text-xs sm:text-sm">
+          Install
         </TabsTrigger>
         <TabsTrigger value="picture" className="min-w-0 flex-1 px-2 text-xs sm:text-sm">
           Picture
@@ -535,6 +492,38 @@ export default function InventoryPage() {
           </div>
         )}
 
+        {mode === 'edit' ? (
+          <div>
+            <Label>Status</Label>
+            <Select
+              value={formData.status_id || ''}
+              onValueChange={(value) => setFormData({ ...formData, status_id: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                {statuses.map((status) => (
+                  <SelectItem key={status.id} value={String(status.id)}>
+                    {status.status_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+
+        {mode === 'edit' ? (
+          <div>
+            <Label>Configuration Item</Label>
+            <Input
+              value={formData.configuration_item}
+              onChange={(e) => setFormData({ ...formData, configuration_item: e.target.value })}
+              placeholder="Defaults to part number or name"
+            />
+          </div>
+        ) : null}
+
         <div>
           <Label>Description</Label>
           <Input
@@ -565,17 +554,52 @@ export default function InventoryPage() {
 
         <div>
           <Label>
-            Manufacturer Part Number
+            Part Number
             {inventoryUsesInstances(selectedEntityType) ? ' *' : ''}
           </Label>
           <Input
-            value={formData.manufacturer_part_number}
-            onChange={(e) =>
-              setFormData({ ...formData, manufacturer_part_number: e.target.value })
-            }
+            value={formData.part_number}
+            onChange={(e) => setFormData({ ...formData, part_number: e.target.value })}
             placeholder="e.g., MPN-12345"
           />
         </div>
+
+        {mode === 'edit' && selectedEntityType === 'component' ? (
+          <div>
+            <Label>SKU</Label>
+            <Input
+              value={formData.sku}
+              onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+              placeholder="Component SKU"
+            />
+          </div>
+        ) : null}
+
+        {mode === 'edit' ? (
+          <>
+            <div>
+              <Label>Original Part Number</Label>
+              <Input
+                value={formData.original_part_number}
+                onChange={(e) =>
+                  setFormData({ ...formData, original_part_number: e.target.value })
+                }
+                placeholder="Original part number from manufacturer"
+              />
+            </div>
+
+            <div>
+              <Label>Original Serial Number</Label>
+              <Input
+                value={formData.original_serial_number}
+                onChange={(e) =>
+                  setFormData({ ...formData, original_serial_number: e.target.value })
+                }
+                placeholder="Original serial number"
+              />
+            </div>
+          </>
+        ) : null}
 
         <div>
           <Label>OEM Name</Label>
@@ -647,6 +671,35 @@ export default function InventoryPage() {
         </div>
       </TabsContent>
 
+      <TabsContent value="install" className="mt-4 space-y-4">
+        <div>
+          <Label>Installation Date</Label>
+          <Input
+            type="date"
+            value={formData.installation_date}
+            onChange={(e) => setFormData({ ...formData, installation_date: e.target.value })}
+          />
+        </div>
+        <div>
+          <Label>Installed By</Label>
+          <Select
+            value={formData.installed_by_id || ''}
+            onValueChange={(value) => setFormData({ ...formData, installed_by_id: value })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select installer" />
+            </SelectTrigger>
+            <SelectContent>
+              {users.map((user) => (
+                <SelectItem key={user.id} value={String(user.id)}>
+                  {user.full_name || user.username}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </TabsContent>
+
       <TabsContent value="picture" className="mt-4 space-y-4">
         <div>
           <Label>Picture</Label>
@@ -692,51 +745,22 @@ export default function InventoryPage() {
       </TabsContent>
 
       <TabsContent value="attachments" className="mt-4 space-y-4">
-        <div>
-          <Label>Attachment Type</Label>
-          <Select
-            value={pendingAttachmentMeta.attachment_type}
-            onValueChange={(value) =>
-              setPendingAttachmentMeta((prev) => ({
-                ...prev,
-                attachment_type: value as AttachmentType,
-              }))
-            }
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select attachment type" />
-            </SelectTrigger>
-            <SelectContent>
-              {ATTACHMENT_TYPES.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label>Attachment Name / Description</Label>
-          <Input
-            value={pendingAttachmentMeta.description ?? ''}
-            onChange={(e) =>
-              setPendingAttachmentMeta((prev) => ({
-                ...prev,
-                description: e.target.value,
-              }))
-            }
-            placeholder="e.g. Test Report for VSWR"
-          />
-        </div>
-
-        <div>
-          <Label>Attachment File</Label>
-          <Input
-            type="file"
-            onChange={(e) => setPendingAttachment(e.target.files?.[0] ?? null)}
-          />
-        </div>
+        <EntityAttachmentsSection
+          ownerType={
+            inventoryUsesInstances(selectedEntityType) && editingInstanceId
+              ? 'inventory_instance'
+              : 'inventory'
+          }
+          ownerId={
+            mode === 'edit'
+              ? inventoryUsesInstances(selectedEntityType)
+                ? editingInstanceId
+                : editingId
+              : null
+          }
+          pendingAttachments={pendingAttachments}
+          onPendingAttachmentsChange={setPendingAttachments}
+        />
       </TabsContent>
 
       {mode === 'edit' && inventoryUsesInstances(selectedEntityType) ? (
@@ -780,7 +804,7 @@ export default function InventoryPage() {
                             type="button"
                             size="sm"
                             variant="outline"
-                            onClick={() => loadInstanceIntoForm(instance)}
+                            onClick={() => editingGroup && loadInstanceIntoForm(instance, editingGroup)}
                           >
                             Edit
                           </Button>
@@ -887,11 +911,12 @@ export default function InventoryPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Type</TableHead>
                   <TableHead>Category</TableHead>
-                  <TableHead>Serial Number</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>Part Number</TableHead>
+                  <TableHead>Serial Number</TableHead>
                   <TableHead>Quantity</TableHead>
+                  <TableHead>Inventory Holder</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -899,23 +924,30 @@ export default function InventoryPage() {
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                       No inventory items found
                     </TableCell>
                   </TableRow>
                 ) : (
                   filtered.map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell className="capitalize font-medium">{item.inventory_type}</TableCell>
-                      <TableCell>{item.entityName || 'N/A'}</TableCell>
-                      <TableCell>{item.serialNumber || '—'}</TableCell>
+                      <TableCell className="font-medium">{item.entityName || 'N/A'}</TableCell>
+                      <TableCell className="capitalize">{item.inventory_type}</TableCell>
                       <TableCell>{item.partNumber || '—'}</TableCell>
-                      <TableCell>
-                        {item.quantity}
-                      </TableCell>
-                      <TableCell>{item.location}</TableCell>
+                      <TableCell>{item.serialNumber || '—'}</TableCell>
+                      <TableCell>{item.quantity}</TableCell>
+                      <TableCell>{item.holderName || '—'}</TableCell>
+                      <TableCell>{item.displayLocation || '—'}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
+                          {canAddInventoryChildren(item.inventory_type) ? (
+                            <Button size="sm" variant="secondary" asChild>
+                              <Link href={`/inventory/${item.id}/add-children`}>
+                                <Layers className="mr-1 h-4 w-4" />
+                                Add Children
+                              </Link>
+                            </Button>
+                          ) : null}
                           <Button size="sm" variant="outline" onClick={() => openEdit(item)}>
                             <Edit className="h-4 w-4" />
                           </Button>
