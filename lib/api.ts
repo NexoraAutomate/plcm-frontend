@@ -194,6 +194,8 @@ export const inventory = {
       }),
     }),
   get: (id: number) => api.get<Models.Inventory>(`/inventory/${id}/`),
+  listByEntity: (entityId: number) =>
+    api.get<Models.Inventory[]>(`/inventory/by-entity/${entityId}/`),
   create: (data: Partial<Models.Inventory>) => api.post<Models.Inventory>("/inventory/", data),
   update: (id: number, data: Partial<Models.Inventory>) => api.put<Models.Inventory>(`/inventory/${id}/`, data),
   delete: (id: number) => api.delete(`/inventory/${id}/`),
@@ -263,6 +265,10 @@ export const entities = {
   get: (id: number) => api.get<Models.Entity>(`/entities/${id}/`),
   getStatusHistory: (id: number) => api.get<Models.EntityStatusHistory[]>(`/entities/${id}/status-history/`),
   getMaintenanceLogs: (id: number) => api.get<Models.MaintenanceLog[]>(`/entities/${id}/maintenance-logs/`),
+  getReplacementChain: (entityType: string, entityPk: number) =>
+    api.get<Models.EntityReplacementChainItem[]>(
+      `/entities/${encodeURIComponent(entityType)}/${entityPk}/replacement-chain/`
+    ),
   partNumber: () => api.get<string[]>("/part-numbers/"),
 };
 

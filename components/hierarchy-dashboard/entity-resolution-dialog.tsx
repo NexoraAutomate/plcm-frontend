@@ -163,6 +163,7 @@ export function EntityResolutionDialog({
         new_serial_number: newSerialNumber.trim() || undefined,
         notes: notes.trim() || undefined,
         inventory_item_id: selectedInventoryId ? Number(selectedInventoryId) : undefined,
+        inventory_instance_id: undefined,
       });
       invalidateProjectResolutionCache(projectId);
       await refreshData({ silent: true });

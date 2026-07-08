@@ -26,6 +26,14 @@ import {
 import * as api from '@/lib/api';
 import { EntityStatusHistorySheet } from '@/components/entity-status-history-sheet';
 import { EntityInstallMetadataCard } from '@/components/entity-install-metadata-card';
+import {
+  ReplaceFromInventoryDialog,
+  type ReplaceFromInventoryTarget,
+} from '@/components/replace-from-inventory-dialog';
+import {
+  filterCurrentInstallEntities,
+  resolveProjectIdForHardwareEntity,
+} from '@/lib/entity-replacement';
 
 export default function SubsystemDetailPage() {
   const params = useParams();
@@ -48,10 +56,23 @@ export default function SubsystemDetailPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [replaceOpen, setReplaceOpen] = useState(false);
+  const [replaceTarget, setReplaceTarget] = useState<ReplaceFromInventoryTarget | null>(null);
 
   const subsystem = subsystems.find((s) => String(s.id) === subsystemId);
   const system = subsystem ? systems.find((s) => s.id === subsystem.system_id) : null;
-  const subsystemModules = subsystem ? modules.filter((m) => m.subsystem_id === subsystem.id) : [];
+  const projectId = subsystem
+    ? resolveProjectIdForHardwareEntity('subsystem', subsystem.id, {
+        systems,
+        subsystems,
+        modules: [],
+        units: [],
+        components: [],
+      })
+    : null;
+  const subsystemModules = subsystem
+    ? filterCurrentInstallEntities(modules.filter((m) => m.subsystem_id === subsystem.id))
+    : [];
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
   const [subsystemHierarchyNames, setSubsystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
@@ -326,6 +347,8 @@ export default function SubsystemDetailPage() {
         ownerType="subsystem"
         entity={subsystem}
         onUpdate={(data) => updateSubsystem(subsystem.id, data)}
+        projectId={projectId ?? undefined}
+        allowReplace
       />
 
       {/* Modules Cards */}
@@ -335,6 +358,17 @@ export default function SubsystemDetailPage() {
         entities={subsystemModules}
         onAdd={() => setIsAddOpen(true)}
         onEdit={openEditModule}
+        onReplace={(entity) => {
+          setReplaceTarget({
+            entityType: 'module',
+            entityId: entity.id,
+            entityName: entity.name,
+            partNumber: entity.part_number,
+            serialNumber: entity.serial_number,
+            replacementSequence: entity.replacement_sequence,
+          });
+          setReplaceOpen(true);
+        }}
         onDelete={handleDeleteModule}
         detailPath={(id) => `/modules/${id}`}
         addButtonLabel="Add Module"
@@ -394,6 +428,15 @@ export default function SubsystemDetailPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      {projectId ? (
+        <ReplaceFromInventoryDialog
+          open={replaceOpen}
+          onOpenChange={setReplaceOpen}
+          projectId={projectId}
+          target={replaceTarget}
+        />
+      ) : null}
     </div>
   );
 }

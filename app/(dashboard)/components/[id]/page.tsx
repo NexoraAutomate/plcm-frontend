@@ -10,15 +10,25 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { StatusBadge } from '@/components/status-badge';
 import { EntityStatusHistorySheet } from '@/components/entity-status-history-sheet';
 import { EntityInstallMetadataCard } from '@/components/entity-install-metadata-card';
+import { resolveProjectIdForHardwareEntity } from '@/lib/entity-replacement';
 
 export default function ComponentDetailPage() {
   const params = useParams();
   const componentId = params.id as string;
-  const { components, units, modules, updateComponent } = useDataStore();
+  const { components, units, modules, subsystems, systems, updateComponent } = useDataStore();
   
   const component = components.find((c) => String(c.id) === componentId);
   const unit = component ? units.find((u) => u.id === component.unit_id) : null;
   const module = unit ? modules.find((m) => m.id === unit.module_id) : null;
+  const projectId = component
+    ? resolveProjectIdForHardwareEntity('component', component.id, {
+        systems,
+        subsystems,
+        modules,
+        units,
+        components,
+      })
+    : null;
 
   if (!component) {
     return (
@@ -131,6 +141,8 @@ export default function ComponentDetailPage() {
         ownerType="component"
         entity={component}
         onUpdate={(data) => updateComponent(component.id, data)}
+        projectId={projectId ?? undefined}
+        allowReplace
       />
 
       {/* Component Details */}

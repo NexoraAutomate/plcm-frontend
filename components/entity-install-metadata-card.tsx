@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pencil, Upload, Trash2 } from 'lucide-react';
+import { Pencil, Upload, Trash2, Replace } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,13 +22,38 @@ import * as api from '@/lib/api';
 import { formatUserRef } from '@/lib/user-display';
 import { toast } from 'sonner';
 import { EntityPicture } from '@/components/entity-picture';
+import {
+  ReplaceFromInventoryDialog,
+  type ReplaceFromInventoryTarget,
+} from '@/components/replace-from-inventory-dialog';
+import type { HierarchyEntityType } from '@/lib/entity-hierarchy';
 
 type HardwareOwnerType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
 
+function MetadataField({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="font-medium">{value?.trim() || '—'}</p>
+    </div>
+  );
+}
+
 interface EntityInstallMetadataCardProps {
   ownerType: HardwareOwnerType;
-  entity: HierarchyInstallFields & { id: number; name: string };
+  entity: HierarchyInstallFields & {
+    id: number;
+    name: string;
+    part_number?: string;
+    serial_number?: string;
+    configuration_item?: string;
+    oem_name?: string;
+    sku?: string;
+    replacement_sequence?: number;
+  };
   onUpdate: (data: Partial<HierarchyInstallFields>) => Promise<void>;
+  projectId?: number;
+  allowReplace?: boolean;
 }
 
 function normalizeInstallPayload(data: Record<string, unknown>) {
@@ -39,12 +64,18 @@ export function EntityInstallMetadataCard({
   ownerType,
   entity,
   onUpdate,
+  projectId,
+  allowReplace = false,
 }: EntityInstallMetadataCardProps) {
   const { users } = useDataStore();
   const [editOpen, setEditOpen] = useState(false);
+  const [replaceOpen, setReplaceOpen] = useState(false);
   const [attachments, setAttachments] = useState<EntityAttachment[]>([]);
+  const [linkedOemName, setLinkedOemName] = useState<string | undefined>();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [editingAttachment, setEditingAttachment] = useState<EntityAttachment | null>(null);
+
+  const oemName = entity.oem_name?.trim() || linkedOemName;
 
   const installerLabel = useMemo(() => {
     if (!entity.installed_by_id) return undefined;
@@ -69,6 +100,32 @@ export function EntityInstallMetadataCard({
   useEffect(() => {
     void loadAttachments();
   }, [loadAttachments]);
+
+  useEffect(() => {
+    if (entity.oem_name?.trim()) {
+      setLinkedOemName(undefined);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await api.inventory.listByEntity(entity.id);
+        const match = (res.data ?? []).find((item) => item.oem_name?.trim());
+        if (!cancelled) {
+          setLinkedOemName(match?.oem_name?.trim() || undefined);
+        }
+      } catch {
+        if (!cancelled) {
+          setLinkedOemName(undefined);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [entity.id, entity.oem_name]);
 
   const handleSave = async (data: Record<string, unknown>) => {
     try {
@@ -146,6 +203,18 @@ export function EntityInstallMetadataCard({
     }
   };
 
+  const replaceTarget = useMemo<ReplaceFromInventoryTarget | null>(() => {
+    if (!allowReplace || !projectId) return null;
+    return {
+      entityType: ownerType as HierarchyEntityType,
+      entityId: entity.id,
+      entityName: entity.name,
+      partNumber: entity.part_number,
+      serialNumber: entity.serial_number,
+      replacementSequence: entity.replacement_sequence,
+    };
+  }, [allowReplace, projectId, ownerType, entity]);
+
   return (
     <>
       <Card className="shadow-sm">
@@ -156,32 +225,55 @@ export function EntityInstallMetadataCard({
               Install date, custodian, original identifiers, and attachments for {entity.name}
             </CardDescription>
           </div>
-          <Button type="button" variant="outline" size="sm" onClick={() => setEditOpen(true)}>
-            <Pencil className="mr-2 h-4 w-4" />
-            Edit
-          </Button>
+          <div className="flex gap-2">
+            {allowReplace && projectId ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => setReplaceOpen(true)}>
+                <Replace className="mr-2 h-4 w-4" />
+                Replace
+              </Button>
+            ) : null}
+            <Button type="button" variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
-            <div>
-              <p className="text-xs text-muted-foreground">Installation Date</p>
-              <p className="font-medium">
-                {entity.installation_date
-                  ? new Date(entity.installation_date).toLocaleDateString()
-                  : '—'}
-              </p>
+          <div className="space-y-3">
+            <p className="text-sm font-medium">Hardware Identification</p>
+            <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+              <MetadataField label="Part Number" value={entity.part_number} />
+              <MetadataField label="Serial Number" value={entity.serial_number} />
+              <MetadataField label="Configuration Item" value={entity.configuration_item} />
+              <MetadataField label="OEM Name" value={oemName} />
+              {ownerType === 'component' || entity.sku?.trim() ? (
+                <MetadataField label="SKU" value={entity.sku} />
+              ) : null}
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Installed By</p>
-              <p className="font-medium">{installerLabel ?? '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Original Part #</p>
-              <p className="font-medium">{entity.original_part_number || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Original Serial #</p>
-              <p className="font-medium">{entity.original_serial_number || '—'}</p>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-sm font-medium">Installation Details</p>
+            <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+              <MetadataField
+                label="Installation Date"
+                value={
+                  entity.installation_date
+                    ? new Date(entity.installation_date).toLocaleDateString()
+                    : undefined
+                }
+              />
+              <MetadataField label="Installed By" value={installerLabel} />
+              <MetadataField label="Original Part #" value={entity.original_part_number} />
+              <MetadataField label="Original Serial #" value={entity.original_serial_number} />
+              {(entity.replacement_sequence ?? 0) > 0 ? (
+                <div>
+                  <p className="text-xs text-muted-foreground">Install Generation</p>
+                  <p className="font-medium text-primary">
+                    Current replacement #{entity.replacement_sequence}
+                  </p>
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -303,6 +395,15 @@ export function EntityInstallMetadataCard({
         attachment={editingAttachment ?? undefined}
         onSubmit={handleUpdateAttachment}
       />
+
+      {projectId ? (
+        <ReplaceFromInventoryDialog
+          open={replaceOpen}
+          onOpenChange={setReplaceOpen}
+          projectId={projectId}
+          target={replaceTarget}
+        />
+      ) : null}
     </>
   );
 }

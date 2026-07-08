@@ -126,6 +126,11 @@ export interface HierarchyInstallFields {
   picture_url?: string
   original_part_number?: string
   original_serial_number?: string
+  is_current_install?: boolean
+  root_entity_id?: number | null
+  replaced_entity_id?: number | null
+  replacement_sequence?: number
+  replaced_at?: string | null
 }
 
 export interface EntityAttachment {
@@ -628,6 +633,7 @@ export interface AdminHierarchyReplacePayload {
   new_serial_number?: string;
   notes?: string;
   inventory_item_id?: number;
+  inventory_instance_id?: number;
 }
 
 export interface AdminHierarchyReplaceResponse {
@@ -636,6 +642,27 @@ export interface AdminHierarchyReplaceResponse {
   configuration_history_id?: number | null;
   old_part_number?: string | null;
   new_part_number: string;
+  new_entity_id: number;
+  old_entity_id: number;
+}
+
+export interface EntityReplacementChainItem {
+  id: number;
+  entity_type: string;
+  name?: string;
+  part_number?: string;
+  serial_number?: string;
+  configuration_item?: string;
+  original_part_number?: string;
+  original_serial_number?: string;
+  is_current_install: boolean;
+  root_entity_id: number;
+  replaced_entity_id?: number | null;
+  replacement_sequence: number;
+  replaced_at?: string | null;
+  installation_date?: string | null;
+  installed_by_id?: number | null;
+  created_at?: string | null;
 }
 
 // API Response types

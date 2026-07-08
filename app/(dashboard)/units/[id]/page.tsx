@@ -26,6 +26,14 @@ import {
 } from '@/lib/inventory-child-install';
 import { EntityStatusHistorySheet } from '@/components/entity-status-history-sheet';
 import { EntityInstallMetadataCard } from '@/components/entity-install-metadata-card';
+import {
+  ReplaceFromInventoryDialog,
+  type ReplaceFromInventoryTarget,
+} from '@/components/replace-from-inventory-dialog';
+import {
+  filterCurrentInstallEntities,
+  resolveProjectIdForHardwareEntity,
+} from '@/lib/entity-replacement';
 
 export default function UnitDetailPage() {
   const params = useParams();
@@ -34,6 +42,8 @@ export default function UnitDetailPage() {
   const {
     units,
     modules,
+    subsystems,
+    systems,
     components,
     createSystem,
     createSubsystem,
@@ -48,10 +58,23 @@ export default function UnitDetailPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [replaceOpen, setReplaceOpen] = useState(false);
+  const [replaceTarget, setReplaceTarget] = useState<ReplaceFromInventoryTarget | null>(null);
 
   const unit = units.find((u) => String(u.id) === unitId);
   const module = unit ? modules.find((m) => m.id === unit.module_id) : null;
-  const unitComponents = unit ? components.filter((c) => c.unit_id === unit.id) : [];
+  const projectId = unit
+    ? resolveProjectIdForHardwareEntity('unit', unit.id, {
+        systems,
+        subsystems,
+        modules,
+        units,
+        components: [],
+      })
+    : null;
+  const unitComponents = unit
+    ? filterCurrentInstallEntities(components.filter((c) => c.unit_id === unit.id))
+    : [];
 
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
@@ -334,6 +357,8 @@ export default function UnitDetailPage() {
         ownerType="unit"
         entity={unit}
         onUpdate={(data) => updateUnit(unit.id, data)}
+        projectId={projectId ?? undefined}
+        allowReplace
       />
 
       {/* Components Cards */}
@@ -343,6 +368,17 @@ export default function UnitDetailPage() {
         entities={unitComponents}
         onAdd={() => setIsAddOpen(true)}
         onEdit={openEditComponent}
+        onReplace={(entity) => {
+          setReplaceTarget({
+            entityType: 'component',
+            entityId: entity.id,
+            entityName: entity.name,
+            partNumber: entity.part_number,
+            serialNumber: entity.serial_number,
+            replacementSequence: entity.replacement_sequence,
+          });
+          setReplaceOpen(true);
+        }}
         onDelete={handleDeleteComponent}
         detailPath={(id) => `/components/${id}`}
         addButtonLabel="Add Component"
@@ -402,6 +438,15 @@ export default function UnitDetailPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      {projectId ? (
+        <ReplaceFromInventoryDialog
+          open={replaceOpen}
+          onOpenChange={setReplaceOpen}
+          projectId={projectId}
+          target={replaceTarget}
+        />
+      ) : null}
     </div>
   );
 }

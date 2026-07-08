@@ -168,6 +168,11 @@ function HierarchyFlowNode({ data }: NodeProps<Node<HierarchyNodeData>>) {
           <Badge variant="outline" className={cn('text-[10px] uppercase', styles.badge)}>
             {styles.label}
           </Badge>
+          {(data.replacementSequence ?? 0) > 0 ? (
+            <Badge variant="secondary" className="text-[10px]">
+              R{data.replacementSequence}
+            </Badge>
+          ) : null}
           <div className="flex items-center gap-0.5">
             {showBuildTimeline ? (
               <button

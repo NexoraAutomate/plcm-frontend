@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2, ArrowRight, Network, Pencil } from 'lucide-react';
+import { Plus, Trash2, ArrowRight, Network, Pencil, Replace } from 'lucide-react';
 import { StatusBadge } from './status-badge';
 import { resolveStatusName } from '@/lib/entity-status';
 import type { Status } from '@/lib/models';
@@ -25,10 +25,20 @@ interface EntityCardsProps {
     description?: string;
     picture_url?: string;
     installation_date?: string;
+    part_number?: string;
+    serial_number?: string;
+    replacement_sequence?: number;
   }>;
   statuses?: Status[];
   onAdd: () => void;
   onEdit?: (id: number) => void;
+  onReplace?: (entity: {
+    id: number;
+    name: string;
+    part_number?: string;
+    serial_number?: string;
+    replacement_sequence?: number;
+  }) => void;
   onDelete: (id: number) => void;
   detailPath: (id: number) => string;
   secondaryPath?: (id: number) => string;
@@ -44,6 +54,7 @@ export function EntityCards({
   entities,
   onAdd,
   onEdit,
+  onReplace,
   onDelete,
   detailPath,
   secondaryPath,
@@ -86,6 +97,11 @@ export function EntityCards({
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-sm truncate">{entity.name}</h3>
+                            {(entity.replacement_sequence ?? 0) > 0 ? (
+                              <p className="text-xs font-medium text-primary mt-0.5">
+                                Current install · replacement #{entity.replacement_sequence}
+                              </p>
+                            ) : null}
                             {entity.description && (
                               <p className="text-xs text-muted-foreground truncate mt-1">
                                 {entity.description}
@@ -143,6 +159,17 @@ export function EntityCards({
                           >
                             <Pencil className="h-3 w-3" />
                             Edit
+                          </Button>
+                        ) : null}
+                        {onReplace ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 gap-1.5"
+                            onClick={() => onReplace(entity)}
+                          >
+                            <Replace className="h-3 w-3" />
+                            Replace
                           </Button>
                         ) : null}
                         <Button

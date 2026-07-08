@@ -8,6 +8,7 @@ import type {
   Unit,
 } from '@/lib/models';
 import { resolveStatusName } from '@/lib/entity-status';
+import { filterCurrentInstallEntities } from '@/lib/entity-replacement';
 
 export type HierarchyEntityType =
   | 'system'
@@ -28,6 +29,8 @@ export interface HierarchyTreeNode {
   description?: string;
   detailPath: string;
   children: HierarchyTreeNode[];
+  replacementSequence?: number;
+  isCurrentInstall?: boolean;
 }
 
 export interface HierarchyNodeFieldVisibility {
@@ -59,6 +62,8 @@ export interface HierarchyNodeData extends Record<string, unknown> {
   fieldVisibility?: HierarchyNodeFieldVisibility;
   highlightState?: 'selected' | 'dimmed' | 'normal';
   hasResolutionHistory?: boolean;
+  replacementSequence?: number;
+  isCurrentInstall?: boolean;
 }
 
 const DETAIL_PATH: Record<HierarchyEntityType, (id: number) => string> = {
@@ -88,6 +93,8 @@ export function mapEntityFields(
     status_id?: number;
     status_name?: string;
     status?: { status_name?: string };
+    replacement_sequence?: number;
+    is_current_install?: boolean;
   },
   statuses: Status[] = []
 ) {
@@ -100,6 +107,8 @@ export function mapEntityFields(
     partNumber: entity.part_number,
     createdAt: entity.created_at,
     description: entity.description,
+    replacementSequence: entity.replacement_sequence,
+    isCurrentInstall: entity.is_current_install !== false,
   };
 }
 
@@ -111,7 +120,9 @@ export function buildSystemHierarchyTree(
   components: Component[],
   statuses: Status[] = []
 ): HierarchyTreeNode {
-  const systemSubsystems = subsystems.filter((sub) => sub.system_id === system.id);
+  const systemSubsystems = filterCurrentInstallEntities(
+    subsystems.filter((sub) => sub.system_id === system.id)
+  );
 
   return {
     id: makeNodeId('system', system.id),
@@ -120,7 +131,9 @@ export function buildSystemHierarchyTree(
     ...mapEntityFields(system, statuses),
     detailPath: DETAIL_PATH.system(system.id),
     children: systemSubsystems.map((subsystem) => {
-      const subsystemModules = modules.filter((mod) => mod.subsystem_id === subsystem.id);
+      const subsystemModules = filterCurrentInstallEntities(
+        modules.filter((mod) => mod.subsystem_id === subsystem.id)
+      );
 
       return {
         id: makeNodeId('subsystem', subsystem.id),
@@ -129,7 +142,9 @@ export function buildSystemHierarchyTree(
         ...mapEntityFields(subsystem, statuses),
         detailPath: DETAIL_PATH.subsystem(subsystem.id),
         children: subsystemModules.map((module) => {
-          const moduleUnits = units.filter((unit) => unit.module_id === module.id);
+            const moduleUnits = filterCurrentInstallEntities(
+              units.filter((unit) => unit.module_id === module.id)
+            );
 
           return {
             id: makeNodeId('module', module.id),
@@ -138,7 +153,9 @@ export function buildSystemHierarchyTree(
             ...mapEntityFields(module, statuses),
             detailPath: DETAIL_PATH.module(module.id),
             children: moduleUnits.map((unit) => {
-              const unitComponents = components.filter((comp) => comp.unit_id === unit.id);
+              const unitComponents = filterCurrentInstallEntities(
+                components.filter((comp) => comp.unit_id === unit.id)
+              );
 
               return {
                 id: makeNodeId('unit', unit.id),
@@ -209,6 +226,8 @@ export function hierarchyTreeToFlow(
           createdAt: node.createdAt,
           description: node.description,
           detailPath: node.detailPath,
+          replacementSequence: node.replacementSequence,
+          isCurrentInstall: node.isCurrentInstall,
         },
       });
 

@@ -29,6 +29,11 @@ import {
   buildCreateEntityByType,
   installEntityFromInventoryWithChildren,
 } from '@/lib/inventory-child-install';
+import {
+  ReplaceFromInventoryDialog,
+  type ReplaceFromInventoryTarget,
+} from '@/components/replace-from-inventory-dialog';
+import { filterCurrentInstallEntities } from '@/lib/entity-replacement';
 
 export default function SystemDetailPage() {
   const params = useParams();
@@ -52,10 +57,14 @@ export default function SystemDetailPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [replaceOpen, setReplaceOpen] = useState(false);
+  const [replaceTarget, setReplaceTarget] = useState<ReplaceFromInventoryTarget | null>(null);
 
   const system = systems.find((s) => String(s.id) === systemId);
   const project = system ? projects.find((p) => p.id === system.project_id) : null;
-  const systemSubsystems = system ? subsystems.filter((sub) => sub.system_id === system.id) : [];
+  const systemSubsystems = system
+    ? filterCurrentInstallEntities(subsystems.filter((sub) => sub.system_id === system.id))
+    : [];
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
   const [systemHierarchyNames, setSystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
@@ -346,6 +355,8 @@ export default function SystemDetailPage() {
         ownerType="system"
         entity={system}
         onUpdate={(data) => updateSystem(system.id, data)}
+        projectId={project?.id}
+        allowReplace
       />
 
       {/* Subsystems Cards */}
@@ -356,6 +367,17 @@ export default function SystemDetailPage() {
         statuses={storeStatuses.length ? storeStatuses : statuses}
         onAdd={() => setIsAddOpen(true)}
         onEdit={openEditSubsystem}
+        onReplace={(entity) => {
+          setReplaceTarget({
+            entityType: 'subsystem',
+            entityId: entity.id,
+            entityName: entity.name,
+            partNumber: entity.part_number,
+            serialNumber: entity.serial_number,
+            replacementSequence: entity.replacement_sequence,
+          });
+          setReplaceOpen(true);
+        }}
         onDelete={handleDeleteSubsystem}
         detailPath={(id) => `/subsystems/${id}`}
         addButtonLabel="Add Subsystem"
@@ -415,6 +437,15 @@ export default function SystemDetailPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      {project ? (
+        <ReplaceFromInventoryDialog
+          open={replaceOpen}
+          onOpenChange={setReplaceOpen}
+          projectId={project.id}
+          target={replaceTarget}
+        />
+      ) : null}
     </div>
   );
 }

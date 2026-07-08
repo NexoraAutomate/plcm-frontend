@@ -14,6 +14,7 @@ import {
   type HierarchyEntityType,
   type HierarchyTreeNode,
 } from '@/lib/system-hierarchy-graph';
+import { filterCurrentInstallEntities } from '@/lib/entity-replacement';
 
 export type HierarchyHighlightState = 'selected' | 'dimmed' | 'normal';
 
@@ -50,23 +51,29 @@ export function getRunningProjects(projects: Project[]): Project[] {
 }
 
 export function getSystemsForProject(systems: System[], projectId: number): System[] {
-  return systems.filter((system) => system.project_id === projectId);
+  return filterCurrentInstallEntities(systems.filter((system) => system.project_id === projectId));
 }
 
 export function getSubsystemsForSystem(subsystems: Subsystem[], systemId: number): Subsystem[] {
-  return subsystems.filter((subsystem) => subsystem.system_id === systemId);
+  return filterCurrentInstallEntities(
+    subsystems.filter((subsystem) => subsystem.system_id === systemId)
+  );
 }
 
 export function getModulesForSubsystem(modules: Module[], subsystemId: number): Module[] {
-  return modules.filter((module) => module.subsystem_id === subsystemId);
+  return filterCurrentInstallEntities(
+    modules.filter((module) => module.subsystem_id === subsystemId)
+  );
 }
 
 export function getUnitsForModule(units: Unit[], moduleId: number): Unit[] {
-  return units.filter((unit) => unit.module_id === moduleId);
+  return filterCurrentInstallEntities(units.filter((unit) => unit.module_id === moduleId));
 }
 
 export function getComponentsForUnit(components: Component[], unitId: number): Component[] {
-  return components.filter((component) => component.unit_id === unitId);
+  return filterCurrentInstallEntities(
+    components.filter((component) => component.unit_id === unitId)
+  );
 }
 
 function getDeepestSelection(
@@ -468,8 +475,26 @@ export interface SubtreeEntityRef {
   installed_by_id?: number;
   original_part_number?: string;
   original_serial_number?: string;
+  is_current_install?: boolean;
+  replacement_sequence?: number;
+  root_entity_id?: number | null;
 }
 
+function installRefFields(entity: {
+  original_part_number?: string;
+  original_serial_number?: string;
+  is_current_install?: boolean;
+  replacement_sequence?: number;
+  root_entity_id?: number | null;
+}) {
+  return {
+    original_part_number: entity.original_part_number,
+    original_serial_number: entity.original_serial_number,
+    is_current_install: entity.is_current_install,
+    replacement_sequence: entity.replacement_sequence,
+    root_entity_id: entity.root_entity_id,
+  };
+}
 export function collectSubtreeEntities(
   systemId: number,
   systems: System[],
@@ -491,8 +516,7 @@ export function collectSubtreeEntities(
     created_at: system.created_at,
     installation_date: system.installation_date,
     installed_by_id: system.installed_by_id,
-    original_part_number: system.original_part_number,
-    original_serial_number: system.original_serial_number,
+    ...installRefFields(system),
   });
 
   const systemSubsystems = getSubsystemsForSystem(subsystems, systemId);
@@ -508,6 +532,7 @@ export function collectSubtreeEntities(
       installed_by_id: subsystem.installed_by_id,
       original_part_number: subsystem.original_part_number,
       original_serial_number: subsystem.original_serial_number,
+      ...installRefFields(subsystem),
     });
 
     const subsystemModules = getModulesForSubsystem(modules, subsystem.id);
@@ -523,6 +548,7 @@ export function collectSubtreeEntities(
         installed_by_id: module.installed_by_id,
         original_part_number: module.original_part_number,
         original_serial_number: module.original_serial_number,
+        ...installRefFields(module),
       });
 
       const moduleUnits = getUnitsForModule(units, module.id);
@@ -538,6 +564,7 @@ export function collectSubtreeEntities(
           installed_by_id: unit.installed_by_id,
           original_part_number: unit.original_part_number,
           original_serial_number: unit.original_serial_number,
+          ...installRefFields(unit),
         });
 
         const unitComponents = getComponentsForUnit(components, unit.id);
@@ -553,6 +580,7 @@ export function collectSubtreeEntities(
             installed_by_id: component.installed_by_id,
             original_part_number: component.original_part_number,
             original_serial_number: component.original_serial_number,
+            ...installRefFields(component),
           });
         }
       }
@@ -574,6 +602,9 @@ function toSubtreeRef(
     installed_by_id?: number;
     original_part_number?: string;
     original_serial_number?: string;
+    is_current_install?: boolean;
+    replacement_sequence?: number;
+    root_entity_id?: number | null;
   }
 ): SubtreeEntityRef {
   return {
@@ -585,8 +616,7 @@ function toSubtreeRef(
     created_at: entity.created_at,
     installation_date: entity.installation_date,
     installed_by_id: entity.installed_by_id,
-    original_part_number: entity.original_part_number,
-    original_serial_number: entity.original_serial_number,
+    ...installRefFields(entity),
   };
 }
 
