@@ -11,15 +11,17 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import type { ChartDataPoint } from '@/lib/types/dashboard';
+import { ChartLegend, ChartValueLabelList } from './chart-overlays';
 import { DashboardEmptyState } from './DashboardEmptyState';
 
 interface LineChartCardProps {
   title: string;
   data: ChartDataPoint[];
+  seriesLabel?: string;
   onClick?: () => void;
 }
 
-export function LineChartCard({ title, data, onClick }: LineChartCardProps) {
+export function LineChartCard({ title, data, seriesLabel = 'Count', onClick }: LineChartCardProps) {
   return (
     <Card
       className={`h-full ${onClick ? 'cursor-pointer transition-shadow hover:shadow-md' : ''}`}
@@ -44,8 +46,8 @@ export function LineChartCard({ title, data, onClick }: LineChartCardProps) {
         {data.length === 0 ? (
           <DashboardEmptyState message="No trend data" />
         ) : (
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={data}>
+          <ResponsiveContainer width="100%" height={250}>
+            <LineChart data={data} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
               <XAxis dataKey="name" tick={{ fontSize: 11 }} />
               <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
@@ -53,10 +55,14 @@ export function LineChartCard({ title, data, onClick }: LineChartCardProps) {
               <Line
                 type="monotone"
                 dataKey="value"
+                name={seriesLabel}
                 stroke="oklch(0.70 0.18 45)"
                 strokeWidth={2}
                 dot={{ r: 3 }}
-              />
+              >
+                <ChartValueLabelList />
+              </Line>
+              <ChartLegend />
             </LineChart>
           </ResponsiveContainer>
         )}

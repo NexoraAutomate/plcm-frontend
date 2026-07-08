@@ -10,7 +10,7 @@ import {
   useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Plus } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useHierarchyEntityActions } from '@/components/hierarchy-dashboard/use-hierarchy-entity-actions';
@@ -69,6 +69,7 @@ interface ProjectHierarchyFlowProps {
   className?: string;
   onNodeSelect?: (entityId: number, type: HierarchyEntityType) => void;
   systemsLoading?: boolean;
+  onEntityChanged?: () => void | Promise<void>;
 }
 
 function FitViewOnSelectionChange({ dependencyKey }: { dependencyKey: string }) {
@@ -101,11 +102,14 @@ export function ProjectHierarchyFlow({
   className,
   onNodeSelect,
   systemsLoading = false,
+  onEntityChanged,
 }: ProjectHierarchyFlowProps) {
   const { entityActionHandlers, entityActionDialogs } = useHierarchyEntityActions({
     selection,
     onSelectionChange,
     updateSelection,
+    systemsOverride: systems,
+    onEntityChanged,
   });
 
   const [panel, setPanel] = useState<{
@@ -314,6 +318,20 @@ export function ProjectHierarchyFlow({
     );
   }
 
+  if (systemsLoading) {
+    return (
+      <div
+        className={cn(
+          'flex h-full min-h-[420px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-muted/20',
+          className
+        )}
+      >
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">Loading project systems…</p>
+      </div>
+    );
+  }
+
   if (nodes.length === 0) {
     return (
       <>
@@ -350,11 +368,6 @@ export function ProjectHierarchyFlow({
       )}
     >
       <div className="relative min-w-0 flex-1">
-        {systemsLoading ? (
-          <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-background/60 backdrop-blur-[1px]">
-            <p className="text-sm text-muted-foreground">Loading project systems…</p>
-          </div>
-        ) : null}
         <HierarchyNodeLegend
           visibility={fieldVisibility}
           onChange={setFieldVisibility}
@@ -422,6 +435,7 @@ export function ProjectHierarchyFlow({
           onHistoryRefresh={() => {
             invalidateProjectResolutionCache(selection.projectId!);
             refreshResolutionHistory();
+            void onEntityChanged?.();
           }}
         />
       ) : null}

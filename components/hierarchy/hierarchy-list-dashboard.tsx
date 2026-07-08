@@ -22,6 +22,12 @@ import { cn } from '@/lib/utils';
 import { FaultyEntityStatus } from '@/lib/models';
 import type { EntityScopeType } from '@/lib/entity-fault-badges';
 import { CHART_COLORS } from '@/lib/dashboard-chart-theme';
+import {
+  ChartLegend,
+  ChartValueLabelList,
+  HorizontalChartValueLabelList,
+  renderPieSliceLabel,
+} from '@/components/dashboard/chart-overlays';
 
 export interface HierarchyListDashboardConfig {
   entityPlural: string;
@@ -269,17 +275,19 @@ export function HierarchyListDashboard<
                     No {config.entityPlural.toLowerCase()} yet
                   </p>
                 ) : (
-                  <ResponsiveContainer width="100%" height={220}>
+                  <ResponsiveContainer width="100%" height={260}>
                     <PieChart>
                       <Pie
                         data={statusData}
                         dataKey="value"
                         nameKey="name"
                         cx="50%"
-                        cy="50%"
+                        cy="45%"
                         innerRadius={50}
                         outerRadius={80}
                         paddingAngle={2}
+                        label={renderPieSliceLabel}
+                        labelLine={false}
                         className="cursor-pointer"
                         onClick={(_, index) => {
                           const entry = statusData[index];
@@ -302,6 +310,7 @@ export function HierarchyListDashboard<
                         ))}
                       </Pie>
                       <Tooltip />
+                      <ChartLegend />
                     </PieChart>
                   </ResponsiveContainer>
                 )}
@@ -316,8 +325,8 @@ export function HierarchyListDashboard<
                 {statusData.length === 0 ? (
                   <p className="py-12 text-center text-sm text-muted-foreground">No data</p>
                 ) : (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={statusData}>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={statusData} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
                       <XAxis
                         dataKey="name"
@@ -331,6 +340,7 @@ export function HierarchyListDashboard<
                       <Tooltip />
                       <Bar
                         dataKey="value"
+                        name="Count"
                         radius={[4, 4, 0, 0]}
                         className="cursor-pointer"
                         onClick={(data) => {
@@ -347,7 +357,9 @@ export function HierarchyListDashboard<
                             }
                           />
                         ))}
+                        <ChartValueLabelList />
                       </Bar>
+                      <ChartLegend />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -369,14 +381,15 @@ export function HierarchyListDashboard<
                 {parentData.length === 0 ? (
                   <p className="py-12 text-center text-sm text-muted-foreground">No parent links</p>
                 ) : (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={parentData} layout="vertical" margin={{ left: 8 }}>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={parentData} layout="vertical" margin={{ left: 8, right: 24, top: 8, bottom: 8 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" horizontal={false} />
                       <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10 }} />
                       <YAxis type="category" dataKey="name" width={88} tick={{ fontSize: 10 }} />
                       <Tooltip />
                       <Bar
                         dataKey="value"
+                        name="Count"
                         fill="oklch(0.62 0.15 250)"
                         radius={[0, 4, 4, 0]}
                         className="cursor-pointer"
@@ -384,7 +397,10 @@ export function HierarchyListDashboard<
                           const id = (data as { parentId?: number }).parentId;
                           if (id) onParentFilter(String(id));
                         }}
-                      />
+                      >
+                        <HorizontalChartValueLabelList />
+                      </Bar>
+                      <ChartLegend />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -430,8 +446,8 @@ export function HierarchyListDashboard<
                     No {config.entityPlural.toLowerCase()} yet
                   </p>
                 ) : (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={hierarchyData}>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={hierarchyData} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
                       <XAxis
                         dataKey="name"
@@ -445,6 +461,7 @@ export function HierarchyListDashboard<
                       <Tooltip />
                       <Bar
                         dataKey="count"
+                        name={config.hierarchyCountLabel}
                         fill="oklch(0.60 0.12 280)"
                         radius={[4, 4, 0, 0]}
                         className="cursor-pointer"
@@ -452,7 +469,10 @@ export function HierarchyListDashboard<
                           const id = (data as { entityId?: number }).entityId;
                           if (id) router.push(config.detailRoute(id));
                         }}
-                      />
+                      >
+                        <ChartValueLabelList dataKey="count" />
+                      </Bar>
+                      <ChartLegend />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -490,8 +510,8 @@ export function HierarchyListDashboard<
               {timelineData.length === 0 ? (
                 <p className="py-12 text-center text-sm text-muted-foreground">No creation dates recorded</p>
               ) : (
-                <ResponsiveContainer width="100%" height={240}>
-                  <AreaChart data={timelineData}>
+                <ResponsiveContainer width="100%" height={270}>
+                  <AreaChart data={timelineData} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id={config.gradientId} x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="oklch(0.62 0.15 250)" stopOpacity={0.35} />
@@ -505,9 +525,13 @@ export function HierarchyListDashboard<
                     <Area
                       type="monotone"
                       dataKey="value"
+                      name="Added"
                       stroke="oklch(0.62 0.15 250)"
                       fill={`url(#${config.gradientId})`}
-                    />
+                    >
+                      <ChartValueLabelList />
+                    </Area>
+                    <ChartLegend />
                   </AreaChart>
                 </ResponsiveContainer>
               )}

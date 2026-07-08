@@ -27,6 +27,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { cn } from '@/lib/utils';
 import type { Order, Project, Status, System } from '@/lib/models';
 import { CHART_COLORS } from '@/lib/dashboard-chart-theme';
+import {
+  ChartLegend,
+  ChartValueLabelList,
+  HorizontalChartValueLabelList,
+  renderPieSliceLabel,
+} from '@/components/dashboard/chart-overlays';
 import { getSystemCountByProjectId } from '@/lib/entity-counts';
 
 const PROJECT_STATUS_COLORS: Record<string, string> = {
@@ -247,17 +253,19 @@ export function ProjectsMiniDashboard({
                 {projectStatusData.length === 0 ? (
                   <p className="py-12 text-center text-sm text-muted-foreground">No projects yet</p>
                 ) : (
-                  <ResponsiveContainer width="100%" height={220}>
+                  <ResponsiveContainer width="100%" height={260}>
                     <PieChart>
                       <Pie
                         data={projectStatusData}
                         dataKey="value"
                         nameKey="name"
                         cx="50%"
-                        cy="50%"
+                        cy="45%"
                         innerRadius={50}
                         outerRadius={80}
                         paddingAngle={2}
+                        label={renderPieSliceLabel}
+                        labelLine={false}
                         className="cursor-pointer"
                         onClick={(_, index) => {
                           const entry = projectStatusData[index];
@@ -281,6 +289,7 @@ export function ProjectsMiniDashboard({
                         ))}
                       </Pie>
                       <Tooltip />
+                      <ChartLegend />
                     </PieChart>
                   </ResponsiveContainer>
                 )}
@@ -331,14 +340,15 @@ export function ProjectsMiniDashboard({
                 {progressData.length === 0 ? (
                   <p className="py-12 text-center text-sm text-muted-foreground">No projects yet</p>
                 ) : (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={progressData} layout="vertical" margin={{ left: 8 }}>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={progressData} layout="vertical" margin={{ left: 8, right: 24, top: 8, bottom: 8 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" horizontal={false} />
                       <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} />
                       <YAxis type="category" dataKey="name" width={72} tick={{ fontSize: 10 }} />
                       <Tooltip formatter={(v: number) => [`${v}%`, 'Progress']} />
                       <Bar
                         dataKey="value"
+                        name="Progress"
                         fill="oklch(0.65 0.15 165)"
                         radius={[0, 4, 4, 0]}
                         className="cursor-pointer"
@@ -346,7 +356,10 @@ export function ProjectsMiniDashboard({
                           const id = (data as { id?: number }).id;
                           if (id) router.push(`/projects/${id}`);
                         }}
-                      />
+                      >
+                        <HorizontalChartValueLabelList suffix="%" />
+                      </Bar>
+                      <ChartLegend />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -361,14 +374,15 @@ export function ProjectsMiniDashboard({
                 {projectStatusData.length === 0 ? (
                   <p className="py-12 text-center text-sm text-muted-foreground">No data</p>
                 ) : (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={projectStatusData}>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={projectStatusData} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
                       <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-15} textAnchor="end" height={50} />
                       <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
                       <Tooltip />
                       <Bar
                         dataKey="value"
+                        name="Projects"
                         fill="oklch(0.62 0.15 250)"
                         radius={[4, 4, 0, 0]}
                         className="cursor-pointer"
@@ -376,7 +390,10 @@ export function ProjectsMiniDashboard({
                           const name = (data as { name?: string }).name;
                           if (name) onStatusFilter(name);
                         }}
-                      />
+                      >
+                        <ChartValueLabelList />
+                      </Bar>
+                      <ChartLegend />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -396,14 +413,15 @@ export function ProjectsMiniDashboard({
                 {systemsData.length === 0 ? (
                   <p className="py-12 text-center text-sm text-muted-foreground">No systems linked yet</p>
                 ) : (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={systemsData} layout="vertical" margin={{ left: 8 }}>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={systemsData} layout="vertical" margin={{ left: 8, right: 24, top: 8, bottom: 8 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" horizontal={false} />
                       <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10 }} />
                       <YAxis type="category" dataKey="name" width={72} tick={{ fontSize: 10 }} />
                       <Tooltip />
                       <Bar
                         dataKey="value"
+                        name="Systems"
                         fill="oklch(0.60 0.12 280)"
                         radius={[0, 4, 4, 0]}
                         className="cursor-pointer"
@@ -411,7 +429,10 @@ export function ProjectsMiniDashboard({
                           const id = (data as { id?: number }).id;
                           if (id) router.push(`/projects/${id}`);
                         }}
-                      />
+                      >
+                        <HorizontalChartValueLabelList />
+                      </Bar>
+                      <ChartLegend />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -455,8 +476,8 @@ export function ProjectsMiniDashboard({
               {projectsTimeline.length === 0 ? (
                 <p className="py-12 text-center text-sm text-muted-foreground">No start dates recorded</p>
               ) : (
-                <ResponsiveContainer width="100%" height={240}>
-                  <AreaChart data={projectsTimeline}>
+                <ResponsiveContainer width="100%" height={270}>
+                  <AreaChart data={projectsTimeline} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="projectsPageFill" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="oklch(0.65 0.15 165)" stopOpacity={0.35} />
@@ -470,9 +491,13 @@ export function ProjectsMiniDashboard({
                     <Area
                       type="monotone"
                       dataKey="value"
+                      name="Projects"
                       stroke="oklch(0.65 0.15 165)"
                       fill="url(#projectsPageFill)"
-                    />
+                    >
+                      <ChartValueLabelList />
+                    </Area>
+                    <ChartLegend />
                   </AreaChart>
                 </ResponsiveContainer>
               )}

@@ -6,6 +6,7 @@ import {
   RadialBar,
   PolarAngleAxis,
   ResponsiveContainer,
+  Legend,
 } from 'recharts';
 import type { GaugeMetric } from '@/lib/types/dashboard';
 
@@ -39,7 +40,7 @@ export function GaugeChartCard({ metric, onClick }: GaugeChartCardProps) {
         <CardTitle className="text-sm font-medium">{metric.label}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col items-center">
-        <ResponsiveContainer width="100%" height={180}>
+        <ResponsiveContainer width="100%" height={200}>
           <RadialBarChart
             cx="50%"
             cy="50%"
@@ -51,7 +52,14 @@ export function GaugeChartCard({ metric, onClick }: GaugeChartCardProps) {
             endAngle={0}
           >
             <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
-            <RadialBar background dataKey="value" cornerRadius={8} />
+            <RadialBar
+              background
+              dataKey="value"
+              name={metric.label}
+              cornerRadius={8}
+              label={{ position: 'insideStart', fill: 'white', fontSize: 11, fontWeight: 600 }}
+            />
+            <Legend verticalAlign="bottom" height={24} iconType="circle" iconSize={8} />
           </RadialBarChart>
         </ResponsiveContainer>
         <p className="text-2xl font-bold">

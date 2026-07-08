@@ -1,6 +1,6 @@
 'use client';
 
-import { type LucideIcon, TrendingDown, TrendingUp, Minus } from 'lucide-react';
+import { type LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
@@ -9,7 +9,6 @@ type AccentColor = 'blue' | 'green' | 'red' | 'amber' | 'orange' | 'slate' | 'em
 interface ExecutiveKPICardProps {
   label: string;
   value: number;
-  changePercent: number | null;
   icon: LucideIcon;
   accentColor?: AccentColor;
   isSelected?: boolean;
@@ -55,15 +54,11 @@ const iconBgStyles: Record<AccentColor, string> = {
 export function ExecutiveKPICard({
   label,
   value,
-  changePercent,
   icon: Icon,
   accentColor = 'blue',
   isSelected = false,
   onClick,
 }: ExecutiveKPICardProps) {
-  const change = changePercent ?? 0;
-  const showChange = changePercent !== null;
-
   return (
     <Card
       role={onClick ? 'button' : undefined}
@@ -86,44 +81,18 @@ export function ExecutiveKPICard({
         onClick && 'cursor-pointer'
       )}
     >
-      <CardContent className="flex items-center justify-between p-4 md:p-5">
-        <div className="space-y-1">
-          <p className="text-xs font-medium text-muted-foreground md:text-sm">{label}</p>
-          <p className="text-2xl font-bold tracking-tight">{value.toLocaleString()}</p>
-          {showChange ? (
-            <div className="flex items-center gap-1">
-              {change > 0 ? (
-                <TrendingUp className="h-3 w-3 text-emerald-500" />
-              ) : change < 0 ? (
-                <TrendingDown className="h-3 w-3 text-red-500" />
-              ) : (
-                <Minus className="h-3 w-3 text-muted-foreground" />
-              )}
-              <span
-                className={cn(
-                  'text-xs font-medium',
-                  change > 0
-                    ? 'text-emerald-600 dark:text-emerald-400'
-                    : change < 0
-                      ? 'text-red-600 dark:text-red-400'
-                      : 'text-muted-foreground'
-                )}
-              >
-                {change > 0 ? `+${change}%` : change < 0 ? `${change}%` : '—'}
-              </span>
-              <span className="text-xs text-muted-foreground">MoM</span>
-            </div>
-          ) : (
-            <span className="text-xs text-muted-foreground">— MoM</span>
-          )}
+      <CardContent className="flex items-center justify-between px-3 py-2.5">
+        <div className="min-w-0 space-y-0.5">
+          <p className="truncate text-[11px] font-medium text-muted-foreground">{label}</p>
+          <p className="text-lg font-bold leading-tight tracking-tight">{value.toLocaleString()}</p>
         </div>
         <div
           className={cn(
-            'flex h-11 w-11 items-center justify-center rounded-xl',
+            'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
             iconBgStyles[accentColor]
           )}
         >
-          <Icon className="h-5 w-5" />
+          <Icon className="h-4 w-4" />
         </div>
       </CardContent>
     </Card>

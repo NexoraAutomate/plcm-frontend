@@ -1,6 +1,7 @@
 'use client';
 
-import { Search, RotateCcw } from 'lucide-react';
+import Link from 'next/link';
+import { Search, RotateCcw, GitBranch } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -11,35 +12,23 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { ExecutiveDashboardFilters } from '@/lib/types/dashboard';
-import type { Customer, Order, Project, Status } from '@/lib/models';
+import type { Customer, Order, Project } from '@/lib/models';
 
 interface DashboardFilterBarProps {
   filters: ExecutiveDashboardFilters;
   customers: Customer[];
   orders: Order[];
   projects: Project[];
-  projectStatuses: Status[];
   onChange: (patch: Partial<ExecutiveDashboardFilters>) => void;
   onClear: () => void;
   onSearchOpen?: () => void;
 }
-
-const MAINTENANCE_STATUSES = [
-  'open',
-  'under_inspection',
-  'under_repair',
-  'resolved',
-  'closed',
-];
-
-const CONFIG_STATUSES = ['repair', 'replace', 'reconfigure', 'no_action'];
 
 export function DashboardFilterBar({
   filters,
   customers,
   orders,
   projects,
-  projectStatuses,
   onChange,
   onClear,
   onSearchOpen,
@@ -66,7 +55,9 @@ export function DashboardFilterBar({
           Reset
         </Button>
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+      {/* <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"> */}
+      <div className="flex justify-between">
+      <div className="flex gap-2 w-1/2"> 
         <Select
           value={filters.customer_id?.toString() ?? 'all'}
           onValueChange={(v) =>
@@ -131,82 +122,20 @@ export function DashboardFilterBar({
           </SelectContent>
         </Select>
 
-        <Select
-          value={filters.project_status ?? 'all'}
-          onValueChange={(v) =>
-            onChange({ project_status: v === 'all' ? undefined : v })
-          }
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Project Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Project Statuses</SelectItem>
-            {projectStatuses.map((s) => (
-              <SelectItem key={s.id} value={s.status_name}>
-                {s.status_name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={filters.maintenance_status ?? 'all'}
-          onValueChange={(v) =>
-            onChange({ maintenance_status: v === 'all' ? undefined : v })
-          }
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Maintenance Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Maintenance Statuses</SelectItem>
-            {MAINTENANCE_STATUSES.map((s) => (
-              <SelectItem key={s} value={s}>
-                {s.replace(/_/g, ' ')}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={filters.configuration_status ?? 'all'}
-          onValueChange={(v) =>
-            onChange({ configuration_status: v === 'all' ? undefined : v })
-          }
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Config Resolution" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Config Types</SelectItem>
-            {CONFIG_STATUSES.map((s) => (
-              <SelectItem key={s} value={s}>
-                {s.replace(/_/g, ' ')}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {/* <Input
-          type="date"
-          value={filters.date_from?.slice(0, 10) ?? ''}
-          onChange={(e) =>
-            onChange({ date_from: e.target.value ? `${e.target.value}T00:00:00` : undefined })
-          }
-          placeholder="From date"
-        />
-
-        <Input
-          type="date"
-          value={filters.date_to?.slice(0, 10) ?? ''}
-          onChange={(e) =>
-            onChange({ date_to: e.target.value ? `${e.target.value}T23:59:59` : undefined })
-          }
-          placeholder="To date"
-        /> */}
-
-        <div className="relative sm:col-span-2 lg:col-span-1 xl:col-span-2">
+        <Button variant="outline" size="sm" className="shrink-0" asChild>
+          <Link
+            href={
+              filters.project_id != null
+                ? `/hierarchy-dashboard?project_id=${filters.project_id}`
+                : '/hierarchy-dashboard'
+            }
+          >
+            <GitBranch className="mr-2 h-4 w-4" />
+            Hierarchy
+          </Link>
+        </Button>
+        </div>
+        <div className="relative w-1/2">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             readOnly

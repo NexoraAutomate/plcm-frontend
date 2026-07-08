@@ -81,7 +81,7 @@ export function EntityResolutionDialog({
   onCompleted,
 }: EntityResolutionDialogProps) {
   const { user, hasAccess } = useAuth();
-  const { users } = useDataStore();
+  const { users, refreshData } = useDataStore();
   const [replacementOpen, setReplacementOpen] = useState(false);
   const [replaceFormOpen, setReplaceFormOpen] = useState(false);
   const [newPartNumber, setNewPartNumber] = useState('');
@@ -163,6 +163,7 @@ export function EntityResolutionDialog({
         inventory_item_id: selectedInventoryId ? Number(selectedInventoryId) : undefined,
       });
       invalidateProjectResolutionCache(projectId);
+      await refreshData({ silent: true });
       toast.success('Replacement completed and maintenance case closed.');
       setReplaceFormOpen(false);
       onCompleted?.();

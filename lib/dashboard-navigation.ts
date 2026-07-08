@@ -23,6 +23,8 @@ export const KPI_ROUTES: Record<string, string> = {
   open_faulty_entities: '/maintenance',
   components_under_investigation: '/maintenance',
   config_changes_this_month: '/maintenance',
+  total_inventory: '/inventory',
+  total_users: '/users',
 };
 
 export function kpiRoute(key: string): string {

@@ -11,15 +11,17 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import type { ChartDataPoint } from '@/lib/types/dashboard';
+import { ChartLegend, ChartValueLabelList } from './chart-overlays';
 import { DashboardEmptyState } from './DashboardEmptyState';
 
 interface AreaChartCardProps {
   title: string;
   data: ChartDataPoint[];
+  seriesLabel?: string;
   onClick?: () => void;
 }
 
-export function AreaChartCard({ title, data, onClick }: AreaChartCardProps) {
+export function AreaChartCard({ title, data, seriesLabel = 'Count', onClick }: AreaChartCardProps) {
   return (
     <Card
       className={`h-full ${onClick ? 'cursor-pointer transition-shadow hover:shadow-md' : ''}`}
@@ -44,8 +46,8 @@ export function AreaChartCard({ title, data, onClick }: AreaChartCardProps) {
         {data.length === 0 ? (
           <DashboardEmptyState message="No timeline data" />
         ) : (
-          <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={data}>
+          <ResponsiveContainer width="100%" height={250}>
+            <AreaChart data={data} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="oklch(0.62 0.15 250)" stopOpacity={0.35} />
@@ -59,9 +61,13 @@ export function AreaChartCard({ title, data, onClick }: AreaChartCardProps) {
               <Area
                 type="monotone"
                 dataKey="value"
+                name={seriesLabel}
                 stroke="oklch(0.62 0.15 250)"
                 fill="url(#areaFill)"
-              />
+              >
+                <ChartValueLabelList />
+              </Area>
+              <ChartLegend />
             </AreaChart>
           </ResponsiveContainer>
         )}

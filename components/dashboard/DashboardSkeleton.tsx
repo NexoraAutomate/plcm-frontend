@@ -9,7 +9,7 @@ export function DashboardSkeleton() {
       <Skeleton className="h-32 w-full" />
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
         {Array.from({ length: 10 }).map((_, i) => (
-          <Skeleton key={i} className="h-28" />
+          <Skeleton key={i} className="h-20" />
         ))}
       </div>
       <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">

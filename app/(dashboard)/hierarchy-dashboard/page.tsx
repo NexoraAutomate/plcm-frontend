@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
 import { toast } from 'sonner';
@@ -51,6 +52,8 @@ function clearChildSelections(
 }
 
 export default function HierarchyDashboardPage() {
+  const searchParams = useSearchParams();
+  const projectIdParam = searchParams.get('project_id');
   const { pageLoading, hierarchyLoading, hierarchyAttempted } = useEntityHierarchyGate();
   const {
     projects: storeProjects,
@@ -92,10 +95,11 @@ export default function HierarchyDashboardPage() {
     [allProjects]
   );
 
-  const loadProjectSystems = useCallback(async (projectId: number) => {
-    if (loadedProjectIdRef.current === projectId) return;
+  const loadProjectSystems = useCallback(async (projectId: number, force = false) => {
+    if (!force && loadedProjectIdRef.current === projectId) return;
 
     loadedProjectIdRef.current = projectId;
+    setProjectSystems([]);
     setSystemsLoading(true);
     try {
       const res = await api.projects.getSystems(projectId);
@@ -108,6 +112,24 @@ export default function HierarchyDashboardPage() {
       setSystemsLoading(false);
     }
   }, []);
+
+  const handleEntityChanged = useCallback(async () => {
+    if (!selection.projectId) return;
+    loadedProjectIdRef.current = null;
+    await loadProjectSystems(selection.projectId, true);
+  }, [loadProjectSystems, selection.projectId]);
+
+  useEffect(() => {
+    if (!projectIdParam) return;
+    const projectId = Number(projectIdParam);
+    if (!Number.isFinite(projectId) || projectId <= 0) return;
+
+    setSelection((current) => {
+      if (current.projectId === projectId) return current;
+      return { projectId };
+    });
+    void loadProjectSystems(projectId);
+  }, [projectIdParam, loadProjectSystems]);
 
   const systemsForSelection = selection.projectId ? projectSystems : storeSystems;
 
@@ -167,11 +189,17 @@ export default function HierarchyDashboardPage() {
       });
 
       if (key === 'projectId' && value) {
+        if (loadedProjectIdRef.current !== value) {
+          loadedProjectIdRef.current = null;
+          setProjectSystems([]);
+          setSystemsLoading(true);
+        }
         void loadProjectSystems(value);
       }
       if (key === 'projectId' && !value) {
         loadedProjectIdRef.current = null;
         setProjectSystems([]);
+        setSystemsLoading(false);
       }
     },
     [loadProjectSystems]
@@ -314,6 +342,7 @@ export default function HierarchyDashboardPage() {
         statuses={statuses}
         onNodeSelect={handleNodeSelect}
         systemsLoading={systemsLoading}
+        onEntityChanged={handleEntityChanged}
         className="min-h-0 flex-1 border-0"
       />
     </div>

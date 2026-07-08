@@ -24,6 +24,7 @@ import {
   Cpu,
   Puzzle,
   GitBranch,
+  Bell,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -52,6 +53,7 @@ const navItems: NavItem[] = [
   { label: "Projects", href: "/projects", icon: Rocket },
   { label: "Inventory", href: "/inventory", icon: Package },
   { label: "Maintenance", href: "/maintenance", icon: Wrench },
+  { label: "Notifications", href: "/notifications", icon: Bell },
 ];
 
 const hierarchyItems: NavItem[] = [

@@ -18,11 +18,12 @@ import {
 import {
   hierarchyInstallFormFields,
   hierarchyInstallInitialValues,
+  inventoryToHierarchyCreatePayload,
   parseHierarchyInstallPayload,
 } from '@/lib/hierarchy-install-fields';
 import type { HierarchyDashboardSelection } from '@/lib/project-hierarchy-dashboard';
 import { syncEntityPicture } from '@/lib/entity-picture-upload';
-import type { Hierarchy, Status, System } from '@/lib/models';
+import type { Hierarchy, Inventory, Status, System } from '@/lib/models';
 import type { HierarchyEntityType } from '@/lib/system-hierarchy-graph';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -49,6 +50,8 @@ interface UseHierarchyEntityActionsOptions {
   selection: HierarchyDashboardSelection;
   onSelectionChange: (selection: HierarchyDashboardSelection) => void;
   updateSelection: (key: DashboardLevelKey, value?: number) => void;
+  systemsOverride?: System[];
+  onEntityChanged?: () => void | Promise<void>;
 }
 
 function formatAxiosError(error: unknown, fallback: string): string {
@@ -68,13 +71,62 @@ function buildSerialNumber(name: string, partNumber: string): string {
   return name || partNumber || '';
 }
 
+function filterInventoryForHierarchy(
+  items: Inventory[],
+  entityType: DashboardEntityType,
+  allowedNames: string[]
+): Inventory[] {
+  const allowed = new Set(allowedNames.map((name) => name.trim().toLowerCase()).filter(Boolean));
+  if (allowed.size === 0) return [];
+
+  return items.filter(
+    (item) =>
+      item.inventory_type === entityType &&
+      item.quantity > 0 &&
+      allowed.has(item.name?.trim().toLowerCase() ?? '')
+  );
+}
+
+function resolveInstallIdentity(
+  formData: Record<string, unknown>,
+  inventoryItems: Inventory[],
+  name: string
+) {
+  const partNumber = String(formData.partnumber || '').trim();
+  const inventoryMatch =
+    inventoryItems.find((item) => item.manufacturer_part_number?.trim() === partNumber) ??
+    inventoryItems.find((item) => item.name?.trim() === name);
+
+  if (inventoryMatch) {
+    const serial = buildSerialNumber(
+      name,
+      inventoryMatch.manufacturer_part_number || partNumber
+    );
+    return {
+      payload: inventoryToHierarchyCreatePayload(inventoryMatch, serial),
+      inventoryMatch,
+    };
+  }
+
+  return {
+    payload: {
+      part_number: partNumber,
+      serial_number: buildSerialNumber(name, partNumber),
+      configuration_item: partNumber || name,
+    },
+    inventoryMatch: undefined,
+  };
+}
+
 export function useHierarchyEntityActions({
   selection,
   onSelectionChange,
   updateSelection,
+  systemsOverride = [],
+  onEntityChanged,
 }: UseHierarchyEntityActionsOptions) {
   const {
-    systems,
+    systems: storeSystems,
     subsystems,
     modules,
     units,
@@ -95,7 +147,16 @@ export function useHierarchyEntityActions({
     createComponent,
     updateComponent,
     deleteComponent,
+    refreshData,
   } = useDataStore();
+
+  const effectiveSystems = useMemo(() => {
+    const merged = new Map(storeSystems.map((system) => [system.id, system]));
+    for (const system of systemsOverride) {
+      merged.set(system.id, system);
+    }
+    return Array.from(merged.values());
+  }, [storeSystems, systemsOverride]);
 
   const [dialogState, setDialogState] = useState<DialogState | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -107,13 +168,19 @@ export function useHierarchyEntityActions({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [hierarchyNames, setHierarchyNames] = useState<Hierarchy[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<Inventory[]>([]);
   const [loadingFormData, setLoadingFormData] = useState(false);
+
+  const notifyEntityChanged = useCallback(async () => {
+    await refreshData({ silent: true });
+    await onEntityChanged?.();
+  }, [onEntityChanged, refreshData]);
 
   const getEntity = useCallback(
     (type: DashboardEntityType, id: number) => {
       switch (type) {
         case 'system':
-          return systems.find((item) => item.id === id);
+          return effectiveSystems.find((item) => item.id === id);
         case 'subsystem':
           return subsystems.find((item) => item.id === id);
         case 'module':
@@ -126,7 +193,7 @@ export function useHierarchyEntityActions({
           return undefined;
       }
     },
-    [systems, subsystems, modules, units, components]
+    [effectiveSystems, subsystems, modules, units, components]
   );
 
   const getParentEntity = useCallback(
@@ -135,7 +202,7 @@ export function useHierarchyEntityActions({
         case 'system':
           return undefined;
         case 'subsystem':
-          return systems.find((item) => item.id === parentId);
+          return effectiveSystems.find((item) => item.id === parentId);
         case 'module':
           return subsystems.find((item) => item.id === parentId);
         case 'unit':
@@ -146,7 +213,22 @@ export function useHierarchyEntityActions({
           return undefined;
       }
     },
-    [systems, subsystems, modules, units]
+    [effectiveSystems, subsystems, modules, units]
+  );
+
+  const loadInventoryOptions = useCallback(
+    async (entityType: DashboardEntityType, allowedNames: string[]) => {
+      if (allowedNames.length === 0) {
+        setInventoryItems([]);
+        return;
+      }
+
+      const invRes = await api.inventory.list(0, 1000, entityType);
+      setInventoryItems(
+        filterInventoryForHierarchy(invRes.data ?? [], entityType, allowedNames)
+      );
+    },
+    []
   );
 
   const loadFormData = useCallback(
@@ -155,6 +237,7 @@ export function useHierarchyEntityActions({
       if (!config?.statusType || !config.hierarchyType) {
         setStatuses([]);
         setHierarchyNames([]);
+        setInventoryItems([]);
         return;
       }
 
@@ -165,13 +248,19 @@ export function useHierarchyEntityActions({
 
         if (entityType === 'system') {
           const hierarchyRes = await api.hierarchies.list('system');
-          setHierarchyNames(hierarchyRes.data);
+          const names = hierarchyRes.data ?? [];
+          setHierarchyNames(names);
+          await loadInventoryOptions(
+            'system',
+            names.map((item) => item.name)
+          );
           return;
         }
 
         const parentEntity = getParentEntity(entityType, parentId);
         if (!parentEntity || !config.parentHierarchyType) {
           setHierarchyNames([]);
+          setInventoryItems([]);
           return;
         }
 
@@ -182,21 +271,28 @@ export function useHierarchyEntityActions({
 
         if (!parentHierarchyId) {
           setHierarchyNames([]);
+          setInventoryItems([]);
           return;
         }
 
         const childRes = await api.hierarchies.list(config.hierarchyType, parentHierarchyId);
-        setHierarchyNames(childRes.data);
+        const names = childRes.data ?? [];
+        setHierarchyNames(names);
+        await loadInventoryOptions(
+          entityType,
+          names.map((item) => item.name)
+        );
       } catch (error) {
         console.error('Failed to load hierarchy form data', error);
         toast.error('Failed to load form options');
         setStatuses([]);
         setHierarchyNames([]);
+        setInventoryItems([]);
       } finally {
         setLoadingFormData(false);
       }
     },
-    [getParentEntity]
+    [getParentEntity, loadInventoryOptions]
   );
 
   useEffect(() => {
@@ -215,6 +311,7 @@ export function useHierarchyEntityActions({
     setDialogState(null);
     setStatuses([]);
     setHierarchyNames([]);
+    setInventoryItems([]);
   }, []);
 
   const handleCreate = async (
@@ -222,13 +319,24 @@ export function useHierarchyEntityActions({
     parentId: number,
     formData: Record<string, unknown>
   ) => {
+    const name = String(formData.name || '');
+    const { payload: installPayload, inventoryMatch } = resolveInstallIdentity(
+      formData,
+      inventoryItems,
+      name
+    );
+
+    if (inventoryMatch) {
+      await api.inventory.update(inventoryMatch.id, {
+        quantity: Math.max(0, inventoryMatch.quantity - 1),
+      });
+    }
+
     const payload = {
-      name: String(formData.name),
+      name,
       description: String(formData.description || ''),
       status_id: Number(formData.id),
-      part_number: String(formData.partnumber || ''),
-      serial_number: buildSerialNumber(String(formData.name || ''), String(formData.partnumber || '')),
-      configuration_item: String(formData.partnumber || formData.name || ''),
+      ...installPayload,
     };
 
     switch (entityType) {
@@ -271,6 +379,8 @@ export function useHierarchyEntityActions({
         break;
       }
     }
+
+    await notifyEntityChanged();
   };
 
   const handleUpdate = async (
@@ -317,6 +427,8 @@ export function useHierarchyEntityActions({
         });
         break;
     }
+
+    await notifyEntityChanged();
   };
 
   const handleDelete = async () => {
@@ -350,6 +462,7 @@ export function useHierarchyEntityActions({
         delete next[DASHBOARD_LEVELS[index].selectionKey];
       }
       onSelectionChange(next);
+      await notifyEntityChanged();
     } catch (error) {
       toast.error(formatAxiosError(error, `Failed to delete ${entityType}`));
     } finally {
@@ -394,7 +507,7 @@ export function useHierarchyEntityActions({
           type,
           entityId,
           selection,
-          systems,
+          effectiveSystems,
           subsystems,
           modules,
           units,
@@ -416,7 +529,7 @@ export function useHierarchyEntityActions({
           type,
           entityId,
           selection,
-          systems,
+          effectiveSystems,
           subsystems,
           modules,
           units,
@@ -442,7 +555,7 @@ export function useHierarchyEntityActions({
     }),
     [
       selection,
-      systems,
+      effectiveSystems,
       subsystems,
       modules,
       units,
@@ -455,8 +568,37 @@ export function useHierarchyEntityActions({
     ? getEntity(dialogState.entityType, dialogState.entityId)
     : undefined;
 
+  const partNumberOptions = useMemo(() => {
+    const options = new Map<string, string>();
+    for (const item of inventoryItems) {
+      const partNumber = item.manufacturer_part_number?.trim();
+      if (!partNumber) continue;
+      const label = item.name ? `${partNumber} — ${item.name}` : partNumber;
+      options.set(partNumber, label);
+    }
+    return Array.from(options.entries()).map(([value, label]) => ({ value, label }));
+  }, [inventoryItems]);
+
   const formFields = useMemo(() => {
     if (!dialogState) return [];
+
+    const partNumberField =
+      partNumberOptions.length > 0
+        ? {
+            name: 'partnumber',
+            label: 'Part #',
+            type: 'select' as const,
+            required: false,
+            placeholder: 'Select part number from inventory',
+            options: partNumberOptions,
+          }
+        : {
+            name: 'partnumber',
+            label: 'Part #',
+            type: 'text' as const,
+            required: false,
+            placeholder: 'Enter part number',
+          };
 
     const baseFields = [
       {
@@ -473,13 +615,7 @@ export function useHierarchyEntityActions({
         required: false,
         placeholder: `Enter ${dialogState.entityType} description`,
       },
-      {
-        name: 'partnumber',
-        label: 'Part #',
-        type: 'text' as const,
-        required: false,
-        placeholder: 'Enter part number',
-      },
+      partNumberField,
       {
         name: 'id',
         label: 'Status',
@@ -508,7 +644,7 @@ export function useHierarchyEntityActions({
     }
 
     return baseFields;
-  }, [dialogState, hierarchyNames, statuses, users]);
+  }, [dialogState, hierarchyNames, partNumberOptions, statuses, users]);
 
   const initialValues = useMemo(() => {
     if (!editingEntity || dialogState?.mode !== 'edit') return undefined;
@@ -542,12 +678,17 @@ export function useHierarchyEntityActions({
             <DialogDescription>
               {dialogState?.mode === 'edit'
                 ? 'Update the selected entity details.'
-                : 'Create a new entity in the hierarchy.'}
+                : hierarchyNames.length === 0
+                  ? 'No hierarchy templates are available for this parent. Configure them under Systems Hierarchy first.'
+                  : partNumberOptions.length === 0
+                    ? 'Choose a hierarchy name and enter a part number, or add matching inventory stock first.'
+                    : 'Choose a hierarchy name and part number from inventory.'}
             </DialogDescription>
           </DialogHeader>
 
           {dialogState && !loadingFormData ? (
             <EntityForm
+              key={`${dialogState.mode}-${dialogState.entityType}-${dialogState.parentId}-${dialogState.entityId ?? 'new'}`}
               fields={formFields}
               initialValues={initialValues}
               onSubmit={handleFormSubmit}

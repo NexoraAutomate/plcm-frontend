@@ -108,6 +108,7 @@ export function useExecutiveDashboardQuery(
   return useQuery({
     queryKey: queryKeys.executiveDashboard(filters),
     queryFn: () => fetchExecutiveDashboardData(filters),
+    placeholderData: (previous) => previous,
   });
 }
 

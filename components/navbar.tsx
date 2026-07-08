@@ -1,78 +1,40 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, Moon, Sun, Wrench, AlertTriangle, CheckCircle2, Users, Rocket } from "lucide-react";
+import { Moon, Sun, Bell } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/lib/auth-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import BackendAnimation from '@/components/backend-animation';
+import Image from "next/image";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useAppNotifications, type AppNotification } from "@/hooks/use-app-notifications";
+import { NotificationRow } from "@/components/notifications/notification-row";
+import { useAppNotifications } from "@/hooks/use-app-notifications";
 import { useNotificationSync } from "@/hooks/use-notification-sync";
-import { formatDistanceToNow } from "date-fns";
-import Image from "next/image";
-
-
-
-
-const TYPE_ICON: Record<AppNotification['type'], typeof Bell> = {
-  open_maintenance_case: Wrench,
-  confirmed_fault: AlertTriangle,
-  identified_fault: AlertTriangle,
-  suspected_fault: AlertTriangle,
-  under_inspection_fault: Wrench,
-  case_resolved: CheckCircle2,
-  project_completed: Rocket,
-  project_updated: Rocket,
-  order_updated: Rocket,
-  customer_status_change: Users,
-};
-
-function NotificationRow({ item }: { item: AppNotification }) {
-  const Icon = TYPE_ICON[item.type];
-  return (
-    <Link
-      href={item.href}
-      className="flex gap-3 rounded-lg p-3 transition-colors hover:bg-muted/60"
-    >
-      <div
-        className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-          item.priority === 'high'
-            ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
-            : item.priority === 'medium'
-              ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
-              : 'bg-muted text-muted-foreground'
-        }`}
-      >
-        <Icon className="h-4 w-4" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium leading-tight">{item.title}</p>
-        <p className="truncate text-xs text-muted-foreground">{item.message}</p>
-        <p className="mt-1 text-[10px] text-muted-foreground">
-          {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
-        </p>
-      </div>
-    </Link>
-  );
-}
 
 export function Navbar() {
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
   useNotificationSync();
-  const { notifications, unreadCount, highPriorityCount, loading } = useAppNotifications();
+  const {
+    notifications,
+    unreadCount,
+    highPriorityCount,
+    loading,
+    isRead,
+    markAsRead,
+    markAllAsRead,
+    clearAll,
+  } = useAppNotifications();
 
   return (
     <header className="flex h-16 items-center justify-between border-b border-border bg-card px-6">
       <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
-        {/* <BackendAnimation /> */}
         <Image
           src="/lottie/System Icon.svg"
           width={30}
@@ -127,11 +89,44 @@ export function Navbar() {
               ) : (
                 <div className="divide-y p-1">
                   {notifications.slice(0, 30).map((item) => (
-                    <NotificationRow key={item.id} item={item} />
+                    <NotificationRow
+                      key={item.id}
+                      item={item}
+                      isRead={isRead(item.id)}
+                      onMarkRead={markAsRead}
+                    />
                   ))}
                 </div>
               )}
             </ScrollArea>
+            <div className="flex items-center justify-between gap-2 border-t px-3 py-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs"
+                disabled={notifications.length === 0}
+                onClick={clearAll}
+              >
+                Clear all
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs"
+                disabled={unreadCount === 0}
+                onClick={markAllAsRead}
+              >
+                Mark as read
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs"
+                asChild
+              >
+                <Link href="/notifications">View all</Link>
+              </Button>
+            </div>
           </PopoverContent>
         </Popover>
 

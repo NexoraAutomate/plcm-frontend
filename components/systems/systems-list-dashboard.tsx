@@ -28,6 +28,12 @@ import { cn } from '@/lib/utils';
 import type { Project, Status, System, Subsystem } from '@/lib/models';
 import { FaultyEntityStatus } from '@/lib/models';
 import { CHART_COLORS } from '@/lib/dashboard-chart-theme';
+import {
+  ChartLegend,
+  ChartValueLabelList,
+  HorizontalChartValueLabelList,
+  renderPieSliceLabel,
+} from '@/components/dashboard/chart-overlays';
 
 const SYSTEM_STATUS_COLORS: Record<string, string> = {
   Design: 'oklch(0.62 0.15 250)',
@@ -244,17 +250,19 @@ export function SystemsListDashboard({
                 {statusData.length === 0 ? (
                   <p className="py-12 text-center text-sm text-muted-foreground">No systems yet</p>
                 ) : (
-                  <ResponsiveContainer width="100%" height={220}>
+                  <ResponsiveContainer width="100%" height={260}>
                     <PieChart>
                       <Pie
                         data={statusData}
                         dataKey="value"
                         nameKey="name"
                         cx="50%"
-                        cy="50%"
+                        cy="45%"
                         innerRadius={50}
                         outerRadius={80}
                         paddingAngle={2}
+                        label={renderPieSliceLabel}
+                        labelLine={false}
                         className="cursor-pointer"
                         onClick={(_, index) => {
                           const entry = statusData[index];
@@ -277,6 +285,7 @@ export function SystemsListDashboard({
                         ))}
                       </Pie>
                       <Tooltip />
+                      <ChartLegend />
                     </PieChart>
                   </ResponsiveContainer>
                 )}
@@ -291,14 +300,15 @@ export function SystemsListDashboard({
                 {statusData.length === 0 ? (
                   <p className="py-12 text-center text-sm text-muted-foreground">No data</p>
                 ) : (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={statusData}>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={statusData} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
                       <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-15} textAnchor="end" height={50} />
                       <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
                       <Tooltip />
                       <Bar
                         dataKey="value"
+                        name="Count"
                         radius={[4, 4, 0, 0]}
                         className="cursor-pointer"
                         onClick={(data) => {
@@ -315,7 +325,9 @@ export function SystemsListDashboard({
                             }
                           />
                         ))}
+                        <ChartValueLabelList />
                       </Bar>
+                      <ChartLegend />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -335,14 +347,15 @@ export function SystemsListDashboard({
                 {projectData.length === 0 ? (
                   <p className="py-12 text-center text-sm text-muted-foreground">No project links</p>
                 ) : (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={projectData} layout="vertical" margin={{ left: 8 }}>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={projectData} layout="vertical" margin={{ left: 8, right: 24, top: 8, bottom: 8 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" horizontal={false} />
                       <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10 }} />
                       <YAxis type="category" dataKey="name" width={88} tick={{ fontSize: 10 }} />
                       <Tooltip />
                       <Bar
                         dataKey="value"
+                        name="Systems"
                         fill="oklch(0.62 0.15 250)"
                         radius={[0, 4, 4, 0]}
                         className="cursor-pointer"
@@ -350,7 +363,10 @@ export function SystemsListDashboard({
                           const id = (data as { projectId?: number }).projectId;
                           if (id) onProjectFilter(String(id));
                         }}
-                      />
+                      >
+                        <HorizontalChartValueLabelList />
+                      </Bar>
+                      <ChartLegend />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -392,14 +408,15 @@ export function SystemsListDashboard({
                 {hierarchyData.length === 0 ? (
                   <p className="py-12 text-center text-sm text-muted-foreground">No systems yet</p>
                 ) : (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={hierarchyData}>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={hierarchyData} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
                       <XAxis dataKey="name" tick={{ fontSize: 9 }} interval={0} angle={-20} textAnchor="end" height={55} />
                       <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
                       <Tooltip />
                       <Bar
                         dataKey="subsystems"
+                        name="Subsystems"
                         fill="oklch(0.60 0.12 280)"
                         radius={[4, 4, 0, 0]}
                         className="cursor-pointer"
@@ -407,7 +424,10 @@ export function SystemsListDashboard({
                           const id = (data as { systemId?: number }).systemId;
                           if (id) router.push(`/systems/${id}`);
                         }}
-                      />
+                      >
+                        <ChartValueLabelList dataKey="subsystems" />
+                      </Bar>
+                      <ChartLegend />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -445,8 +465,8 @@ export function SystemsListDashboard({
               {timelineData.length === 0 ? (
                 <p className="py-12 text-center text-sm text-muted-foreground">No creation dates recorded</p>
               ) : (
-                <ResponsiveContainer width="100%" height={240}>
-                  <AreaChart data={timelineData}>
+                <ResponsiveContainer width="100%" height={270}>
+                  <AreaChart data={timelineData} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="systemsPageFill" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="oklch(0.62 0.15 250)" stopOpacity={0.35} />
@@ -460,9 +480,13 @@ export function SystemsListDashboard({
                     <Area
                       type="monotone"
                       dataKey="value"
+                      name="Systems"
                       stroke="oklch(0.62 0.15 250)"
                       fill="url(#systemsPageFill)"
-                    />
+                    >
+                      <ChartValueLabelList />
+                    </Area>
+                    <ChartLegend />
                   </AreaChart>
                 </ResponsiveContainer>
               )}

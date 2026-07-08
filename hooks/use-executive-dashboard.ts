@@ -59,7 +59,8 @@ export function useExecutiveDashboard() {
 
   return {
     data: data ?? null,
-    loading: isLoading || isFetching,
+    loading: isLoading,
+    fetching: isFetching,
     error: error instanceof Error ? error.message : error ? String(error) : null,
     filters,
     kpiFilter,

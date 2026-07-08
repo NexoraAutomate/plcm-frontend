@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import type { ChartDataPoint } from '@/lib/types/dashboard';
 import { CHART_COLORS } from '@/lib/dashboard-chart-theme';
+import { ChartLegend, renderPieSliceLabel } from './chart-overlays';
 import { DashboardEmptyState } from './DashboardEmptyState';
 
 interface DonutChartCardProps {
@@ -24,25 +25,28 @@ export function DonutChartCard({ title, data, onSliceClick }: DonutChartCardProp
         {chartData.length === 0 ? (
           <DashboardEmptyState message="No data for current filters" />
         ) : (
-          <ResponsiveContainer width="100%" height={220}>
+          <ResponsiveContainer width="100%" height={260}>
             <PieChart>
               <Pie
                 data={chartData}
                 dataKey="value"
                 nameKey="name"
                 cx="50%"
-                cy="50%"
+                cy="45%"
                 innerRadius={55}
                 outerRadius={85}
                 paddingAngle={2}
+                label={renderPieSliceLabel}
+                labelLine={false}
                 onClick={(_, index) => onSliceClick?.(chartData[index])}
                 className={onSliceClick ? 'cursor-pointer' : undefined}
               >
-                {chartData.map((_, i) => (
-                  <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                {chartData.map((entry, i) => (
+                  <Cell key={entry.name} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                 ))}
               </Pie>
               <Tooltip />
+              <ChartLegend />
             </PieChart>
           </ResponsiveContainer>
         )}

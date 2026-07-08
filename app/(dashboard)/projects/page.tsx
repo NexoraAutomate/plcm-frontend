@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Search, BarChart3 } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, BarChart3, GitBranch } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { StatusBadge } from '@/components/status-badge';
@@ -375,11 +375,19 @@ export default function ProjectsPage(){
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>All Projects</CardTitle>
-          <CardDescription>
-            Showing {projects.length} on this page · {pagination.total} matching
-          </CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+          <div>
+            <CardTitle>All Projects</CardTitle>
+            <CardDescription>
+              Showing {projects.length} on this page · {pagination.total} matching
+            </CardDescription>
+          </div>
+          <Button variant="outline" size="sm" className="shrink-0" asChild>
+            <Link href="/hierarchy-dashboard">
+              <GitBranch className="mr-2 h-4 w-4" />
+              Hierarchy Dashboard
+            </Link>
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
