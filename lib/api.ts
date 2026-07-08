@@ -197,6 +197,15 @@ export const inventory = {
   create: (data: Partial<Models.Inventory>) => api.post<Models.Inventory>("/inventory/", data),
   update: (id: number, data: Partial<Models.Inventory>) => api.put<Models.Inventory>(`/inventory/${id}/`, data),
   delete: (id: number) => api.delete(`/inventory/${id}/`),
+  consume: (id: number) =>
+    api.post<Models.InventoryConsumeResult>(`/inventory/${id}/consume/`),
+  listInstances: (inventoryId: number) =>
+    api.get<Models.InventoryInstance[]>(`/inventory/${inventoryId}/instances/`),
+  createInstance: (inventoryId: number, data: Partial<Models.InventoryInstance>) =>
+    api.post<Models.InventoryInstance>(`/inventory/${inventoryId}/instances/`, data),
+  updateInstance: (instanceId: number, data: Partial<Models.InventoryInstance>) =>
+    api.put<Models.InventoryInstance>(`/inventory/instances/${instanceId}/`, data),
+  deleteInstance: (instanceId: number) => api.delete(`/inventory/instances/${instanceId}/`),
 };
 
 // Statuses

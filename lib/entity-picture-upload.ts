@@ -6,7 +6,8 @@ export type PictureOwnerType =
   | 'module'
   | 'unit'
   | 'component'
-  | 'inventory';
+  | 'inventory'
+  | 'inventory_instance';
 
 export async function syncEntityPicture(
   ownerType: PictureOwnerType,

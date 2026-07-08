@@ -154,9 +154,8 @@ export const maintenanceService = {
     return res.data;
   },
 
-  decrementInventoryItem: async (inventoryItemId: number, currentQuantity: number) => {
-    const newQuantity = Math.max(0, currentQuantity - 1);
-    return libApi.inventory.update(inventoryItemId, { quantity: newQuantity });
+  decrementInventoryItem: async (inventoryItemId: number) => {
+    return libApi.inventory.consume(inventoryItemId);
   },
   
   // Backend has no bulk-update route; apply individual PUT updates instead.

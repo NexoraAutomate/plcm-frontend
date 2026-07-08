@@ -578,11 +578,8 @@ export default function MaintenanceCaseInvestigationPage({
             replacementPartNumber
           );
 
-          if (replacement?.inventoryItemId != null && replacement.inventoryQuantity != null) {
-            await maintenanceService.decrementInventoryItem(
-              replacement.inventoryItemId,
-              replacement.inventoryQuantity
-            );
+          if (replacement?.inventoryItemId != null) {
+            await maintenanceService.decrementInventoryItem(replacement.inventoryItemId);
           }
         }
 

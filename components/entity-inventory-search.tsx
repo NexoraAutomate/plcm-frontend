@@ -86,18 +86,24 @@ export function EntityInventorySearch({
 
     setUsingItemId(item.id);
     try {
-      await onUseInventory(item);
+      const consumeRes = await api.inventory.consume(item.id);
+      const consumedInstance = consumeRes.data?.consumed_instance;
+      const updatedInventory = consumeRes.data?.inventory ?? item;
+      const itemForInstall: Inventory = {
+        ...item,
+        ...updatedInventory,
+        serial_number: consumedInstance?.serial_number ?? item.serial_number,
+      };
 
-      const newQuantity = item.quantity - 1;
-      await api.inventory.update(item.id, { quantity: newQuantity });
+      await onUseInventory(itemForInstall);
 
       const updatedItems = inventoryItems.map((invItem) =>
-        invItem.id === item.id ? { ...invItem, quantity: newQuantity } : invItem
+        invItem.id === item.id ? { ...invItem, ...updatedInventory } : invItem
       );
       setInventoryItems(updatedItems);
       setFilteredItems(
         filteredItems.map((invItem) =>
-          invItem.id === item.id ? { ...invItem, quantity: newQuantity } : invItem
+          invItem.id === item.id ? { ...invItem, ...updatedInventory } : invItem
         )
       );
     } catch (err) {

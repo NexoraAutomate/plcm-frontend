@@ -327,9 +327,7 @@ export function useHierarchyEntityActions({
     );
 
     if (inventoryMatch) {
-      await api.inventory.update(inventoryMatch.id, {
-        quantity: Math.max(0, inventoryMatch.quantity - 1),
-      });
+      await api.inventory.consume(inventoryMatch.id);
     }
 
     const payload = {

@@ -13,7 +13,7 @@ import { Plus, Edit, Trash2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import { ATTACHMENT_TYPES, type AttachmentType } from '@/lib/attachment-types';
-import type { EntityAttachmentMetadata, Inventory } from '@/lib/models';
+import type { EntityAttachmentMetadata, Inventory, InventoryInstance } from '@/lib/models';
 import { useDataStore } from '@/lib/data-store';
 import { useHierarchiesQuery } from '@/hooks/queries';
 import { fetchInventoryPage } from '@/hooks/queries/fetchers';
@@ -22,6 +22,12 @@ import { usePaginatedList } from '@/hooks/use-paginated-list';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import {
+  formatInventorySerialNumbers,
+  inventorySupportsQuantity,
+  inventoryUsesInstances,
+  resolveInventoryQuantity,
+} from '@/lib/entity-hierarchy';
 
 type EntityType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
 
@@ -35,7 +41,7 @@ function enrichInventoryItems(items: Inventory[]): InventoryItem[] {
   return items.map((item) => ({
     ...item,
     entityName: item.name,
-    serialNumber: item.serial_number || '',
+    serialNumber: formatInventorySerialNumbers(item),
     partNumber: item.manufacturer_part_number || '',
   }));
 }
@@ -57,6 +63,8 @@ export default function InventoryPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingInstanceId, setEditingInstanceId] = useState<number | null>(null);
+  const [instances, setInstances] = useState<InventoryInstance[]>([]);
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({
     open: false,
     id: null,
@@ -121,17 +129,36 @@ export default function InventoryPage() {
     setRemovePicture(false);
     setPendingAttachmentMeta({ attachment_type: 'other', description: '' });
     setSelectedEntityType('component');
+    setEditingInstanceId(null);
+    setInstances([]);
     setFormTab('general');
   };
 
-  const buildInventoryPayload = () => ({
+  const buildGroupPayload = () => ({
     name: formData.name,
     inventory_type: selectedEntityType,
-    serial_number: formData.serial_number,
-    quantity: formData.quantity,
     description: formData.description,
     oem_name: formData.oem_name,
     manufacturer_part_number: formData.manufacturer_part_number,
+    ...(inventorySupportsQuantity(selectedEntityType)
+      ? {
+          serial_number: formData.serial_number,
+          quantity: resolveInventoryQuantity(selectedEntityType, formData.quantity),
+          location: formData.location,
+          holder_user_id: formData.holder_user_id ? Number(formData.holder_user_id) : undefined,
+          added_date: formData.added_date
+            ? new Date(formData.added_date).toISOString()
+            : undefined,
+          shelf_life_expires_at: formData.shelf_life_expires_at
+            ? new Date(formData.shelf_life_expires_at).toISOString()
+            : undefined,
+          picture_url: removePicture ? undefined : formData.picture_url || undefined,
+        }
+      : {}),
+  });
+
+  const buildInstancePayload = () => ({
+    serial_number: formData.serial_number,
     location: formData.location,
     holder_user_id: formData.holder_user_id ? Number(formData.holder_user_id) : undefined,
     added_date: formData.added_date
@@ -140,35 +167,76 @@ export default function InventoryPage() {
     shelf_life_expires_at: formData.shelf_life_expires_at
       ? new Date(formData.shelf_life_expires_at).toISOString()
       : undefined,
-    picture_url: removePicture ? null : formData.picture_url || undefined,
+    picture_url: removePicture ? undefined : formData.picture_url || undefined,
+  });
+
+  const getLatestInstanceId = (item: Inventory) => {
+    const itemInstances = item.instances ?? [];
+    return itemInstances[itemInstances.length - 1]?.id;
+  };
+
+  async function syncMedia(ownerType: 'inventory' | 'inventory_instance', ownerId: number) {
+    if (removePicture) {
+      await api.pictures.remove(ownerType, ownerId);
+    } else if (pendingPictureFile) {
+      await api.pictures.upload(ownerType, ownerId, pendingPictureFile);
+    }
+    if (pendingAttachment) {
+      await api.attachments.upload(ownerType, ownerId, pendingAttachment, {
+        attachment_type: pendingAttachmentMeta.attachment_type,
+        description: pendingAttachmentMeta.description,
+      });
+    }
+  }
+
+  const buildInventoryPayload = () => ({
+    ...buildGroupPayload(),
+    ...(inventoryUsesInstances(selectedEntityType) ? buildInstancePayload() : {}),
   });
 
   async function handleCreate() {
-    if (!formData.name.trim() || formData.quantity <= 0 || !formData.location.trim()) {
-      toast.error(`Please fill in required fields: ${getEntityDisplayName(selectedEntityType)} category, Quantity (>0), and Location`);
+    const usesInstances = inventoryUsesInstances(selectedEntityType);
+
+    if (!formData.name.trim() || (!usesInstances && !formData.location.trim())) {
+      toast.error(
+        `Please fill in required fields: ${getEntityDisplayName(selectedEntityType)} category${
+          usesInstances ? '' : ' and Location'
+        }`
+      );
+      return;
+    }
+    if (usesInstances && !formData.manufacturer_part_number.trim()) {
+      toast.error('Manufacturer part number is required for serialized inventory');
+      return;
+    }
+    if (usesInstances && !formData.location.trim()) {
+      toast.error('Location is required for each serialized unit');
+      return;
+    }
+    if (inventorySupportsQuantity(selectedEntityType) && formData.quantity <= 0) {
+      toast.error('Please enter a quantity greater than 0 for component inventory');
       return;
     }
 
     try {
       const payload = buildInventoryPayload();
-
       const created = await api.inventory.create(payload);
       if (created.data?.id) {
-        if (removePicture) {
-          await api.pictures.remove('inventory', created.data.id);
-        } else if (pendingPictureFile) {
-          await api.pictures.upload('inventory', created.data.id, pendingPictureFile);
-        }
-        if (pendingAttachment) {
-          await api.attachments.upload('inventory', created.data.id, pendingAttachment, {
-            attachment_type: pendingAttachmentMeta.attachment_type,
-            description: pendingAttachmentMeta.description,
-          });
+        const mediaOwnerType = usesInstances ? 'inventory_instance' : 'inventory';
+        const mediaOwnerId = usesInstances
+          ? getLatestInstanceId(created.data)
+          : created.data.id;
+        if (mediaOwnerId) {
+          await syncMedia(mediaOwnerType, mediaOwnerId);
         }
       }
-      toast.success('Inventory item created');
+      toast.success(
+        usesInstances
+          ? 'Serialized unit added to inventory group'
+          : 'Inventory item created'
+      );
       pagination.invalidate();
-      
+
       resetForm();
       setIsCreateOpen(false);
     } catch (err) {
@@ -179,31 +247,41 @@ export default function InventoryPage() {
 
   async function handleUpdate() {
     if (!editingId) return;
-    if (!formData.name.trim() || formData.quantity <= 0 || !formData.location.trim()) {
-      toast.error('Please fill in required fields: Name, Quantity (>0), and Location');
+    const usesInstances = inventoryUsesInstances(selectedEntityType);
+
+    if (!formData.name.trim() || (!usesInstances && !formData.location.trim())) {
+      toast.error(
+        `Please fill in required fields: Name${usesInstances ? '' : ' and Location'}`
+      );
+      return;
+    }
+    if (usesInstances && editingInstanceId && !formData.location.trim()) {
+      toast.error('Location is required for each serialized unit');
+      return;
+    }
+    if (inventorySupportsQuantity(selectedEntityType) && formData.quantity <= 0) {
+      toast.error('Please enter a quantity greater than 0 for component inventory');
       return;
     }
 
     try {
-      const payload = buildInventoryPayload();
+      await api.inventory.update(editingId, buildGroupPayload());
 
-      await api.inventory.update(editingId, payload);
-      if (removePicture) {
-        await api.pictures.remove('inventory', editingId);
-      } else if (pendingPictureFile) {
-        await api.pictures.upload('inventory', editingId, pendingPictureFile);
+      if (usesInstances && editingInstanceId) {
+        await api.inventory.updateInstance(editingInstanceId, buildInstancePayload());
+        const mediaOwnerId = editingInstanceId;
+        await syncMedia('inventory_instance', mediaOwnerId);
+      } else if (!usesInstances) {
+        await syncMedia('inventory', editingId);
       }
-      if (pendingAttachment) {
-        await api.attachments.upload('inventory', editingId, pendingAttachment, {
-          attachment_type: pendingAttachmentMeta.attachment_type,
-          description: pendingAttachmentMeta.description,
-        });
-      }
+
       toast.success('Inventory item updated');
       pagination.invalidate();
 
       resetForm();
       setEditingId(null);
+      setEditingInstanceId(null);
+      setInstances([]);
       setIsEditOpen(false);
     } catch (err) {
       console.error('Failed to update inventory item:', err);
@@ -226,30 +304,117 @@ export default function InventoryPage() {
     }
   }
 
-  function openEdit(item: InventoryItem) {
+  function loadInstanceIntoForm(instance: InventoryInstance) {
+    setEditingInstanceId(instance.id);
+    setPendingAttachment(null);
+    setPendingPictureFile(null);
+    setRemovePicture(false);
+    setFormData((prev) => ({
+      ...prev,
+      serial_number: instance.serial_number || '',
+      location: instance.location || '',
+      holder_user_id: instance.holder_user_id ? String(instance.holder_user_id) : '',
+      added_date: instance.added_date ? instance.added_date.slice(0, 10) : '',
+      shelf_life_expires_at: instance.shelf_life_expires_at
+        ? instance.shelf_life_expires_at.slice(0, 10)
+        : '',
+      picture_url: instance.picture_url || '',
+    }));
+  }
+
+  async function handleAddInstance() {
+    if (!editingId) return;
+    if (!formData.location.trim()) {
+      toast.error('Location is required for each serialized unit');
+      return;
+    }
+
+    try {
+      const created = await api.inventory.createInstance(editingId, buildInstancePayload());
+      if (created.data?.id) {
+        await syncMedia('inventory_instance', created.data.id);
+      }
+      const refreshed = await api.inventory.get(editingId);
+      const nextInstances = refreshed.data?.instances ?? [];
+      setInstances(nextInstances);
+      if (created.data) {
+        loadInstanceIntoForm(created.data);
+      }
+      toast.success('Serialized unit added');
+      pagination.invalidate();
+    } catch (err) {
+      console.error('Failed to add inventory unit:', err);
+      toast.error('Failed to add serialized unit');
+    }
+  }
+
+  async function handleDeleteInstance(instanceId: number) {
+    try {
+      await api.inventory.deleteInstance(instanceId);
+      const refreshed = editingId ? await api.inventory.get(editingId) : null;
+      if (!refreshed?.data) {
+        pagination.invalidate();
+        resetForm();
+        setEditingId(null);
+        setIsEditOpen(false);
+        toast.success('Inventory group removed');
+        return;
+      }
+      const nextInstances = refreshed.data.instances ?? [];
+      setInstances(nextInstances);
+      if (nextInstances.length > 0) {
+        loadInstanceIntoForm(nextInstances[0]);
+      } else {
+        setEditingInstanceId(null);
+      }
+      toast.success('Serialized unit removed');
+      pagination.invalidate();
+    } catch (err) {
+      console.error('Failed to delete inventory unit:', err);
+      toast.error('Failed to delete serialized unit');
+    }
+  }
+
+  async function openEdit(item: InventoryItem) {
     setEditingId(item.id);
     setFormTab('general');
     setSelectedEntityType(item.inventory_type as EntityType);
     setPendingAttachment(null);
     setPendingPictureFile(null);
     setRemovePicture(false);
-    setFormData({
-      name: item.name || '',
-      inventory_type: item.inventory_type,
-      serial_number: item.serial_number || '',
-      quantity: item.quantity,
-      description: item.description || '',
-      oem_name: item.oem_name || '',
-      manufacturer_part_number: item.manufacturer_part_number || '',
-      location: item.location || '',
-      holder_user_id: item.holder_user_id ? String(item.holder_user_id) : '',
-      added_date: item.added_date ? item.added_date.slice(0, 10) : '',
-      shelf_life_expires_at: item.shelf_life_expires_at
-        ? item.shelf_life_expires_at.slice(0, 10)
-        : '',
-      picture_url: item.picture_url || '',
-    });
-    setIsEditOpen(true);
+
+    try {
+      const res = await api.inventory.get(item.id);
+      const fullItem = res.data ?? item;
+      const itemInstances = fullItem.instances ?? [];
+      setInstances(itemInstances);
+      setFormData({
+        name: fullItem.name || '',
+        inventory_type: fullItem.inventory_type,
+        serial_number: fullItem.serial_number || '',
+        quantity: fullItem.quantity,
+        description: fullItem.description || '',
+        oem_name: fullItem.oem_name || '',
+        manufacturer_part_number: fullItem.manufacturer_part_number || '',
+        location: fullItem.location || '',
+        holder_user_id: fullItem.holder_user_id ? String(fullItem.holder_user_id) : '',
+        added_date: fullItem.added_date ? fullItem.added_date.slice(0, 10) : '',
+        shelf_life_expires_at: fullItem.shelf_life_expires_at
+          ? fullItem.shelf_life_expires_at.slice(0, 10)
+          : '',
+        picture_url: fullItem.picture_url || '',
+      });
+
+      if (inventoryUsesInstances(fullItem.inventory_type as EntityType) && itemInstances.length > 0) {
+        loadInstanceIntoForm(itemInstances[0]);
+      } else {
+        setEditingInstanceId(null);
+      }
+      setIsEditOpen(true);
+    } catch (err) {
+      console.error('Failed to load inventory item:', err);
+      toast.error('Failed to load inventory details');
+    }
   }
 
   const inventoryDialogClassName =
@@ -273,6 +438,11 @@ export default function InventoryPage() {
         <TabsTrigger value="attachments" className="min-w-0 flex-1 px-2 text-xs sm:text-sm">
           Attachments
         </TabsTrigger>
+        {mode === 'edit' && inventoryUsesInstances(selectedEntityType) ? (
+          <TabsTrigger value="units" className="min-w-0 flex-1 px-2 text-xs sm:text-sm">
+            Units
+          </TabsTrigger>
+        ) : null}
       </TabsList>
 
       <TabsContent value="general" className="mt-4 space-y-4">
@@ -282,8 +452,14 @@ export default function InventoryPage() {
             <Select
               value={selectedEntityType}
               onValueChange={(value) => {
-                setSelectedEntityType(value as EntityType);
-                setFormData({ ...formData, inventory_type: value, name: '' });
+                const newType = value as EntityType;
+                setSelectedEntityType(newType);
+                setFormData({
+                  ...formData,
+                  inventory_type: value,
+                  name: '',
+                  quantity: inventorySupportsQuantity(newType) ? formData.quantity : 1,
+                });
               }}
             >
               <SelectTrigger>
@@ -329,19 +505,35 @@ export default function InventoryPage() {
           </Select>
         </div>
 
-        <div>
-          <Label>Quantity {mode === 'create' ? '*' : ''}</Label>
-          <Input
-            type="number"
-            min="1"
-            value={formData.quantity || ''}
-            onChange={(e) => {
-              const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
-              setFormData({ ...formData, quantity: isNaN(val) ? 0 : val });
-            }}
-            placeholder="Enter quantity"
-          />
-        </div>
+        {inventorySupportsQuantity(selectedEntityType) ? (
+          <div>
+            <Label>Quantity {mode === 'create' ? '*' : ''}</Label>
+            <Input
+              type="number"
+              min="1"
+              value={formData.quantity || ''}
+              onChange={(e) => {
+                const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
+                setFormData({ ...formData, quantity: isNaN(val) ? 0 : val });
+              }}
+              placeholder="Enter quantity"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Component inventory can be stocked in bulk.
+            </p>
+          </div>
+        ) : (
+          <div>
+            <Label>Quantity</Label>
+            <Input
+              value={mode === 'edit' ? String(formData.quantity || 0) : 'Calculated automatically'}
+              disabled
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Quantity is the total number of serialized units sharing this part number.
+            </p>
+          </div>
+        )}
 
         <div>
           <Label>Description</Label>
@@ -355,16 +547,27 @@ export default function InventoryPage() {
 
       <TabsContent value="part-number" className="mt-4 space-y-4">
         <div>
-          <Label>Serial Number</Label>
+          <Label>
+            Serial Number
+            {inventoryUsesInstances(selectedEntityType) && mode === 'create' ? ' *' : ''}
+          </Label>
           <Input
             value={formData.serial_number}
             onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
             placeholder="e.g., SN-2024-001"
           />
+          {inventoryUsesInstances(selectedEntityType) ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Each serialized unit gets its own serial number.
+            </p>
+          ) : null}
         </div>
 
         <div>
-          <Label>Manufacturer Part Number</Label>
+          <Label>
+            Manufacturer Part Number
+            {inventoryUsesInstances(selectedEntityType) ? ' *' : ''}
+          </Label>
           <Input
             value={formData.manufacturer_part_number}
             onChange={(e) =>
@@ -385,6 +588,16 @@ export default function InventoryPage() {
       </TabsContent>
 
       <TabsContent value="holder" className="mt-4 space-y-4">
+        {inventoryUsesInstances(selectedEntityType) && mode === 'edit' && editingInstanceId ? (
+          <p className="text-sm text-muted-foreground">
+            Holder details apply to the selected serialized unit.
+          </p>
+        ) : null}
+        {inventoryUsesInstances(selectedEntityType) && mode === 'create' ? (
+          <p className="text-sm text-muted-foreground">
+            Holder details apply to the serialized unit being added.
+          </p>
+        ) : null}
         <div>
           <Label>Inventory Holder</Label>
           <Select
@@ -525,6 +738,70 @@ export default function InventoryPage() {
           />
         </div>
       </TabsContent>
+
+      {mode === 'edit' && inventoryUsesInstances(selectedEntityType) ? (
+        <TabsContent value="units" className="mt-4 space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm text-muted-foreground">
+              {instances.length} serialized unit{instances.length === 1 ? '' : 's'} in this group
+            </p>
+            <Button type="button" size="sm" variant="outline" onClick={handleAddInstance}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Unit
+            </Button>
+          </div>
+          <div className="overflow-x-auto rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Serial Number</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {instances.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center text-muted-foreground py-6">
+                      No serialized units yet
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  instances.map((instance) => (
+                    <TableRow
+                      key={instance.id}
+                      className={editingInstanceId === instance.id ? 'bg-muted/50' : undefined}
+                    >
+                      <TableCell>{instance.serial_number || '—'}</TableCell>
+                      <TableCell>{instance.location || '—'}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => loadInstanceIntoForm(instance)}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleDeleteInstance(instance.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+      ) : null}
     </Tabs>
   );
 
@@ -633,7 +910,9 @@ export default function InventoryPage() {
                       <TableCell>{item.entityName || 'N/A'}</TableCell>
                       <TableCell>{item.serialNumber || '—'}</TableCell>
                       <TableCell>{item.partNumber || '—'}</TableCell>
-                      <TableCell>{item.quantity}</TableCell>
+                      <TableCell>
+                        {item.quantity}
+                      </TableCell>
                       <TableCell>{item.location}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">

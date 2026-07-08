@@ -237,6 +237,18 @@ export interface Hierarchy {
 }
 
 // Inventory
+export interface InventoryInstance {
+  id: number
+  inventory_id: number
+  serial_number?: string
+  holder_user_id?: number
+  location?: string
+  added_date?: string
+  shelf_life_expires_at?: string
+  picture_url?: string
+  updated_at?: string
+}
+
 export interface Inventory {
   id: number
   name: string
@@ -254,7 +266,13 @@ export interface Inventory {
   picture_url?: string
   created_at?: string
   updated_at?: string
+  instances?: InventoryInstance[]
   component?: Component
+}
+
+export interface InventoryConsumeResult {
+  inventory: Inventory
+  consumed_instance?: InventoryInstance | null
 }
 
 // Entity (generic resource tracker)
