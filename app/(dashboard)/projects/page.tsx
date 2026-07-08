@@ -14,7 +14,6 @@ import { Plus, Edit, Trash2, Search, BarChart3, GitBranch } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { StatusBadge } from '@/components/status-badge';
-import * as api from '@/lib/api';
 import * as Models from '@/lib/models';
 import { EntityNameWithFault } from '@/components/entity-fault-ping';
 import { useEntityFaultMap } from '@/hooks/use-entity-fault-map';
@@ -35,6 +34,11 @@ import { EntityCountCell } from '@/components/entity-count-cell';
 import { Progress } from '@/components/ui/progress';
 import { ProjectProgressDialog } from '@/components/projects/project-progress-dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  createCompleteHierarchy,
+  summarizeHierarchyCounts,
+} from '@/lib/create-complete-hierarchy';
 
 export default function ProjectsPage(){
   const router = useRouter();
@@ -43,7 +47,16 @@ export default function ProjectsPage(){
     id: null,
   });
   const searchParams = useSearchParams();
-  const { users, orders, systems, projects: storeProjects, createProject, updateProject, deleteProject, getEntityMaintenanceLogs } = useDataStore();
+  const {
+    users,
+    orders,
+    systems,
+    projects: storeProjects,
+    createProject,
+    updateProject,
+    deleteProject,
+    ensureHierarchyLoaded,
+  } = useDataStore();
   const faultMap = useEntityFaultMap();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
@@ -57,6 +70,8 @@ export default function ProjectsPage(){
   const [isProgressOpen, setIsProgressOpen] = useState(false);
   const [progressProject, setProgressProject] = useState<Models.Project | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [createCompleteHierarchyEnabled, setCreateCompleteHierarchyEnabled] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -67,6 +82,19 @@ export default function ProjectsPage(){
     status_id: 0,
   });
   const { data: statuses = [] } = useStatusesByTypeQuery('projects');
+
+  function resetCreateForm() {
+    setFormData({
+      name: '',
+      description: '',
+      start_date: '',
+      end_date: '',
+      owner_id: 0,
+      order_id: 0,
+      status_id: 0,
+    });
+    setCreateCompleteHierarchyEnabled(true);
+  }
 
   useEffect(() => {
     if (searchParams.get('action') === 'create') {
@@ -116,21 +144,37 @@ export default function ProjectsPage(){
       toast.error('Please fill in all required fields');
       return;
     }
+    setIsCreating(true);
     try {
-      await createProject(formData);
+      const project = await createProject(formData);
+
+      if (createCompleteHierarchyEnabled) {
+        try {
+          const counts = await createCompleteHierarchy(project.id, formData.name.trim());
+          await ensureHierarchyLoaded({ force: true });
+          if (counts.systems === 0) {
+            toast.info(
+              'Project created. No Systems Hierarchy entries were found to auto-create.'
+            );
+          } else {
+            toast.success(
+              `Complete hierarchy created: ${summarizeHierarchyCounts(counts)}.`
+            );
+          }
+        } catch {
+          toast.error(
+            'Project created, but failed to create the complete hierarchy. You can add systems manually.'
+          );
+        }
+      }
+
       pagination.invalidate();
-      setFormData({
-        name: '',
-        description: '',
-        start_date: '',
-        end_date: '',
-        owner_id: 0,
-        order_id: 0,
-        status_id: 0,
-      });
+      resetCreateForm();
       setIsCreateOpen(false);
     } catch {
       // Error handled by DataStore
+    } finally {
+      setIsCreating(false);
     }
   }
 
@@ -261,7 +305,14 @@ export default function ProjectsPage(){
           />
         </div>
         {/* Create New Project PoP up Window */}
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <Dialog
+          open={isCreateOpen}
+          onOpenChange={(open) => {
+            if (isCreating) return;
+            setIsCreateOpen(open);
+            if (!open) resetCreateForm();
+          }}
+        >
           <DialogTrigger asChild>
             <Button className="gap-2">
               <Plus className="h-4 w-4" />
@@ -280,6 +331,7 @@ export default function ProjectsPage(){
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g. Sat-A Lifecycle"
+                  disabled={isCreating}
                 />
               </div>
               <div>
@@ -288,6 +340,7 @@ export default function ProjectsPage(){
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Project details"
+                  disabled={isCreating}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -297,6 +350,7 @@ export default function ProjectsPage(){
                     type="date"
                     value={formData.start_date}
                     onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                    disabled={isCreating}
                   />
                 </div>
                 <div>
@@ -305,6 +359,7 @@ export default function ProjectsPage(){
                     type="date"
                     value={formData.end_date}
                     onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                    disabled={isCreating}
                   />
                 </div>
               </div>
@@ -313,6 +368,7 @@ export default function ProjectsPage(){
                 <Select
                   value={formData.owner_id.toString()}
                   onValueChange={(v) => setFormData({ ...formData, owner_id: parseInt(v) })}
+                  disabled={isCreating}
                 >
                   <SelectTrigger className='w-full'>
                     <SelectValue placeholder="Select owner" />
@@ -332,6 +388,7 @@ export default function ProjectsPage(){
                 <Select
                   value={formData.order_id.toString()}
                   onValueChange={(v) => setFormData({ ...formData, order_id: parseInt(v) })}
+                  disabled={isCreating}
                 >
                   <SelectTrigger className='w-full'>
                     <SelectValue placeholder="Select order (optional)" />
@@ -350,6 +407,7 @@ export default function ProjectsPage(){
                 <Select
                   value={formData.status_id.toString()}
                   onValueChange={(v) => setFormData({ ...formData, status_id: parseInt(v) })}
+                  disabled={isCreating}
                 >
                   <SelectTrigger className='w-full'>
                     <SelectValue placeholder="Select status" />
@@ -363,11 +421,43 @@ export default function ProjectsPage(){
                   </SelectContent>
                 </Select>
               </div>
+              <div className="flex items-start gap-3 rounded-lg border p-3">
+                <Checkbox
+                  id="create-complete-hierarchy"
+                  checked={createCompleteHierarchyEnabled}
+                  onCheckedChange={(checked) =>
+                    setCreateCompleteHierarchyEnabled(checked === true)
+                  }
+                  disabled={isCreating}
+                />
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="create-complete-hierarchy"
+                    className="cursor-pointer font-medium leading-none"
+                  >
+                    Create Complete Hierarchy
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Creates blank Systems, Sub-Systems, Modules, Units, and Components from the
+                    defined Systems Hierarchy, using placeholder names based on the project name.
+                  </p>
+                </div>
+              </div>
               <div className="flex gap-2 justify-end pt-4">
-                <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsCreateOpen(false)}
+                  disabled={isCreating}
+                >
                   Cancel
                 </Button>
-                <Button onClick={handleCreate}>Create</Button>
+                <Button onClick={handleCreate} disabled={isCreating}>
+                  {isCreating
+                    ? createCompleteHierarchyEnabled
+                      ? 'Creating hierarchy...'
+                      : 'Creating...'
+                    : 'Create'}
+                </Button>
               </div>
             </div>
           </DialogContent>
