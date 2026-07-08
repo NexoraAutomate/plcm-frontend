@@ -58,6 +58,58 @@ function matchesEntity(entity: Entity, entityType: string, entityPk: number): bo
   );
 }
 
+function normalizedEntityKey(entityType: string, entityPk: number): string {
+  return `${entityType.toLowerCase()}:${entityPk}`;
+}
+
+/**
+ * Resolves many (entityType, entityPk) refs to their generic entity IDs using a
+ * single entity-list load. This avoids issuing one `/entities/lookup/` request
+ * per ref (which can be hundreds for a project subtree and floods the backend).
+ *
+ * Returns a map keyed by `type:pk` (lowercased) → generic entity id.
+ */
+export async function resolveEntityIds(
+  refs: Array<{ type: HardwareEntityType | string; pk: number }>
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  if (refs.length === 0) return result;
+
+  const buildIndex = (entities: Entity[]) => {
+    const byKey = new Map<string, number>();
+    for (const entity of entities) {
+      byKey.set(normalizedEntityKey(entity.entity_type, entity.entity_pk), entity.id);
+    }
+    return byKey;
+  };
+
+  const resolveFromIndex = (byKey: Map<string, number>) => {
+    let missing = false;
+    for (const ref of refs) {
+      const key = normalizedEntityKey(ref.type, ref.pk);
+      if (result.has(key)) continue;
+      const entityId = byKey.get(key);
+      if (entityId != null) {
+        result.set(key, entityId);
+      } else {
+        missing = true;
+      }
+    }
+    return missing;
+  };
+
+  const hasMissing = resolveFromIndex(buildIndex(await loadEntitiesFromList()));
+
+  // If some refs weren't found, the cached list may be stale. Refresh it once
+  // (not per-ref) and retry so we never storm the backend with reloads.
+  if (hasMissing) {
+    clearEntityCache();
+    resolveFromIndex(buildIndex(await loadEntitiesFromList()));
+  }
+
+  return result;
+}
+
 export async function resolveEntity(
   entityType: HardwareEntityType | string,
   entityPk: number

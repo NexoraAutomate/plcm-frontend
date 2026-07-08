@@ -24,7 +24,7 @@ import {
 import type { HierarchyEntityType } from '@/lib/system-hierarchy-graph';
 import * as api from '@/lib/api';
 import { ABSOLUTE_FETCH_CAP, fetchCappedPages } from '@/lib/data-loading';
-import { resolveEntityId } from '@/lib/entity-resolver';
+import { resolveEntityIds } from '@/lib/entity-resolver';
 import { formatUserRef } from '@/lib/user-display';
 
 export interface SubtreeMatchContext {
@@ -402,19 +402,14 @@ export async function loadResolutionHistoryForProject(
     components
   );
 
-  const entityIdEntries = await Promise.all(
-    matchContext.refs.map(async (ref) => {
-      const entityId = await resolveEntityId(ref.type, ref.pk);
-      return entityId ? ([entityId, ref] as const) : null;
-    })
-  );
+  const entityIdByKey = await resolveEntityIds(matchContext.refs);
 
   const subtreeByEntityId = new Map<number, SubtreeEntityRef>();
   const resolvedEntityIds = new Set<number>();
 
-  for (const entry of entityIdEntries) {
-    if (!entry) continue;
-    const [entityId, ref] = entry;
+  for (const ref of matchContext.refs) {
+    const entityId = entityIdByKey.get(makeEntityKey(ref.type, ref.pk));
+    if (entityId == null) continue;
     subtreeByEntityId.set(entityId, ref);
     resolvedEntityIds.add(entityId);
   }

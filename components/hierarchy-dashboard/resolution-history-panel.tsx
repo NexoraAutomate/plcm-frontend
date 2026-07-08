@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { resolveEntityId } from '@/lib/entity-resolver';
+import { resolveEntityIds } from '@/lib/entity-resolver';
 import { formatMaintenanceApiError } from '@/services/maintenance';
 import {
   collectSubtreeEntities,
@@ -27,6 +27,7 @@ import {
   entityKeyForRecord,
   entityLabelForHistory,
   loadConfigurationHistoryForSubtree,
+  makeEntityKey,
   type LifecycleTimelineEvent,
 } from '@/lib/resolution-history-matching';
 import type { ConfigurationHistory, Component, Module, Subsystem, System, Unit } from '@/lib/models';
@@ -101,19 +102,14 @@ export function ResolutionHistoryPanel({
       setErrorMessage(null);
 
       try {
-        const entityIdEntries = await Promise.all(
-          subtree.map(async (ref) => {
-            const entityId = await resolveEntityId(ref.type, ref.pk);
-            return entityId ? ([entityId, ref] as const) : null;
-          })
-        );
+        const entityIdByKey = await resolveEntityIds(subtree);
 
         const entityIdMap = new Map<number, SubtreeEntityRef>();
         const resolvedEntityIds = new Set<number>();
 
-        for (const entry of entityIdEntries) {
-          if (!entry) continue;
-          const [entityId, ref] = entry;
+        for (const ref of subtree) {
+          const entityId = entityIdByKey.get(makeEntityKey(ref.type, ref.pk));
+          if (entityId == null) continue;
           entityIdMap.set(entityId, ref);
           resolvedEntityIds.add(entityId);
         }
