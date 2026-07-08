@@ -8,7 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Search, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
-import { inventoryPartNumber, mergeInventoryWithInstance } from '@/lib/inventory-entity-fields';
+import { inventoryPartNumber } from '@/lib/inventory-entity-fields';
+import { needsSerialSelection } from '@/lib/inventory-install';
+import { InventorySerialSelectDialog } from '@/components/inventory-serial-select-dialog';
 import type { Inventory } from '@/lib/models';
 import { getInventoryTypeLabel, type HierarchyEntityType } from '@/lib/entity-hierarchy';
 
@@ -16,7 +18,7 @@ interface EntityInventorySearchProps {
   parentEntityName: string;
   inventoryType: HierarchyEntityType;
   allowedInventoryNames: string[];
-  onUseInventory: (item: Inventory) => Promise<void>;
+  onUseInventory: (item: Inventory, instanceId?: number) => Promise<Inventory | void>;
 }
 
 export function EntityInventorySearch({
@@ -31,6 +33,7 @@ export function EntityInventorySearch({
   const [loading, setLoading] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
   const [usingItemId, setUsingItemId] = useState<number | null>(null);
+  const [serialDialogItem, setSerialDialogItem] = useState<Inventory | null>(null);
 
   const inventoryTypeLabel = getInventoryTypeLabel(inventoryType);
 
@@ -79,7 +82,16 @@ export function EntityInventorySearch({
     setFilteredItems(filtered);
   }, [search, inventoryItems]);
 
-  async function handleUseItem(item: Inventory) {
+  function updateInventoryRow(itemId: number, updatedInventory: Inventory) {
+    setInventoryItems((items) =>
+      items.map((invItem) => (invItem.id === itemId ? { ...invItem, ...updatedInventory } : invItem))
+    );
+    setFilteredItems((items) =>
+      items.map((invItem) => (invItem.id === itemId ? { ...invItem, ...updatedInventory } : invItem))
+    );
+  }
+
+  async function performUse(item: Inventory, instanceId?: number) {
     if (item.quantity <= 0) {
       toast.error('This item is out of stock');
       return;
@@ -87,34 +99,25 @@ export function EntityInventorySearch({
 
     setUsingItemId(item.id);
     try {
-      const consumeRes = await api.inventory.consume(item.id);
-      const consumedInstance = consumeRes.data?.consumed_instance;
-      const updatedInventory = consumeRes.data?.inventory ?? item;
-      const itemForInstall = mergeInventoryWithInstance(
-        {
-          ...item,
-          ...updatedInventory,
-        },
-        consumedInstance
-      );
-
-      await onUseInventory(itemForInstall);
-
-      const updatedItems = inventoryItems.map((invItem) =>
-        invItem.id === item.id ? { ...invItem, ...updatedInventory } : invItem
-      );
-      setInventoryItems(updatedItems);
-      setFilteredItems(
-        filteredItems.map((invItem) =>
-          invItem.id === item.id ? { ...invItem, ...updatedInventory } : invItem
-        )
-      );
+      const updatedInventory = await onUseInventory(item, instanceId);
+      if (updatedInventory) {
+        updateInventoryRow(item.id, updatedInventory);
+      }
+      setSerialDialogItem(null);
     } catch (err) {
       console.error('Failed to use inventory item:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to use inventory item');
     } finally {
       setUsingItemId(null);
     }
+  }
+
+  function handleUseItem(item: Inventory) {
+    if (needsSerialSelection(item)) {
+      setSerialDialogItem(item);
+      return;
+    }
+    void performUse(item);
   }
 
   if (loading) {
@@ -129,95 +132,111 @@ export function EntityInventorySearch({
   }
 
   return (
-    <Card>
-      <CardHeader className="cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Inventory — {inventoryTypeLabel}s</CardTitle>
-            <CardDescription>
-              {parentEntityName} — {filteredItems.length} available {inventoryType} item
-              {filteredItems.length === 1 ? '' : 's'} in stock
-            </CardDescription>
-          </div>
-          <ChevronDown
-            className={`h-5 w-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-          />
-        </div>
-      </CardHeader>
-
-      {isExpanded && (
-        <CardContent className="space-y-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name, serial number, part number, or OEM..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10"
+    <>
+      <Card>
+        <CardHeader className="cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Inventory — {inventoryTypeLabel}s</CardTitle>
+              <CardDescription>
+                {parentEntityName} — {filteredItems.length} available {inventoryType} item
+                {filteredItems.length === 1 ? '' : 's'} in stock
+              </CardDescription>
+            </div>
+            <ChevronDown
+              className={`h-5 w-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
             />
           </div>
+        </CardHeader>
 
-          {filteredItems.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              {inventoryItems.length === 0
-                ? `No ${inventoryType} inventory available for ${parentEntityName}`
-                : 'No matching inventory items'}
+        {isExpanded && (
+          <CardContent className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name, serial number, part number, or OEM..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10"
+              />
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Serial Number</TableHead>
-                    <TableHead>Part Number</TableHead>
-                    <TableHead>OEM</TableHead>
-                    <TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredItems.map((item) => {
-                    const outOfStock = item.quantity <= 0;
 
-                    return (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.name}</TableCell>
-                        <TableCell className="text-sm">{item.serial_number || '—'}</TableCell>
-                        <TableCell className="text-sm">{item.part_number || '—'}</TableCell>
-                        <TableCell className="text-sm">{item.oem_name || '—'}</TableCell>
-                        <TableCell className="text-right font-medium">
-                          <span
-                            className={`px-2 py-1 rounded ${
-                              outOfStock
-                                ? 'bg-red-100 text-red-800'
-                                : item.quantity <= 5
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-green-100 text-green-800'
-                            }`}
-                          >
-                            {item.quantity}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            variant={outOfStock ? 'outline' : 'default'}
-                            onClick={() => handleUseItem(item)}
-                            disabled={outOfStock || usingItemId === item.id}
-                          >
-                            {usingItemId === item.id ? 'Adding...' : 'Use'}
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      )}
-    </Card>
+            {filteredItems.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                {inventoryItems.length === 0
+                  ? `No ${inventoryType} inventory available for ${parentEntityName}`
+                  : 'No matching inventory items'}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Serial Number</TableHead>
+                      <TableHead>Part Number</TableHead>
+                      <TableHead>OEM</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredItems.map((item) => {
+                      const outOfStock = item.quantity <= 0;
+
+                      return (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-medium">{item.name}</TableCell>
+                          <TableCell className="text-sm">{item.serial_number || '—'}</TableCell>
+                          <TableCell className="text-sm">{inventoryPartNumber(item) || '—'}</TableCell>
+                          <TableCell className="text-sm">{item.oem_name || '—'}</TableCell>
+                          <TableCell className="text-right font-medium">
+                            <span
+                              className={`px-2 py-1 rounded ${
+                                outOfStock
+                                  ? 'bg-red-100 text-red-800'
+                                  : item.quantity <= 5
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-green-100 text-green-800'
+                              }`}
+                            >
+                              {item.quantity}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              variant={outOfStock ? 'outline' : 'default'}
+                              onClick={() => handleUseItem(item)}
+                              disabled={outOfStock || usingItemId === item.id}
+                            >
+                              {usingItemId === item.id ? 'Adding...' : 'Use'}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
+
+      <InventorySerialSelectDialog
+        item={serialDialogItem}
+        open={serialDialogItem != null}
+        onOpenChange={(open) => {
+          if (!open) setSerialDialogItem(null);
+        }}
+        confirming={serialDialogItem != null && usingItemId === serialDialogItem.id}
+        onConfirm={(instanceId) => {
+          if (serialDialogItem) {
+            void performUse(serialDialogItem, instanceId);
+          }
+        }}
+      />
+    </>
   );
 }

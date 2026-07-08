@@ -197,8 +197,10 @@ export const inventory = {
   create: (data: Partial<Models.Inventory>) => api.post<Models.Inventory>("/inventory/", data),
   update: (id: number, data: Partial<Models.Inventory>) => api.put<Models.Inventory>(`/inventory/${id}/`, data),
   delete: (id: number) => api.delete(`/inventory/${id}/`),
-  consume: (id: number) =>
-    api.post<Models.InventoryConsumeResult>(`/inventory/${id}/consume/`),
+  consume: (id: number, instanceId?: number) =>
+    api.post<Models.InventoryConsumeResult>(`/inventory/${id}/consume/`, {
+      instance_id: instanceId ?? null,
+    }),
   listInstances: (inventoryId: number) =>
     api.get<Models.InventoryInstance[]>(`/inventory/${inventoryId}/instances/`),
   createInstance: (inventoryId: number, data: Partial<Models.InventoryInstance>) =>
@@ -206,6 +208,32 @@ export const inventory = {
   updateInstance: (instanceId: number, data: Partial<Models.InventoryInstance>) =>
     api.put<Models.InventoryInstance>(`/inventory/instances/${instanceId}/`, data),
   deleteInstance: (instanceId: number) => api.delete(`/inventory/instances/${instanceId}/`),
+  getChildren: (
+    inventoryId: number,
+    options?: { parentInstanceId?: number; parentInstanceSerial?: string }
+  ) =>
+    api.get<Models.InventoryChildLink[]>(`/inventory/${inventoryId}/children/`, {
+      params: {
+        ...(options?.parentInstanceId != null
+          ? { parent_instance_id: options.parentInstanceId }
+          : {}),
+        ...(options?.parentInstanceSerial
+          ? { parent_instance_serial: options.parentInstanceSerial }
+          : {}),
+      },
+    }),
+  replaceChildren: (
+    inventoryId: number,
+    data: {
+      parent_instance_id?: number;
+      children: Array<{
+        child_category_name: string;
+        child_inventory_id: number;
+        child_instance_id?: number;
+        child_instance_serial?: string;
+      }>;
+    }
+  ) => api.put<Models.InventoryChildLink[]>(`/inventory/${inventoryId}/children/`, data),
 };
 
 // Statuses
@@ -368,6 +396,16 @@ export const attachments = {
   update: (attachmentId: number, data: Models.EntityAttachmentMetadata) =>
     api.patch<Models.EntityAttachment>(`/attachments/${attachmentId}/`, data),
   delete: (attachmentId: number) => api.delete(`/attachments/${attachmentId}/`),
+  copy: (fromOwnerType: string, fromOwnerId: number, toOwnerType: string, toOwnerId: number) => {
+    const formData = new FormData();
+    formData.append('from_owner_type', fromOwnerType);
+    formData.append('from_owner_id', String(fromOwnerId));
+    formData.append('to_owner_type', toOwnerType);
+    formData.append('to_owner_id', String(toOwnerId));
+    return api.post<Models.EntityAttachment[]>('/attachments/copy/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   download: async (attachmentId: number, fileName: string) => {
     const res = await api.get<Blob>(`/attachments/${attachmentId}/download/`, {
       responseType: 'blob',
@@ -400,6 +438,16 @@ export const pictures = {
     api.delete('/pictures/', {
       params: buildQueryParams({ owner_type: ownerType, owner_id: ownerId }),
     }),
+  copy: (fromOwnerType: string, fromOwnerId: number, toOwnerType: string, toOwnerId: number) => {
+    const formData = new FormData();
+    formData.append('from_owner_type', fromOwnerType);
+    formData.append('from_owner_id', String(fromOwnerId));
+    formData.append('to_owner_type', toOwnerType);
+    formData.append('to_owner_id', String(toOwnerId));
+    return api.post<{ picture_url: string | null }>('/pictures/copy/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };
 
 export default api;

@@ -278,6 +278,17 @@ export interface InventoryConsumeResult {
   consumed_instance?: InventoryInstance | null
 }
 
+export interface InventoryChildLink {
+  id: number
+  parent_inventory_id: number
+  parent_instance_id?: number | null
+  parent_instance_serial?: string | null
+  child_category_name: string
+  child_inventory_id: number
+  child_instance_id?: number | null
+  child_instance_serial?: string | null
+}
+
 // Entity (generic resource tracker)
 export interface Entity {
   id: number

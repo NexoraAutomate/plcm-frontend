@@ -23,8 +23,13 @@ import {
 } from '@/lib/hierarchy-install-fields';
 import type { HierarchyDashboardSelection } from '@/lib/project-hierarchy-dashboard';
 import { syncEntityPicture } from '@/lib/entity-picture-upload';
-import { inventoryPartNumber } from '@/lib/inventory-entity-fields';
-import type { Hierarchy, Inventory, Status, System } from '@/lib/models';
+import { inventoryPartNumber, mergeInventoryWithInstance } from '@/lib/inventory-entity-fields';
+import { buildInventoryAssetSources, copyInventoryAssetsToEntity } from '@/lib/inventory-install';
+import {
+  buildCreateEntityByType,
+  installDefinedInventoryChildren,
+} from '@/lib/inventory-child-install';
+import type { Hierarchy, Inventory, InventoryInstance, Status, System } from '@/lib/models';
 import type { HierarchyEntityType } from '@/lib/system-hierarchy-graph';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -158,6 +163,41 @@ export function useHierarchyEntityActions({
     }
     return Array.from(merged.values());
   }, [storeSystems, systemsOverride]);
+
+  const createEntityByType = useMemo(
+    () =>
+      buildCreateEntityByType({
+        createSystem: async (data) => ({ id: (await createSystem(data as any)).id }),
+        createSubsystem: async (data) => ({ id: (await createSubsystem(data as any)).id }),
+        createModule: async (data) => ({ id: (await createModule(data as any)).id }),
+        createUnit: async (data) => ({ id: (await createUnit(data as any)).id }),
+        createComponent: async (data) => ({ id: (await createComponent(data as any)).id }),
+      }),
+    [createSystem, createSubsystem, createModule, createUnit, createComponent]
+  );
+
+  const installInventoryChildren = useCallback(
+    async (
+      parentInventoryItem: Inventory,
+      parentEntityId: number,
+      parentInstanceId?: number | null,
+      parentInstanceSerial?: string | null
+    ) => {
+      const childrenInstalled = await installDefinedInventoryChildren({
+        parentInventoryItem,
+        parentEntityId,
+        parentInstanceId,
+        parentInstanceSerial,
+        createEntityByType,
+      });
+      if (childrenInstalled > 0) {
+        toast.success(
+          `Also installed ${childrenInstalled} child entit${childrenInstalled === 1 ? 'y' : 'ies'} from inventory`
+        );
+      }
+    },
+    [createEntityByType]
+  );
 
   const [dialogState, setDialogState] = useState<DialogState | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -321,14 +361,32 @@ export function useHierarchyEntityActions({
     formData: Record<string, unknown>
   ) => {
     const name = String(formData.name || '');
-    const { payload: installPayload, inventoryMatch } = resolveInstallIdentity(
+    const resolved = resolveInstallIdentity(
       formData,
       inventoryItems,
       name
     );
 
+    const inventoryMatch = resolved.inventoryMatch;
+    let installPayload = resolved.payload;
+    let consumedInstanceForAssets: InventoryInstance | null = null;
+    let parentInventoryAfterConsume: Inventory | null = null;
+
     if (inventoryMatch) {
-      await api.inventory.consume(inventoryMatch.id);
+      const consumeRes = await api.inventory.consume(inventoryMatch.id);
+      consumedInstanceForAssets = consumeRes.data?.consumed_instance ?? null;
+      parentInventoryAfterConsume = consumeRes.data?.inventory ?? inventoryMatch;
+
+      const merged = mergeInventoryWithInstance(
+        { ...inventoryMatch, ...parentInventoryAfterConsume },
+        consumedInstanceForAssets
+      );
+
+      const serialForEntity =
+        consumedInstanceForAssets?.serial_number?.trim() ||
+        String((installPayload as any).serial_number || merged.serial_number || '');
+
+      installPayload = inventoryToHierarchyCreatePayload(merged, serialForEntity);
     }
 
     const payload = {
@@ -343,37 +401,115 @@ export function useHierarchyEntityActions({
         const created = await createSystem({
           ...payload,
           project_id: parentId,
-          ...parseHierarchyInstallPayload(formData),
+          ...(inventoryMatch ? {} : parseHierarchyInstallPayload(formData)),
         });
+
+        if (inventoryMatch) {
+          await copyInventoryAssetsToEntity(
+            entityType as any,
+            created.id,
+            buildInventoryAssetSources(inventoryMatch, consumedInstanceForAssets)
+          );
+          if (parentInventoryAfterConsume) {
+            await installInventoryChildren(
+              { ...inventoryMatch, ...parentInventoryAfterConsume },
+              created.id,
+              consumedInstanceForAssets?.id,
+              consumedInstanceForAssets?.original_serial_number ||
+                consumedInstanceForAssets?.serial_number
+            );
+          }
+        }
+
         await syncEntityPicture('system', created.id, formData);
         updateSelection('systemId', created.id);
         break;
       }
       case 'subsystem': {
         const created = await createSubsystem({ ...payload, system_id: parentId });
+        if (inventoryMatch) {
+          await copyInventoryAssetsToEntity(
+            entityType as any,
+            created.id,
+            buildInventoryAssetSources(inventoryMatch, consumedInstanceForAssets)
+          );
+          if (parentInventoryAfterConsume) {
+            await installInventoryChildren(
+              { ...inventoryMatch, ...parentInventoryAfterConsume },
+              created.id,
+              consumedInstanceForAssets?.id,
+              consumedInstanceForAssets?.original_serial_number ||
+                consumedInstanceForAssets?.serial_number
+            );
+          }
+        }
         updateSelection('subsystemId', created.id);
         break;
       }
       case 'module': {
         const created = await createModule({ ...payload, subsystem_id: parentId });
+        if (inventoryMatch) {
+          await copyInventoryAssetsToEntity(
+            entityType as any,
+            created.id,
+            buildInventoryAssetSources(inventoryMatch, consumedInstanceForAssets)
+          );
+          if (parentInventoryAfterConsume) {
+            await installInventoryChildren(
+              { ...inventoryMatch, ...parentInventoryAfterConsume },
+              created.id,
+              consumedInstanceForAssets?.id,
+              consumedInstanceForAssets?.original_serial_number ||
+                consumedInstanceForAssets?.serial_number
+            );
+          }
+        }
         updateSelection('moduleId', created.id);
         break;
       }
       case 'unit': {
         const created = await createUnit({ ...payload, module_id: parentId });
+        if (inventoryMatch) {
+          await copyInventoryAssetsToEntity(
+            entityType as any,
+            created.id,
+            buildInventoryAssetSources(inventoryMatch, consumedInstanceForAssets)
+          );
+          if (parentInventoryAfterConsume) {
+            await installInventoryChildren(
+              { ...inventoryMatch, ...parentInventoryAfterConsume },
+              created.id,
+              consumedInstanceForAssets?.id,
+              consumedInstanceForAssets?.original_serial_number ||
+                consumedInstanceForAssets?.serial_number
+            );
+          }
+        }
         updateSelection('unitId', created.id);
         break;
       }
       case 'component': {
         const created = await createComponent({
-          name: payload.name,
-          description: payload.description,
-          status_id: payload.status_id,
-          part_number: payload.part_number,
-          serial_number: payload.serial_number,
+          ...payload,
           sku: String(formData.sku || ''),
           unit_id: parentId,
         });
+        if (inventoryMatch) {
+          await copyInventoryAssetsToEntity(
+            entityType as any,
+            created.id,
+            buildInventoryAssetSources(inventoryMatch, consumedInstanceForAssets)
+          );
+          if (parentInventoryAfterConsume) {
+            await installInventoryChildren(
+              { ...inventoryMatch, ...parentInventoryAfterConsume },
+              created.id,
+              consumedInstanceForAssets?.id,
+              consumedInstanceForAssets?.original_serial_number ||
+                consumedInstanceForAssets?.serial_number
+            );
+          }
+        }
         updateSelection('componentId', created.id);
         break;
       }

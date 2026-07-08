@@ -21,17 +21,33 @@ import * as api from '@/lib/api';
 import { fetchStatusesByType } from '@/lib/api';
 import * as Models from '@/lib/models';
 import type { Inventory } from '@/lib/models';
-import { getChildInventoryType, nextSerialNumberFromInventory } from '@/lib/entity-hierarchy';
-import { inventoryToHierarchyCreatePayload } from '@/lib/hierarchy-install-fields';
+import { getChildInventoryType } from '@/lib/entity-hierarchy';
 import { resolveStatusName } from '@/lib/entity-status';
 import { EntityStatusHistorySheet } from '@/components/entity-status-history-sheet';
 import { EntityInstallMetadataCard } from '@/components/entity-install-metadata-card';
+import {
+  buildCreateEntityByType,
+  installEntityFromInventoryWithChildren,
+} from '@/lib/inventory-child-install';
 
 export default function SystemDetailPage() {
   const params = useParams();
   const systemId = params.id as string;
   const { pageLoading } = useEntityHierarchyGate();
-  const { systems, projects, subsystems, createSubsystem, deleteSubsystem, updateSubsystem, updateSystem, statuses: storeStatuses } = useDataStore();
+  const {
+    systems,
+    projects,
+    subsystems,
+    createSystem,
+    createSubsystem,
+    createModule,
+    createUnit,
+    createComponent,
+    deleteSubsystem,
+    updateSubsystem,
+    updateSystem,
+    statuses: storeStatuses,
+  } = useDataStore();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -159,7 +175,7 @@ export default function SystemDetailPage() {
     }
   }
 
-  async function handleUseInventory(item: Inventory) {
+  async function handleUseInventory(item: Inventory, instanceId?: number) {
     if (!system) {
       throw new Error('System not found');
     }
@@ -169,16 +185,32 @@ export default function SystemDetailPage() {
       throw new Error('No subsystem status available');
     }
 
-    await createSubsystem({
-      name: item.name,
-      description: item.description || '',
-      system_id: system.id,
-      status_id: defaultStatus.id,
-      ...inventoryToHierarchyCreatePayload(
-        item,
-        nextSerialNumberFromInventory(item, systemSubsystems)
-      ),
+    const createEntityByType = buildCreateEntityByType({
+      createSystem: async (data) => ({ id: (await createSystem(data as any)).id }),
+      createSubsystem: async (data) => ({ id: (await createSubsystem(data as any)).id }),
+      createModule: async (data) => ({ id: (await createModule(data as any)).id }),
+      createUnit: async (data) => ({ id: (await createUnit(data as any)).id }),
+      createComponent: async (data) => ({ id: (await createComponent(data as any)).id }),
     });
+
+    const result = await installEntityFromInventoryWithChildren({
+      inventoryItem: item,
+      instanceId,
+      parentEntityId: system.id,
+      entityType: 'subsystem',
+      existingChildren: systemSubsystems,
+      defaultStatus,
+      createEntity: (data) => createEntityByType('subsystem', data),
+      createEntityByType,
+    });
+
+    if (result.childrenInstalled > 0) {
+      toast.success(
+        `Installed ${item.name} and ${result.childrenInstalled} child entit${result.childrenInstalled === 1 ? 'y' : 'ies'} from inventory`
+      );
+    }
+
+    return result.updatedInventory;
   }
   useEffect(() => {
     const fetchData = async () => {

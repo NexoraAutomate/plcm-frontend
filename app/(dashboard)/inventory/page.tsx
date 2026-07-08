@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Plus, Edit, Trash2, Search, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
@@ -39,6 +40,8 @@ import {
   resolveInventoryQuantity,
 } from '@/lib/entity-hierarchy';
 import { canAddInventoryChildren } from '@/lib/inventory-child-install';
+import { needsSerialSelection } from '@/lib/inventory-install';
+import { InventorySerialSelectDialog } from '@/components/inventory-serial-select-dialog';
 
 type EntityType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
 
@@ -81,6 +84,7 @@ function enrichInventoryItems(items: Inventory[], users: User[]): InventoryItem[
 }
 
 export default function InventoryPage() {
+  const router = useRouter();
   const { users, statuses } = useDataStore();
   const [search, setSearch] = useState('');
   const [entityTypeFilter, setEntityTypeFilter] = useState<EntityType | 'all'>('all');
@@ -104,6 +108,7 @@ export default function InventoryPage() {
     open: false,
     id: null,
   });
+  const [addChildrenItem, setAddChildrenItem] = useState<InventoryItem | null>(null);
 
   const [selectedEntityType, setSelectedEntityType] = useState<EntityType>('component');
   const { data: hierarchyCategories = [] } = useHierarchiesQuery(selectedEntityType);
@@ -126,6 +131,19 @@ export default function InventoryPage() {
       item.partNumber?.toLowerCase().includes(search.toLowerCase());
     return matchesType && matchesSearch;
   });
+
+  function navigateToAddChildren(item: InventoryItem, instanceId?: number) {
+    const query = instanceId != null ? `?instanceId=${instanceId}` : '';
+    router.push(`/inventory/${item.id}/add-children${query}`);
+  }
+
+  function handleAddChildrenClick(item: InventoryItem) {
+    if (needsSerialSelection(item)) {
+      setAddChildrenItem(item);
+      return;
+    }
+    navigateToAddChildren(item);
+  }
 
   const resetForm = () => {
     setFormData({ ...emptyInventoryEntityForm });
@@ -941,11 +959,13 @@ export default function InventoryPage() {
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
                           {canAddInventoryChildren(item.inventory_type) ? (
-                            <Button size="sm" variant="secondary" asChild>
-                              <Link href={`/inventory/${item.id}/add-children`}>
-                                <Layers className="mr-1 h-4 w-4" />
-                                Add Children
-                              </Link>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => handleAddChildrenClick(item)}
+                            >
+                              <Layers className="mr-1 h-4 w-4" />
+                              Add Children
                             </Button>
                           ) : null}
                           <Button size="sm" variant="outline" onClick={() => openEdit(item)}>
@@ -994,6 +1014,26 @@ export default function InventoryPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <InventorySerialSelectDialog
+        item={addChildrenItem}
+        open={addChildrenItem != null}
+        onOpenChange={(open) => {
+          if (!open) setAddChildrenItem(null);
+        }}
+        confirmLabel="Continue"
+        description={
+          addChildrenItem
+            ? `${addChildrenItem.name} has ${addChildrenItem.quantity} units in stock. Choose which serial number to add children under.`
+            : undefined
+        }
+        onConfirm={(instanceId) => {
+          if (addChildrenItem) {
+            navigateToAddChildren(addChildrenItem, instanceId);
+            setAddChildrenItem(null);
+          }
+        }}
+      />
 
       <ConfirmDialog
         open={deleteConfirm.open}

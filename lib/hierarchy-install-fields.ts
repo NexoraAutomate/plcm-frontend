@@ -12,6 +12,7 @@ export function inventoryToHierarchyCreatePayload(item: Inventory, serialNumber:
     original_serial_number: item.original_serial_number || serialNumber,
     installation_date: item.installation_date || new Date().toISOString(),
     installed_by_id: item.installed_by_id,
+    ...(item.status_id != null ? { status_id: item.status_id } : {}),
     picture_url: item.picture_url,
     ...(item.inventory_type === 'component' && item.sku ? { sku: item.sku } : {}),
   };

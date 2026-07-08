@@ -22,8 +22,10 @@ import * as Models from '@/lib/models';
 import { EntityInventorySearch } from '@/components/entity-inventory-search';
 import { EntityStatusHistorySheet } from '@/components/entity-status-history-sheet';
 import type { Inventory } from '@/lib/models';
-import { nextSerialNumberFromInventory } from '@/lib/entity-hierarchy';
-import { inventoryToHierarchyCreatePayload } from '@/lib/hierarchy-install-fields';
+import {
+  buildCreateEntityByType,
+  installEntityFromInventoryWithChildren,
+} from '@/lib/inventory-child-install';
 import {
   hierarchyInstallFormFields,
   hierarchyInstallInitialValues,
@@ -35,7 +37,19 @@ export default function ProjectDetailPage() {
   const params = useParams();
   const projectId = params.id as string;
   const { pageLoading } = useEntityHierarchyGate();
-  const { projects, systems, orders, createSystem, deleteSystem, updateSystem, users } = useDataStore();
+  const {
+    projects,
+    systems,
+    orders,
+    createSystem,
+    createSubsystem,
+    createModule,
+    createUnit,
+    createComponent,
+    deleteSystem,
+    updateSystem,
+    users,
+  } = useDataStore();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -188,7 +202,7 @@ export default function ProjectDetailPage() {
     }
   }
 
-  async function handleUseInventory(item: Inventory) {
+  async function handleUseInventory(item: Inventory, instanceId?: number) {
     if (!project) {
       throw new Error('Project not found');
     }
@@ -198,16 +212,32 @@ export default function ProjectDetailPage() {
       throw new Error('No system status available');
     }
 
-    await createSystem({
-      name: item.name,
-      description: item.description || '',
-      project_id: project.id,
-      status_id: defaultStatus.id,
-      ...inventoryToHierarchyCreatePayload(
-        item,
-        nextSerialNumberFromInventory(item, projectSystems)
-      ),
+    const createEntityByType = buildCreateEntityByType({
+      createSystem: async (data) => ({ id: (await createSystem(data as any)).id }),
+      createSubsystem: async (data) => ({ id: (await createSubsystem(data as any)).id }),
+      createModule: async (data) => ({ id: (await createModule(data as any)).id }),
+      createUnit: async (data) => ({ id: (await createUnit(data as any)).id }),
+      createComponent: async (data) => ({ id: (await createComponent(data as any)).id }),
     });
+
+    const result = await installEntityFromInventoryWithChildren({
+      inventoryItem: item,
+      instanceId,
+      parentEntityId: project.id,
+      entityType: 'system',
+      existingChildren: projectSystems,
+      defaultStatus,
+      createEntity: (data) => createEntityByType('system', data),
+      createEntityByType,
+    });
+
+    if (result.childrenInstalled > 0) {
+      toast.success(
+        `Installed ${item.name} and ${result.childrenInstalled} child entit${result.childrenInstalled === 1 ? 'y' : 'ies'} from inventory`
+      );
+    }
+
+    return result.updatedInventory;
   }
   
   useEffect(() => {
