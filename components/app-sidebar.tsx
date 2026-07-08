@@ -182,7 +182,7 @@ export function AppSidebar() {
               width={30}
               height={30}
               alt="Backend"
-              className="invert"
+              className="dark:invert"
             />
             {/* <Satellite className="h-5 w-5 text-sidebar-primary-foreground" /> */}
           </div>
