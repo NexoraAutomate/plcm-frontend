@@ -25,28 +25,34 @@ function childrenOf(templates: Hierarchy[], parentId: number, level: HierarchyLe
   );
 }
 
-function sanitizeToken(value: string): string {
-  return value.trim().replace(/\s+/g, '-');
-}
-
-function buildPlaceholderName(
+function buildIdentifierBase(
   projectName: string,
   templateName: string,
   counters: Map<string, number>
 ): string {
-  const key = sanitizeToken(templateName).toLowerCase();
+  const trimmedProject = projectName.trim();
+  const trimmedTemplate = templateName.trim();
+  const key = trimmedTemplate.toLowerCase();
   const next = (counters.get(key) ?? 0) + 1;
   counters.set(key, next);
-  return `${sanitizeToken(projectName)}-${sanitizeToken(templateName)}-${next}`;
+  const suffix = next > 1 ? `-${next}` : '';
+  return `${trimmedProject}-${trimmedTemplate}${suffix}`;
 }
 
-function buildEntityFields(name: string) {
+function buildEntityFields(
+  projectName: string,
+  templateName: string,
+  counters: Map<string, number>
+) {
+  const name = templateName.trim();
+  const identifierBase = buildIdentifierBase(projectName, templateName, counters);
+
   return {
     name,
     description: 'Auto-created from Systems Hierarchy',
-    part_number: `${name}-PN`,
-    serial_number: name,
-    configuration_item: `${name}-CI`,
+    part_number: `${identifierBase}-PN`,
+    serial_number: identifierBase,
+    configuration_item: `${identifierBase}-CI`,
   };
 }
 
@@ -82,9 +88,8 @@ export async function createCompleteHierarchy(
   }
 
   for (const systemTemplate of systemTemplates) {
-    const systemName = buildPlaceholderName(projectName, systemTemplate.name, nameCounters);
     const systemRes = await api.systems.create({
-      ...buildEntityFields(systemName),
+      ...buildEntityFields(projectName, systemTemplate.name, nameCounters),
       project_id: projectId,
       status_id: firstStatusId(statuses, 'system'),
     });
@@ -92,9 +97,8 @@ export async function createCompleteHierarchy(
     counts.systems += 1;
 
     for (const subsystemTemplate of childrenOf(templates, systemTemplate.id, 'subsystem')) {
-      const subsystemName = buildPlaceholderName(projectName, subsystemTemplate.name, nameCounters);
       const subsystemRes = await api.subsystems.create({
-        ...buildEntityFields(subsystemName),
+        ...buildEntityFields(projectName, subsystemTemplate.name, nameCounters),
         system_id: systemId,
         status_id: firstStatusId(statuses, 'subsystem'),
       });
@@ -102,9 +106,8 @@ export async function createCompleteHierarchy(
       counts.subsystems += 1;
 
       for (const moduleTemplate of childrenOf(templates, subsystemTemplate.id, 'module')) {
-        const moduleName = buildPlaceholderName(projectName, moduleTemplate.name, nameCounters);
         const moduleRes = await api.modules.create({
-          ...buildEntityFields(moduleName),
+          ...buildEntityFields(projectName, moduleTemplate.name, nameCounters),
           subsystem_id: subsystemId,
           status_id: firstStatusId(statuses, 'module'),
         });
@@ -112,9 +115,8 @@ export async function createCompleteHierarchy(
         counts.modules += 1;
 
         for (const unitTemplate of childrenOf(templates, moduleTemplate.id, 'unit')) {
-          const unitName = buildPlaceholderName(projectName, unitTemplate.name, nameCounters);
           const unitRes = await api.units.create({
-            ...buildEntityFields(unitName),
+            ...buildEntityFields(projectName, unitTemplate.name, nameCounters),
             module_id: moduleId,
             status_id: firstStatusId(statuses, 'unit'),
           });
@@ -122,14 +124,14 @@ export async function createCompleteHierarchy(
           counts.units += 1;
 
           for (const componentTemplate of childrenOf(templates, unitTemplate.id, 'component')) {
-            const componentName = buildPlaceholderName(
+            const componentFields = buildEntityFields(
               projectName,
               componentTemplate.name,
               nameCounters
             );
             await api.components.create({
-              ...buildEntityFields(componentName),
-              sku: `${componentName}-SKU`,
+              ...componentFields,
+              sku: `${componentFields.serial_number}-SKU`,
               unit_id: unitId,
               status_id: firstStatusId(statuses, 'component'),
             });

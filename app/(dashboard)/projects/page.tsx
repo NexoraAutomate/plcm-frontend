@@ -439,7 +439,8 @@ export default function ProjectsPage(){
                   </Label>
                   <p className="text-xs text-muted-foreground">
                     Creates blank Systems, Sub-Systems, Modules, Units, and Components from the
-                    defined Systems Hierarchy, using placeholder names based on the project name.
+                    defined Systems Hierarchy. Entity names match the hierarchy templates; part and
+                    serial numbers are prefixed with the project name.
                   </p>
                 </div>
               </div>
