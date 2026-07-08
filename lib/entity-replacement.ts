@@ -95,6 +95,18 @@ export function buildReplacementStockRows(items: Inventory[]): ReplacementStockR
   return rows;
 }
 
+export function getReplacementDateForDisplay(entity: {
+  replaced_at?: string | null;
+  installation_date?: string;
+  replacement_sequence?: number;
+}): string | undefined {
+  if (entity.replaced_at) return entity.replaced_at;
+  if ((entity.replacement_sequence ?? 0) > 0 && entity.installation_date) {
+    return entity.installation_date;
+  }
+  return undefined;
+}
+
 export function resolveProjectIdForHardwareEntity(
   entityType: HierarchyEntityType,
   entityId: number,

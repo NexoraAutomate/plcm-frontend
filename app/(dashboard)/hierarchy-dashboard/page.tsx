@@ -26,6 +26,7 @@ import {
   type HierarchyDashboardSelection,
 } from '@/lib/project-hierarchy-dashboard';
 import type { HierarchyEntityType } from '@/lib/system-hierarchy-graph';
+import type { HierarchyDossierMode } from '@/lib/hierarchy-dossier-mode';
 import type { System } from '@/lib/models';
 
 const CHILD_CLEAR_MAP: Record<
@@ -77,6 +78,7 @@ export default function HierarchyDashboardPage() {
       : (fetchedProjects ?? []);
 
   const [selection, setSelection] = useState<HierarchyDashboardSelection>({});
+  const [dossierMode, setDossierMode] = useState<HierarchyDossierMode>('bhd');
   const [serialQuery, setSerialQuery] = useState('');
   const [serialSearching, setSerialSearching] = useState(false);
   const [projectSystems, setProjectSystems] = useState<System[]>([]);
@@ -327,6 +329,8 @@ export default function HierarchyDashboardPage() {
         unitOptions={unitOptions}
         componentOptions={componentOptions}
         selectedProject={selectedProject}
+        dossierMode={dossierMode}
+        onDossierModeChange={setDossierMode}
       />
 
       <ProjectHierarchyFlow
@@ -343,6 +347,7 @@ export default function HierarchyDashboardPage() {
         onNodeSelect={handleNodeSelect}
         systemsLoading={systemsLoading}
         onEntityChanged={handleEntityChanged}
+        dossierMode={dossierMode}
         className="min-h-0 flex-1 border-0"
       />
     </div>

@@ -103,6 +103,8 @@ function HierarchyFlowNode({ data }: NodeProps<Node<HierarchyNodeData>>) {
 
   const showBuildTimeline = Boolean(actions?.onViewResolutionHistory);
   const hasReplacements = Boolean(data.hasResolutionHistory);
+  const isReplacedEntity = Boolean(data.isReplacedEntity);
+  const isMmhdView = data.dossierMode === 'mmhd';
   const entityActions = actions?.entityActions;
   const childType = CHILD_ENTITY_TYPE[data.type];
   const typeLabel = getEntityLabel(data.type).toLowerCase();
@@ -143,11 +145,20 @@ function HierarchyFlowNode({ data }: NodeProps<Node<HierarchyNodeData>>) {
         role={canNavigate ? 'button' : undefined}
         tabIndex={canNavigate ? 0 : undefined}
         className={cn(
-          'nodrag nopan nowheel w-[220px] rounded-lg border bg-card px-3 py-2.5 text-left shadow-sm transition-all',
-          styles.border,
-          canNavigate && 'cursor-pointer hover:bg-accent/30',
+          'nodrag nopan nowheel w-[220px] rounded-lg border px-3 py-2.5 text-left shadow-sm transition-all',
+          isReplacedEntity
+            ? 'border-orange-500 bg-orange-50 dark:border-orange-500 dark:bg-orange-950/60'
+            : cn('bg-card', styles.border),
+          canNavigate &&
+            (isReplacedEntity
+              ? 'cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-900/70'
+              : 'cursor-pointer hover:bg-accent/30'),
           highlightState === 'selected' &&
+            !isReplacedEntity &&
             'ring-2 ring-primary shadow-md scale-[1.02] z-10',
+          highlightState === 'selected' &&
+            isReplacedEntity &&
+            'ring-2 ring-orange-500 border-orange-500 shadow-md scale-[1.02] z-10',
           highlightState === 'dimmed' && 'opacity-45 saturate-50',
           entityActions && 'pb-2'
         )}
@@ -181,8 +192,16 @@ function HierarchyFlowNode({ data }: NodeProps<Node<HierarchyNodeData>>) {
                   'nodrag nopan nowheel relative flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-amber-700 transition-colors hover:bg-amber-500/10 dark:text-amber-300',
                   hasReplacements && 'ring-1 ring-amber-500/40'
                 )}
-                title="View initial build timeline"
-                aria-label={`View build timeline for ${data.label}`}
+                title={
+                  isMmhdView
+                    ? 'View replacement history'
+                    : 'View initial build timeline'
+                }
+                aria-label={
+                  isMmhdView
+                    ? `View replacement history for ${data.label}`
+                    : `View build timeline for ${data.label}`
+                }
                 onPointerDown={(event) => event.stopPropagation()}
                 onClick={handleResolutionHistory}
               >

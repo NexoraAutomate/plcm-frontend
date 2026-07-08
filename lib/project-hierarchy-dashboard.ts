@@ -142,9 +142,14 @@ function toTreeNode<T extends { id: number; name: string }>(
   type: HierarchyEntityType,
   statuses: Status[],
   selection: HierarchyDashboardSelection,
-  children: HierarchyTreeNode[] = []
+  children: HierarchyTreeNode[] = [],
+  options?: { preferOriginalBuild?: boolean }
 ): HierarchyTreeNode {
-  const fields = mapEntityFields(entity as Parameters<typeof mapEntityFields>[0], statuses);
+  const fields = mapEntityFields(
+    entity as Parameters<typeof mapEntityFields>[0],
+    statuses,
+    { preferOriginalBuild: options?.preferOriginalBuild }
+  );
 
   return {
     id: makeNodeId(type, entity.id),
@@ -164,7 +169,8 @@ export function buildProjectHierarchyTree(
   modules: Module[],
   units: Unit[],
   components: Component[],
-  statuses: Status[] = []
+  statuses: Status[] = [],
+  options?: { expandAll?: boolean; preferOriginalBuild?: boolean }
 ): HierarchyTreeNode[] {
   if (!selection.projectId) return [];
 
@@ -172,21 +178,25 @@ export function buildProjectHierarchyTree(
   if (projectSystems.length === 0) return [];
 
   return projectSystems.map((system) => {
-    const isOnPath = !selection.systemId || system.id === selection.systemId;
+    const isOnPath = options?.expandAll || !selection.systemId || system.id === selection.systemId;
+    const effectiveSelection = options?.expandAll
+      ? { ...selection, systemId: system.id }
+      : selection;
     const systemChildren =
-      isOnPath && selection.systemId
+      isOnPath && (options?.expandAll || selection.systemId)
         ? buildSubsystemLevel(
-            selection,
+            effectiveSelection,
             system.id,
             subsystems,
             modules,
             units,
             components,
-            statuses
+            statuses,
+            options
           )
         : [];
 
-    return toTreeNode(system, 'system', statuses, selection, systemChildren);
+    return toTreeNode(system, 'system', statuses, selection, systemChildren, options);
   });
 }
 
@@ -197,18 +207,31 @@ function buildSubsystemLevel(
   modules: Module[],
   units: Unit[],
   components: Component[],
-  statuses: Status[]
+  statuses: Status[],
+  options?: { expandAll?: boolean; preferOriginalBuild?: boolean }
 ): HierarchyTreeNode[] {
   const systemSubsystems = getSubsystemsForSystem(subsystems, systemId);
 
   return systemSubsystems.map((subsystem) => {
-    const isOnPath = !selection.subsystemId || subsystem.id === selection.subsystemId;
+    const isOnPath =
+      options?.expandAll || !selection.subsystemId || subsystem.id === selection.subsystemId;
+    const effectiveSelection = options?.expandAll
+      ? { ...selection, subsystemId: subsystem.id }
+      : selection;
     const subsystemChildren =
-      isOnPath && selection.subsystemId
-        ? buildModuleLevel(selection, subsystem.id, modules, units, components, statuses)
+      isOnPath && (options?.expandAll || selection.subsystemId)
+        ? buildModuleLevel(
+            effectiveSelection,
+            subsystem.id,
+            modules,
+            units,
+            components,
+            statuses,
+            options
+          )
         : [];
 
-    return toTreeNode(subsystem, 'subsystem', statuses, selection, subsystemChildren);
+    return toTreeNode(subsystem, 'subsystem', statuses, selection, subsystemChildren, options);
   });
 }
 
@@ -218,18 +241,22 @@ function buildModuleLevel(
   modules: Module[],
   units: Unit[],
   components: Component[],
-  statuses: Status[]
+  statuses: Status[],
+  options?: { expandAll?: boolean; preferOriginalBuild?: boolean }
 ): HierarchyTreeNode[] {
   const subsystemModules = getModulesForSubsystem(modules, subsystemId);
 
   return subsystemModules.map((module) => {
-    const isOnPath = !selection.moduleId || module.id === selection.moduleId;
+    const isOnPath = options?.expandAll || !selection.moduleId || module.id === selection.moduleId;
+    const effectiveSelection = options?.expandAll
+      ? { ...selection, moduleId: module.id }
+      : selection;
     const moduleChildren =
-      isOnPath && selection.moduleId
-        ? buildUnitLevel(selection, module.id, units, components, statuses)
+      isOnPath && (options?.expandAll || selection.moduleId)
+        ? buildUnitLevel(effectiveSelection, module.id, units, components, statuses, options)
         : [];
 
-    return toTreeNode(module, 'module', statuses, selection, moduleChildren);
+    return toTreeNode(module, 'module', statuses, selection, moduleChildren, options);
   });
 }
 
@@ -238,18 +265,20 @@ function buildUnitLevel(
   moduleId: number,
   units: Unit[],
   components: Component[],
-  statuses: Status[]
+  statuses: Status[],
+  options?: { expandAll?: boolean; preferOriginalBuild?: boolean }
 ): HierarchyTreeNode[] {
   const moduleUnits = getUnitsForModule(units, moduleId);
 
   return moduleUnits.map((unit) => {
-    const isOnPath = !selection.unitId || unit.id === selection.unitId;
+    const isOnPath = options?.expandAll || !selection.unitId || unit.id === selection.unitId;
+    const effectiveSelection = options?.expandAll ? { ...selection, unitId: unit.id } : selection;
     const unitChildren =
-      isOnPath && selection.unitId
-        ? buildComponentLevel(selection, unit.id, components, statuses)
+      isOnPath && (options?.expandAll || selection.unitId)
+        ? buildComponentLevel(effectiveSelection, unit.id, components, statuses, options)
         : [];
 
-    return toTreeNode(unit, 'unit', statuses, selection, unitChildren);
+    return toTreeNode(unit, 'unit', statuses, selection, unitChildren, options);
   });
 }
 
@@ -257,10 +286,11 @@ function buildComponentLevel(
   selection: HierarchyDashboardSelection,
   unitId: number,
   components: Component[],
-  statuses: Status[]
+  statuses: Status[],
+  options?: { expandAll?: boolean; preferOriginalBuild?: boolean }
 ): HierarchyTreeNode[] {
   return getComponentsForUnit(components, unitId).map((component) =>
-    toTreeNode(component, 'component', statuses, selection, [])
+    toTreeNode(component, 'component', statuses, selection, [], options)
   );
 }
 
@@ -271,7 +301,8 @@ export function buildProjectHierarchyFlow(
   modules: Module[],
   units: Unit[],
   components: Component[],
-  statuses: Status[] = []
+  statuses: Status[] = [],
+  options?: { expandAll?: boolean; preferOriginalBuild?: boolean }
 ) {
   const roots = buildProjectHierarchyTree(
     selection,
@@ -280,7 +311,8 @@ export function buildProjectHierarchyFlow(
     modules,
     units,
     components,
-    statuses
+    statuses,
+    options
   );
 
   if (roots.length === 0) {

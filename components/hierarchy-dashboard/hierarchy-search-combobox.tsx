@@ -34,6 +34,8 @@ interface HierarchySearchComboboxProps {
   onClear?: () => void;
   disabled?: boolean;
   className?: string;
+  triggerClassName?: string;
+  labelClassName?: string;
 }
 
 export function HierarchySearchCombobox({
@@ -45,6 +47,8 @@ export function HierarchySearchCombobox({
   onClear,
   disabled = false,
   className,
+  triggerClassName,
+  labelClassName,
 }: HierarchySearchComboboxProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -64,7 +68,7 @@ export function HierarchySearchCombobox({
   return (
     <div className={cn('space-y-2', className)}>
       <div className="flex items-center justify-between gap-2">
-        <Label>{label}</Label>
+        <Label className={labelClassName}>{label}</Label>
         {onClear ? (
           <Button
             type="button"
@@ -93,7 +97,7 @@ export function HierarchySearchCombobox({
             role="combobox"
             aria-expanded={open}
             disabled={disabled}
-            className="h-10 w-full justify-between font-normal"
+            className={cn('h-10 w-full justify-between font-normal', triggerClassName)}
           >
             <span className="truncate">
               {selectedOption?.label || placeholder}

@@ -7,7 +7,9 @@ import {
 } from '@/lib/hierarchy-dashboard-entity-config';
 import type { HierarchyDashboardSelection } from '@/lib/project-hierarchy-dashboard';
 import type { Project } from '@/lib/models';
+import type { HierarchyDossierMode } from '@/lib/hierarchy-dossier-mode';
 import { Button } from '@/components/ui/button';
+import { HierarchyDossierCombobox } from '@/components/hierarchy-dashboard/hierarchy-dossier-combobox';
 import {
   HierarchySearchCombobox,
   type HierarchySearchOption,
@@ -25,6 +27,8 @@ interface HierarchyDashboardControlsProps {
   unitOptions: HierarchySearchOption[];
   componentOptions: HierarchySearchOption[];
   selectedProject?: Project;
+  dossierMode: HierarchyDossierMode;
+  onDossierModeChange: (mode: HierarchyDossierMode) => void;
 }
 
 export function HierarchyDashboardControls({
@@ -39,6 +43,8 @@ export function HierarchyDashboardControls({
   unitOptions,
   componentOptions,
   selectedProject,
+  dossierMode,
+  onDossierModeChange,
 }: HierarchyDashboardControlsProps) {
   const hasSelection = Boolean(
     selection.projectId ||
@@ -79,6 +85,12 @@ export function HierarchyDashboardControls({
   return (
     <>
       <div className="flex flex-wrap items-end gap-3">
+        <HierarchyDossierCombobox
+          value={dossierMode}
+          onChange={onDossierModeChange}
+          className="w-full min-w-[280px] sm:w-80"
+        />
+
         <div className="grid min-w-0 flex-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
           {visibleLevels.map((level) => (
             <HierarchySearchCombobox

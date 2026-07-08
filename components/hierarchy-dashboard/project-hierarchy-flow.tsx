@@ -31,6 +31,14 @@ import {
 } from '@/components/hierarchy-entity-detail-panel';
 import { HierarchyNodeLegend } from '@/components/hierarchy-node-legend';
 import { BuildTimelineDialog } from '@/components/hierarchy-dashboard/build-timeline-dialog';
+import { ReplacementHistoryDialog } from '@/components/hierarchy-dashboard/replacement-history-dialog';
+import { MmhdMaintenanceSummary } from '@/components/hierarchy-dashboard/mmhd-maintenance-summary';
+import { HierarchyExpandToggle } from '@/components/hierarchy-dashboard/hierarchy-expand-toggle';
+import type { HierarchyDossierMode } from '@/lib/hierarchy-dossier-mode';
+import {
+  collectProjectReplacedEntities,
+  isReplacedHardwareEntity,
+} from '@/lib/project-maintenance-stats';
 import {
   invalidateProjectResolutionCache,
   useProjectResolutionHistory,
@@ -39,6 +47,9 @@ import {
   filterRecordsForNode,
   loadDeliveriesForCases,
   makeEntityKey,
+  buildReplacementHistoryRows,
+  filterReplacementRecords,
+  subtreeRefForRecord,
 } from '@/lib/resolution-history-matching';
 import type { MaintenanceDelivery } from '@/lib/models';
 import {
@@ -70,6 +81,7 @@ interface ProjectHierarchyFlowProps {
   onNodeSelect?: (entityId: number, type: HierarchyEntityType) => void;
   systemsLoading?: boolean;
   onEntityChanged?: () => void | Promise<void>;
+  dossierMode?: HierarchyDossierMode;
 }
 
 function FitViewOnSelectionChange({ dependencyKey }: { dependencyKey: string }) {
@@ -103,6 +115,7 @@ export function ProjectHierarchyFlow({
   onNodeSelect,
   systemsLoading = false,
   onEntityChanged,
+  dossierMode = 'bhd',
 }: ProjectHierarchyFlowProps) {
   const { entityActionHandlers, entityActionDialogs } = useHierarchyEntityActions({
     selection,
@@ -125,6 +138,7 @@ export function ProjectHierarchyFlow({
   const [fieldVisibility, setFieldVisibility] = useState<HierarchyNodeFieldVisibility>(
     DEFAULT_NODE_FIELD_VISIBILITY
   );
+  const [expandFullHierarchy, setExpandFullHierarchy] = useState(false);
   const [resolutionDeliveries, setResolutionDeliveries] = useState<MaintenanceDelivery[]>([]);
 
   const {
@@ -142,6 +156,67 @@ export function ProjectHierarchyFlow({
     units,
     components,
   });
+
+  const isMmhdMode = dossierMode === 'mmhd';
+
+  const replacedEntities = useMemo(() => {
+    if (!selection.projectId || !isMmhdMode) return [];
+    return collectProjectReplacedEntities(
+      selection.projectId,
+      systems,
+      subsystems,
+      modules,
+      units,
+      components,
+      nodesWithHistory
+    );
+  }, [
+    selection.projectId,
+    isMmhdMode,
+    systems,
+    subsystems,
+    modules,
+    units,
+    components,
+    nodesWithHistory,
+  ]);
+
+  const replacedEntityKeys = useMemo(
+    () => new Set(replacedEntities.map((entity) => makeEntityKey(entity.type, entity.entityId))),
+    [replacedEntities]
+  );
+
+  useEffect(() => {
+    setExpandFullHierarchy(false);
+  }, [selection.projectId, dossierMode]);
+
+  useEffect(() => {
+    if (dossierMode === 'bhd') {
+      setFieldVisibility((current) => ({
+        ...current,
+        partNumber: true,
+        serialNumber: true,
+        replacementDate: false,
+      }));
+    }
+  }, [dossierMode]);
+
+  const replacementDateByEntityKey = useMemo(() => {
+    if (!isMmhdMode) return new Map<string, string>();
+
+    const dates = new Map<string, string>();
+    for (const record of filterReplacementRecords(projectResolutionRecords)) {
+      const ref = subtreeRefForRecord(record, matchContext, subtreeByEntityId);
+      if (!ref || !record.change_date) continue;
+
+      const key = makeEntityKey(ref.type, ref.pk);
+      const existing = dates.get(key);
+      if (!existing || new Date(record.change_date).getTime() > new Date(existing).getTime()) {
+        dates.set(key, record.change_date);
+      }
+    }
+    return dates;
+  }, [isMmhdMode, projectResolutionRecords, matchContext, subtreeByEntityId]);
 
   const handleToggleDetails = useCallback((entityId: number, type: HierarchyEntityType) => {
     setPanel((prev) => {
@@ -254,20 +329,38 @@ export function ProjectHierarchyFlow({
       modules,
       units,
       components,
-      statuses
+      statuses,
+      {
+        expandAll: expandFullHierarchy,
+        preferOriginalBuild: dossierMode === 'bhd',
+      }
     );
 
     return {
-      nodes: flow.nodes.map((node) => ({
-        ...node,
-        data: {
-          ...node.data,
-          fieldVisibility,
-          hasResolutionHistory: nodesWithHistory.has(
-            makeEntityKey(node.data.type, node.data.entityId)
-          ),
-        },
-      })),
+      nodes: flow.nodes.map((node) => {
+        const entityKey = makeEntityKey(node.data.type, node.data.entityId);
+        const isReplacedEntity =
+          isMmhdMode &&
+          (replacedEntityKeys.has(entityKey) ||
+            isReplacedHardwareEntity({
+              replacement_sequence: node.data.replacementSequence,
+            }));
+
+        const replacementDate =
+          node.data.replacementDate ?? replacementDateByEntityKey.get(entityKey);
+
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            fieldVisibility,
+            hasResolutionHistory: nodesWithHistory.has(entityKey),
+            isReplacedEntity,
+            dossierMode,
+            replacementDate,
+          },
+        };
+      }),
       edges: flow.edges,
     };
   }, [
@@ -280,11 +373,18 @@ export function ProjectHierarchyFlow({
     statuses,
     fieldVisibility,
     nodesWithHistory,
+    isMmhdMode,
+    expandFullHierarchy,
+    replacedEntityKeys,
+    dossierMode,
+    replacementDateByEntityKey,
   ]);
 
   const fitViewKey = useMemo(
     () =>
       [
+        dossierMode,
+        expandFullHierarchy ? 'expanded' : 'collapsed',
         selection.projectId,
         selection.systemId,
         selection.subsystemId,
@@ -294,7 +394,7 @@ export function ProjectHierarchyFlow({
       ]
         .filter(Boolean)
         .join(':'),
-    [selection]
+    [dossierMode, expandFullHierarchy, selection]
   );
 
   useEffect(() => {
@@ -368,9 +468,23 @@ export function ProjectHierarchyFlow({
       )}
     >
       <div className="relative min-w-0 flex-1">
+        {!isMmhdMode ? (
+          <HierarchyExpandToggle
+            expanded={expandFullHierarchy}
+            onToggle={() => setExpandFullHierarchy((current) => !current)}
+          />
+        ) : null}
+        {isMmhdMode ? (
+          <MmhdMaintenanceSummary
+            replacedCount={replacedEntities.length}
+            onShowReplacedParts={() => setExpandFullHierarchy(true)}
+          />
+        ) : null}
         <HierarchyNodeLegend
           visibility={fieldVisibility}
           onChange={setFieldVisibility}
+          dossierMode={dossierMode}
+          className={isMmhdMode ? 'top-14' : undefined}
         />
         <ReactFlowProvider>
           <HierarchyFlowActionsProvider
@@ -415,29 +529,48 @@ export function ProjectHierarchyFlow({
         components={components}
         project={project}
         statuses={statuses}
+        dossierMode={dossierMode}
       />
 
       {resolutionDialog && selection.projectId ? (
-        <BuildTimelineDialog
-          open={resolutionDialog.open}
-          onOpenChange={(open) => {
-            if (!open) {
-              setResolutionDialog(null);
-            }
-          }}
-          nodeLabel={resolutionDialog.label}
-          projectId={selection.projectId}
-          records={resolutionDialogRecords}
-          matchContext={matchContext}
-          subtreeByEntityId={subtreeByEntityId}
-          installationRefs={resolutionDialogInstallationRefs}
-          deliveries={resolutionDeliveries}
-          onHistoryRefresh={() => {
-            invalidateProjectResolutionCache(selection.projectId!);
-            refreshResolutionHistory();
-            void onEntityChanged?.();
-          }}
-        />
+        isMmhdMode ? (
+          <ReplacementHistoryDialog
+            open={resolutionDialog.open}
+            onOpenChange={(open) => {
+              if (!open) {
+                setResolutionDialog(null);
+              }
+            }}
+            title={`Replacement history — ${resolutionDialog.label}`}
+            rows={buildReplacementHistoryRows(
+              resolutionDialogRecords,
+              matchContext,
+              subtreeByEntityId,
+              resolutionDeliveries
+            )}
+          />
+        ) : (
+          <BuildTimelineDialog
+            open={resolutionDialog.open}
+            onOpenChange={(open) => {
+              if (!open) {
+                setResolutionDialog(null);
+              }
+            }}
+            nodeLabel={resolutionDialog.label}
+            projectId={selection.projectId}
+            records={resolutionDialogRecords}
+            matchContext={matchContext}
+            subtreeByEntityId={subtreeByEntityId}
+            installationRefs={resolutionDialogInstallationRefs}
+            deliveries={resolutionDeliveries}
+            onHistoryRefresh={() => {
+              invalidateProjectResolutionCache(selection.projectId!);
+              refreshResolutionHistory();
+              void onEntityChanged?.();
+            }}
+          />
+        )
       ) : null}
     </div>
     {entityActionDialogs}

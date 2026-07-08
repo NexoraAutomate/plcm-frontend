@@ -8,7 +8,7 @@ import type {
   Unit,
 } from '@/lib/models';
 import { resolveStatusName } from '@/lib/entity-status';
-import { filterCurrentInstallEntities } from '@/lib/entity-replacement';
+import { filterCurrentInstallEntities, getReplacementDateForDisplay } from '@/lib/entity-replacement';
 
 export type HierarchyEntityType =
   | 'system'
@@ -25,11 +25,13 @@ export interface HierarchyTreeNode {
   status?: string;
   serialNumber?: string;
   partNumber?: string;
+  configurationItem?: string;
   createdAt?: string;
   description?: string;
   detailPath: string;
   children: HierarchyTreeNode[];
   replacementSequence?: number;
+  replacementDate?: string;
   isCurrentInstall?: boolean;
 }
 
@@ -39,6 +41,7 @@ export interface HierarchyNodeFieldVisibility {
   partNumber: boolean;
   createdAt: boolean;
   description: boolean;
+  replacementDate: boolean;
 }
 
 export const DEFAULT_NODE_FIELD_VISIBILITY: HierarchyNodeFieldVisibility = {
@@ -47,6 +50,7 @@ export const DEFAULT_NODE_FIELD_VISIBILITY: HierarchyNodeFieldVisibility = {
   partNumber: false,
   createdAt: false,
   description: false,
+  replacementDate: false,
 };
 
 export interface HierarchyNodeData extends Record<string, unknown> {
@@ -56,6 +60,7 @@ export interface HierarchyNodeData extends Record<string, unknown> {
   status?: string;
   serialNumber?: string;
   partNumber?: string;
+  configurationItem?: string;
   createdAt?: string;
   description?: string;
   detailPath: string;
@@ -63,7 +68,10 @@ export interface HierarchyNodeData extends Record<string, unknown> {
   highlightState?: 'selected' | 'dimmed' | 'normal';
   hasResolutionHistory?: boolean;
   replacementSequence?: number;
+  replacementDate?: string;
   isCurrentInstall?: boolean;
+  isReplacedEntity?: boolean;
+  dossierMode?: 'bhd' | 'mmhd';
 }
 
 const DETAIL_PATH: Record<HierarchyEntityType, (id: number) => string> = {
@@ -89,25 +97,44 @@ export function mapEntityFields(
     description?: string;
     part_number?: string;
     serial_number?: string;
+    configuration_item?: string;
+    original_part_number?: string;
+    original_serial_number?: string;
     created_at?: string;
     status_id?: number;
     status_name?: string;
     status?: { status_name?: string };
     replacement_sequence?: number;
     is_current_install?: boolean;
+    replaced_at?: string | null;
+    installation_date?: string;
   },
-  statuses: Status[] = []
+  statuses: Status[] = [],
+  options?: { preferOriginalBuild?: boolean }
 ) {
   const statusName = resolveStatusName(entity, statuses);
+  const useOriginal = options?.preferOriginalBuild === true;
+  const partNumber = useOriginal
+    ? entity.original_part_number?.trim() || entity.part_number
+    : entity.part_number;
+  const serialNumber = useOriginal
+    ? entity.original_serial_number?.trim() || entity.serial_number
+    : entity.serial_number;
+  const configurationItem =
+    entity.configuration_item?.trim() ||
+    (useOriginal ? partNumber : entity.part_number)?.trim() ||
+    undefined;
 
   return {
     name: entity.name,
     status: statusName !== 'Unknown' ? statusName : undefined,
-    serialNumber: entity.serial_number,
-    partNumber: entity.part_number,
+    serialNumber,
+    partNumber,
+    configurationItem,
     createdAt: entity.created_at,
     description: entity.description,
     replacementSequence: entity.replacement_sequence,
+    replacementDate: getReplacementDateForDisplay(entity),
     isCurrentInstall: entity.is_current_install !== false,
   };
 }
@@ -223,10 +250,12 @@ export function hierarchyTreeToFlow(
           status: node.status,
           serialNumber: node.serialNumber,
           partNumber: node.partNumber,
+          configurationItem: node.configurationItem,
           createdAt: node.createdAt,
           description: node.description,
           detailPath: node.detailPath,
           replacementSequence: node.replacementSequence,
+          replacementDate: node.replacementDate,
           isCurrentInstall: node.isCurrentInstall,
         },
       });

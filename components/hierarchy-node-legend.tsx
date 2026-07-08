@@ -4,32 +4,41 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import type { HierarchyNodeFieldVisibility } from '@/lib/system-hierarchy-graph';
+import type { HierarchyDossierMode } from '@/lib/hierarchy-dossier-mode';
 
 const LEGEND_FIELDS: {
   key: keyof HierarchyNodeFieldVisibility;
   label: string;
+  mmhdOnly?: boolean;
 }[] = [
   { key: 'status', label: 'Status' },
   { key: 'serialNumber', label: 'Serial Number' },
   { key: 'partNumber', label: 'Part Number' },
   { key: 'createdAt', label: 'Created Date' },
   { key: 'description', label: 'Description' },
+  { key: 'replacementDate', label: 'Replacement Date', mmhdOnly: true },
 ];
 
 interface HierarchyNodeLegendProps {
   visibility: HierarchyNodeFieldVisibility;
   onChange: (visibility: HierarchyNodeFieldVisibility) => void;
   className?: string;
+  dossierMode?: HierarchyDossierMode;
 }
 
 export function HierarchyNodeLegend({
   visibility,
   onChange,
   className,
+  dossierMode = 'bhd',
 }: HierarchyNodeLegendProps) {
   const toggleField = (key: keyof HierarchyNodeFieldVisibility, checked: boolean) => {
     onChange({ ...visibility, [key]: checked });
   };
+
+  const visibleFields = LEGEND_FIELDS.filter(
+    (field) => !field.mmhdOnly || dossierMode === 'mmhd'
+  );
 
   return (
     <div
@@ -42,7 +51,7 @@ export function HierarchyNodeLegend({
         Node fields
       </p>
       <div className="space-y-2">
-        {LEGEND_FIELDS.map((field) => (
+        {visibleFields.map((field) => (
           <div key={field.key} className="flex items-center gap-2">
             <Checkbox
               id={`hierarchy-field-${field.key}`}
@@ -62,7 +71,7 @@ export function HierarchyNodeLegend({
   );
 }
 
-function formatCreatedDate(value?: string) {
+function formatNodeDate(value?: string) {
   if (!value) return undefined;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
@@ -76,9 +85,13 @@ export function HierarchyNodeFieldLines({
     status?: string;
     serialNumber?: string;
     partNumber?: string;
+    configurationItem?: string;
     createdAt?: string;
+    replacementDate?: string;
     description?: string;
     type?: string;
+    dossierMode?: 'bhd' | 'mmhd';
+    isReplacedEntity?: boolean;
     fieldVisibility?: HierarchyNodeFieldVisibility;
   };
 }) {
@@ -88,22 +101,36 @@ export function HierarchyNodeFieldLines({
     partNumber: false,
     createdAt: false,
     description: false,
+    replacementDate: false,
   };
 
   const lines: { label: string; value: string }[] = [];
 
   if (visibility.serialNumber && data.serialNumber?.trim()) {
-    lines.push({ label: 'S/N', value: data.serialNumber });
+    lines.push({
+      label: data.dossierMode === 'bhd' ? 'Orig S/N' : 'S/N',
+      value: data.serialNumber,
+    });
   }
   if (visibility.partNumber && data.partNumber?.trim()) {
-    lines.push({ label: 'P/N', value: data.partNumber });
+    lines.push({
+      label: data.dossierMode === 'bhd' ? 'Orig P/N' : 'P/N',
+      value: data.partNumber,
+    });
+  }
+  if (data.dossierMode === 'bhd' && data.configurationItem?.trim()) {
+    lines.push({ label: 'Config', value: data.configurationItem });
   }
   if (visibility.status && data.status?.trim()) {
     lines.push({ label: 'Status', value: data.status });
   }
   if (visibility.createdAt && data.createdAt) {
-    const formatted = formatCreatedDate(data.createdAt);
+    const formatted = formatNodeDate(data.createdAt);
     if (formatted) lines.push({ label: 'Created', value: formatted });
+  }
+  if (data.dossierMode === 'mmhd' && visibility.replacementDate && data.replacementDate) {
+    const formatted = formatNodeDate(data.replacementDate);
+    if (formatted) lines.push({ label: 'Replaced', value: formatted });
   }
   if (visibility.description && data.description?.trim()) {
     lines.push({ label: 'Desc', value: data.description });
