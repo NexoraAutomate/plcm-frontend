@@ -15,6 +15,7 @@ import { EntityCards } from '@/components/entity-cards';
 import { EntityForm } from '@/components/entity-form';
 import { EntityInventorySearch } from '@/components/entity-inventory-search';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import axios from 'axios';
 import * as api from '@/lib/api';
@@ -33,10 +34,12 @@ import {
   ReplaceFromInventoryDialog,
   type ReplaceFromInventoryTarget,
 } from '@/components/replace-from-inventory-dialog';
-import { filterCurrentInstallEntities } from '@/lib/entity-replacement';
+import { filterCurrentInstallEntities, HARDWARE_ENTITY_DETAIL_PATH } from '@/lib/entity-replacement';
+import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
 
 export default function SystemDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const systemId = params.id as string;
   const { pageLoading } = useEntityHierarchyGate();
   const {
@@ -60,7 +63,7 @@ export default function SystemDetailPage() {
   const [replaceOpen, setReplaceOpen] = useState(false);
   const [replaceTarget, setReplaceTarget] = useState<ReplaceFromInventoryTarget | null>(null);
 
-  const system = systems.find((s) => String(s.id) === systemId);
+  const system = useResolvedHardwareEntity(systemId, 'system', systems);
   const project = system ? projects.find((p) => p.id === system.project_id) : null;
   const systemSubsystems = system
     ? filterCurrentInstallEntities(subsystems.filter((sub) => sub.system_id === system.id))
@@ -444,6 +447,11 @@ export default function SystemDetailPage() {
           onOpenChange={setReplaceOpen}
           projectId={project.id}
           target={replaceTarget}
+          onCompleted={(result) => {
+            if (result.new_entity_id && result.new_entity_id !== Number(systemId)) {
+              router.replace(HARDWARE_ENTITY_DETAIL_PATH.system(result.new_entity_id));
+            }
+          }}
         />
       ) : null}
     </div>

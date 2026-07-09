@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async (username: string, password: string) => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api' ||'http://193.193.193.80:8000/api';
     // const apiUrl = 'http://192.168.1.10:8000/api';
     
     // ✅ Create form-encoded body (IMPORTANT)

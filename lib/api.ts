@@ -3,7 +3,7 @@ import type * as Models from "./models";
 import type { ListFilterParams } from "./list-filters";
 import { normalizeListFilters } from "./list-filters";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api' ||'http://193.193.193.80:8000/api';
 
 export type ListRequestOptions = { includeTotal?: boolean };
 

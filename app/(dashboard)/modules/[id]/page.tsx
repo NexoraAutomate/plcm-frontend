@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useDataStore } from '@/lib/data-store';
 import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
@@ -32,11 +32,15 @@ import {
 } from '@/components/replace-from-inventory-dialog';
 import {
   filterCurrentInstallEntities,
+  HARDWARE_ENTITY_DETAIL_PATH,
+  resolveCurrentInstallEntity,
   resolveProjectIdForHardwareEntity,
 } from '@/lib/entity-replacement';
+import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
 
 export default function ModuleDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const moduleId = params.id as string;
   const { pageLoading } = useEntityHierarchyGate();
   const {
@@ -60,8 +64,8 @@ export default function ModuleDetailPage() {
   const [replaceOpen, setReplaceOpen] = useState(false);
   const [replaceTarget, setReplaceTarget] = useState<ReplaceFromInventoryTarget | null>(null);
 
-  const module = modules.find((m) => String(m.id) === moduleId);
-  const subsystem = module ? subsystems.find((s) => s.id === module.subsystem_id) : null;
+  const module = useResolvedHardwareEntity(moduleId, 'module', modules);
+  const subsystem = module ? resolveCurrentInstallEntity(module.subsystem_id, subsystems) : null;
   const projectId = module
     ? resolveProjectIdForHardwareEntity('module', module.id, {
         systems,
@@ -437,6 +441,11 @@ export default function ModuleDetailPage() {
           onOpenChange={setReplaceOpen}
           projectId={projectId}
           target={replaceTarget}
+          onCompleted={(result) => {
+            if (result.new_entity_id && result.new_entity_id !== Number(moduleId)) {
+              router.replace(HARDWARE_ENTITY_DETAIL_PATH.module(result.new_entity_id));
+            }
+          }}
         />
       ) : null}
     </div>

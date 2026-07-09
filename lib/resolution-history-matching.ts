@@ -56,7 +56,7 @@ export interface LifecycleTimelineEvent {
 const FAULTY_ENTITY_ID_OFFSET = 1_000_000_000;
 const MAINTENANCE_CASE_ID_OFFSET = 2_000_000_000;
 
-export const PROJECT_RESOLUTION_CACHE_VERSION = 9;
+export const PROJECT_RESOLUTION_CACHE_VERSION = 10;
 
 const ENTITY_TYPE_ORDER: Record<HierarchyEntityType, number> = {
   system: 0,
@@ -282,6 +282,38 @@ function sortLifecycleEvents(events: LifecycleTimelineEvent[]) {
   });
 }
 
+export function buildNodesWithReplacementHistory(
+  records: ConfigurationHistory[],
+  matchContext: SubtreeMatchContext,
+  subtreeByEntityId: Map<number, SubtreeEntityRef>,
+  systems: System[],
+  subsystems: Subsystem[],
+  modules: Module[],
+  units: Unit[],
+  components: Component[]
+) {
+  const keys = new Set<string>();
+
+  for (const record of filterReplacementRecords(records)) {
+    const ref = subtreeRefForRecord(record, matchContext, subtreeByEntityId);
+    if (!ref) continue;
+
+    for (const key of getAncestorEntityKeys(
+      ref.type,
+      ref.pk,
+      systems,
+      subsystems,
+      modules,
+      units,
+      components
+    )) {
+      keys.add(key);
+    }
+  }
+
+  return keys;
+}
+
 export function buildNodesWithResolutionHistory(
   records: ConfigurationHistory[],
   matchContext: SubtreeMatchContext,
@@ -404,19 +436,28 @@ export async function loadResolutionHistoryForProject(
 
   const entityIdEntries = await Promise.all(
     matchContext.refs.map(async (ref) => {
-      const entityId = await resolveEntityId(ref.type, ref.pk);
-      return entityId ? ([entityId, ref] as const) : null;
+      const rootPk = ref.root_entity_id ?? ref.pk;
+      const slotEntityId = await resolveEntityId(ref.type, rootPk);
+      const currentEntityId =
+        ref.pk !== rootPk ? await resolveEntityId(ref.type, ref.pk) : slotEntityId;
+
+      const mappings: Array<[number, SubtreeEntityRef]> = [];
+      if (slotEntityId) mappings.push([slotEntityId, ref]);
+      if (currentEntityId && currentEntityId !== slotEntityId) {
+        mappings.push([currentEntityId, ref]);
+      }
+      return mappings;
     })
   );
 
   const subtreeByEntityId = new Map<number, SubtreeEntityRef>();
   const resolvedEntityIds = new Set<number>();
 
-  for (const entry of entityIdEntries) {
-    if (!entry) continue;
-    const [entityId, ref] = entry;
-    subtreeByEntityId.set(entityId, ref);
-    resolvedEntityIds.add(entityId);
+  for (const mappings of entityIdEntries) {
+    for (const [entityId, ref] of mappings) {
+      subtreeByEntityId.set(entityId, ref);
+      resolvedEntityIds.add(entityId);
+    }
   }
 
   const records = await loadConfigurationHistoryForSubtree(

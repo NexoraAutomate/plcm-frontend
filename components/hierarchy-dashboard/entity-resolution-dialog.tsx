@@ -36,6 +36,7 @@ import { maintenanceService } from '@/services/maintenance';
 import { filterInventoryForReplacement } from '@/lib/inventory-filter';
 import { inventoryPartNumber } from '@/lib/inventory-entity-fields';
 import { invalidateProjectResolutionCache } from '@/components/hierarchy-dashboard/use-project-resolution-history';
+import { clearEntityCache } from '@/lib/entity-resolver';
 import * as api from '@/lib/api';
 import { toast } from 'sonner';
 
@@ -82,7 +83,7 @@ export function EntityResolutionDialog({
   onCompleted,
 }: EntityResolutionDialogProps) {
   const { user, hasAccess } = useAuth();
-  const { users, refreshData } = useDataStore();
+  const { users, refreshData, ensureHierarchyLoaded } = useDataStore();
   const [replacementOpen, setReplacementOpen] = useState(false);
   const [replaceFormOpen, setReplaceFormOpen] = useState(false);
   const [newPartNumber, setNewPartNumber] = useState('');
@@ -165,7 +166,9 @@ export function EntityResolutionDialog({
         inventory_item_id: selectedInventoryId ? Number(selectedInventoryId) : undefined,
         inventory_instance_id: undefined,
       });
+      clearEntityCache();
       invalidateProjectResolutionCache(projectId);
+      await ensureHierarchyLoaded({ force: true });
       await refreshData({ silent: true });
       toast.success('Replacement completed and maintenance case closed.');
       setReplaceFormOpen(false);

@@ -23,8 +23,7 @@ export function collectProjectReplacedEntities(
   subsystems: Subsystem[],
   modules: Module[],
   units: Unit[],
-  components: Component[],
-  nodesWithHistory?: Set<string>
+  components: Component[]
 ): ReplacedEntityRef[] {
   const projectSystems = getSystemsForProject(systems, projectId);
   const systemIds = new Set(projectSystems.map((system) => system.id));
@@ -54,10 +53,7 @@ export function collectProjectReplacedEntities(
     if (!isCurrentInstallEntity(entity)) return;
 
     const key = makeEntityKey(type, entity.id);
-    const hasReplacementMetadata = isReplacedHardwareEntity(entity);
-    const hasHistory = nodesWithHistory?.has(key) ?? false;
-
-    if (!hasReplacementMetadata && !hasHistory) return;
+    if (!isReplacedHardwareEntity(entity)) return;
     if (seen.has(key)) return;
 
     seen.add(key);

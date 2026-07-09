@@ -167,8 +167,7 @@ export function ProjectHierarchyFlow({
       subsystems,
       modules,
       units,
-      components,
-      nodesWithHistory
+      components
     );
   }, [
     selection.projectId,
@@ -178,7 +177,6 @@ export function ProjectHierarchyFlow({
     modules,
     units,
     components,
-    nodesWithHistory,
   ]);
 
   const replacedEntityKeys = useMemo(

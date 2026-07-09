@@ -3,6 +3,8 @@
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useDataStore } from '@/lib/data-store';
+import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
+import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Calendar, Layers, Code2 } from 'lucide-react';
@@ -10,16 +12,21 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { StatusBadge } from '@/components/status-badge';
 import { EntityStatusHistorySheet } from '@/components/entity-status-history-sheet';
 import { EntityInstallMetadataCard } from '@/components/entity-install-metadata-card';
-import { resolveProjectIdForHardwareEntity } from '@/lib/entity-replacement';
+import {
+  resolveCurrentInstallEntity,
+  resolveProjectIdForHardwareEntity,
+} from '@/lib/entity-replacement';
+import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
 
 export default function ComponentDetailPage() {
   const params = useParams();
   const componentId = params.id as string;
+  const { pageLoading } = useEntityHierarchyGate();
   const { components, units, modules, subsystems, systems, updateComponent } = useDataStore();
   
-  const component = components.find((c) => String(c.id) === componentId);
-  const unit = component ? units.find((u) => u.id === component.unit_id) : null;
-  const module = unit ? modules.find((m) => m.id === unit.module_id) : null;
+  const component = useResolvedHardwareEntity(componentId, 'component', components);
+  const unit = component ? resolveCurrentInstallEntity(component.unit_id, units) : null;
+  const module = unit ? resolveCurrentInstallEntity(unit.module_id, modules) : null;
   const projectId = component
     ? resolveProjectIdForHardwareEntity('component', component.id, {
         systems,
@@ -29,6 +36,10 @@ export default function ComponentDetailPage() {
         components,
       })
     : null;
+
+  if (pageLoading) {
+    return <PageLoader />;
+  }
 
   if (!component) {
     return (

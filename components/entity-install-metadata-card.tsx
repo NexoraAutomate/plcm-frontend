@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Pencil, Upload, Trash2, Replace } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,7 @@ import {
   type ReplaceFromInventoryTarget,
 } from '@/components/replace-from-inventory-dialog';
 import type { HierarchyEntityType } from '@/lib/entity-hierarchy';
+import { HARDWARE_ENTITY_DETAIL_PATH } from '@/lib/entity-replacement';
 
 type HardwareOwnerType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
 
@@ -68,6 +70,7 @@ export function EntityInstallMetadataCard({
   allowReplace = false,
 }: EntityInstallMetadataCardProps) {
   const { users } = useDataStore();
+  const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
   const [replaceOpen, setReplaceOpen] = useState(false);
   const [attachments, setAttachments] = useState<EntityAttachment[]>([]);
@@ -402,6 +405,11 @@ export function EntityInstallMetadataCard({
           onOpenChange={setReplaceOpen}
           projectId={projectId}
           target={replaceTarget}
+          onCompleted={(result) => {
+            if (result.new_entity_id && result.new_entity_id !== entity.id) {
+              router.replace(HARDWARE_ENTITY_DETAIL_PATH[ownerType](result.new_entity_id));
+            }
+          }}
         />
       ) : null}
     </>

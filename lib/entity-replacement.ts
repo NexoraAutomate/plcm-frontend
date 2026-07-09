@@ -3,6 +3,17 @@ import { inventoryPartNumber } from '@/lib/inventory-entity-fields';
 import { inventoryUsesInstances, type HierarchyEntityType } from '@/lib/entity-hierarchy';
 import { getSelectableInstances } from '@/lib/inventory-install';
 
+export const HARDWARE_ENTITY_DETAIL_PATH: Record<
+  HierarchyEntityType,
+  (id: number) => string
+> = {
+  system: (id) => `/systems/${id}`,
+  subsystem: (id) => `/subsystems/${id}`,
+  module: (id) => `/modules/${id}`,
+  unit: (id) => `/units/${id}`,
+  component: (id) => `/components/${id}`,
+};
+
 export interface EntityReplacementFields {
   is_current_install?: boolean;
   root_entity_id?: number | null;
@@ -27,8 +38,53 @@ export function isCurrentInstallEntity<T extends EntityReplacementFields>(entity
   return entity.is_current_install !== false;
 }
 
-export function filterCurrentInstallEntities<T extends EntityReplacementFields>(entities: T[]): T[] {
-  return entities.filter(isCurrentInstallEntity);
+export type HardwareEntityWithSlot = EntityReplacementFields & {
+  id: number;
+  root_entity_id?: number | null;
+};
+
+export function resolveSlotRootId(entity: { id: number; root_entity_id?: number | null }): number {
+  return entity.root_entity_id ?? entity.id;
+}
+
+export function filterCurrentInstallEntities<T extends HardwareEntityWithSlot>(entities: T[]): T[] {
+  const current = entities.filter(isCurrentInstallEntity);
+  const bySlot = new Map<number, T>();
+
+  for (const entity of current) {
+    const rootId = resolveSlotRootId(entity);
+    const existing = bySlot.get(rootId);
+    if (!existing) {
+      bySlot.set(rootId, entity);
+      continue;
+    }
+
+    const existingSeq = existing.replacement_sequence ?? 0;
+    const entitySeq = entity.replacement_sequence ?? 0;
+    if (entitySeq > existingSeq || (entitySeq === existingSeq && entity.id > existing.id)) {
+      bySlot.set(rootId, entity);
+    }
+  }
+
+  return [...bySlot.values()];
+}
+
+/** Resolve the active install for a hardware slot when the URL may reference a superseded row. */
+export function resolveCurrentInstallEntity<T extends HardwareEntityWithSlot>(
+  entityId: number,
+  entities: T[]
+): T | undefined {
+  const requested = entities.find((entity) => entity.id === entityId);
+  if (!requested) return undefined;
+
+  const rootId = resolveSlotRootId(requested);
+  const slotEntities = entities.filter((entity) => resolveSlotRootId(entity) === rootId);
+  const currentInstalls = filterCurrentInstallEntities(slotEntities);
+  if (currentInstalls.length > 0) return currentInstalls[0];
+
+  return slotEntities.sort(
+    (a, b) => (b.replacement_sequence ?? 0) - (a.replacement_sequence ?? 0)
+  )[0];
 }
 
 export function instanceLabel(instance: InventoryInstance, index: number): string {

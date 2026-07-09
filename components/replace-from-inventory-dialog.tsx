@@ -30,6 +30,9 @@ import type { HierarchyEntityType } from '@/lib/entity-hierarchy';
 import { maintenanceService } from '@/services/maintenance';
 import * as api from '@/lib/api';
 import { toast } from 'sonner';
+import { clearEntityCache } from '@/lib/entity-resolver';
+import { invalidateProjectResolutionCache } from '@/components/hierarchy-dashboard/use-project-resolution-history';
+import type { AdminHierarchyReplaceResponse } from '@/lib/models';
 
 export interface ReplaceFromInventoryTarget {
   entityType: HierarchyEntityType;
@@ -45,7 +48,7 @@ interface ReplaceFromInventoryDialogProps {
   onOpenChange: (open: boolean) => void;
   projectId: number;
   target: ReplaceFromInventoryTarget | null;
-  onCompleted?: () => void;
+  onCompleted?: (result: AdminHierarchyReplaceResponse) => void;
 }
 
 export function ReplaceFromInventoryDialog({
@@ -55,7 +58,7 @@ export function ReplaceFromInventoryDialog({
   target,
   onCompleted,
 }: ReplaceFromInventoryDialogProps) {
-  const { refreshData } = useDataStore();
+  const { refreshData, ensureHierarchyLoaded } = useDataStore();
   const [notes, setNotes] = useState('');
   const [search, setSearch] = useState('');
   const [stockRows, setStockRows] = useState<ReplacementStockRow[]>([]);
@@ -135,7 +138,7 @@ export function ReplaceFromInventoryDialog({
 
     setSubmitting(true);
     try {
-      await maintenanceService.adminHierarchyReplace({
+      const result = await maintenanceService.adminHierarchyReplace({
         project_id: projectId,
         entity_type: target.entityType,
         entity_id: target.entityId,
@@ -148,10 +151,13 @@ export function ReplaceFromInventoryDialog({
         inventory_item_id: selectedRow.inventoryId,
         inventory_instance_id: selectedRow.instanceId,
       });
+      clearEntityCache();
+      invalidateProjectResolutionCache(projectId);
+      await ensureHierarchyLoaded({ force: true });
       await refreshData({ silent: true });
       toast.success('Replacement completed and maintenance case closed.');
       onOpenChange(false);
-      onCompleted?.();
+      onCompleted?.(result);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to perform replacement.');
     } finally {
