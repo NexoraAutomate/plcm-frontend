@@ -1,7 +1,10 @@
 /** Shared query params for paginated list endpoints. */
 export interface ListFilterParams {
   search?: string;
+  /** Numeric status FK (projects, orders, etc.) */
   status_id?: number;
+  /** String status enum (e.g. maintenance case `open` / `resolved`) */
+  status?: string;
   order_id?: number;
   customer_id?: number;
   project_id?: number;

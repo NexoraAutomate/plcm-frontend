@@ -294,7 +294,10 @@ export const maintenanceLogs = {
 
 // Maintenance Cases
 export const maintenanceCases = {
-  list: (skip = 0, limit = 100) => api.get<Models.MaintenanceCase[]>('/maintenance-cases/', { params: { skip, limit } }),
+  list: (skip = 0, limit = 100, filters?: ListFilterParams) =>
+    api.get<Models.MaintenanceCase[]>('/maintenance-cases/', {
+      params: listParams(skip, limit, undefined, filters),
+    }),
   get: (id: number) => api.get<Models.MaintenanceCase>(`/maintenance-cases/${id}/`),
   create: (data: Models.CreateMaintenanceCasePayload) => api.post<Models.MaintenanceCase>('/maintenance-cases/', data),
   update: (id: number, data: Models.UpdateMaintenanceCasePayload) => api.put<Models.MaintenanceCase>(`/maintenance-cases/${id}/`, data),
@@ -323,9 +326,9 @@ export const faultyEntities = {
 
 // Maintenance Actions
 export const maintenanceActions = {
-  list: (skip?: number, limit?: number) =>
+  list: (skip?: number, limit?: number, caseId?: number) =>
     api.get<Models.MaintenanceAction[]>('/maintenance-actions/', {
-      params: buildQueryParams({ skip, limit }),
+      params: buildQueryParams({ skip, limit, case_id: caseId }),
     }),
   listByFaultyEntityId: (faultyEntityId: number, skip?: number, limit?: number) =>
     api.get<Models.MaintenanceAction[]>(`/faulty-entities/${faultyEntityId}/actions/`, {

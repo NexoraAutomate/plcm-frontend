@@ -64,60 +64,58 @@ export function MaintenanceTable({
         next.delete(id);
         return next;
       });
-    } else {
-      setExpandedRows((prev) =>
-        new Map(prev).set(id, {
-          id,
-          faultyEntities: [],
-          maintenanceActions: [],
-          maintenanceDeliveries: [],
-          isLoading: true,
-        })
-      );
+      return;
+    }
 
-      try {
-        const [faultyEntities, maintenanceDeliveries] = await Promise.all([
-          getFaultyEntities ? getFaultyEntities(id) : Promise.resolve([]),
-          getMaintenanceDeliveries ? getMaintenanceDeliveries(id) : Promise.resolve([]),
-        ]);
+    setExpandedRows((prev) =>
+      new Map(prev).set(id, {
+        id,
+        faultyEntities: [],
+        maintenanceActions: [],
+        maintenanceDeliveries: [],
+        isLoading: true,
+      })
+    );
 
-        let maintenanceActions: MaintenanceAction[] = [];
-        if (getMaintenanceActions) {
-          maintenanceActions = await getMaintenanceActions(
-            id,
-            faultyEntities.map((entity) => entity.id)
-          );
-        }
+    const patchExpanded = (partial: Partial<ExpandedRow>) => {
+      setExpandedRows((prev) => {
+        const next = new Map(prev);
+        const row = next.get(id);
+        if (!row) return prev;
+        next.set(id, { ...row, ...partial, isLoading: false });
+        return next;
+      });
+    };
 
-        setExpandedRows((prev) => {
-          const next = new Map(prev);
-          if (next.has(id)) {
-            next.set(id, {
-              id,
-              faultyEntities,
-              maintenanceActions,
-              maintenanceDeliveries,
-              isLoading: false,
-            });
-          }
-          return next;
-        });
-      } catch (error) {
-        console.error('Failed to fetch expanded data:', error);
-        setExpandedRows((prev) => {
-          const next = new Map(prev);
-          if (next.has(id)) {
-            next.set(id, {
-              id,
-              faultyEntities: [],
-              maintenanceActions: [],
-              maintenanceDeliveries: [],
-              isLoading: false,
-            });
-          }
-          return next;
-        });
-      }
+    try {
+      // Load all tab data in parallel; show tabs as soon as the first response arrives.
+      await Promise.all([
+        (getFaultyEntities ? getFaultyEntities(id) : Promise.resolve([])).then((faultyEntities) => {
+          patchExpanded({ faultyEntities });
+          return faultyEntities;
+        }),
+        (getMaintenanceActions
+          ? getMaintenanceActions(id, [])
+          : Promise.resolve([])
+        ).then((maintenanceActions) => {
+          patchExpanded({ maintenanceActions });
+          return maintenanceActions;
+        }),
+        (getMaintenanceDeliveries
+          ? getMaintenanceDeliveries(id)
+          : Promise.resolve([])
+        ).then((maintenanceDeliveries) => {
+          patchExpanded({ maintenanceDeliveries });
+          return maintenanceDeliveries;
+        }),
+      ]);
+    } catch (error) {
+      console.error('Failed to fetch expanded data:', error);
+      patchExpanded({
+        faultyEntities: [],
+        maintenanceActions: [],
+        maintenanceDeliveries: [],
+      });
     }
   };
 

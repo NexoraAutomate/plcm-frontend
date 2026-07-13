@@ -5,6 +5,7 @@ import { KPICard } from '@/components/kpi-card';
 import { AlertCircle, CheckCircle2, Wrench, Package, Lock, ClipboardCheck, type LucideIcon } from 'lucide-react';
 import type { MaintenanceCase } from '@/lib/models';
 import { CASE_STATUS_META, mapCaseStatusFromApi } from '@/lib/maintenance-workflow';
+import type { MaintenanceCaseStatusCounts } from '@/hooks/use-maintenance-case-status-counts';
 
 interface StatusCount {
   status: string;
@@ -15,7 +16,8 @@ interface StatusCount {
 }
 
 interface MaintenanceMiniDashboardProps {
-  cases: MaintenanceCase[];
+  cases?: MaintenanceCase[];
+  counts?: MaintenanceCaseStatusCounts | null;
   onStatusFilter?: (status: string) => void;
 }
 
@@ -27,8 +29,14 @@ const FILTER_STATUSES = [
   'closed',
 ] as const;
 
-export function MaintenanceMiniDashboard({ cases, onStatusFilter }: MaintenanceMiniDashboardProps) {
-  const totalCount = cases.length;
+export function MaintenanceMiniDashboard({
+  cases = [],
+  counts,
+  onStatusFilter,
+}: MaintenanceMiniDashboardProps) {
+  const totalCount =
+    counts?.total ??
+    cases.length;
 
   const statusCounts: StatusCount[] = [
     {
@@ -44,7 +52,9 @@ export function MaintenanceMiniDashboard({ cases, onStatusFilter }: MaintenanceM
       return {
         status: apiStatus,
         label: meta.label,
-        count: cases.filter((c) => c.status === apiStatus).length,
+        count:
+          counts?.byStatus[apiStatus] ??
+          cases.filter((c) => c.status === apiStatus).length,
         icon:
           apiStatus === 'open'
             ? AlertCircle
@@ -90,7 +100,9 @@ export function MaintenanceMiniDashboard({ cases, onStatusFilter }: MaintenanceM
                   title={item.label}
                   value={item.count}
                   change={
-                    item.status !== 'Total' ? Math.round((100 * item.count) / totalCount) : 0
+                    item.status !== 'Total' && totalCount > 0
+                      ? Math.round((100 * item.count) / totalCount)
+                      : 0
                   }
                   icon={item.icon}
                   accentColor={item.color}

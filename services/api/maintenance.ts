@@ -52,8 +52,10 @@ export const faultyEntities = {
 
 // Maintenance Actions
 export const maintenanceActions = {
-  list: (skip = 0, limit = 100) =>
-    api.get<Types.MaintenanceAction[]>('/maintenance-actions/', { params: { skip, limit } }),
+  list: (skip = 0, limit = 100, caseId?: number) =>
+    api.get<Types.MaintenanceAction[]>('/maintenance-actions/', {
+      params: { skip, limit, ...(caseId != null ? { case_id: caseId } : {}) },
+    }),
   listByFaultyEntityId: (faultyEntityId: number, skip = 0, limit = 100) =>
     api.get<Types.MaintenanceAction[]>(`/faulty-entities/${faultyEntityId}/actions/`, { params: { skip, limit } }),
   get: (id: number) =>

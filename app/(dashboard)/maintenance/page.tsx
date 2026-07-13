@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+import { useQueryClient } from '@tanstack/react-query';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { EntityLookupNode, FaultType, FaultyEntityStatus } from '@/lib/models';
+import { FaultType, FaultyEntityStatus } from '@/lib/models';
 import {
   Select,
   SelectContent,
@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Search, RefreshCw, ExternalLink } from 'lucide-react';
+import { Plus, Search, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import * as maintenanceApi from '@/lib/api';
 import * as MaintenanceTypes from '@/lib/models';
@@ -28,18 +28,25 @@ import { loadAllPartNumbers } from '@/lib/part-numbers';
 import { fetchMaintenanceCasesPage } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
 import { usePaginatedList } from '@/hooks/use-paginated-list';
+import { useListPageLoader } from '@/hooks/use-list-page-loader';
+import { useMaintenanceCaseStatusCounts } from '@/hooks/use-maintenance-case-status-counts';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
+import type { ListFilterParams } from '@/lib/list-filters';
 
 export default function MaintenancePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const {maintenanceCases,projects,loading,createMaintenanceCase,updateMaintenanceCase,deleteMaintenanceCase,lookupEntityByPartNumber,suspectChildren,confirmFault,refreshData} = useDataStore();
-  const pagination = usePaginatedList({
-    queryKey: queryKeys.maintenanceCasesPage(),
-    fetchPage: fetchMaintenanceCasesPage,
-  });
-  const paginatedCases = pagination.items;
+  const queryClient = useQueryClient();
+  const {
+    projects,
+    createMaintenanceCase,
+    updateMaintenanceCase,
+    deleteMaintenanceCase,
+    lookupEntityByPartNumber,
+    suspectChildren,
+    confirmFault,
+  } = useDataStore();
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>(searchParams.get('status') || 'all');
@@ -54,24 +61,30 @@ export default function MaintenancePage() {
   const [lookupCaseId, setLookupCaseId] = useState<number | null>(null);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
-  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [isMutating, setIsMutating] = useState(false);
   const [faultyEntities, setFaultyEntities] = useState<MaintenanceTypes.FaultyEntity[]>([]);
   const [maintenanceActions, setMaintenanceActions] = useState<MaintenanceTypes.MaintenanceAction[]>([]);
   const [maintenanceDeliveries, setMaintenanceDeliveries] = useState<MaintenanceTypes.MaintenanceDelivery[]>([]);
-  // const [statuses, setStatuses] = useState<Models.Status[]>([]);
 
+  const listFilters = useMemo((): ListFilterParams | undefined => {
+    const filters: ListFilterParams = {};
+    if (statusFilter !== 'all') filters.status = statusFilter;
+    if (projectFilter !== 'all') filters.project_id = Number(projectFilter);
+    return Object.keys(filters).length > 0 ? filters : undefined;
+  }, [statusFilter, projectFilter]);
 
-  const loadMaintenanceCases = async () => {
-    try {
-      setIsLoadingData(true);
-      await refreshData({ silent: true });
-    } catch (err) {
-      console.error('Failed to load maintenance cases:', err);
-      toast.error('Failed to load maintenance cases');
-    } finally {
-      setIsLoadingData(false);
-    }
-  };
+  const pagination = usePaginatedList({
+    queryKey: queryKeys.maintenanceCasesPage(listFilters),
+    fetchPage: fetchMaintenanceCasesPage,
+    filters: listFilters,
+  });
+  const paginatedCases = pagination.items;
+  const { data: statusCounts, refetch: refetchStatusCounts } = useMaintenanceCaseStatusCounts();
+
+  const showLoader = useListPageLoader(pagination, {
+    filtersActive: statusFilter !== 'all' || projectFilter !== 'all',
+    hasData: paginatedCases.length > 0,
+  });
 
   const loadPartNumber = async () => {
     try {
@@ -83,14 +96,25 @@ export default function MaintenancePage() {
     }
   };
 
-  useEffect(() => {
-    loadMaintenanceCases();
-    loadPartNumber();
-  }, []);
+  const invalidateCaseQueries = () => {
+    pagination.invalidate();
+    void queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceCaseStatusCounts() });
+    void refetchStatusCounts();
+  };
+
+  const handleRefresh = async () => {
+    setIsMutating(true);
+    try {
+      await pagination.refetch();
+      await refetchStatusCounts();
+    } finally {
+      setIsMutating(false);
+    }
+  };
 
   useEffect(() => {
     if (!isLookupOpen) return;
-    loadPartNumber();
+    void loadPartNumber();
   }, [isLookupOpen]);
 
   useEffect(() => {
@@ -100,45 +124,39 @@ export default function MaintenancePage() {
     }
   }, [searchParams, router]);
 
-
-  useEffect(() => {
-    pagination.setPage(0);
-  }, [search, statusFilter, projectFilter]);
-
-  const filtered = paginatedCases.filter((c) => {
-    const matchesSearch =
-      c.case_number.toLowerCase().includes(search.toLowerCase()) ||
-      c.description.toLowerCase().includes(search.toLowerCase());
-    
-      // console.log('filtered Case description:', c.description);
-      // console.log('filtered Case description:', c.case_number);
-      const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
-      // console.log('filtered Case matchesStatus', matchesStatus);
-      const matchesProject = projectFilter === 'all' || c.project_id.toString() === projectFilter;
-      // console.log('filtered Case matchesProject:',matchesProject);
-    return matchesSearch && matchesStatus && matchesProject;
-  });
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return paginatedCases;
+    return paginatedCases.filter(
+      (c) =>
+        c.case_number.toLowerCase().includes(q) ||
+        (c.description ?? '').toLowerCase().includes(q)
+    );
+  }, [paginatedCases, search]);
 
   const handleCreate = async (data: MaintenanceTypes.CreateMaintenanceCasePayload) => {
     try {
-      // console.log('Creating case with data:', data);
+      setIsMutating(true);
       await createMaintenanceCase(data);
-      pagination.invalidate();
-      await loadMaintenanceCases();
-    } catch (err) {
+      invalidateCaseQueries();
+    } catch {
       // Error handled by data store
+    } finally {
+      setIsMutating(false);
     }
   };
 
   const handleUpdate = async (data: MaintenanceTypes.UpdateMaintenanceCasePayload) => {
     if (!editingCase) return;
     try {
+      setIsMutating(true);
       await updateMaintenanceCase(editingCase.id, data);
-      pagination.invalidate();
       setEditingCase(null);
-      await loadMaintenanceCases();
-    } catch (err) {
+      invalidateCaseQueries();
+    } catch {
       // Error handled by data store
+    } finally {
+      setIsMutating(false);
     }
   };
 
@@ -160,10 +178,7 @@ export default function MaintenancePage() {
 
     try {
       const response = await lookupEntityByPartNumber(partNumberValue);
-      // console.log('Lookup response:', response);
       setLookupResponse(response);
-      // console.log('Lookup response:', lookupResponses);
-      // console.log(JSON.stringify(lookupResponses?.descendants, null, 2));
     } catch (err) {
       console.error('Lookup failed:', err);
       setLookupError('No entity found for that part number.');
@@ -184,17 +199,14 @@ export default function MaintenancePage() {
       status: MaintenanceTypes.CaseStatus.Open,
       entity_id: lookupResponses.matched_entity_id,
       entity_type: lookupResponses.matched_entity_type.toLowerCase(),
-      part_number:lookupResponses.matched_entity_PartNumber
+      part_number: lookupResponses.matched_entity_PartNumber,
     };
-    // console.log('Creating case with payload:', payload)
     try {
       const created = await createMaintenanceCase(payload);
-      pagination.invalidate();
+      invalidateCaseQueries();
       setLookupCaseId(created.id);
-      // console.log(lookupCaseId);
-      await loadMaintenanceCases();
       toast.success(`Created maintenance case #${created.id}`);
-    } catch (err) {
+    } catch {
       // Error handled by data store
     }
   };
@@ -213,9 +225,7 @@ export default function MaintenancePage() {
         serial_number: lookupResponses.matched_entity_serialNumber,
         part_number: lookupResponses.matched_entity_PartNumber,
         children: lookupResponses.descendants,
-
       });
-      console.log('Lookup Response Children', lookupResponses.descendants)
       toast.success('Children suspicion workflow started.');
     } catch (err) {
       console.error('Suspect children failed:', err);
@@ -245,11 +255,13 @@ export default function MaintenancePage() {
       return;
     }
     try {
+      setIsMutating(true);
       await deleteMaintenanceCase(caseItem.id);
-      pagination.invalidate();
-      await loadMaintenanceCases();
-    } catch (err) {
+      invalidateCaseQueries();
+    } catch {
       // Error handled by data store
+    } finally {
+      setIsMutating(false);
     }
   };
 
@@ -257,7 +269,7 @@ export default function MaintenancePage() {
     setEditingCase(caseItem);
     setIsEditOpen(true);
   };
-  
+
   const handleView = (caseItem: MaintenanceTypes.MaintenanceCase) => {
     router.push(`/maintenance/cases/${caseItem.id}`);
   };
@@ -270,7 +282,6 @@ export default function MaintenancePage() {
     try {
       const res = await maintenanceApi.faultyEntities.listByCaseId(caseId);
       setFaultyEntities(res.data);
-      console.log("Faulty entities for case", caseId, res.data)
       return res.data;
     } catch (err) {
       console.error('Failed to fetch faulty entities:', err);
@@ -300,13 +311,12 @@ export default function MaintenancePage() {
     }
   };
 
-  if (loading) {
+  if (showLoader) {
     return <PageLoader />;
   }
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
@@ -328,13 +338,11 @@ export default function MaintenancePage() {
         </div>
       </div>
 
-      {/* Mini Dashboard */}
       <MaintenanceMiniDashboard
-        cases={maintenanceCases}
+        counts={statusCounts}
         onStatusFilter={handleStatusFilter}
       />
 
-      {/* Filter Bar */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="space-y-2">
           <Label htmlFor="search">Search</Label>
@@ -387,19 +395,18 @@ export default function MaintenancePage() {
         <div className="space-y-2 flex items-end">
           <Button
             variant="outline"
-            onClick={loadMaintenanceCases}
-            disabled={isLoadingData}
+            onClick={() => void handleRefresh()}
+            disabled={isMutating || pagination.fetching}
             className="w-full"
           >
             <RefreshCw
-              className={`h-4 w-4 mr-2 ${isLoadingData ? 'animate-spin' : ''}`}
+              className={`h-4 w-4 mr-2 ${isMutating || pagination.fetching ? 'animate-spin' : ''}`}
             />
             Refresh
           </Button>
         </div>
       </div>
 
-      {/* Main Table */}
       <div className="space-y-2">
         <p className="text-sm text-muted-foreground">
           Showing {filtered.length} on this page · {pagination.total} total in database
@@ -409,7 +416,7 @@ export default function MaintenancePage() {
           onEdit={handleEdit}
           onDelete={handleDelete}
           onView={handleView}
-          isLoading={isLoadingData || pagination.loading}
+          isLoading={isMutating || pagination.loading}
           getFaultyEntities={getFaultyEntities}
           getMaintenanceActions={getMaintenanceActions}
           getMaintenanceDeliveries={getMaintenanceDeliveries}
@@ -427,7 +434,6 @@ export default function MaintenancePage() {
         />
       </div>
 
-      {/* Lookup Dialog */}
       <MaintenanceLookupDialog
         isOpen={isLookupOpen}
         onOpenChange={(open) => {
@@ -452,7 +458,6 @@ export default function MaintenancePage() {
         onConfirmFault={handleConfirmFault}
       />
 
-      {/* Create/Edit Dialog */}
       <MaintenanceCaseDialog
         isOpen={isCreateOpen || isEditOpen}
         onClose={() => {
@@ -463,7 +468,7 @@ export default function MaintenancePage() {
         onSubmit={handleSubmit}
         editingCase={editingCase}
         projects={projects}
-        isLoading={isLoadingData}
+        isLoading={isMutating}
       />
     </div>
   );

@@ -1,7 +1,7 @@
 'use client';
 
 import axios from 'axios';
-import api, * as libApi from '@/lib/api';
+import * as libApi from '@/lib/api';
 import { resolveEntityId } from '@/lib/entity-resolver';
 import type {
   MaintenanceCase,
@@ -186,57 +186,27 @@ export const maintenanceService = {
   },
   getFaultyEntityHistory: (entityId: number) => libApi.faultyEntities.getMaintenanceHistory(entityId),
   getCaseTimeline: async (caseId: number, faultyEntityIds: number[] = []) => {
-    const actions: MaintenanceAction[] = [];
-    const faultyEntityIdSet = new Set(faultyEntityIds);
+    // Single case-scoped request — avoids N+1 per-entity action calls on expand.
+    try {
+      const res = await libApi.maintenanceActions.list(0, 1000, caseId);
+      return { data: res.data ?? [] };
+    } catch {
+      // Fallback when case_id filtering is unavailable.
+    }
 
-    const appendActions = (items: MaintenanceAction[] | undefined) => {
-      if (!Array.isArray(items)) return;
-      actions.push(...items);
-    };
+    if (faultyEntityIds.length === 0) {
+      return { data: [] };
+    }
 
     try {
-      const res = await api.get<MaintenanceAction[]>('/maintenance-actions/', {
-        params: { case_id: caseId },
-      });
-      appendActions(res.data);
+      const res = await libApi.maintenanceActions.list(0, 1000);
+      const idSet = new Set(faultyEntityIds);
+      return {
+        data: (res.data ?? []).filter((action) => idSet.has(action.faulty_entity_id)),
+      };
     } catch {
-      // Continue with other sources.
+      return { data: [] };
     }
-
-    if (faultyEntityIds.length > 0) {
-      const entityResults = await Promise.allSettled(
-        faultyEntityIds.map(async (entityId) => {
-          const [actionsRes, historyRes] = await Promise.all([
-            libApi.maintenanceActions.listByFaultyEntityId(entityId),
-            libApi.faultyEntities.getMaintenanceHistory(entityId),
-          ]);
-          return [...(actionsRes.data ?? []), ...(historyRes.data ?? [])];
-        })
-      );
-
-      for (const result of entityResults) {
-        if (result.status === 'fulfilled') {
-          appendActions(result.value);
-        }
-      }
-    }
-
-    if (actions.length === 0) {
-      try {
-        const res = await libApi.maintenanceActions.list(0, 1000);
-        appendActions(
-          (res.data ?? []).filter((action) => faultyEntityIdSet.has(action.faulty_entity_id))
-        );
-      } catch {
-        // No global actions available.
-      }
-    }
-
-    const uniqueActions = Array.from(
-      new Map(actions.map((action) => [action.id, action])).values()
-    );
-
-    return { data: uniqueActions };
   },
   confirmFaultyEntity: (entityId: number) =>
     libApi.faultyEntities.update(entityId, { status: 'confirmed_faulty' as FaultyEntityStatus }),

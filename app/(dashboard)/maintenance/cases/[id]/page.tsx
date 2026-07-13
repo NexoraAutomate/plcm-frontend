@@ -200,22 +200,19 @@ export default function MaintenanceCaseInvestigationPage({
   };
 
   const reloadCaseState = async () => {
-    const [caseRes, entitiesRes] = await Promise.all([
+    const [caseRes, entitiesRes, timelineRes] = await Promise.all([
       maintenanceService.getCase(caseId),
       maintenanceService.getFaultyEntitiesByCaseId(caseId),
+      maintenanceService.getCaseTimeline(caseId),
     ]);
 
     const updatedEntities = entitiesRes.data || [];
-
-    const timelineRes = await maintenanceService.getCaseTimeline(
-      caseId,
-      updatedEntities.map((entity) => entity.id)
-    );
+    const actions = timelineRes.data || [];
 
     setMaintenanceCase(caseRes.data);
     setEntities(updatedEntities);
-    setMaintenanceActions(timelineRes.data || []);
-    return { caseData: caseRes.data, updatedEntities, actions: timelineRes.data || [] };
+    setMaintenanceActions(actions);
+    return { caseData: caseRes.data, updatedEntities, actions };
   };
 
   const suggestResolveCaseIfReady = (
@@ -256,34 +253,22 @@ export default function MaintenanceCaseInvestigationPage({
     setIsLoading(true);
     setTimelineLoading(true);
 
-    let loadedEntities: FaultyEntity[] = [];
-
     try {
-      const [caseRes, entitiesRes] = await Promise.all([
+      const [caseRes, entitiesRes, timelineRes] = await Promise.all([
         maintenanceService.getCase(caseId),
         maintenanceService.getFaultyEntitiesByCaseId(caseId),
+        maintenanceService.getCaseTimeline(caseId),
       ]);
 
-      loadedEntities = entitiesRes.data || [];
       setMaintenanceCase(caseRes.data);
-      setEntities(loadedEntities);
+      setEntities(entitiesRes.data || []);
+      setMaintenanceActions(timelineRes.data || []);
     } catch (error) {
       console.error('Unable to load investigation data', error);
       toast.error('Failed to load maintenance investigation details.');
-    } finally {
-      setIsLoading(false);
-    }
-
-    try {
-      const timelineRes = await maintenanceService.getCaseTimeline(
-        caseId,
-        loadedEntities.map((entity) => entity.id)
-      );
-      setMaintenanceActions(timelineRes.data || []);
-    } catch (error) {
-      console.error('Unable to load case timeline', error);
       setMaintenanceActions([]);
     } finally {
+      setIsLoading(false);
       setTimelineLoading(false);
     }
   };
