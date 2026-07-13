@@ -82,15 +82,15 @@ export function ReplaceFromInventoryDialog({
       .list(0, 1000, target.entityType)
       .then(async (res) => {
         if (cancelled) return;
-        const filtered = filterInventoryForReplacement(
-          res.data ?? [],
-          target.entityType,
-          target.entityName
+        const candidates = (res.data ?? []).filter(
+          (item) =>
+            item.inventory_type?.toLowerCase() === target.entityType.toLowerCase() &&
+            item.name?.trim().toLowerCase() === target.entityName.trim().toLowerCase()
         );
 
         const withInstances = await Promise.all(
-          filtered.map(async (item) => {
-            if ((item.instances ?? []).length > 0 || item.quantity <= 1) {
+          candidates.map(async (item) => {
+            if ((item.instances ?? []).length > 0 || Number(item.quantity) <= 0) {
               return item;
             }
             try {
@@ -103,7 +103,11 @@ export function ReplaceFromInventoryDialog({
         );
 
         if (cancelled) return;
-        setStockRows(buildReplacementStockRows(withInstances));
+        setStockRows(
+          buildReplacementStockRows(
+            filterInventoryForReplacement(withInstances, target.entityType, target.entityName)
+          )
+        );
       })
       .catch(() => {
         if (!cancelled) {

@@ -270,6 +270,13 @@ export const entities = {
       `/entities/${encodeURIComponent(entityType)}/${entityPk}/replacement-chain/`
     ),
   partNumber: () => api.get<string[]>("/part-numbers/"),
+  serialNumbers: (options?: { q?: string; limit?: number }) =>
+    api.get<string[]>("/serial-numbers/", {
+      params: buildQueryParams({
+        q: options?.q,
+        limit: options?.limit,
+      }),
+    }),
 };
 
 // Entity Status History
@@ -302,7 +309,10 @@ export const maintenanceCases = {
   create: (data: Models.CreateMaintenanceCasePayload) => api.post<Models.MaintenanceCase>('/maintenance-cases/', data),
   update: (id: number, data: Models.UpdateMaintenanceCasePayload) => api.put<Models.MaintenanceCase>(`/maintenance-cases/${id}/`, data),
   delete: (id: number) => api.delete(`/maintenance-cases/${id}/`),
-  lookupEntityByPartNumber: (partNumber: string) => api.get<Models.lookUpResponse>(`/entities/lookup-by-PN/${encodeURIComponent(partNumber)}/`),
+  lookupEntityByPartNumber: (partNumber: string) =>
+    api.get<Models.lookUpResponse>(`/entities/lookup-by-PN/${encodeURIComponent(partNumber)}/`),
+  lookupEntityBySerialNumber: (serialNumber: string) =>
+    api.get<Models.lookUpResponse>(`/entities/lookup-by-SN/${encodeURIComponent(serialNumber)}/`),
   suspectChildren: (caseId: number, data: Models.SuspectChildrenPayload) => api.post(`/maintenance-cases/${caseId}/suspect-children/`, data),
   confirmFault: (caseId: number, data: Models.ConfirmFaultPayload) => api.post(`/maintenance-cases/${caseId}/confirm-fault/`, data),
   adminHierarchyReplace: (data: Models.AdminHierarchyReplacePayload) =>

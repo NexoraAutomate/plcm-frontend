@@ -24,6 +24,8 @@ export const maintenanceCases = {
   delete: (id: number) => api.delete(`/maintenance-cases/${id}/`),
   lookupEntityByPartNumber: (partNumber: string) =>
     api.get<Types.EntityLookupResponse>(`/entities/lookup-by-PN/${encodeURIComponent(partNumber)}/`),
+  lookupEntityBySerialNumber: (serialNumber: string) =>
+    api.get<Types.EntityLookupResponse>(`/entities/lookup-by-SN/${encodeURIComponent(serialNumber)}/`),
   suspectChildren: (caseId: number, data: Types.SuspectChildrenPayload) =>
     api.post(`/maintenance-cases/${caseId}/suspect-children/`, data),
   confirmFault: (caseId: number, data: Types.ConfirmFaultPayload) =>

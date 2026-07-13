@@ -28,13 +28,13 @@ import {
   filterReplacementRowsForEntity,
   type SubtreeMatchContext,
 } from '@/lib/resolution-history-matching';
-import type { ConfigurationHistory, Inventory, MaintenanceDelivery } from '@/lib/models';
+import type { ConfigurationHistory, MaintenanceDelivery } from '@/lib/models';
 import type { SubtreeEntityRef } from '@/lib/project-hierarchy-dashboard';
 import type { HierarchyEntityType } from '@/lib/system-hierarchy-graph';
 import { ReplacementHistoryDialog } from '@/components/hierarchy-dashboard/replacement-history-dialog';
 import { maintenanceService } from '@/services/maintenance';
 import { filterInventoryForReplacement } from '@/lib/inventory-filter';
-import { inventoryPartNumber } from '@/lib/inventory-entity-fields';
+import { buildReplacementStockRows, type ReplacementStockRow } from '@/lib/entity-replacement';
 import { invalidateProjectResolutionCache } from '@/components/hierarchy-dashboard/use-project-resolution-history';
 import { clearEntityCache } from '@/lib/entity-resolver';
 import * as api from '@/lib/api';
@@ -68,6 +68,10 @@ function canAdminReplace(
   );
 }
 
+function stockRowKey(row: ReplacementStockRow): string {
+  return row.instanceId != null ? `i-${row.instanceId}` : `inv-${row.inventoryId}-${row.srNo}`;
+}
+
 export function EntityResolutionDialog({
   open,
   onOpenChange,
@@ -89,8 +93,8 @@ export function EntityResolutionDialog({
   const [newPartNumber, setNewPartNumber] = useState('');
   const [newSerialNumber, setNewSerialNumber] = useState('');
   const [notes, setNotes] = useState('');
-  const [selectedInventoryId, setSelectedInventoryId] = useState('');
-  const [inventoryItems, setInventoryItems] = useState<Inventory[]>([]);
+  const [selectedStockKey, setSelectedStockKey] = useState('');
+  const [stockRows, setStockRows] = useState<ReplacementStockRow[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   const installerLabel = useMemo(() => {
@@ -122,16 +126,35 @@ export function EntityResolutionDialog({
       setNewPartNumber('');
       setNewSerialNumber('');
       setNotes('');
-      setSelectedInventoryId('');
-      setInventoryItems([]);
+      setSelectedStockKey('');
+      setStockRows([]);
       return;
     }
 
     let cancelled = false;
-    void api.inventory.list(0, 1000, entityType).then((res) => {
+    void api.inventory.list(0, 1000, entityType).then(async (res) => {
       if (cancelled) return;
-      const items = filterInventoryForReplacement(res.data ?? [], entityType, entityLabel);
-      setInventoryItems(items);
+      const candidates = (res.data ?? []).filter(
+        (item) =>
+          item.inventory_type?.toLowerCase() === entityType.toLowerCase() &&
+          item.name?.trim().toLowerCase() === entityLabel.trim().toLowerCase()
+      );
+      const withInstances = await Promise.all(
+        candidates.map(async (item) => {
+          if ((item.instances ?? []).length > 0 || Number(item.quantity) <= 0) {
+            return item;
+          }
+          try {
+            const instanceRes = await api.inventory.listInstances(item.id);
+            return { ...item, instances: instanceRes.data ?? [] };
+          } catch {
+            return item;
+          }
+        })
+      );
+      if (cancelled) return;
+      const items = filterInventoryForReplacement(withInstances, entityType, entityLabel);
+      setStockRows(buildReplacementStockRows(items));
     });
 
     return () => {
@@ -140,15 +163,24 @@ export function EntityResolutionDialog({
   }, [replaceFormOpen, entityType, entityLabel]);
 
   useEffect(() => {
-    if (!selectedInventoryId) return;
-    const item = inventoryItems.find((entry) => String(entry.id) === selectedInventoryId);
-    if (item) {
-      const part = inventoryPartNumber(item);
-      if (part) setNewPartNumber(part);
+    if (!selectedStockKey) return;
+    const row = stockRows.find((entry) => stockRowKey(entry) === selectedStockKey);
+    if (row) {
+      if (row.partNumber && row.partNumber !== '—') setNewPartNumber(row.partNumber);
+      if (row.serialNumber && row.serialNumber !== '—') setNewSerialNumber(row.serialNumber);
     }
-  }, [selectedInventoryId, inventoryItems]);
+  }, [selectedStockKey, stockRows]);
+
+  const selectedRow = useMemo(
+    () => stockRows.find((row) => stockRowKey(row) === selectedStockKey),
+    [stockRows, selectedStockKey]
+  );
 
   const handleAdminReplace = async () => {
+    if (!newSerialNumber.trim()) {
+      toast.error('Enter a replacement serial number.');
+      return;
+    }
     if (!newPartNumber.trim()) {
       toast.error('Enter a replacement part number.');
       return;
@@ -161,10 +193,10 @@ export function EntityResolutionDialog({
         entity_type: entityType,
         entity_id: entityPk,
         new_part_number: newPartNumber.trim(),
-        new_serial_number: newSerialNumber.trim() || undefined,
+        new_serial_number: newSerialNumber.trim(),
         notes: notes.trim() || undefined,
-        inventory_item_id: selectedInventoryId ? Number(selectedInventoryId) : undefined,
-        inventory_instance_id: undefined,
+        inventory_item_id: selectedRow?.inventoryId,
+        inventory_instance_id: selectedRow?.instanceId,
       });
       clearEntityCache();
       invalidateProjectResolutionCache(projectId);
@@ -273,6 +305,16 @@ export function EntityResolutionDialog({
 
           <div className="space-y-4">
             <div>
+              <Label htmlFor="new-serial">New Serial Number *</Label>
+              <Input
+                id="new-serial"
+                value={newSerialNumber}
+                onChange={(e) => setNewSerialNumber(e.target.value)}
+                placeholder="Unique replacement serial number"
+              />
+            </div>
+
+            <div>
               <Label htmlFor="new-part">New Part Number *</Label>
               <Input
                 id="new-part"
@@ -282,33 +324,26 @@ export function EntityResolutionDialog({
               />
             </div>
 
-            {inventoryItems.length > 0 ? (
+            {stockRows.length > 0 ? (
               <div>
-                <Label>From Inventory (optional)</Label>
-                <Select value={selectedInventoryId} onValueChange={setSelectedInventoryId}>
+                <Label>From Inventory (by serial)</Label>
+                <Select value={selectedStockKey} onValueChange={setSelectedStockKey}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select inventory item" />
+                    <SelectValue placeholder="Select serial from inventory" />
                   </SelectTrigger>
                   <SelectContent>
-                    {inventoryItems.map((item) => (
-                      <SelectItem key={item.id} value={String(item.id)}>
-                        {inventoryPartNumber(item) || item.name} (qty {item.quantity})
+                    {stockRows.map((row) => (
+                      <SelectItem key={stockRowKey(row)} value={stockRowKey(row)}>
+                        {row.serialNumber}
+                        {row.partNumber && row.partNumber !== '—'
+                          ? ` · PN ${row.partNumber}`
+                          : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             ) : null}
-
-            <div>
-              <Label htmlFor="new-serial">New Serial Number</Label>
-              <Input
-                id="new-serial"
-                value={newSerialNumber}
-                onChange={(e) => setNewSerialNumber(e.target.value)}
-                placeholder="Optional"
-              />
-            </div>
 
             <div>
               <Label htmlFor="replace-notes">Notes</Label>

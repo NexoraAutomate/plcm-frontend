@@ -544,27 +544,34 @@ export default function MaintenanceCaseInvestigationPage({
       const oldPartNumber = resolveEntity.part_number;
       const oldSerialNumber = resolveEntity.serial_number;
       const replacementPartNumber = replacement?.partNumber;
+      const replacementSerialNumber = replacement?.serialNumber;
 
       try {
         const changes = buildResolveFaultUpdatePayload(resolutionType, {
           old_part_number: oldPartNumber,
           new_part_number: replacementPartNumber,
           old_serial_number: oldSerialNumber,
-          new_serial_number: replacement?.serialNumber,
+          new_serial_number: replacementSerialNumber,
           remarks: notes,
         });
 
         await maintenanceService.updateFaultyEntity(resolveEntity.id, changes);
 
-        if (replacementPartNumber) {
-          await maintenanceService.updateEntityPartNumber(
+        if (replacementPartNumber || replacementSerialNumber) {
+          await maintenanceService.updateEntityIdentity(
             resolveEntity.entity_type,
             resolveEntity.entity_id,
-            replacementPartNumber
+            {
+              partNumber: replacementPartNumber,
+              serialNumber: replacementSerialNumber,
+            }
           );
 
           if (replacement?.inventoryItemId != null) {
-            await maintenanceService.decrementInventoryItem(replacement.inventoryItemId);
+            await maintenanceService.decrementInventoryItem(
+              replacement.inventoryItemId,
+              replacement.inventoryInstanceId
+            );
           }
         }
 
@@ -580,8 +587,10 @@ export default function MaintenanceCaseInvestigationPage({
             : ActionType.Inspection;
 
         const replacementNote =
-          resolutionType === ResolutionType.REPLACED && replacementPartNumber
-            ? `Replaced ${oldPartNumber || 'unknown'} with ${replacementPartNumber}`
+          resolutionType === ResolutionType.REPLACED && (replacementPartNumber || replacementSerialNumber)
+            ? `Replaced ${oldSerialNumber || oldPartNumber || 'unknown'} with ${
+                replacementSerialNumber || replacementPartNumber
+              }`
             : undefined;
 
         await logEngineerAction(

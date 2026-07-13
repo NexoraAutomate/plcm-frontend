@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import type * as Models from '@/lib/models';
-import { entities } from '@/lib/api';
+import { entities, maintenanceCases } from '@/lib/api';
 import { useDataStore } from '@/lib/data-store';
 import { fetchMaintenanceLogsPage } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
@@ -32,17 +32,13 @@ export default function MaintenancePage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedLog, setSelectedLog] = useState<typeof maintenanceLogs[0] | null>(null);
   const [formData, setFormData] = useState({
-    part_number: '',
+    serial_number: '',
     entity_id: 0,
     performed_by: 0,
     notes: '',
     maintenance_type: 'preventive',
   });
-  type LookupEntity = Models.Entity & {
-    parents?: Models.Entity[];
-    children?: Models.Entity[];
-  };
-  const [lookupResult, setLookupResult] = useState<LookupEntity | null>(null);
+  const [lookupResult, setLookupResult] = useState<Models.lookUpResponse | null>(null);
   const [lookupError, setLookupError] = useState('');
   const [isLookupLoading, setIsLookupLoading] = useState(false);
 
@@ -73,7 +69,7 @@ export default function MaintenancePage() {
       });
       pagination.invalidate();
       setFormData({
-        part_number: '',
+        serial_number: '',
         entity_id: 0,
         performed_by: 0,
         notes: '',
@@ -88,8 +84,8 @@ export default function MaintenancePage() {
   }
 
   const handleLookup = async () => {
-    if (!formData.part_number.trim()) {
-      toast.error('Enter a part number to lookup');
+    if (!formData.serial_number.trim()) {
+      toast.error('Enter a serial number to lookup');
       return;
     }
 
@@ -97,15 +93,22 @@ export default function MaintenancePage() {
     setIsLookupLoading(true);
 
     try {
-      const res = await entities.lookupByPartNumber(formData.part_number.trim());
-      const entity = res.data as LookupEntity;
-
-      if (!entity || !entity.id) {
-        throw new Error('No entity found for that part number');
+      const res = await maintenanceCases.lookupEntityBySerialNumber(formData.serial_number.trim());
+      const lookup = res.data;
+      if (!lookup?.matched_entity_id) {
+        throw new Error('No entity found for that serial number');
       }
 
-      setLookupResult(entity);
-      setFormData((prev) => ({ ...prev, entity_id: entity.id }));
+      const genericRes = await entities.lookup(
+        lookup.matched_entity_type,
+        lookup.matched_entity_id
+      );
+      if (!genericRes.data?.id) {
+        throw new Error('Unable to resolve entity for maintenance log');
+      }
+
+      setLookupResult(lookup);
+      setFormData((prev) => ({ ...prev, entity_id: genericRes.data.id }));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Lookup failed';
       setLookupResult(null);
@@ -122,7 +125,9 @@ export default function MaintenancePage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">maintenanceLogs</h1>
-        <p className="text-muted-foreground mt-2">Find an entity by part number, inspect its hierarchy, and log maintenance activity.</p>
+        <p className="text-muted-foreground mt-2">
+          Find an entity by serial number, inspect its hierarchy, and log maintenance activity.
+        </p>
       </div>
 
       <div className="flex gap-4 items-center">
@@ -160,13 +165,13 @@ export default function MaintenancePage() {
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="part_number">Part Number *</Label>
+                <Label htmlFor="serial_number">Serial Number *</Label>
                 <div className="flex gap-2">
                   <Input
-                    id="part_number"
-                    value={formData.part_number}
-                    onChange={(e) => setFormData({ ...formData, part_number: e.target.value })}
-                    placeholder="Enter part number to search"
+                    id="serial_number"
+                    value={formData.serial_number}
+                    onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
+                    placeholder="Enter serial number to search"
                   />
                   <Button type="button" onClick={handleLookup} disabled={isLookupLoading}>
                     {isLookupLoading ? 'Searching...' : 'Lookup'}
@@ -179,32 +184,46 @@ export default function MaintenancePage() {
 
               {lookupResult && (
                 <div className="rounded-lg border p-4 bg-muted/5">
-                  <p className="text-sm font-semibold">{lookupResult.display_name}</p>
+                  <p className="text-sm font-semibold">{lookupResult.matched_label}</p>
                   <p className="text-sm text-muted-foreground">
-                    Type: {lookupResult.entity_type}
+                    Type: {lookupResult.matched_entity_type}
                   </p>
-                  <p className="text-sm text-muted-foreground">ID: {lookupResult.id}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Serial: {lookupResult.matched_entity_serialNumber}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Part #: {lookupResult.matched_entity_PartNumber}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Hardware ID: {lookupResult.matched_entity_id}
+                  </p>
 
-                  {lookupResult.parents?.length ? (
+                  {lookupResult.ancestors?.length ? (
                     <div className="mt-3">
                       <p className="text-sm font-medium">Parent hierarchy</p>
                       <ul className="list-disc list-inside text-sm">
-                        {lookupResult.parents.map((parent) => (
-                          <li key={parent.id}>
-                            {parent.entity_type} · {parent.display_name}
+                        {lookupResult.ancestors.map((parent) => (
+                          <li key={`${parent.entity_type}-${parent.entity_id}`}>
+                            {parent.entity_type} · {parent.entity_name || parent.label}
+                            {parent.entity_SerialNumber
+                              ? ` · SN ${parent.entity_SerialNumber}`
+                              : ''}
                           </li>
                         ))}
                       </ul>
                     </div>
                   ) : null}
 
-                  {lookupResult.children?.length ? (
+                  {lookupResult.descendants?.length ? (
                     <div className="mt-3">
                       <p className="text-sm font-medium">Child hierarchy</p>
                       <ul className="list-disc list-inside text-sm">
-                        {lookupResult.children.map((child) => (
-                          <li key={child.id}>
-                            {child.entity_type} · {child.display_name}
+                        {lookupResult.descendants.slice(0, 8).map((child) => (
+                          <li key={`${child.entity_type}-${child.entity_id}`}>
+                            {child.entity_type} · {child.entity_name || child.label}
+                            {child.entity_SerialNumber
+                              ? ` · SN ${child.entity_SerialNumber}`
+                              : ''}
                           </li>
                         ))}
                       </ul>

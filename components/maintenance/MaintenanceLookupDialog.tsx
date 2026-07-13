@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronsUpDown, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,16 +25,16 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { searchProjectSerialNumbers } from '@/lib/serial-numbers';
 import { EntityLookupTree } from './EntityLookupTree';
 import type { EntityLookupNode, lookUpResponse } from '@/lib/models';
 
 interface MaintenanceLookupDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  partNumber: string;
-  setPartNumber: (value: string) => void;
-  partNumbers: string[];
-  onLookup: (partNumber: string) => Promise<void>;
+  serialNumber: string;
+  setSerialNumber: (value: string) => void;
+  onLookup: (serialNumber: string) => Promise<void>;
   onCreateCase: () => Promise<void>;
   lookupResponse: lookUpResponse | null;
   caseId?: number | null;
@@ -44,43 +44,74 @@ interface MaintenanceLookupDialogProps {
   onConfirmFault?: (node: EntityLookupNode) => Promise<void>;
 }
 
-interface PartNumberFieldProps {
+interface SerialNumberFieldProps {
   value: string;
   onChange: (value: string) => void;
-  options: string[];
 }
 
-function PartNumberField({ value, onChange, options }: PartNumberFieldProps) {
+function SerialNumberField({ value, onChange }: SerialNumberFieldProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [options, setOptions] = useState<string[]>([]);
+  const [searching, setSearching] = useState(false);
+  const requestIdRef = useRef(0);
 
-  const filteredOptions = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return options;
-    return options.filter((partNumber) =>
-      partNumber.toLowerCase().includes(query)
-    );
-  }, [options, searchQuery]);
+  useEffect(() => {
+    if (!open) return;
+
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setOptions([]);
+      setSearching(false);
+      return;
+    }
+
+    const requestId = ++requestIdRef.current;
+    setSearching(true);
+    const timeoutId = window.setTimeout(() => {
+      void searchProjectSerialNumbers(q, 25)
+        .then((results) => {
+          if (requestIdRef.current !== requestId) return;
+          setOptions(results);
+        })
+        .catch(() => {
+          if (requestIdRef.current !== requestId) return;
+          setOptions([]);
+        })
+        .finally(() => {
+          if (requestIdRef.current !== requestId) return;
+          setSearching(false);
+        });
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [open, searchQuery]);
 
   return (
     <div className="space-y-2">
-      <Label htmlFor="part-number">Part Number</Label>
+      <Label htmlFor="serial-number">Serial Number</Label>
       <Popover
         open={open}
         onOpenChange={(nextOpen) => {
           setOpen(nextOpen);
-          if (!nextOpen) setSearchQuery('');
+          if (!nextOpen) {
+            setSearchQuery('');
+            setOptions([]);
+            setSearching(false);
+          }
         }}
       >
         <PopoverTrigger asChild>
           <Button
-            id="part-number"
+            id="serial-number"
             variant="outline"
             role="combobox"
             aria-expanded={open}
             className="h-10 w-full justify-between font-normal"
           >
-            <span className="truncate">{value || 'Select part number'}</span>
+            <span className="truncate">{value || 'Search serial number'}</span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
@@ -92,39 +123,53 @@ function PartNumberField({ value, onChange, options }: PartNumberFieldProps) {
         >
           <Command shouldFilter={false}>
             <CommandInput
-              placeholder="Search part number..."
+              placeholder="Type at least 2 characters..."
               value={searchQuery}
               onValueChange={setSearchQuery}
             />
             <CommandList>
-              <CommandEmpty>No part number found.</CommandEmpty>
-              <CommandGroup className="max-h-72 overflow-auto">
-                {filteredOptions.map((partNumber) => (
-                  <CommandItem
-                    key={partNumber}
-                    value={partNumber}
-                    onSelect={() => {
-                      onChange(partNumber);
-                      setOpen(false);
-                      setSearchQuery('');
-                    }}
-                  >
-                    <Check
-                      className={cn(
-                        'mr-2 h-4 w-4',
-                        value === partNumber ? 'opacity-100' : 'opacity-0'
-                      )}
-                    />
-                    {partNumber}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
+              {searching ? (
+                <div className="flex items-center gap-2 px-3 py-4 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Searching…
+                </div>
+              ) : searchQuery.trim().length < 2 ? (
+                <div className="px-3 py-4 text-sm text-muted-foreground">
+                  Type at least 2 characters to search project-installed serials.
+                </div>
+              ) : (
+                <>
+                  <CommandEmpty>No matching project-installed serial.</CommandEmpty>
+                  <CommandGroup className="max-h-72 overflow-auto">
+                    {options.map((serialNumber) => (
+                      <CommandItem
+                        key={serialNumber}
+                        value={serialNumber}
+                        onSelect={() => {
+                          onChange(serialNumber);
+                          setOpen(false);
+                          setSearchQuery('');
+                          setOptions([]);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            'mr-2 h-4 w-4',
+                            value === serialNumber ? 'opacity-100' : 'opacity-0'
+                          )}
+                        />
+                        {serialNumber}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </>
+              )}
             </CommandList>
           </Command>
         </PopoverContent>
       </Popover>
       <p className="text-xs text-muted-foreground">
-        {options.length} part number{options.length === 1 ? '' : 's'} available
+        Searches only serials installed under a project (not inventory stock).
       </p>
     </div>
   );
@@ -133,9 +178,8 @@ function PartNumberField({ value, onChange, options }: PartNumberFieldProps) {
 export function MaintenanceLookupDialog({
   isOpen,
   onOpenChange,
-  partNumber,
-  setPartNumber,
-  partNumbers,
+  serialNumber,
+  setSerialNumber,
   onLookup,
   onCreateCase,
   lookupResponse,
@@ -159,16 +203,12 @@ export function MaintenanceLookupDialog({
 
         <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)]">
           <aside className="space-y-4 border-b bg-muted/20 p-4 sm:p-6 lg:border-b-0 lg:border-r">
-            <PartNumberField
-              value={partNumber}
-              onChange={setPartNumber}
-              options={partNumbers}
-            />
+            <SerialNumberField value={serialNumber} onChange={setSerialNumber} />
 
             <div className="flex flex-col gap-2">
               <Button
-                onClick={() => onLookup(partNumber)}
-                disabled={lookupLoading || partNumber.trim().length === 0}
+                onClick={() => onLookup(serialNumber)}
+                disabled={lookupLoading || serialNumber.trim().length === 0}
                 className="w-full"
               >
                 {lookupLoading ? (
@@ -196,7 +236,7 @@ export function MaintenanceLookupDialog({
 
             {!lookupResponse ? (
               <p className="text-sm text-muted-foreground">
-                Select a part number, then run lookup to load the entity hierarchy.
+                Type a serial to search project-installed hardware, then run lookup.
               </p>
             ) : null}
           </aside>

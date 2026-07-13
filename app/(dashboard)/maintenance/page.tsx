@@ -24,7 +24,6 @@ import { MaintenanceMiniDashboard } from '@/components/maintenance/MaintenanceMi
 import { MaintenanceLookupDialog } from '@/components/maintenance/MaintenanceLookupDialog';
 import { MaintenanceCaseDialog } from '@/components/maintenance/MaintenanceCaseDialog';
 import { MaintenanceTable } from '@/components/maintenance/MaintenanceTable';
-import { loadAllPartNumbers } from '@/lib/part-numbers';
 import { fetchMaintenanceCasesPage } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
 import { usePaginatedList } from '@/hooks/use-paginated-list';
@@ -43,7 +42,7 @@ export default function MaintenancePage() {
     createMaintenanceCase,
     updateMaintenanceCase,
     deleteMaintenanceCase,
-    lookupEntityByPartNumber,
+    lookupEntityBySerialNumber,
     suspectChildren,
     confirmFault,
   } = useDataStore();
@@ -55,8 +54,7 @@ export default function MaintenancePage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isLookupOpen, setIsLookupOpen] = useState(false);
   const [editingCase, setEditingCase] = useState<MaintenanceTypes.MaintenanceCase | null>(null);
-  const [partNumber, setPartNumber] = useState('');
-  const [partNumbers, setPartNumbers] = useState<string[]>([]);
+  const [serialNumber, setSerialNumber] = useState('');
   const [lookupResponses, setLookupResponse] = useState<MaintenanceTypes.lookUpResponse | null>(null);
   const [lookupCaseId, setLookupCaseId] = useState<number | null>(null);
   const [lookupLoading, setLookupLoading] = useState(false);
@@ -86,16 +84,6 @@ export default function MaintenancePage() {
     hasData: paginatedCases.length > 0,
   });
 
-  const loadPartNumber = async () => {
-    try {
-      const allPartNumbers = await loadAllPartNumbers();
-      setPartNumbers(allPartNumbers);
-    } catch (err) {
-      console.error('Failed to load PartNumbers:', err);
-      toast.error('Failed to load PartNumbers');
-    }
-  };
-
   const invalidateCaseQueries = () => {
     pagination.invalidate();
     void queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceCaseStatusCounts() });
@@ -111,11 +99,6 @@ export default function MaintenancePage() {
       setIsMutating(false);
     }
   };
-
-  useEffect(() => {
-    if (!isLookupOpen) return;
-    void loadPartNumber();
-  }, [isLookupOpen]);
 
   useEffect(() => {
     if (searchParams.get('lookup') === 'true') {
@@ -170,18 +153,18 @@ export default function MaintenancePage() {
     }
   };
 
-  const handleLookup = async (partNumberValue: string) => {
+  const handleLookup = async (serialNumberValue: string) => {
     setLookupError(null);
     setLookupLoading(true);
     setLookupResponse(null);
     setLookupCaseId(null);
 
     try {
-      const response = await lookupEntityByPartNumber(partNumberValue);
+      const response = await lookupEntityBySerialNumber(serialNumberValue);
       setLookupResponse(response);
     } catch (err) {
       console.error('Lookup failed:', err);
-      setLookupError('No entity found for that part number.');
+      setLookupError('No entity found for that serial number.');
     } finally {
       setLookupLoading(false);
     }
@@ -329,7 +312,7 @@ export default function MaintenancePage() {
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => setIsLookupOpen(true)} variant="secondary" className="gap-2">
             <Search className="h-4 w-4" />
-            Lookup by Part Number
+            Lookup by Serial Number
           </Button>
           <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
             <Plus className="h-4 w-4" />
@@ -442,12 +425,11 @@ export default function MaintenancePage() {
             setLookupResponse(null);
             setLookupError(null);
             setLookupCaseId(null);
-            setPartNumber('');
+            setSerialNumber('');
           }
         }}
-        partNumber={partNumber}
-        setPartNumber={setPartNumber}
-        partNumbers={partNumbers}
+        serialNumber={serialNumber}
+        setSerialNumber={setSerialNumber}
         onLookup={handleLookup}
         onCreateCase={handleCreateCaseFromLookup}
         lookupResponse={lookupResponses}

@@ -19,69 +19,48 @@ export function toDbEntityType(entityType: string): string {
   return ENTITY_TYPE_DB_LABELS[entityType.toLowerCase()] ?? entityType;
 }
 
-let entityCache: Entity[] | null = null;
-let entityCachePromise: Promise<Entity[]> | null = null;
+/** Per (type, pk) cache — never page the full /entities list (can be tens of thousands). */
+const lookupCache = new Map<string, Promise<Entity | null>>();
 
-async function loadEntitiesFromList(): Promise<Entity[]> {
-  if (entityCache) return entityCache;
-
-  entityCachePromise ??= (async () => {
-    const all: Entity[] = [];
-    const pageSize = 500;
-    let skip = 0;
-
-    while (true) {
-      const res = await api.entities.list(skip, pageSize);
-      all.push(...res.data);
-      if (res.data.length < pageSize) break;
-      skip += pageSize;
-    }
-
-    entityCache = all;
-    return all;
-  })();
-
-  return entityCachePromise;
+function cacheKey(entityType: string, entityPk: number): string {
+  return `${entityType.toLowerCase()}:${entityPk}`;
 }
 
 export function clearEntityCache() {
-  entityCache = null;
-  entityCachePromise = null;
+  lookupCache.clear();
 }
 
-function matchesEntity(entity: Entity, entityType: string, entityPk: number): boolean {
-  const dbType = toDbEntityType(entityType);
-  return (
-    entity.entity_pk === entityPk &&
-    (entity.entity_type === dbType ||
-      entity.entity_type.toLowerCase() === entityType.toLowerCase())
-  );
-}
-
+/**
+ * Resolve the generic Entity row for a hierarchy hardware record.
+ * Uses GET /entities/lookup/ only — does not scan the full entities table.
+ */
 export async function resolveEntity(
   entityType: HardwareEntityType | string,
   entityPk: number
 ): Promise<Entity | null> {
+  if (!Number.isFinite(entityPk) || entityPk <= 0) return null;
+
+  const key = cacheKey(entityType, entityPk);
+  const cached = lookupCache.get(key);
+  if (cached) return cached;
+
+  const pending = (async () => {
+    try {
+      const res = await api.entities.lookup(entityType, entityPk);
+      return res.data ?? null;
+    } catch {
+      return null;
+    }
+  })();
+
+  lookupCache.set(key, pending);
+
   try {
-    const res = await api.entities.lookup(entityType, entityPk);
-    return res.data;
+    return await pending;
   } catch {
-    // Fall back to cached list scan (legacy / offline tolerance)
+    lookupCache.delete(key);
+    return null;
   }
-
-  const findMatch = (entities: Entity[]) =>
-    entities.find((entity) => matchesEntity(entity, entityType, entityPk));
-
-  let entities = await loadEntitiesFromList();
-  let match = findMatch(entities);
-
-  if (!match) {
-    clearEntityCache();
-    entities = await loadEntitiesFromList();
-    match = findMatch(entities);
-  }
-
-  return match ?? null;
 }
 
 export async function resolveEntityId(

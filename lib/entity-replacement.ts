@@ -100,7 +100,8 @@ export function buildReplacementStockRows(items: Inventory[]): ReplacementStockR
     const partNumber = inventoryPartNumber(item) || item.name || '—';
 
     if (!usesInstances) {
-      if (item.quantity <= 0) continue;
+      // Component / bulk stock — only show when quantity remains.
+      if (Number(item.quantity) <= 0) continue;
       srNo += 1;
       rows.push({
         srNo,
@@ -116,21 +117,8 @@ export function buildReplacementStockRows(items: Inventory[]): ReplacementStockR
     }
 
     const instances = getSelectableInstances(item);
-    if (instances.length === 0) {
-      if (item.quantity <= 0) continue;
-      srNo += 1;
-      rows.push({
-        srNo,
-        inventoryId: item.id,
-        name: item.name,
-        partNumber,
-        serialNumber: item.serial_number?.trim() || '—',
-        configurationItem: item.configuration_item,
-        oemName: item.oem_name,
-        location: item.location,
-      });
-      continue;
-    }
+    // Instance-based stock: never offer catalog rows with no remaining units.
+    if (instances.length === 0) continue;
 
     instances.forEach((instance, index) => {
       srNo += 1;

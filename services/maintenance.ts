@@ -114,6 +114,30 @@ export const maintenanceService = {
         throw new Error(`Unsupported entity type: ${entityType}`);
     }
   },
+  updateEntityIdentity: async (
+    entityType: EntityType,
+    entityId: number,
+    identity: { partNumber?: string; serialNumber?: string }
+  ) => {
+    const payload: { part_number?: string; serial_number?: string } = {};
+    if (identity.partNumber) payload.part_number = identity.partNumber;
+    if (identity.serialNumber) payload.serial_number = identity.serialNumber;
+
+    switch (entityType) {
+      case EntityType.System:
+        return libApi.systems.update(entityId, payload);
+      case EntityType.Subsystem:
+        return libApi.subsystems.update(entityId, payload);
+      case EntityType.Module:
+        return libApi.modules.update(entityId, payload);
+      case EntityType.Unit:
+        return libApi.units.update(entityId, payload);
+      case EntityType.Component:
+        return libApi.components.update(entityId, payload);
+      default:
+        throw new Error(`Unsupported entity type: ${entityType}`);
+    }
+  },
   createMaintenanceAction: (data: Partial<MaintenanceAction>) => libApi.maintenanceActions.create(data as any),
 
   recordEngineerAction: async (input: RecordEngineerActionInput) => {
@@ -154,8 +178,8 @@ export const maintenanceService = {
     return res.data;
   },
 
-  decrementInventoryItem: async (inventoryItemId: number) => {
-    return libApi.inventory.consume(inventoryItemId);
+  decrementInventoryItem: async (inventoryItemId: number, instanceId?: number) => {
+    return libApi.inventory.consume(inventoryItemId, instanceId);
   },
   
   // Backend has no bulk-update route; apply individual PUT updates instead.

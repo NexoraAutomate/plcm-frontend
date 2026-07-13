@@ -7,8 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import * as api from '@/lib/api';
-import { filterInventoryForReplacement, inventoryPartNumberLabel } from '@/lib/inventory-filter';
-import { FaultyEntity, Inventory, ResolutionType } from '@/lib/models';
+import { filterInventoryForReplacementByPartNumber } from '@/lib/inventory-filter';
+import { inventoryPartNumber } from '@/lib/inventory-entity-fields';
+import { buildReplacementStockRows, type ReplacementStockRow } from '@/lib/entity-replacement';
+import { FaultyEntity, ResolutionType } from '@/lib/models';
 import {
   isClassifiedFaultType,
   resolutionRequiresClassifiedFaultType,
@@ -19,6 +21,7 @@ export interface ReplacementSelection {
   inventoryItemId?: number;
   inventoryQuantity?: number;
   serialNumber?: string;
+  inventoryInstanceId?: number;
 }
 
 interface ResolveFaultDialogProps {
@@ -40,6 +43,10 @@ const resolutionOptions: Array<{ value: ResolutionType; label: string }> = [
   { value: ResolutionType.DECOMMISSIONED, label: 'Decommissioned' },
 ];
 
+function stockRowKey(row: ReplacementStockRow): string {
+  return row.instanceId != null ? `i-${row.instanceId}` : `inv-${row.inventoryId}-${row.srNo}`;
+}
+
 export function ResolveFaultDialog({
   entity,
   open,
@@ -48,30 +55,30 @@ export function ResolveFaultDialog({
   isProcessing = false,
 }: ResolveFaultDialogProps) {
   const [resolutionType, setResolutionType] = useState<ResolutionType | ''>('');
-  const [selectedInventoryId, setSelectedInventoryId] = useState('');
+  const [selectedStockKey, setSelectedStockKey] = useState('');
   const [notes, setNotes] = useState('');
-  const [inventoryItems, setInventoryItems] = useState<Inventory[]>([]);
+  const [stockRows, setStockRows] = useState<ReplacementStockRow[]>([]);
   const [inventoryLoading, setInventoryLoading] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setResolutionType('');
-      setSelectedInventoryId('');
+      setSelectedStockKey('');
       setNotes('');
-      setInventoryItems([]);
+      setStockRows([]);
     }
   }, [open]);
 
-  const requiresReplacementPartNumber = resolutionType === ResolutionType.REPLACED;
+  const requiresReplacement = resolutionType === ResolutionType.REPLACED;
   const requiresClassifiedFaultType =
     Boolean(resolutionType) && resolutionRequiresClassifiedFaultType(resolutionType as ResolutionType);
   const hasMissingFaultType =
     requiresClassifiedFaultType && !isClassifiedFaultType(entity?.fault_type);
 
   useEffect(() => {
-    if (!open || !entity || !requiresReplacementPartNumber) {
-      setInventoryItems([]);
-      setSelectedInventoryId('');
+    if (!open || !entity || !requiresReplacement) {
+      setStockRows([]);
+      setSelectedStockKey('');
       return;
     }
 
@@ -80,19 +87,50 @@ export function ResolveFaultDialog({
     const loadInventory = async () => {
       setInventoryLoading(true);
       try {
+        const targetPartNumber = entity.part_number?.trim() ?? '';
+        if (!targetPartNumber) {
+          if (!cancelled) {
+            setStockRows([]);
+            setSelectedStockKey('');
+          }
+          return;
+        }
+
         const res = await api.inventory.list(0, 1000, entity.entity_type);
-        const items = filterInventoryForReplacement(
-          res.data ?? [],
-          entity.entity_type,
-          entity.entity_name ?? ''
+        const normalizedPart = targetPartNumber.toLowerCase();
+        const candidates = (res.data ?? []).filter(
+          (item) =>
+            item.inventory_type?.toLowerCase() === entity.entity_type.toLowerCase() &&
+            inventoryPartNumber(item).toLowerCase() === normalizedPart
         );
+
+        const withInstances = await Promise.all(
+          candidates.map(async (item) => {
+            if ((item.instances ?? []).length > 0 || Number(item.quantity) <= 0) {
+              return item;
+            }
+            try {
+              const instanceRes = await api.inventory.listInstances(item.id);
+              return { ...item, instances: instanceRes.data ?? [] };
+            } catch {
+              return item;
+            }
+          })
+        );
+
+        const items = filterInventoryForReplacementByPartNumber(
+          withInstances,
+          entity.entity_type,
+          targetPartNumber
+        );
+        const rows = buildReplacementStockRows(items);
         if (!cancelled) {
-          setInventoryItems(items);
-          setSelectedInventoryId('');
+          setStockRows(rows);
+          setSelectedStockKey('');
         }
       } catch {
         if (!cancelled) {
-          setInventoryItems([]);
+          setStockRows([]);
         }
       } finally {
         if (!cancelled) {
@@ -106,24 +144,24 @@ export function ResolveFaultDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, entity, requiresReplacementPartNumber]);
+  }, [open, entity, requiresReplacement]);
 
-  const selectedInventory = useMemo(
-    () => inventoryItems.find((item) => String(item.id) === selectedInventoryId),
-    [inventoryItems, selectedInventoryId]
+  const selectedRow = useMemo(
+    () => stockRows.find((row) => stockRowKey(row) === selectedStockKey),
+    [stockRows, selectedStockKey]
   );
 
   const canSubmit =
     Boolean(resolutionType) &&
-    (!requiresReplacementPartNumber || Boolean(selectedInventory)) &&
+    (!requiresReplacement || Boolean(selectedRow)) &&
     !hasMissingFaultType;
 
   const details = useMemo(
     () => [
       { label: 'Entity Type', value: entity?.entity_type || 'N/A' },
       { label: 'Entity ID', value: entity?.entity_id.toString() || 'N/A' },
-      { label: 'Part Number', value: entity?.part_number || 'N/A' },
       { label: 'Serial Number', value: entity?.serial_number || 'N/A' },
+      { label: 'Part Number', value: entity?.part_number || 'N/A' },
       { label: 'Status', value: entity?.status || 'N/A' },
       { label: 'Fault Type', value: entity?.fault_type || 'N/A' },
       {
@@ -137,12 +175,15 @@ export function ResolveFaultDialog({
   const handleSubmit = async () => {
     if (!entity || !resolutionType) return;
 
-    const replacement = selectedInventory
+    const replacement = selectedRow
       ? {
-          partNumber: inventoryPartNumberLabel(selectedInventory),
-          inventoryItemId: selectedInventory.id,
-          inventoryQuantity: selectedInventory.quantity,
-          serialNumber: selectedInventory.serial_number,
+          partNumber: selectedRow.partNumber,
+          inventoryItemId: selectedRow.inventoryId,
+          serialNumber:
+            selectedRow.serialNumber && selectedRow.serialNumber !== '—'
+              ? selectedRow.serialNumber
+              : undefined,
+          inventoryInstanceId: selectedRow.instanceId,
         }
       : undefined;
 
@@ -155,8 +196,9 @@ export function ResolveFaultDialog({
         <DialogHeader>
           <DialogTitle>Resolve Fault</DialogTitle>
           <DialogDescription>
-            Review the selected entity and choose how to resolve the fault. Replacement part
-            number is required when resolution type is Replacement.
+            Review the selected entity and choose how to resolve the fault. When replacing,
+            choose an in-stock serial whose part number matches this entity (
+            {entity?.part_number || 'N/A'}).
           </DialogDescription>
         </DialogHeader>
 
@@ -191,34 +233,35 @@ export function ResolveFaultDialog({
               </Select>
             </div>
 
-            {requiresReplacementPartNumber ? (
+            {requiresReplacement ? (
               <div className="grid gap-2">
-                <Label htmlFor="replacement-part-number">Replacement Part Number</Label>
+                <Label htmlFor="replacement-serial-number">Replacement Serial Number</Label>
                 {inventoryLoading ? (
                   <p className="text-sm text-muted-foreground">Loading inventory...</p>
-                ) : inventoryItems.length === 0 ? (
+                ) : stockRows.length === 0 ? (
                   <p className="text-sm text-destructive">
-                    No replacement parts in inventory for this entity.
+                    {entity.part_number?.trim()
+                      ? `No in-stock inventory serials found for part number ${entity.part_number}.`
+                      : 'This entity has no part number, so replacement stock cannot be matched.'}
                   </p>
                 ) : (
-                  <Select value={selectedInventoryId} onValueChange={setSelectedInventoryId}>
-                    <SelectTrigger id="replacement-part-number" className="w-full">
-                      <SelectValue placeholder="Select replacement part from inventory" />
+                  <Select value={selectedStockKey} onValueChange={setSelectedStockKey}>
+                    <SelectTrigger id="replacement-serial-number" className="w-full">
+                      <SelectValue placeholder="Select replacement by serial number" />
                     </SelectTrigger>
                     <SelectContent>
-                      {inventoryItems.map((item) => {
-                        const partLabel = inventoryPartNumberLabel(item);
+                      {stockRows.map((row) => {
                         const description = [
-                          item.oem_name,
-                          `Qty: ${item.quantity}`,
-                          item.serial_number ? `SN: ${item.serial_number}` : null,
+                          row.partNumber ? `PN: ${row.partNumber}` : null,
+                          row.oemName,
+                          row.name,
                         ]
                           .filter(Boolean)
                           .join(' · ');
 
                         return (
-                          <SelectItem key={item.id} value={String(item.id)}>
-                            <span className="font-medium">{partLabel}</span>
+                          <SelectItem key={stockRowKey(row)} value={stockRowKey(row)}>
+                            <span className="font-medium">{row.serialNumber}</span>
                             {description ? (
                               <span className="ml-2 text-xs text-muted-foreground">{description}</span>
                             ) : null}

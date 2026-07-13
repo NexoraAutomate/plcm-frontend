@@ -131,6 +131,8 @@ interface DataStoreContextType {
   createMaintenanceCase: (data: MaintenanceTypes.CreateMaintenanceCasePayload) => Promise<MaintenanceTypes.MaintenanceCase>;
   updateMaintenanceCase: (id: number, data: MaintenanceTypes.UpdateMaintenanceCasePayload) => Promise<MaintenanceTypes.MaintenanceCase>;
   deleteMaintenanceCase: (id: number) => Promise<void>;
+  lookupEntityBySerialNumber: (serialNumber: string) => Promise<MaintenanceTypes.lookUpResponse>;
+  /** @deprecated Prefer lookupEntityBySerialNumber — part numbers are not unique. */
   lookupEntityByPartNumber: (partNumber: string) => Promise<MaintenanceTypes.lookUpResponse>;
   suspectChildren: (case_Id: number, data: MaintenanceTypes.SuspectChildrenPayload) => Promise<any>;
   confirmFault: (caseId: number, data: MaintenanceTypes.ConfirmFaultPayload) => Promise<any>;
@@ -1072,14 +1074,19 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const lookupEntityByPartNumber = async (partNumber: string) => {
+  const lookupEntityBySerialNumber = async (serialNumber: string) => {
     try {
-      const res = await api.maintenanceCases.lookupEntityByPartNumber(partNumber);
+      const res = await api.maintenanceCases.lookupEntityBySerialNumber(serialNumber);
       return res.data;
     } catch (err) {
-      toast.error('Failed to lookup entity by part number');
+      toast.error('Failed to lookup entity by serial number');
       throw err;
     }
+  };
+
+  const lookupEntityByPartNumber = async (partNumber: string) => {
+    // Kept for compatibility; lookup is keyed by serial number.
+    return lookupEntityBySerialNumber(partNumber);
   };
 
   const suspectChildren = async (caseId: number, data: MaintenanceTypes.SuspectChildrenPayload) => {
@@ -1431,6 +1438,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     createMaintenanceCase,
     updateMaintenanceCase,
     deleteMaintenanceCase,
+    lookupEntityBySerialNumber,
     lookupEntityByPartNumber,
     suspectChildren,
     confirmFault,
