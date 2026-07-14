@@ -1,0 +1,13 @@
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+node_modules
+.next
+.vscode
+.cursor
+*.md
+*.txt
+tsconfig.tsbuildinfo
+pnpm-lock.yaml
