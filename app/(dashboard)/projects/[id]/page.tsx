@@ -8,7 +8,7 @@ import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, FileText, Calendar, Layers, Pencil } from 'lucide-react';
+import { ArrowLeft, FileText, Calendar, Layers, Pencil, Network } from 'lucide-react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Edit, Trash2, Search, Clock, AlertTriangle, Zap, Pause, CheckCircle } from 'lucide-react';
@@ -294,10 +294,16 @@ export default function ProjectDetailPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
-        <div>
+        <div className="flex-1 min-w-0">
           <h1 className="text-3xl font-bold tracking-tight">{project.name}</h1>
           <p className="text-sm text-muted-foreground mt-1">Manage systems and hierarchy</p>
         </div>
+        <Button variant="outline" className="gap-2 shrink-0" asChild>
+          <Link href={`/hierarchy-dashboard?project_id=${projectId}`}>
+            <Network className="h-4 w-4" />
+            Hierarchy
+          </Link>
+        </Button>
       </div>
 
       {/* Project Info Cards */}

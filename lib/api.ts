@@ -228,6 +228,7 @@ export const inventory = {
     inventoryId: number,
     data: {
       parent_instance_id?: number;
+      parent_instance_serial?: string;
       children: Array<{
         child_category_name: string;
         child_inventory_id: number;

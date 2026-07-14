@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Edit, Trash2, Search, Layers } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Layers, Network, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import { EntityAttachmentsSection, type PendingAttachmentUpload } from '@/components/entity-attachments-section';
@@ -32,26 +32,98 @@ import { queryKeys } from '@/hooks/queries/query-keys';
 import { usePaginatedList } from '@/hooks/use-paginated-list';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
-import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
-  formatInventorySerialNumbers,
+  getInventorySerialNumbers,
   inventorySupportsQuantity,
   inventoryUsesInstances,
   resolveInventoryQuantity,
 } from '@/lib/entity-hierarchy';
-import { canAddInventoryChildren } from '@/lib/inventory-child-install';
-import { needsSerialSelection } from '@/lib/inventory-install';
+import {
+  canAddInventoryChildren,
+  resolveInventoryInstanceSerial,
+} from '@/lib/inventory-child-install';
+import { getSelectableInstances, needsSerialSelection } from '@/lib/inventory-install';
+import { duplicateInventoryEntity } from '@/lib/inventory-duplicate';
 import { InventorySerialSelectDialog } from '@/components/inventory-serial-select-dialog';
+import { InventoryDeleteDialog } from '@/components/inventory-delete-dialog';
+import { InventoryHierarchyDialog } from '@/components/inventory-hierarchy-dialog';
+import { isInventoryInStock } from '@/lib/inventory-filter';
+import { StatusBadge } from '@/components/status-badge';
+import { cn } from '@/lib/utils';
 
 type EntityType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
+type StockFilter = 'all' | 'available' | 'out_of_stock';
+
+const STOCK_FILTERS: { value: StockFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'available', label: 'Available' },
+  { value: 'out_of_stock', label: 'Out of Stock' },
+];
+
+const ENTITY_TYPE_FILTERS: {
+  value: EntityType | 'all';
+  label: string;
+  activeClass: string;
+  inactiveClass: string;
+}[] = [
+  {
+    value: 'all',
+    label: 'All Types',
+    activeClass: 'border-primary bg-primary text-primary-foreground',
+    inactiveClass: 'border-transparent bg-muted/50 text-muted-foreground hover:bg-muted',
+  },
+  {
+    value: 'system',
+    label: 'System',
+    activeClass:
+      'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300',
+    inactiveClass:
+      'border-blue-100/80 bg-blue-50/40 text-blue-600/70 hover:bg-blue-50/70 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-400/70 dark:hover:bg-blue-950/60',
+  },
+  {
+    value: 'subsystem',
+    label: 'Subsystem',
+    activeClass:
+      'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-300',
+    inactiveClass:
+      'border-sky-100/80 bg-sky-50/40 text-sky-600/70 hover:bg-sky-50/70 dark:border-sky-900/50 dark:bg-sky-950/40 dark:text-sky-400/70 dark:hover:bg-sky-950/60',
+  },
+  {
+    value: 'module',
+    label: 'Module',
+    activeClass:
+      'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-300',
+    inactiveClass:
+      'border-indigo-100/80 bg-indigo-50/40 text-indigo-600/70 hover:bg-indigo-50/70 dark:border-indigo-900/50 dark:bg-indigo-950/40 dark:text-indigo-400/70 dark:hover:bg-indigo-950/60',
+  },
+  {
+    value: 'unit',
+    label: 'Unit',
+    activeClass:
+      'border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-800 dark:bg-cyan-950 dark:text-cyan-300',
+    inactiveClass:
+      'border-cyan-100/80 bg-cyan-50/40 text-cyan-600/70 hover:bg-cyan-50/70 dark:border-cyan-900/50 dark:bg-cyan-950/40 dark:text-cyan-400/70 dark:hover:bg-cyan-950/60',
+  },
+  {
+    value: 'component',
+    label: 'Component',
+    activeClass:
+      'border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-300',
+    inactiveClass:
+      'border-teal-100/80 bg-teal-50/40 text-teal-600/70 hover:bg-teal-50/70 dark:border-teal-900/50 dark:bg-teal-950/40 dark:text-teal-400/70 dark:hover:bg-teal-950/60',
+  },
+];
 
 interface InventoryItem extends Inventory {
   entityName?: string;
   serialNumber?: string;
+  serialNumbers?: string[];
   partNumber?: string;
   holderName?: string;
   displayLocation?: string;
 }
+
+const SERIAL_PREVIEW_LIMIT = 2;
 
 function resolveInventoryHolderId(item: Inventory): number | undefined {
   if (item.holder_user_id) return item.holder_user_id;
@@ -72,10 +144,12 @@ function enrichInventoryItems(items: Inventory[], users: User[]): InventoryItem[
     const holderId = resolveInventoryHolderId(item);
     const holder = holderId ? users.find((user) => user.id === holderId) : undefined;
 
+    const serialNumbers = getInventorySerialNumbers(item);
     return {
       ...item,
       entityName: item.name,
-      serialNumber: formatInventorySerialNumbers(item),
+      serialNumbers,
+      serialNumber: serialNumbers.length > 0 ? serialNumbers.join(', ') : '—',
       partNumber: inventoryPartNumber(item),
       holderName: holder ? formatUserRef(holder) : '—',
       displayLocation: resolveInventoryLocation(item),
@@ -88,6 +162,7 @@ export default function InventoryPage() {
   const { users, statuses } = useDataStore();
   const [search, setSearch] = useState('');
   const [entityTypeFilter, setEntityTypeFilter] = useState<EntityType | 'all'>('all');
+  const [stockFilter, setStockFilter] = useState<StockFilter>('all');
   const inventoryTypeParam = entityTypeFilter !== 'all' ? entityTypeFilter : undefined;
   const pagination = usePaginatedList({
     queryKey: queryKeys.inventoryPage(inventoryTypeParam),
@@ -104,11 +179,36 @@ export default function InventoryPage() {
   const [editingInstanceId, setEditingInstanceId] = useState<number | null>(null);
   const [editingGroup, setEditingGroup] = useState<Inventory | null>(null);
   const [instances, setInstances] = useState<InventoryInstance[]>([]);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({
-    open: false,
-    id: null,
-  });
+  const [deleteTarget, setDeleteTarget] = useState<InventoryItem | null>(null);
   const [addChildrenItem, setAddChildrenItem] = useState<InventoryItem | null>(null);
+  const [hierarchySerialSelectItem, setHierarchySerialSelectItem] = useState<InventoryItem | null>(
+    null
+  );
+  const [hierarchyView, setHierarchyView] = useState<{
+    item: InventoryItem;
+    instanceId?: number;
+  } | null>(null);
+  const [duplicateSerialSelectItem, setDuplicateSerialSelectItem] = useState<InventoryItem | null>(
+    null
+  );
+  const [duplicateTarget, setDuplicateTarget] = useState<{
+    item: InventoryItem;
+    instanceId?: number;
+  } | null>(null);
+  const [duplicating, setDuplicating] = useState(false);
+  const [duplicateForm, setDuplicateForm] = useState({
+    serial_number: '',
+    holder_user_id: '',
+    location: '',
+  });
+  const [serialListItem, setSerialListItem] = useState<InventoryItem | null>(null);
+  const [addMoreItem, setAddMoreItem] = useState<InventoryItem | null>(null);
+  const [addMoreSubmitting, setAddMoreSubmitting] = useState(false);
+  const [addMoreForm, setAddMoreForm] = useState({
+    serial_number: '',
+    holder_user_id: '',
+    location: '',
+  });
 
   const [selectedEntityType, setSelectedEntityType] = useState<EntityType>('component');
   const { data: hierarchyCategories = [] } = useHierarchiesQuery(selectedEntityType);
@@ -120,7 +220,7 @@ export default function InventoryPage() {
 
   useEffect(() => {
     pagination.setPage(0);
-  }, [search, entityTypeFilter]);
+  }, [search, entityTypeFilter, stockFilter]);
 
   const filtered = inventory.filter((item) => {
     const matchesType = entityTypeFilter === 'all' || item.inventory_type === entityTypeFilter;
@@ -129,7 +229,12 @@ export default function InventoryPage() {
       item.entityName?.toLowerCase().includes(search.toLowerCase()) ||
       item.serialNumber?.toLowerCase().includes(search.toLowerCase()) ||
       item.partNumber?.toLowerCase().includes(search.toLowerCase());
-    return matchesType && matchesSearch;
+    const inStock = isInventoryInStock(item);
+    const matchesStock =
+      stockFilter === 'all' ||
+      (stockFilter === 'available' && inStock) ||
+      (stockFilter === 'out_of_stock' && !inStock);
+    return matchesType && matchesSearch && matchesStock;
   });
 
   function navigateToAddChildren(item: InventoryItem, instanceId?: number) {
@@ -143,6 +248,149 @@ export default function InventoryPage() {
       return;
     }
     navigateToAddChildren(item);
+  }
+
+  function openHierarchyView(item: InventoryItem, instanceId?: number) {
+    setHierarchyView({ item, instanceId });
+  }
+
+  function handleViewHierarchyClick(item: InventoryItem) {
+    if (needsSerialSelection(item)) {
+      setHierarchySerialSelectItem(item);
+      return;
+    }
+    const instances = getSelectableInstances(item);
+    const instanceId = instances.length === 1 ? instances[0].id : undefined;
+    openHierarchyView(item, instanceId);
+  }
+
+  function openDuplicateForm(item: InventoryItem, instanceId?: number) {
+    const instance =
+      instanceId != null
+        ? item.instances?.find((entry) => entry.id === instanceId)
+        : item.instances?.length === 1
+          ? item.instances[0]
+          : undefined;
+    const holderId =
+      instance?.holder_user_id ?? resolveInventoryHolderId(item) ?? undefined;
+    const location =
+      instance?.location?.trim() ||
+      (item.location?.trim() && item.location !== '—' ? item.location.trim() : '') ||
+      '';
+
+    setDuplicateTarget({ item, instanceId });
+    setDuplicateForm({
+      serial_number: '',
+      holder_user_id: holderId != null ? String(holderId) : '',
+      location,
+    });
+  }
+
+  async function handleDuplicateConfirm() {
+    if (!duplicateTarget) return;
+
+    const serialNumber = duplicateForm.serial_number.trim();
+    const location = duplicateForm.location.trim();
+    if (!serialNumber || !location) {
+      toast.error('Serial number and location are required');
+      return;
+    }
+    if (!duplicateForm.holder_user_id) {
+      toast.error('Inventory holder is required');
+      return;
+    }
+
+    const holderUserId = Number(duplicateForm.holder_user_id);
+    const { item, instanceId } = duplicateTarget;
+    setDuplicating(true);
+    try {
+      const result = await duplicateInventoryEntity(item, {
+        instanceId,
+        overrides: {
+          serialNumber,
+          holderUserId,
+          location,
+        },
+      });
+      toast.success(
+        result.serial
+          ? `Duplicated ${item.name} as ${result.serial}`
+          : `Duplicated ${item.name}`
+      );
+      setDuplicateTarget(null);
+      pagination.invalidate();
+    } catch (err) {
+      console.error('Failed to duplicate inventory item:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to duplicate inventory item');
+    } finally {
+      setDuplicating(false);
+    }
+  }
+
+  function handleDuplicateClick(item: InventoryItem) {
+    if (duplicating) return;
+    if (needsSerialSelection(item)) {
+      setDuplicateSerialSelectItem(item);
+      return;
+    }
+    const instances = getSelectableInstances(item);
+    const instanceId = instances.length === 1 ? instances[0].id : undefined;
+    openDuplicateForm(item, instanceId);
+  }
+
+  function openAddMore(item: InventoryItem) {
+    setAddMoreItem(item);
+    setAddMoreForm({ serial_number: '', holder_user_id: '', location: '' });
+  }
+
+  async function handleAddMore() {
+    if (!addMoreItem) return;
+
+    const serialNumber = addMoreForm.serial_number.trim();
+    const location = addMoreForm.location.trim();
+    if (!serialNumber || !location) {
+      toast.error('Serial number and location are required');
+      return;
+    }
+    if (!addMoreForm.holder_user_id) {
+      toast.error('Inventory holder is required');
+      return;
+    }
+
+    const holderUserId = Number(addMoreForm.holder_user_id);
+    setAddMoreSubmitting(true);
+    try {
+      if (inventoryUsesInstances(addMoreItem.inventory_type as EntityType)) {
+        await api.inventory.createInstance(addMoreItem.id, {
+          serial_number: serialNumber,
+          holder_user_id: holderUserId,
+          location,
+        });
+      } else {
+        await api.inventory.create({
+          name: addMoreItem.name,
+          inventory_type: addMoreItem.inventory_type,
+          description: addMoreItem.description,
+          oem_name: addMoreItem.oem_name,
+          part_number: addMoreItem.part_number,
+          configuration_item: addMoreItem.configuration_item,
+          status_id: addMoreItem.status_id,
+          sku: addMoreItem.sku,
+          quantity: 1,
+          serial_number: serialNumber,
+          holder_user_id: holderUserId,
+          location,
+        });
+      }
+      toast.success(`Added another ${addMoreItem.name} to inventory`);
+      setAddMoreItem(null);
+      pagination.invalidate();
+    } catch (err) {
+      console.error('Failed to add more inventory:', err);
+      toast.error('Failed to add inventory unit');
+    } finally {
+      setAddMoreSubmitting(false);
+    }
   }
 
   const resetForm = () => {
@@ -285,18 +533,27 @@ export default function InventoryPage() {
     }
   }
 
-  async function confirmDelete() {
-    if (deleteConfirm.id === null) return;
-
+  async function handleDeleteAll(inventoryId: number) {
     try {
-      await api.inventory.delete(deleteConfirm.id);
+      await api.inventory.delete(inventoryId);
       toast.success('Inventory item deleted');
       pagination.invalidate();
     } catch (err) {
       console.error('Failed to delete inventory item:', err);
       toast.error('Failed to delete inventory item');
-    } finally {
-      setDeleteConfirm({ open: false, id: null });
+      throw err;
+    }
+  }
+
+  async function handleDeleteOneSerial(instanceId: number) {
+    try {
+      await api.inventory.deleteInstance(instanceId);
+      toast.success('Serial number deleted');
+      pagination.invalidate();
+    } catch (err) {
+      console.error('Failed to delete inventory serial:', err);
+      toast.error('Failed to delete serial number');
+      throw err;
     }
   }
 
@@ -860,61 +1117,83 @@ export default function InventoryPage() {
         <p className="text-muted-foreground mt-2">Manage inventory for all entity types</p>
       </div>
 
-      <div className="flex gap-4 items-center">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, serial number, or part number..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
-          />
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-4 items-center">
+          <div className="flex-1 min-w-[200px] relative">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, serial number, or part number..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {STOCK_FILTERS.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setStockFilter(value)}
+                className={cn(
+                  'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                  stockFilter === value
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <Dialog
+            open={isCreateOpen}
+            onOpenChange={(open) => {
+              setIsCreateOpen(open);
+              if (open) setFormTab('general');
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Item
+              </Button>
+            </DialogTrigger>
+            <DialogContent className={inventoryDialogClassName}>
+              <DialogHeader>
+                <DialogTitle>Add Inventory Item</DialogTitle>
+                <DialogDescription>Add a new inventory item for any entity type</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                {renderInventoryFormTabs('create')}
+
+                <div className="flex gap-2 justify-end pt-4">
+                  <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleCreate}>Add</Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
-        <Select value={entityTypeFilter} onValueChange={(value) => setEntityTypeFilter(value as EntityType | 'all')}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="system">System</SelectItem>
-            <SelectItem value="subsystem">Subsystem</SelectItem>
-            <SelectItem value="module">Module</SelectItem>
-            <SelectItem value="unit">Unit</SelectItem>
-            <SelectItem value="component">Component</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Dialog
-          open={isCreateOpen}
-          onOpenChange={(open) => {
-            setIsCreateOpen(open);
-            if (open) setFormTab('general');
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Item
-            </Button>
-          </DialogTrigger>
-          <DialogContent className={inventoryDialogClassName}>
-            <DialogHeader>
-              <DialogTitle>Add Inventory Item</DialogTitle>
-              <DialogDescription>Add a new inventory item for any entity type</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              {renderInventoryFormTabs('create')}
-
-              <div className="flex gap-2 justify-end pt-4">
-                <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleCreate}>Add</Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <div className="flex flex-wrap gap-2">
+          {ENTITY_TYPE_FILTERS.map(({ value, label, activeClass, inactiveClass }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setEntityTypeFilter(value)}
+              className={cn(
+                'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                entityTypeFilter === value ? activeClass : inactiveClass
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <Card>
@@ -947,37 +1226,118 @@ export default function InventoryPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((item) => (
+                  filtered.map((item) => {
+                    const serials = item.serialNumbers ?? [];
+                    const hasExtraSerials = serials.length > SERIAL_PREVIEW_LIMIT;
+                    return (
                     <TableRow key={item.id}>
                       <TableCell className="font-medium">{item.entityName || 'N/A'}</TableCell>
-                      <TableCell className="capitalize">{item.inventory_type}</TableCell>
+                      <TableCell>
+                        {item.inventory_type ? (
+                          <StatusBadge
+                            status={
+                              item.inventory_type.charAt(0).toUpperCase() +
+                              item.inventory_type.slice(1)
+                            }
+                          />
+                        ) : (
+                          '—'
+                        )}
+                      </TableCell>
                       <TableCell>{item.partNumber || '—'}</TableCell>
-                      <TableCell>{item.serialNumber || '—'}</TableCell>
+                      <TableCell>
+                        {serials.length === 0 ? (
+                          '—'
+                        ) : hasExtraSerials ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="truncate">
+                              {serials.slice(0, SERIAL_PREVIEW_LIMIT).join(', ')}
+                            </span>
+                            <Button
+                              type="button"
+                              size="icon-sm"
+                              variant="ghost"
+                              className="h-6 w-6 shrink-0 text-xs"
+                              title={`View all ${serials.length} serial numbers`}
+                              aria-label={`View all ${serials.length} serial numbers`}
+                              onClick={() => setSerialListItem(item)}
+                            >
+                              ...
+                            </Button>
+                          </div>
+                        ) : (
+                          serials.join(', ')
+                        )}
+                      </TableCell>
                       <TableCell>{item.quantity}</TableCell>
                       <TableCell>{item.holderName || '—'}</TableCell>
                       <TableCell>{item.displayLocation || '—'}</TableCell>
                       <TableCell className="text-right">
-                        <div className="flex gap-2 justify-end">
-                          {canAddInventoryChildren(item.inventory_type) ? (
+                        <div className="flex gap-1 justify-end">
+                          {item.quantity >= 0 ? (
                             <Button
-                              size="sm"
+                              size="icon-sm"
                               variant="secondary"
-                              onClick={() => handleAddChildrenClick(item)}
+                              onClick={() => openAddMore(item)}
+                              title="Add More"
+                              aria-label="Add More"
                             >
-                              <Layers className="mr-1 h-4 w-4" />
-                              Add Children
+                              <Plus className="h-4 w-4" />
                             </Button>
                           ) : null}
-                          <Button size="sm" variant="outline" onClick={() => openEdit(item)}>
+                          {canAddInventoryChildren(item.inventory_type) ? (
+                            <Button
+                              size="icon-sm"
+                              variant="secondary"
+                              onClick={() => handleAddChildrenClick(item)}
+                              title="Add Children"
+                              aria-label="Add Children"
+                            >
+                              <Layers className="h-4 w-4" />
+                            </Button>
+                          ) : null}
+                          <Button
+                            size="icon-sm"
+                            variant="secondary"
+                            onClick={() => handleViewHierarchyClick(item)}
+                            title="View Hierarchy"
+                            aria-label="View Hierarchy"
+                          >
+                            <Network className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon-sm"
+                            variant="secondary"
+                            onClick={() => handleDuplicateClick(item)}
+                            disabled={duplicating}
+                            title="Duplicate"
+                            aria-label="Duplicate"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon-sm"
+                            variant="outline"
+                            onClick={() => openEdit(item)}
+                            title="Edit"
+                            aria-label="Edit"
+                          >
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button size="sm" variant="destructive" onClick={() => setDeleteConfirm({ open: true, id: item.id })}>
+                          <Button
+                            size="icon-sm"
+                            variant="destructive"
+                            onClick={() => setDeleteTarget(item)}
+                            title="Delete"
+                            aria-label="Delete"
+                          >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
@@ -1035,14 +1395,252 @@ export default function InventoryPage() {
         }}
       />
 
-      <ConfirmDialog
-        open={deleteConfirm.open}
-        onOpenChange={(open) =>
-          setDeleteConfirm((prev) => ({ ...prev, open, id: open ? prev.id : null }))
+      <InventorySerialSelectDialog
+        item={hierarchySerialSelectItem}
+        open={hierarchySerialSelectItem != null}
+        onOpenChange={(open) => {
+          if (!open) setHierarchySerialSelectItem(null);
+        }}
+        confirmLabel="View Hierarchy"
+        description={
+          hierarchySerialSelectItem
+            ? `${hierarchySerialSelectItem.name} has ${hierarchySerialSelectItem.quantity} units in stock. Choose which serial number to view in the hierarchy graph.`
+            : undefined
         }
-        title="Delete Inventory Item"
-        description="Are you sure you want to delete this inventory item? This action cannot be undone."
-        onConfirm={confirmDelete}
+        onConfirm={(instanceId) => {
+          if (hierarchySerialSelectItem) {
+            openHierarchyView(hierarchySerialSelectItem, instanceId);
+            setHierarchySerialSelectItem(null);
+          }
+        }}
+      />
+
+      <InventoryHierarchyDialog
+        item={hierarchyView?.item ?? null}
+        instanceId={hierarchyView?.instanceId}
+        open={hierarchyView != null}
+        onOpenChange={(open) => {
+          if (!open) setHierarchyView(null);
+        }}
+      />
+
+      <Dialog
+        open={serialListItem != null}
+        onOpenChange={(open) => {
+          if (!open) setSerialListItem(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Serial Numbers</DialogTitle>
+            <DialogDescription>
+              {serialListItem
+                ? `All serial numbers for ${serialListItem.entityName || serialListItem.name}`
+                : 'Associated serial numbers'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-64 overflow-y-auto rounded-md border">
+            <ul className="divide-y">
+              {(serialListItem?.serialNumbers ?? []).map((serial) => (
+                <li key={serial} className="px-3 py-2 text-sm font-mono">
+                  {serial}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <InventorySerialSelectDialog
+        item={duplicateSerialSelectItem}
+        open={duplicateSerialSelectItem != null}
+        onOpenChange={(open) => {
+          if (!open) setDuplicateSerialSelectItem(null);
+        }}
+        confirmLabel="Continue"
+        description={
+          duplicateSerialSelectItem
+            ? `${duplicateSerialSelectItem.name} has ${duplicateSerialSelectItem.quantity} units in stock. Choose which serial number to duplicate (including children).`
+            : undefined
+        }
+        onConfirm={(instanceId) => {
+          if (!duplicateSerialSelectItem) return;
+          const item = duplicateSerialSelectItem;
+          setDuplicateSerialSelectItem(null);
+          openDuplicateForm(item, instanceId);
+        }}
+      />
+
+      <Dialog
+        open={duplicateTarget != null}
+        onOpenChange={(open) => {
+          if (!open && !duplicating) setDuplicateTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Duplicate Inventory Item</DialogTitle>
+            <DialogDescription>
+              {duplicateTarget
+                ? (() => {
+                    const sourceSerial = resolveInventoryInstanceSerial(
+                      duplicateTarget.item,
+                      duplicateTarget.instanceId ?? null
+                    );
+                    return `Create a copy of ${duplicateTarget.item.name}${
+                      sourceSerial ? ` (from ${sourceSerial})` : ''
+                    }, including any children. Enter the new serial number, holder, and location.`;
+                  })()
+                : 'Enter details for the duplicated inventory item.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="duplicate-serial">Serial Number *</Label>
+              <Input
+                id="duplicate-serial"
+                value={duplicateForm.serial_number}
+                onChange={(e) =>
+                  setDuplicateForm((prev) => ({ ...prev, serial_number: e.target.value }))
+                }
+                placeholder="e.g., SN-2024-001"
+                disabled={duplicating}
+              />
+            </div>
+            <div>
+              <Label>Inventory Holder *</Label>
+              <Select
+                value={duplicateForm.holder_user_id || ''}
+                onValueChange={(value) =>
+                  setDuplicateForm((prev) => ({ ...prev, holder_user_id: value }))
+                }
+                disabled={duplicating}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select custodian" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={String(user.id)}>
+                      {user.full_name || user.username}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="duplicate-location">Location *</Label>
+              <Input
+                id="duplicate-location"
+                value={duplicateForm.location}
+                onChange={(e) =>
+                  setDuplicateForm((prev) => ({ ...prev, location: e.target.value }))
+                }
+                placeholder="Warehouse location"
+                disabled={duplicating}
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setDuplicateTarget(null)}
+                disabled={duplicating}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleDuplicateConfirm} disabled={duplicating}>
+                {duplicating ? 'Duplicating…' : 'Duplicate'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={addMoreItem != null}
+        onOpenChange={(open) => {
+          if (!open && !addMoreSubmitting) setAddMoreItem(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add More Stock</DialogTitle>
+            <DialogDescription>
+              {addMoreItem
+                ? `Add another ${addMoreItem.name} (${addMoreItem.inventory_type}) with a new serial number, holder, and location.`
+                : 'Add another unit of this inventory item.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="add-more-serial">Serial Number *</Label>
+              <Input
+                id="add-more-serial"
+                value={addMoreForm.serial_number}
+                onChange={(e) =>
+                  setAddMoreForm((prev) => ({ ...prev, serial_number: e.target.value }))
+                }
+                placeholder="e.g., SN-2024-001"
+                disabled={addMoreSubmitting}
+              />
+            </div>
+            <div>
+              <Label>Inventory Holder *</Label>
+              <Select
+                value={addMoreForm.holder_user_id || ''}
+                onValueChange={(value) =>
+                  setAddMoreForm((prev) => ({ ...prev, holder_user_id: value }))
+                }
+                disabled={addMoreSubmitting}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select custodian" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={String(user.id)}>
+                      {user.full_name || user.username}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="add-more-location">Location *</Label>
+              <Input
+                id="add-more-location"
+                value={addMoreForm.location}
+                onChange={(e) =>
+                  setAddMoreForm((prev) => ({ ...prev, location: e.target.value }))
+                }
+                placeholder="Warehouse location"
+                disabled={addMoreSubmitting}
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setAddMoreItem(null)}
+                disabled={addMoreSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleAddMore} disabled={addMoreSubmitting}>
+                {addMoreSubmitting ? 'Adding…' : 'Add'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <InventoryDeleteDialog
+        item={deleteTarget}
+        open={deleteTarget != null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        onDeleteAll={handleDeleteAll}
+        onDeleteOne={handleDeleteOneSerial}
       />
     </div>
   );

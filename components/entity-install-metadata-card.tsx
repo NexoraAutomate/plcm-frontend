@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Pencil, Upload, Trash2, Replace } from 'lucide-react';
+import Link from 'next/link';
+import { Pencil, Upload, Trash2, Replace, Network } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -56,6 +57,7 @@ interface EntityInstallMetadataCardProps {
   onUpdate: (data: Partial<HierarchyInstallFields>) => Promise<void>;
   projectId?: number;
   allowReplace?: boolean;
+  hierarchyHref?: string;
 }
 
 function normalizeInstallPayload(data: Record<string, unknown>) {
@@ -68,6 +70,7 @@ export function EntityInstallMetadataCard({
   onUpdate,
   projectId,
   allowReplace = false,
+  hierarchyHref,
 }: EntityInstallMetadataCardProps) {
   const { users } = useDataStore();
   const router = useRouter();
@@ -229,6 +232,14 @@ export function EntityInstallMetadataCard({
             </CardDescription>
           </div>
           <div className="flex gap-2">
+            {hierarchyHref ? (
+              <Button type="button" variant="outline" size="sm" asChild>
+                <Link href={hierarchyHref}>
+                  <Network className="mr-2 h-4 w-4" />
+                  Hierarchy
+                </Link>
+              </Button>
+            ) : null}
             {allowReplace && projectId ? (
               <Button type="button" variant="outline" size="sm" onClick={() => setReplaceOpen(true)}>
                 <Replace className="mr-2 h-4 w-4" />

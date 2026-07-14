@@ -15,7 +15,6 @@ import { EntityCards } from '@/components/entity-cards';
 import { EntityForm } from '@/components/entity-form';
 import { EntityInventorySearch } from '@/components/entity-inventory-search';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import axios from 'axios';
 import * as api from '@/lib/api';
@@ -34,12 +33,14 @@ import {
   ReplaceFromInventoryDialog,
   type ReplaceFromInventoryTarget,
 } from '@/components/replace-from-inventory-dialog';
-import { filterCurrentInstallEntities, HARDWARE_ENTITY_DETAIL_PATH } from '@/lib/entity-replacement';
+import {
+  filterChildrenForParentSlot,
+  systemHierarchyPath,
+} from '@/lib/entity-replacement';
 import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
 
 export default function SystemDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const systemId = params.id as string;
   const { pageLoading } = useEntityHierarchyGate();
   const {
@@ -66,7 +67,7 @@ export default function SystemDetailPage() {
   const system = useResolvedHardwareEntity(systemId, 'system', systems);
   const project = system ? projects.find((p) => p.id === system.project_id) : null;
   const systemSubsystems = system
-    ? filterCurrentInstallEntities(subsystems.filter((sub) => sub.system_id === system.id))
+    ? filterChildrenForParentSlot(subsystems, system, systems, (sub) => sub.system_id)
     : [];
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
@@ -360,6 +361,7 @@ export default function SystemDetailPage() {
         onUpdate={(data) => updateSystem(system.id, data)}
         projectId={project?.id}
         allowReplace
+        hierarchyHref={systemHierarchyPath(project?.id, system.id)}
       />
 
       {/* Subsystems Cards */}
@@ -383,6 +385,15 @@ export default function SystemDetailPage() {
         }}
         onDelete={handleDeleteSubsystem}
         detailPath={(id) => `/subsystems/${id}`}
+        secondaryPath={
+          project
+            ? (id) =>
+                systemHierarchyPath(project.id, system.id, {
+                  rootType: 'subsystem',
+                  rootId: id,
+                }) ?? '#'
+            : undefined
+        }
         addButtonLabel="Add Subsystem"
         emptyMessage="No subsystems yet. Click 'Add Subsystem' to create one."
         childEntityType="subsystem"
@@ -447,11 +458,6 @@ export default function SystemDetailPage() {
           onOpenChange={setReplaceOpen}
           projectId={project.id}
           target={replaceTarget}
-          onCompleted={(result) => {
-            if (result.new_entity_id && result.new_entity_id !== Number(systemId)) {
-              router.replace(HARDWARE_ENTITY_DETAIL_PATH.system(result.new_entity_id));
-            }
-          }}
         />
       ) : null}
     </div>

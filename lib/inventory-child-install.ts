@@ -69,6 +69,7 @@ export interface ChildInstallSlot {
   skipped: boolean;
   selectedInventoryId: string;
   selectedInstanceId: string;
+  selectedInstanceSerial?: string;
 }
 
 interface HierarchyContext {
@@ -105,14 +106,16 @@ export async function loadAllowedChildHierarchyNames(
 export function filterInventoryForChildCategory(
   items: Inventory[],
   childType: HierarchyEntityType,
-  childName: string
+  childName: string,
+  includeInventoryIds: number[] = []
 ): Inventory[] {
   const normalized = childName.trim().toLowerCase();
+  const includeIds = new Set(includeInventoryIds);
   return items.filter(
     (item) =>
       item.inventory_type === childType &&
       item.name?.trim().toLowerCase() === normalized &&
-      item.quantity > 0
+      (item.quantity > 0 || includeIds.has(item.id))
   );
 }
 
@@ -388,6 +391,23 @@ function pickInventoryStockForChild(
   return options.find((item) => item.quantity > 0);
 }
 
+/**
+ * True when child stock was already removed at compose time and should be
+ * installed without a second consume. Prefer the explicit flag; also treat
+ * serial-snapshot links (instance cleared after compose) as composed so
+ * legacy rows with stock_consumed=false still install every child.
+ */
+export function isComposedChildLink(link: {
+  stock_consumed?: boolean;
+  child_instance_id?: number | null;
+  child_instance_serial?: string | null;
+}): boolean {
+  if (link.stock_consumed) return true;
+  return (
+    link.child_instance_id == null && Boolean(link.child_instance_serial?.trim())
+  );
+}
+
 /** Install configured inventory children (and their descendants) when parent is used in hierarchy. */
 export async function installDefinedInventoryChildren({
   parentInventoryItem,
@@ -396,6 +416,7 @@ export async function installDefinedInventoryChildren({
   parentInstanceSerial,
   createEntityByType,
   inventoryUpdates,
+  prefetchedChildren,
 }: {
   parentInventoryItem: Inventory;
   parentEntityId: number;
@@ -403,20 +424,32 @@ export async function installDefinedInventoryChildren({
   parentInstanceSerial?: string | null;
   createEntityByType: CreateEntityByTypeFn;
   inventoryUpdates?: Map<number, Inventory>;
+  /** Prefer this when parent stock was already consumed (instance FKs cleared). */
+  prefetchedChildren?: Array<{
+    child_inventory_id: number;
+    child_instance_id?: number | null;
+    child_instance_serial?: string | null;
+    stock_consumed?: boolean;
+    child_category_name?: string;
+  }>;
 }): Promise<number> {
   if (!isValidEntityId(parentEntityId)) {
     throw new Error('Invalid parent entity for child inventory install');
   }
 
   const parentType = parentInventoryItem.inventory_type as HierarchyEntityType;
-  if (!canAddInventoryChildren(parentType)) return 0;
+  if (parentType === 'component' || !canAddInventoryChildren(parentType)) return 0;
 
   const childType = getChildInventoryType(parentType);
-  const configuredChildrenRes = await api.inventory.getChildren(parentInventoryItem.id, {
-    parentInstanceId: parentInstanceId ?? undefined,
-    parentInstanceSerial: parentInstanceSerial ?? undefined,
-  });
-  const configuredChildren = configuredChildrenRes.data ?? [];
+  const configuredChildren =
+    prefetchedChildren ??
+    (
+      await api.inventory.getChildren(parentInventoryItem.id, {
+        parentInstanceId: parentInstanceId ?? undefined,
+        parentInstanceSerial: parentInstanceSerial ?? undefined,
+      })
+    ).data ??
+    [];
 
   if (configuredChildren.length > 0) {
     const childStatusRes = await api.statuses.list(STATUS_TYPE_BY_ENTITY[childType]);
@@ -427,18 +460,25 @@ export async function installDefinedInventoryChildren({
     let existingChildren: { name: string; serial_number?: string }[] = [];
 
     for (const link of configuredChildren) {
-      const stockRes = await api.inventory.get(link.child_inventory_id);
-      const stock = stockRes.data;
-      if (!stock || stock.quantity <= 0) continue;
+      const cached = inventoryUpdates?.get(link.child_inventory_id);
+      const stockRes = cached ? null : await api.inventory.get(link.child_inventory_id);
+      const stock = cached ?? stockRes?.data;
+      if (!stock) continue;
+
+      const alreadyConsumed = isComposedChildLink(link);
+      // Legacy free-stock links need remaining qty; composed links install from snapshot.
+      if (!alreadyConsumed && stock.quantity <= 0) continue;
 
       const result = await installEntityFromInventory({
         inventoryItem: stock,
-        instanceId: link.child_instance_id ?? undefined,
+        instanceId: alreadyConsumed ? undefined : (link.child_instance_id ?? undefined),
         parentEntityId,
         entityType: childType,
         existingChildren,
         defaultStatus,
         createEntity: (data) => createEntityByType(childType, data),
+        skipConsume: alreadyConsumed,
+        composedSerialNumber: link.child_instance_serial,
       });
 
       inventoryUpdates?.set(stock.id, result.updatedInventory);
@@ -448,7 +488,7 @@ export async function installDefinedInventoryChildren({
       const nestedCount = await installDefinedInventoryChildren({
         parentInventoryItem: { ...stock, ...result.updatedInventory },
         parentEntityId: result.id,
-        parentInstanceId: link.child_instance_id ?? undefined,
+        parentInstanceId: alreadyConsumed ? undefined : (link.child_instance_id ?? undefined),
         parentInstanceSerial: link.child_instance_serial ?? undefined,
         createEntityByType,
         inventoryUpdates,
@@ -469,7 +509,10 @@ export async function installDefinedInventoryChildren({
     api.inventory.list(0, 1000, childType),
     api.statuses.list(STATUS_TYPE_BY_ENTITY[childType]),
   ]);
-  const childInventory = childInventoryRes.data ?? [];
+  let childInventory = (childInventoryRes.data ?? []).map((item) => {
+    const updated = inventoryUpdates?.get(item.id);
+    return updated ? { ...item, ...updated } : item;
+  });
   const defaultStatus = childStatusRes.data?.[0];
   if (!defaultStatus) return 0;
 
@@ -490,6 +533,9 @@ export async function installDefinedInventoryChildren({
     });
 
     inventoryUpdates?.set(stock.id, result.updatedInventory);
+    childInventory = childInventory.map((item) =>
+      item.id === stock.id ? { ...item, ...result.updatedInventory } : item
+    );
     existingChildren = [...existingChildren, { name: stock.name }];
     installedCount += 1;
 
@@ -514,6 +560,8 @@ export async function installEntityFromInventory({
   existingChildren,
   defaultStatus,
   createEntity,
+  skipConsume = false,
+  composedSerialNumber,
 }: {
   inventoryItem: Inventory;
   instanceId?: number;
@@ -522,6 +570,8 @@ export async function installEntityFromInventory({
   existingChildren: { name: string; serial_number?: string }[];
   defaultStatus: Status;
   createEntity: CreateEntityFn;
+  skipConsume?: boolean;
+  composedSerialNumber?: string | null;
 }): Promise<{ id: number; updatedInventory: Inventory }> {
   const parentField = PARENT_FK_FIELD[entityType];
   if (!parentField) {
@@ -537,6 +587,8 @@ export async function installEntityFromInventory({
     existingChildren,
     defaultStatus,
     createEntity,
+    skipConsume,
+    composedSerialNumber,
   });
 
   return { id: result.entityId, updatedInventory: result.updatedInventory };
@@ -565,6 +617,24 @@ export async function installEntityFromInventoryWithChildren({
   updatedInventory: Inventory;
   childrenInstalled: number;
 }> {
+  const parentInstanceSerial =
+    resolveInventoryInstanceSerial(inventoryItem, instanceId ?? null) ?? null;
+
+  // Snapshot composition before parent consume: deleting the parent instance
+  // SET NULLs parent_instance_id on child links.
+  let prefetchedChildren: Awaited<ReturnType<typeof api.inventory.getChildren>>['data'] = [];
+  if (canAddInventoryChildren(entityType)) {
+    try {
+      const childrenRes = await api.inventory.getChildren(inventoryItem.id, {
+        parentInstanceId: instanceId ?? undefined,
+        parentInstanceSerial: parentInstanceSerial ?? undefined,
+      });
+      prefetchedChildren = childrenRes.data ?? [];
+    } catch (err) {
+      console.warn('Failed to prefetch inventory children before install:', err);
+    }
+  }
+
   const parentResult = await installEntityFromInventory({
     inventoryItem,
     instanceId,
@@ -582,9 +652,10 @@ export async function installEntityFromInventoryWithChildren({
     parentInventoryItem: { ...inventoryItem, ...parentResult.updatedInventory },
     parentEntityId: parentResult.id,
     parentInstanceId: instanceId ?? null,
-    parentInstanceSerial: resolveInventoryInstanceSerial(inventoryItem, instanceId ?? null) ?? null,
+    parentInstanceSerial,
     createEntityByType,
     inventoryUpdates,
+    prefetchedChildren,
   });
 
   return {
@@ -613,6 +684,7 @@ export function buildInitialChildSlots(
       skipped: false,
       selectedInventoryId: saved ? String(saved.child_inventory_id) : '',
       selectedInstanceId: saved?.child_instance_id ? String(saved.child_instance_id) : '',
+      selectedInstanceSerial: saved?.child_instance_serial?.trim() || undefined,
     };
   });
 }

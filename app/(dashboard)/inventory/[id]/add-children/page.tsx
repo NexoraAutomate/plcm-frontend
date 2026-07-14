@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
@@ -58,8 +59,10 @@ export default function InventoryAddChildrenPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const inventoryId = Number(params.id);
   const instanceIdFromQuery = searchParams.get('instanceId');
+  const serialFromQuery = searchParams.get('serial')?.trim() || null;
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -70,6 +73,7 @@ export default function InventoryAddChildrenPage() {
   const [skipAllChildren, setSkipAllChildren] = useState(false);
   const [stopAtThisLevel, setStopAtThisLevel] = useState(false);
   const [parentInstanceId, setParentInstanceId] = useState<number | null>(null);
+  const [parentSerialOverride, setParentSerialOverride] = useState<string | null>(null);
   const [serialDialogOpen, setSerialDialogOpen] = useState(false);
 
   const parentType = inventoryItem?.inventory_type as HierarchyEntityType | undefined;
@@ -77,13 +81,11 @@ export default function InventoryAddChildrenPage() {
     ? getChildInventoryType(parentType)
     : null;
 
-  const parentInstanceSerial = useMemo(
-    () =>
-      inventoryItem
-        ? resolveInventoryInstanceSerial(inventoryItem, parentInstanceId)
-        : undefined,
-    [inventoryItem, parentInstanceId]
-  );
+  const parentInstanceSerial = useMemo(() => {
+    if (parentSerialOverride) return parentSerialOverride;
+    if (!inventoryItem) return undefined;
+    return resolveInventoryInstanceSerial(inventoryItem, parentInstanceId);
+  }, [inventoryItem, parentInstanceId, parentSerialOverride]);
 
   useEffect(() => {
     if (!Number.isFinite(inventoryId)) {
@@ -119,14 +121,33 @@ export default function InventoryAddChildrenPage() {
             : null;
 
         let resolvedInstanceId = validInstanceId;
-        if (resolvedInstanceId == null && needsSerialSelection(item)) {
+        let resolvedSerialOverride: string | null = null;
+
+        if (resolvedInstanceId == null && serialFromQuery) {
+          const matchBySerial = item.instances?.find((instance) => {
+            const serial =
+              instance.original_serial_number?.trim() || instance.serial_number?.trim();
+            return serial?.toLowerCase() === serialFromQuery.toLowerCase();
+          });
+          if (matchBySerial?.id) {
+            resolvedInstanceId = matchBySerial.id;
+          } else {
+            // Serial belongs to a composed unit no longer in free stock.
+            resolvedSerialOverride = serialFromQuery;
+          }
+        }
+
+        if (resolvedInstanceId == null && !resolvedSerialOverride && needsSerialSelection(item)) {
           setSerialDialogOpen(true);
-        } else if (resolvedInstanceId == null && item.instances?.length === 1) {
+        } else if (resolvedInstanceId == null && !resolvedSerialOverride && item.instances?.length === 1) {
           resolvedInstanceId = item.instances[0].id;
         }
         setParentInstanceId(resolvedInstanceId);
+        setParentSerialOverride(resolvedSerialOverride);
 
-        const instanceSerial = resolveInventoryInstanceSerial(item, resolvedInstanceId);
+        const instanceSerial =
+          resolvedSerialOverride ||
+          resolveInventoryInstanceSerial(item, resolvedInstanceId);
 
         const [hierarchies, inventoryList, savedChildrenRes] = await Promise.all([
           loadAllowedChildHierarchyNames(item.name, type),
@@ -151,7 +172,7 @@ export default function InventoryAddChildrenPage() {
     };
 
     void load();
-  }, [inventoryId, instanceIdFromQuery, router]);
+  }, [inventoryId, instanceIdFromQuery, serialFromQuery, router]);
 
   async function reloadSavedChildren(instanceId: number | null) {
     if (!inventoryItem) return;
@@ -169,15 +190,24 @@ export default function InventoryAddChildrenPage() {
 
   function handleParentSerialConfirm(instanceId: number) {
     setParentInstanceId(instanceId);
+    setParentSerialOverride(null);
     setSerialDialogOpen(false);
     router.replace(`/inventory/${inventoryId}/add-children?instanceId=${instanceId}`);
     void reloadSavedChildren(instanceId);
   }
 
+  async function invalidateInventoryCaches() {
+    await queryClient.invalidateQueries({ queryKey: ['inventory'] });
+  }
+
   async function handleSubmit() {
     if (!inventoryItem || !parentType || !childType) return;
 
-    if (needsSerialSelection(inventoryItem) && parentInstanceId == null) {
+    if (
+      needsSerialSelection(inventoryItem) &&
+      parentInstanceId == null &&
+      !parentSerialOverride
+    ) {
       setSerialDialogOpen(true);
       return;
     }
@@ -187,8 +217,10 @@ export default function InventoryAddChildrenPage() {
         setSubmitting(true);
         await api.inventory.replaceChildren(inventoryId, {
           parent_instance_id: parentInstanceId ?? undefined,
+          parent_instance_serial: parentInstanceSerial,
           children: [],
         });
+        await invalidateInventoryCaches();
         toast.success('Child configuration cleared');
         router.push('/inventory');
       } catch (err) {
@@ -216,7 +248,11 @@ export default function InventoryAddChildrenPage() {
         const stock = childInventory.find((item) => String(item.id) === slot.selectedInventoryId);
         if (!stock) continue;
 
-        if (needsSerialSelection(stock) && !slot.selectedInstanceId) {
+        if (
+          needsSerialSelection(stock) &&
+          !slot.selectedInstanceId &&
+          !slot.selectedInstanceSerial
+        ) {
           toast.error(`Select a serial number for "${slot.childName}" inventory stock`);
           return;
         }
@@ -227,23 +263,25 @@ export default function InventoryAddChildrenPage() {
         const instance = slot.selectedInstanceId
           ? stock?.instances?.find((entry) => entry.id === Number(slot.selectedInstanceId))
           : undefined;
+        const serial =
+          instance?.original_serial_number?.trim() ||
+          instance?.serial_number?.trim() ||
+          slot.selectedInstanceSerial ||
+          undefined;
         return {
           child_category_name: slot.childName,
           child_inventory_id: Number(slot.selectedInventoryId),
-          child_instance_id: slot.selectedInstanceId
-            ? Number(slot.selectedInstanceId)
-            : undefined,
-          child_instance_serial:
-            instance?.original_serial_number?.trim() ||
-            instance?.serial_number?.trim() ||
-            undefined,
+          child_instance_id: instance?.id,
+          child_instance_serial: serial,
         };
       });
 
       await api.inventory.replaceChildren(inventoryId, {
         parent_instance_id: parentInstanceId ?? undefined,
+        parent_instance_serial: parentInstanceSerial,
         children,
       });
+      await invalidateInventoryCaches();
 
       toast.success(
         `Saved ${children.length} child ${children.length === 1 ? 'item' : 'items'} for this inventory stock`
@@ -255,8 +293,23 @@ export default function InventoryAddChildrenPage() {
           (item) => String(item.id) === lastChild.selectedInventoryId
         );
         if (lastStock) {
-          const childQuery =
-            lastChild.selectedInstanceId != null
+          const lastSerial =
+            lastChild.selectedInstanceSerial ||
+            (() => {
+              const instance = lastChild.selectedInstanceId
+                ? lastStock.instances?.find(
+                    (entry) => entry.id === Number(lastChild.selectedInstanceId)
+                  )
+                : undefined;
+              return (
+                instance?.original_serial_number?.trim() ||
+                instance?.serial_number?.trim() ||
+                undefined
+              );
+            })();
+          const childQuery = lastSerial
+            ? `?serial=${encodeURIComponent(lastSerial)}`
+            : lastChild.selectedInstanceId
               ? `?instanceId=${lastChild.selectedInstanceId}`
               : '';
           router.push(`/inventory/${lastStock.id}/add-children${childQuery}`);
@@ -302,7 +355,8 @@ export default function InventoryAddChildrenPage() {
           <p className="mt-1 text-muted-foreground">
             Configure {childrenLabel.toLowerCase()} for inventory stock{' '}
             <span className="font-medium text-foreground">{inventoryItem.name}</span> ({parentLabel}
-            ). These install automatically when this item is used in a project.
+            ). Selected children are removed from available inventory and install automatically when
+            this item is used in a project.
           </p>
         </div>
         <Button variant="outline" asChild>
@@ -375,16 +429,23 @@ export default function InventoryAddChildrenPage() {
                       const options = filterInventoryForChildCategory(
                         childInventory,
                         childType,
-                        slot.childName
+                        slot.childName,
+                        slot.selectedInventoryId ? [Number(slot.selectedInventoryId)] : []
                       );
-                      const selectedStock = options.find(
-                        (item) => String(item.id) === slot.selectedInventoryId
-                      );
+                      const selectedStock =
+                        options.find((item) => String(item.id) === slot.selectedInventoryId) ||
+                        childInventory.find((item) => String(item.id) === slot.selectedInventoryId);
                       const stockInstances = selectedStock
                         ? getSelectableInstances(selectedStock)
                         : [];
+                      const composedSerialOnly =
+                        Boolean(slot.selectedInstanceSerial) &&
+                        !stockInstances.some(
+                          (instance) => String(instance.id) === slot.selectedInstanceId
+                        );
                       const stockNeedsSerial =
-                        selectedStock != null && needsSerialSelection(selectedStock);
+                        selectedStock != null &&
+                        (needsSerialSelection(selectedStock) || composedSerialOnly);
 
                       return (
                         <TableRow key={slot.hierarchyId}>
@@ -405,6 +466,12 @@ export default function InventoryAddChildrenPage() {
                                             instances.length === 1
                                               ? String(instances[0].id)
                                               : '',
+                                          selectedInstanceSerial:
+                                            instances.length === 1
+                                              ? instances[0].original_serial_number?.trim() ||
+                                                instances[0].serial_number?.trim() ||
+                                                undefined
+                                              : undefined,
                                         }
                                       : row
                                   )
@@ -432,31 +499,50 @@ export default function InventoryAddChildrenPage() {
                           </TableCell>
                           <TableCell>
                             {stockNeedsSerial ? (
-                              <Select
-                                value={slot.selectedInstanceId}
-                                onValueChange={(value) => {
-                                  setChildHierarchies((prev) =>
-                                    prev.map((row, rowIndex) =>
-                                      rowIndex === index
-                                        ? { ...row, selectedInstanceId: value }
-                                        : row
-                                    )
-                                  );
-                                }}
-                                disabled={slot.skipped}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select serial" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {stockInstances.map((instance, instanceIndex) => (
-                                    <SelectItem key={instance.id} value={String(instance.id)}>
-                                      {instance.serial_number?.trim() ||
-                                        `Unit ${instanceIndex + 1}`}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                              composedSerialOnly ? (
+                                <span className="text-sm">
+                                  {slot.selectedInstanceSerial}
+                                  <span className="ml-1 text-xs text-muted-foreground">
+                                    (composed)
+                                  </span>
+                                </span>
+                              ) : (
+                                <Select
+                                  value={slot.selectedInstanceId}
+                                  onValueChange={(value) => {
+                                    const instance = stockInstances.find(
+                                      (entry) => String(entry.id) === value
+                                    );
+                                    setChildHierarchies((prev) =>
+                                      prev.map((row, rowIndex) =>
+                                        rowIndex === index
+                                          ? {
+                                              ...row,
+                                              selectedInstanceId: value,
+                                              selectedInstanceSerial:
+                                                instance?.original_serial_number?.trim() ||
+                                                instance?.serial_number?.trim() ||
+                                                undefined,
+                                            }
+                                          : row
+                                      )
+                                    );
+                                  }}
+                                  disabled={slot.skipped}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select serial" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {stockInstances.map((instance, instanceIndex) => (
+                                      <SelectItem key={instance.id} value={String(instance.id)}>
+                                        {instance.serial_number?.trim() ||
+                                          `Unit ${instanceIndex + 1}`}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )
                             ) : (
                               <span className="text-sm text-muted-foreground">—</span>
                             )}
@@ -475,6 +561,8 @@ export default function InventoryAddChildrenPage() {
                                             checked === true ? '' : row.selectedInventoryId,
                                           selectedInstanceId:
                                             checked === true ? '' : row.selectedInstanceId,
+                                          selectedInstanceSerial:
+                                            checked === true ? undefined : row.selectedInstanceSerial,
                                         }
                                       : row
                                   )

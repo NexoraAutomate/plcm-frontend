@@ -15,6 +15,8 @@ import { EntityInstallMetadataCard } from '@/components/entity-install-metadata-
 import {
   resolveCurrentInstallEntity,
   resolveProjectIdForHardwareEntity,
+  resolveSystemIdForHardwareEntity,
+  systemHierarchyPath,
 } from '@/lib/entity-replacement';
 import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
 
@@ -36,6 +38,20 @@ export default function ComponentDetailPage() {
         components,
       })
     : null;
+  const systemId = component
+    ? resolveSystemIdForHardwareEntity('component', component.id, {
+        subsystems,
+        modules,
+        units,
+        components,
+      })
+    : null;
+  const hierarchyHref = component
+    ? systemHierarchyPath(projectId, systemId, {
+        rootType: 'component',
+        rootId: component.id,
+      })
+    : undefined;
 
   if (pageLoading) {
     return <PageLoader />;
@@ -154,6 +170,7 @@ export default function ComponentDetailPage() {
         onUpdate={(data) => updateComponent(component.id, data)}
         projectId={projectId ?? undefined}
         allowReplace
+        hierarchyHref={hierarchyHref}
       />
 
       {/* Component Details */}

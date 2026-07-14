@@ -11,6 +11,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { cn } from '@/lib/utils';
 import {
+  buildEntityHierarchyTree,
   buildSystemHierarchyTree,
   hierarchyTreeToFlow,
   DEFAULT_NODE_FIELD_VISIBILITY,
@@ -45,6 +46,24 @@ interface SystemHierarchyFlowProps {
   project?: Project;
   statuses?: Status[];
   className?: string;
+  /** When set, graph starts at this entity and only includes its descendants. */
+  rootType?: HierarchyEntityType;
+  rootEntityId?: number;
+}
+
+function emptyHierarchyMessage(rootType: HierarchyEntityType): string {
+  if (rootType === 'component') {
+    return 'This component has no child hierarchy.';
+  }
+  const childLabel =
+    rootType === 'system'
+      ? 'subsystems'
+      : rootType === 'subsystem'
+        ? 'modules'
+        : rootType === 'module'
+          ? 'units'
+          : 'components';
+  return `No ${childLabel} found for this ${rootType}. Add ${childLabel} to build the hierarchy graph.`;
 }
 
 export function SystemHierarchyFlow({
@@ -56,6 +75,8 @@ export function SystemHierarchyFlow({
   project,
   statuses = [],
   className,
+  rootType = 'system',
+  rootEntityId,
 }: SystemHierarchyFlowProps) {
   const [panel, setPanel] = useState<{
     open: boolean;
@@ -64,6 +85,9 @@ export function SystemHierarchyFlow({
   const [fieldVisibility, setFieldVisibility] = useState<HierarchyNodeFieldVisibility>(
     DEFAULT_NODE_FIELD_VISIBILITY
   );
+
+  const resolvedRootId = rootEntityId ?? system.id;
+  const resolvedRootType = rootType;
 
   const handleToggleDetails = useCallback((entityId: number, type: HierarchyEntityType) => {
     setPanel((prev) => {
@@ -80,15 +104,32 @@ export function SystemHierarchyFlow({
     setPanel((prev) => ({ ...prev, open: false }));
   }, []);
 
-  const { nodes, edges } = useMemo(() => {
-    const tree = buildSystemHierarchyTree(
-      system,
-      subsystems,
-      modules,
-      units,
-      components,
-      statuses
-    );
+  const { nodes, edges, rootMissing } = useMemo(() => {
+    const tree =
+      resolvedRootType === 'system' && resolvedRootId === system.id
+        ? buildSystemHierarchyTree(
+            system,
+            subsystems,
+            modules,
+            units,
+            components,
+            statuses
+          )
+        : buildEntityHierarchyTree(
+            resolvedRootType,
+            resolvedRootId,
+            system,
+            subsystems,
+            modules,
+            units,
+            components,
+            statuses
+          );
+
+    if (!tree) {
+      return { nodes: [], edges: [], rootMissing: true };
+    }
+
     const flow = hierarchyTreeToFlow(tree);
 
     return {
@@ -100,10 +141,21 @@ export function SystemHierarchyFlow({
         },
       })),
       edges: flow.edges,
+      rootMissing: false,
     };
-  }, [system, subsystems, modules, units, components, fieldVisibility, statuses]);
+  }, [
+    system,
+    subsystems,
+    modules,
+    units,
+    components,
+    fieldVisibility,
+    statuses,
+    resolvedRootType,
+    resolvedRootId,
+  ]);
 
-  if (nodes.length <= 1 && edges.length === 0) {
+  if (rootMissing || nodes.length === 0) {
     return (
       <div
         className={cn(
@@ -112,7 +164,9 @@ export function SystemHierarchyFlow({
         )}
       >
         <p className="text-sm text-muted-foreground">
-          No subsystems found for this system. Add subsystems to build the hierarchy graph.
+          {rootMissing
+            ? 'Hierarchy root entity was not found under this system.'
+            : emptyHierarchyMessage(resolvedRootType)}
         </p>
       </div>
     );

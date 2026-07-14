@@ -37,17 +37,22 @@ export function inventoryUsesInstances(type: HierarchyEntityType): boolean {
   return !inventorySupportsQuantity(type);
 }
 
-export function formatInventorySerialNumbers(item: Inventory): string {
+export function getInventorySerialNumbers(item: Inventory): string[] {
   if (inventorySupportsQuantity(item.inventory_type as HierarchyEntityType)) {
-    return item.serial_number?.trim() || '—';
+    const serial = item.serial_number?.trim();
+    return serial ? [serial] : [];
   }
   const serials = (item.instances ?? [])
     .map((instance) => instance.serial_number?.trim())
     .filter((serial): serial is string => Boolean(serial));
-  if (serials.length > 0) {
-    return serials.join(', ');
-  }
-  return item.serial_number?.trim() || '—';
+  if (serials.length > 0) return serials;
+  const fallback = item.serial_number?.trim();
+  return fallback ? [fallback] : [];
+}
+
+export function formatInventorySerialNumbers(item: Inventory): string {
+  const serials = getInventorySerialNumbers(item);
+  return serials.length > 0 ? serials.join(', ') : '—';
 }
 
 export function serialNumberFromInventory(

@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useDataStore } from '@/lib/data-store';
 import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
@@ -31,16 +31,16 @@ import {
   type ReplaceFromInventoryTarget,
 } from '@/components/replace-from-inventory-dialog';
 import {
-  filterCurrentInstallEntities,
-  HARDWARE_ENTITY_DETAIL_PATH,
+  filterChildrenForParentSlot,
   resolveCurrentInstallEntity,
   resolveProjectIdForHardwareEntity,
+  resolveSystemIdForHardwareEntity,
+  systemHierarchyPath,
 } from '@/lib/entity-replacement';
 import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
 
 export default function UnitDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const unitId = params.id as string;
   const { pageLoading } = useEntityHierarchyGate();
   const {
@@ -76,8 +76,22 @@ export default function UnitDetailPage() {
         components: [],
       })
     : null;
+  const systemId = unit
+    ? resolveSystemIdForHardwareEntity('unit', unit.id, {
+        subsystems,
+        modules,
+        units,
+        components: [],
+      })
+    : null;
+  const hierarchyHref = unit
+    ? systemHierarchyPath(projectId, systemId, {
+        rootType: 'unit',
+        rootId: unit.id,
+      })
+    : undefined;
   const unitComponents = unit
-    ? filterCurrentInstallEntities(components.filter((c) => c.unit_id === unit.id))
+    ? filterChildrenForParentSlot(components, unit, units, (component) => component.unit_id)
     : [];
 
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
@@ -363,6 +377,7 @@ export default function UnitDetailPage() {
         onUpdate={(data) => updateUnit(unit.id, data)}
         projectId={projectId ?? undefined}
         allowReplace
+        hierarchyHref={hierarchyHref}
       />
 
       {/* Components Cards */}
@@ -385,6 +400,15 @@ export default function UnitDetailPage() {
         }}
         onDelete={handleDeleteComponent}
         detailPath={(id) => `/components/${id}`}
+        secondaryPath={
+          projectId && systemId
+            ? (id) =>
+                systemHierarchyPath(projectId, systemId, {
+                  rootType: 'component',
+                  rootId: id,
+                }) ?? '#'
+            : undefined
+        }
         addButtonLabel="Add Component"
         emptyMessage="No components yet. Click 'Add Component' to create one."
         childEntityType="component"
@@ -449,11 +473,6 @@ export default function UnitDetailPage() {
           onOpenChange={setReplaceOpen}
           projectId={projectId}
           target={replaceTarget}
-          onCompleted={(result) => {
-            if (result.new_entity_id && result.new_entity_id !== Number(unitId)) {
-              router.replace(HARDWARE_ENTITY_DETAIL_PATH.unit(result.new_entity_id));
-            }
-          }}
         />
       ) : null}
     </div>

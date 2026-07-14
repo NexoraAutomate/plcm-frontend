@@ -101,7 +101,7 @@ export function InventorySerialSelectDialog({
             }}
             disabled={!selectedInstanceId || confirming}
           >
-            {confirming ? 'Adding...' : confirmLabel}
+            {confirming ? 'Working...' : confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

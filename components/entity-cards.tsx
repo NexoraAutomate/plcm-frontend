@@ -102,6 +102,11 @@ export function EntityCards({
                                 Current install · replacement #{entity.replacement_sequence}
                               </p>
                             ) : null}
+                            {entity.serial_number?.trim() ? (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Serial # {entity.serial_number}
+                              </p>
+                            ) : null}
                             {entity.description && (
                               <p className="text-xs text-muted-foreground truncate mt-1">
                                 {entity.description}

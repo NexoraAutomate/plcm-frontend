@@ -261,6 +261,11 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       const run = async () => {
         setHierarchyLoading(true);
         try {
+          if (options?.force) {
+            await queryClient.invalidateQueries({
+              queryKey: queryKeys.hierarchyEntities(),
+            });
+          }
           await loadHierarchyData();
         } catch (err) {
           console.warn('Failed to load hierarchy data:', err);
@@ -274,7 +279,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       hierarchyLoadPromiseRef.current = run();
       await hierarchyLoadPromiseRef.current;
     },
-    [loadHierarchyData]
+    [loadHierarchyData, queryClient]
   );
 
   const ensureHierarchyLoadedRef = useRef(ensureHierarchyLoaded);
@@ -657,7 +662,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const createSystem = async (data: Partial<Models.System>) => {
     try {
       const res = await api.systems.create(data);
-      setSystems([...systems, enrichEntityWithStatus(res.data, statuses)]);
+      setSystems((prev) => [...prev, enrichEntityWithStatus(res.data, statusesRef.current)]);
       toast.success('System created successfully');
       return res.data;
     } catch (err) {
@@ -669,7 +674,9 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const updateSystem = async (id: number, data: Partial<Models.System>) => {
     try {
       const res = await api.systems.update(id, data);
-      setSystems(systems.map((s) => (s.id === id ? enrichEntityWithStatus(res.data, statuses) : s)));
+      setSystems((prev) =>
+        prev.map((s) => (s.id === id ? enrichEntityWithStatus(res.data, statusesRef.current) : s))
+      );
       toast.success('System updated successfully');
       return res.data;
     } catch (err) {
@@ -681,7 +688,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const deleteSystem = async (id: number) => {
     try {
       await api.systems.delete(id);
-      setSystems(systems.filter((s) => s.id !== id));
+      setSystems((prev) => prev.filter((s) => s.id !== id));
       toast.success('System deleted successfully');
     } catch (err) {
       toast.error('Failed to delete system');
@@ -713,7 +720,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const createSubsystem = async (data: Partial<Models.Subsystem>) => {
     try {
       const res = await api.subsystems.create(data);
-      setSubsystems([...subsystems, enrichEntityWithStatus(res.data, statuses)]);
+      setSubsystems((prev) => [...prev, enrichEntityWithStatus(res.data, statusesRef.current)]);
       toast.success('Subsystem created successfully');
       return res.data;
     } catch (err) {
@@ -725,7 +732,9 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const updateSubsystem = async (id: number, data: Partial<Models.Subsystem>) => {
     try {
       const res = await api.subsystems.update(id, data);
-      setSubsystems(subsystems.map((s) => (s.id === id ? enrichEntityWithStatus(res.data, statuses) : s)));
+      setSubsystems((prev) =>
+        prev.map((s) => (s.id === id ? enrichEntityWithStatus(res.data, statusesRef.current) : s))
+      );
       toast.success('Subsystem updated successfully');
       return res.data;
     } catch (err) {
@@ -737,7 +746,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const deleteSubsystem = async (id: number) => {
     try {
       await api.subsystems.delete(id);
-      setSubsystems(subsystems.filter((s) => s.id !== id));
+      setSubsystems((prev) => prev.filter((s) => s.id !== id));
       toast.success('Subsystem deleted successfully');
     } catch (err) {
       toast.error('Failed to delete subsystem');
@@ -769,7 +778,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const createModule = async (data: Partial<Models.Module>) => {
     try {
       const res = await api.modules.create(data);
-      setModules([...modules, enrichEntityWithStatus(res.data, statuses)]);
+      setModules((prev) => [...prev, enrichEntityWithStatus(res.data, statusesRef.current)]);
       toast.success('Module created successfully');
       return res.data;
     } catch (err) {
@@ -781,7 +790,9 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const updateModule = async (id: number, data: Partial<Models.Module>) => {
     try {
       const res = await api.modules.update(id, data);
-      setModules(modules.map((m) => (m.id === id ? enrichEntityWithStatus(res.data, statuses) : m)));
+      setModules((prev) =>
+        prev.map((m) => (m.id === id ? enrichEntityWithStatus(res.data, statusesRef.current) : m))
+      );
       toast.success('Module updated successfully');
       return res.data;
     } catch (err) {
@@ -793,7 +804,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const deleteModule = async (id: number) => {
     try {
       await api.modules.delete(id);
-      setModules(modules.filter((m) => m.id !== id));
+      setModules((prev) => prev.filter((m) => m.id !== id));
       toast.success('Module deleted successfully');
     } catch (err) {
       toast.error('Failed to delete module');
@@ -825,7 +836,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const createUnit = async (data: Partial<Models.Unit>) => {
     try {
       const res = await api.units.create(data);
-      setUnits([...units, enrichEntityWithStatus(res.data, statuses)]);
+      setUnits((prev) => [...prev, enrichEntityWithStatus(res.data, statusesRef.current)]);
       toast.success('Unit created successfully');
       return res.data;
     } catch (err) {
@@ -837,7 +848,9 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const updateUnit = async (id: number, data: Partial<Models.Unit>) => {
     try {
       const res = await api.units.update(id, data);
-      setUnits(units.map((u) => (u.id === id ? enrichEntityWithStatus(res.data, statuses) : u)));
+      setUnits((prev) =>
+        prev.map((u) => (u.id === id ? enrichEntityWithStatus(res.data, statusesRef.current) : u))
+      );
       toast.success('Unit updated successfully');
       return res.data;
     } catch (err) {
@@ -849,7 +862,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const deleteUnit = async (id: number) => {
     try {
       await api.units.delete(id);
-      setUnits(units.filter((u) => u.id !== id));
+      setUnits((prev) => prev.filter((u) => u.id !== id));
       toast.success('Unit deleted successfully');
     } catch (err) {
       toast.error('Failed to delete unit');
@@ -881,7 +894,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const createComponent = async (data: Partial<Models.Component>) => {
     try {
       const res = await api.components.create(data);
-      setComponents([...components, enrichEntityWithStatus(res.data, statuses)]);
+      setComponents((prev) => [...prev, enrichEntityWithStatus(res.data, statusesRef.current)]);
       toast.success('Component created successfully');
       return res.data;
     } catch (err) {
@@ -893,7 +906,9 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const updateComponent = async (id: number, data: Partial<Models.Component>) => {
     try {
       const res = await api.components.update(id, data);
-      setComponents(components.map((c) => (c.id === id ? enrichEntityWithStatus(res.data, statuses) : c)));
+      setComponents((prev) =>
+        prev.map((c) => (c.id === id ? enrichEntityWithStatus(res.data, statusesRef.current) : c))
+      );
       toast.success('Component updated successfully');
       return res.data;
     } catch (err) {
@@ -905,7 +920,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const deleteComponent = async (id: number) => {
     try {
       await api.components.delete(id);
-      setComponents(components.filter((c) => c.id !== id));
+      setComponents((prev) => prev.filter((c) => c.id !== id));
       toast.success('Component deleted successfully');
     } catch (err) {
       toast.error('Failed to delete component');
@@ -927,7 +942,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const createInventoryItem = async (data: Partial<Models.Inventory>) => {
     try {
       const res = await api.inventory.create(data);
-      setInventory([...inventory, res.data]);
+      setInventory((prev) => [...prev, res.data]);
       toast.success('Inventory item created successfully');
       return res.data;
     } catch (err) {
@@ -939,7 +954,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const updateInventoryItem = async (id: number, data: Partial<Models.Inventory>) => {
     try {
       const res = await api.inventory.update(id, data);
-      setInventory(inventory.map((inv) => (inv.id === id ? res.data : inv)));
+      setInventory((prev) => prev.map((inv) => (inv.id === id ? res.data : inv)));
       toast.success('Inventory item updated successfully');
       return res.data;
     } catch (err) {
@@ -951,7 +966,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const deleteInventoryItem = async (id: number) => {
     try {
       await api.inventory.delete(id);
-      setInventory(inventory.filter((inv) => inv.id !== id));
+      setInventory((prev) => prev.filter((inv) => inv.id !== id));
       toast.success('Inventory item deleted successfully');
     } catch (err) {
       toast.error('Failed to delete inventory item');

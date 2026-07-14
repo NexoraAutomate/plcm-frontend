@@ -1,16 +1,23 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, ChevronDown } from 'lucide-react';
+import { Search, ChevronDown, Network } from 'lucide-react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
+import { useDataStore } from '@/lib/data-store';
 import { inventoryPartNumber } from '@/lib/inventory-entity-fields';
-import { needsSerialSelection } from '@/lib/inventory-install';
+import { isInventoryInStock } from '@/lib/inventory-filter';
+import {
+  getSelectableInstances,
+  needsSerialSelection,
+} from '@/lib/inventory-install';
+import { formatUserRef } from '@/lib/user-display';
 import { InventorySerialSelectDialog } from '@/components/inventory-serial-select-dialog';
+import { InventoryHierarchyDialog } from '@/components/inventory-hierarchy-dialog';
 import type { Inventory } from '@/lib/models';
 import { getInventoryTypeLabel, type HierarchyEntityType } from '@/lib/entity-hierarchy';
 
@@ -21,12 +28,27 @@ interface EntityInventorySearchProps {
   onUseInventory: (item: Inventory, instanceId?: number) => Promise<Inventory | void>;
 }
 
+function resolveInventoryHolderId(item: Inventory): number | undefined {
+  if (item.holder_user_id) return item.holder_user_id;
+  return item.instances?.find((instance) => instance.holder_user_id)?.holder_user_id;
+}
+
+function resolveInventoryLocation(item: Inventory): string {
+  if (item.location?.trim()) return item.location;
+  const locations = (item.instances ?? [])
+    .map((instance) => instance.location?.trim())
+    .filter((location): location is string => Boolean(location));
+  if (locations.length === 0) return '—';
+  return [...new Set(locations)].join(', ');
+}
+
 export function EntityInventorySearch({
   parentEntityName,
   inventoryType,
   allowedInventoryNames,
   onUseInventory,
 }: EntityInventorySearchProps) {
+  const { users } = useDataStore();
   const [inventoryItems, setInventoryItems] = useState<Inventory[]>([]);
   const [filteredItems, setFilteredItems] = useState<Inventory[]>([]);
   const [search, setSearch] = useState('');
@@ -34,8 +56,23 @@ export function EntityInventorySearch({
   const [isExpanded, setIsExpanded] = useState(false);
   const [usingItemId, setUsingItemId] = useState<number | null>(null);
   const [serialDialogItem, setSerialDialogItem] = useState<Inventory | null>(null);
+  const [hierarchySerialSelectItem, setHierarchySerialSelectItem] = useState<Inventory | null>(
+    null
+  );
+  const [hierarchyView, setHierarchyView] = useState<{
+    item: Inventory;
+    instanceId?: number;
+  } | null>(null);
 
   const inventoryTypeLabel = getInventoryTypeLabel(inventoryType);
+
+  const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
+
+  function getHolderName(item: Inventory): string {
+    const holderId = resolveInventoryHolderId(item);
+    const holder = holderId != null ? usersById.get(holderId) : undefined;
+    return holder ? formatUserRef(holder) : '—';
+  }
 
   useEffect(() => {
     const fetchInventory = async () => {
@@ -53,7 +90,8 @@ export function EntityInventorySearch({
         const items = (res.data || []).filter(
           (item) =>
             item.inventory_type === inventoryType &&
-            allowedNames.has(item.name?.toLowerCase() ?? '')
+            allowedNames.has(item.name?.toLowerCase() ?? '') &&
+            isInventoryInStock(item)
         );
         setInventoryItems(items);
         setFilteredItems(items);
@@ -72,27 +110,34 @@ export function EntityInventorySearch({
 
   useEffect(() => {
     const searchLower = search.toLowerCase();
-    const filtered = inventoryItems.filter(
-      (item) =>
+    const filtered = inventoryItems.filter((item) => {
+      const holderName = getHolderName(item).toLowerCase();
+      const location = resolveInventoryLocation(item).toLowerCase();
+      return (
         item.name?.toLowerCase().includes(searchLower) ||
         item.serial_number?.toLowerCase().includes(searchLower) ||
         item.part_number?.toLowerCase().includes(searchLower) ||
-        item.oem_name?.toLowerCase().includes(searchLower)
-    );
+        item.oem_name?.toLowerCase().includes(searchLower) ||
+        holderName.includes(searchLower) ||
+        (location !== '—' && location.includes(searchLower))
+      );
+    });
     setFilteredItems(filtered);
-  }, [search, inventoryItems]);
+  }, [search, inventoryItems, usersById]);
 
   function updateInventoryRow(itemId: number, updatedInventory: Inventory) {
+    if (!isInventoryInStock(updatedInventory)) {
+      setInventoryItems((items) => items.filter((invItem) => invItem.id !== itemId));
+      return;
+    }
+
     setInventoryItems((items) =>
-      items.map((invItem) => (invItem.id === itemId ? { ...invItem, ...updatedInventory } : invItem))
-    );
-    setFilteredItems((items) =>
       items.map((invItem) => (invItem.id === itemId ? { ...invItem, ...updatedInventory } : invItem))
     );
   }
 
   async function performUse(item: Inventory, instanceId?: number) {
-    if (item.quantity <= 0) {
+    if (!isInventoryInStock(item)) {
       toast.error('This item is out of stock');
       return;
     }
@@ -118,6 +163,20 @@ export function EntityInventorySearch({
       return;
     }
     void performUse(item);
+  }
+
+  function openHierarchyView(item: Inventory, instanceId?: number) {
+    setHierarchyView({ item, instanceId });
+  }
+
+  function handleViewHierarchyClick(item: Inventory) {
+    if (needsSerialSelection(item)) {
+      setHierarchySerialSelectItem(item);
+      return;
+    }
+    const instances = getSelectableInstances(item);
+    const instanceId = instances.length === 1 ? instances[0].id : undefined;
+    openHierarchyView(item, instanceId);
   }
 
   if (loading) {
@@ -154,7 +213,7 @@ export function EntityInventorySearch({
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by name, serial number, part number, or OEM..."
+                placeholder="Search by name, serial, part number, OEM, holder, or location..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-10"
@@ -164,7 +223,7 @@ export function EntityInventorySearch({
             {filteredItems.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 {inventoryItems.length === 0
-                  ? `No ${inventoryType} inventory available for ${parentEntityName}`
+                  ? `No available ${inventoryType} inventory for ${parentEntityName}`
                   : 'No matching inventory items'}
               </div>
             ) : (
@@ -176,13 +235,15 @@ export function EntityInventorySearch({
                       <TableHead>Serial Number</TableHead>
                       <TableHead>Part Number</TableHead>
                       <TableHead>OEM</TableHead>
+                      <TableHead>Inventory Holder</TableHead>
+                      <TableHead>Location</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
                       <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredItems.map((item) => {
-                      const outOfStock = item.quantity <= 0;
+                      const qty = Number(item.quantity) || 0;
 
                       return (
                         <TableRow key={item.id}>
@@ -190,28 +251,38 @@ export function EntityInventorySearch({
                           <TableCell className="text-sm">{item.serial_number || '—'}</TableCell>
                           <TableCell className="text-sm">{inventoryPartNumber(item) || '—'}</TableCell>
                           <TableCell className="text-sm">{item.oem_name || '—'}</TableCell>
+                          <TableCell className="text-sm">{getHolderName(item)}</TableCell>
+                          <TableCell className="text-sm">{resolveInventoryLocation(item)}</TableCell>
                           <TableCell className="text-right font-medium">
                             <span
                               className={`px-2 py-1 rounded ${
-                                outOfStock
-                                  ? 'bg-red-100 text-red-800'
-                                  : item.quantity <= 5
+                                qty <= 5
                                   ? 'bg-yellow-100 text-yellow-800'
                                   : 'bg-green-100 text-green-800'
                               }`}
                             >
-                              {item.quantity}
+                              {qty}
                             </span>
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              size="sm"
-                              variant={outOfStock ? 'outline' : 'default'}
-                              onClick={() => handleUseItem(item)}
-                              disabled={outOfStock || usingItemId === item.id}
-                            >
-                              {usingItemId === item.id ? 'Adding...' : 'Use'}
-                            </Button>
+                            <div className="flex gap-1 justify-end">
+                              <Button
+                                size="icon-sm"
+                                variant="secondary"
+                                onClick={() => handleViewHierarchyClick(item)}
+                                title="View Hierarchy"
+                                aria-label="View Hierarchy"
+                              >
+                                <Network className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleUseItem(item)}
+                                disabled={usingItemId === item.id}
+                              >
+                                {usingItemId === item.id ? 'Adding...' : 'Use'}
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -235,6 +306,35 @@ export function EntityInventorySearch({
           if (serialDialogItem) {
             void performUse(serialDialogItem, instanceId);
           }
+        }}
+      />
+
+      <InventorySerialSelectDialog
+        item={hierarchySerialSelectItem}
+        open={hierarchySerialSelectItem != null}
+        onOpenChange={(open) => {
+          if (!open) setHierarchySerialSelectItem(null);
+        }}
+        confirmLabel="View Hierarchy"
+        description={
+          hierarchySerialSelectItem
+            ? `${hierarchySerialSelectItem.name} has ${hierarchySerialSelectItem.quantity} units in stock. Choose which serial number to view in the hierarchy graph.`
+            : undefined
+        }
+        onConfirm={(instanceId) => {
+          if (hierarchySerialSelectItem) {
+            openHierarchyView(hierarchySerialSelectItem, instanceId);
+            setHierarchySerialSelectItem(null);
+          }
+        }}
+      />
+
+      <InventoryHierarchyDialog
+        item={hierarchyView?.item ?? null}
+        instanceId={hierarchyView?.instanceId}
+        open={hierarchyView != null}
+        onOpenChange={(open) => {
+          if (!open) setHierarchyView(null);
         }}
       />
     </>

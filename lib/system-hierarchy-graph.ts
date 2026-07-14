@@ -207,6 +207,58 @@ export function buildSystemHierarchyTree(
   };
 }
 
+function findSubtreeNode(
+  root: HierarchyTreeNode,
+  type: HierarchyEntityType,
+  entityId: number
+): HierarchyTreeNode | null {
+  if (root.type === type && root.entityId === entityId) return root;
+  for (const child of root.children) {
+    const found = findSubtreeNode(child, type, entityId);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** Hierarchy rooted at a specific installed entity and its descendants only. */
+export function buildEntityHierarchyTree(
+  rootType: HierarchyEntityType,
+  rootEntityId: number,
+  system: System,
+  subsystems: Subsystem[],
+  modules: Module[],
+  units: Unit[],
+  components: Component[],
+  statuses: Status[] = []
+): HierarchyTreeNode | null {
+  const fullTree = buildSystemHierarchyTree(
+    system,
+    subsystems,
+    modules,
+    units,
+    components,
+    statuses
+  );
+
+  if (rootType === 'system') {
+    return rootEntityId === system.id ? fullTree : null;
+  }
+
+  return findSubtreeNode(fullTree, rootType, rootEntityId);
+}
+
+export const HIERARCHY_ENTITY_TYPES: HierarchyEntityType[] = [
+  'system',
+  'subsystem',
+  'module',
+  'unit',
+  'component',
+];
+
+export function isHierarchyEntityType(value: string | null | undefined): value is HierarchyEntityType {
+  return !!value && (HIERARCHY_ENTITY_TYPES as string[]).includes(value);
+}
+
 function collectNodesByDepth(
   root: HierarchyTreeNode
 ): Map<number, HierarchyTreeNode[]> {

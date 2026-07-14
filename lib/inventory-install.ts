@@ -86,6 +86,9 @@ export async function installEntityFromInventory({
   existingChildren,
   defaultStatus,
   createEntity,
+  /** When true, child stock was already removed at compose time — create entity only. */
+  skipConsume = false,
+  composedSerialNumber,
 }: {
   inventoryItem: Inventory;
   instanceId?: number;
@@ -95,18 +98,32 @@ export async function installEntityFromInventory({
   existingChildren: { name: string; serial_number?: string }[];
   defaultStatus: Status;
   createEntity: (data: Record<string, unknown>) => Promise<{ id: number }>;
+  skipConsume?: boolean;
+  composedSerialNumber?: string | null;
 }): Promise<{ entityId: number; updatedInventory: Inventory }> {
   if (!isValidEntityId(parentEntityId)) {
     throw new Error(`Invalid parent entity for ${entityType} install`);
   }
 
-  const consumeRes = await api.inventory.consume(inventoryItem.id, instanceId);
-  const consumedInstance = consumeRes.data?.consumed_instance ?? null;
-  const updatedInventory = consumeRes.data?.inventory ?? inventoryItem;
+  let consumedInstance: InventoryInstance | null = null;
+  let updatedInventory = inventoryItem;
+
+  if (!skipConsume) {
+    const consumeRes = await api.inventory.consume(inventoryItem.id, instanceId);
+    consumedInstance = consumeRes.data?.consumed_instance ?? null;
+    updatedInventory = consumeRes.data?.inventory ?? inventoryItem;
+  }
+
   const merged = mergeInventoryWithInstance(
     { ...inventoryItem, ...updatedInventory },
     consumedInstance
   );
+
+  const composedSerial = composedSerialNumber?.trim();
+  if (composedSerial) {
+    merged.serial_number = composedSerial;
+    merged.original_serial_number = merged.original_serial_number || composedSerial;
+  }
 
   const serialNumber = serialNumberFromInventory(
     merged,

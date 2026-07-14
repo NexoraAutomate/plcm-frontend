@@ -292,6 +292,7 @@ export interface InventoryChildLink {
   child_inventory_id: number
   child_instance_id?: number | null
   child_instance_serial?: string | null
+  stock_consumed?: boolean
 }
 
 // Entity (generic resource tracker)

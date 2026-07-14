@@ -69,6 +69,39 @@ export function filterCurrentInstallEntities<T extends HardwareEntityWithSlot>(e
   return [...bySlot.values()];
 }
 
+/**
+ * Children for a parent detail page after replacement.
+ * Prefer children whose FK points at the current parent; if none (legacy
+ * reparent miss), fall back to current-install children still attached to any
+ * superseded row in the same parent slot.
+ */
+export function filterChildrenForParentSlot<
+  TChild extends HardwareEntityWithSlot,
+  TParent extends HardwareEntityWithSlot,
+>(
+  children: TChild[],
+  parent: TParent,
+  allParents: TParent[],
+  getParentId: (child: TChild) => number
+): TChild[] {
+  const direct = filterCurrentInstallEntities(
+    children.filter((child) => getParentId(child) === parent.id)
+  );
+  if (direct.length > 0) return direct;
+
+  const parentRoot = resolveSlotRootId(parent);
+  const slotParentIds = new Set(
+    allParents
+      .filter((row) => resolveSlotRootId(row) === parentRoot)
+      .map((row) => row.id)
+  );
+  slotParentIds.add(parent.id);
+
+  return filterCurrentInstallEntities(
+    children.filter((child) => slotParentIds.has(getParentId(child)))
+  );
+}
+
 /** Resolve the active install for a hardware slot when the URL may reference a superseded row. */
 export function resolveCurrentInstallEntity<T extends HardwareEntityWithSlot>(
   entityId: number,
@@ -187,4 +220,52 @@ export function resolveProjectIdForHardwareEntity(
   const component = context.components.find((item) => item.id === entityId);
   if (!component) return null;
   return resolveProjectIdForHardwareEntity('unit', component.unit_id, context);
+}
+
+export function resolveSystemIdForHardwareEntity(
+  entityType: HierarchyEntityType,
+  entityId: number,
+  context: {
+    subsystems: Array<{ id: number; system_id: number }>;
+    modules: Array<{ id: number; subsystem_id: number }>;
+    units: Array<{ id: number; module_id: number }>;
+    components: Array<{ id: number; unit_id: number }>;
+  }
+): number | null {
+  if (entityType === 'system') return entityId;
+
+  if (entityType === 'subsystem') {
+    return context.subsystems.find((item) => item.id === entityId)?.system_id ?? null;
+  }
+
+  if (entityType === 'module') {
+    const module = context.modules.find((item) => item.id === entityId);
+    if (!module) return null;
+    return resolveSystemIdForHardwareEntity('subsystem', module.subsystem_id, context);
+  }
+
+  if (entityType === 'unit') {
+    const unit = context.units.find((item) => item.id === entityId);
+    if (!unit) return null;
+    return resolveSystemIdForHardwareEntity('module', unit.module_id, context);
+  }
+
+  const component = context.components.find((item) => item.id === entityId);
+  if (!component) return null;
+  return resolveSystemIdForHardwareEntity('unit', component.unit_id, context);
+}
+
+export function systemHierarchyPath(
+  projectId: number | null | undefined,
+  systemId: number | null | undefined,
+  root?: { rootType: HierarchyEntityType; rootId: number }
+): string | undefined {
+  if (!projectId || !systemId) return undefined;
+  const base = `/projects/${projectId}/systems/${systemId}/hierarchy`;
+  if (!root || root.rootType === 'system') return base;
+  const params = new URLSearchParams({
+    rootType: root.rootType,
+    rootId: String(root.rootId),
+  });
+  return `${base}?${params.toString()}`;
 }
