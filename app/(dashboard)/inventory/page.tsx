@@ -762,37 +762,66 @@ export default function InventoryPage() {
   }
 
   const inventoryDialogClassName =
-    'top-[8vh] max-h-[90vh] translate-y-0 overflow-y-auto sm:max-w-xl';
+    'top-[4vh] max-h-[92vh] w-[min(100vw-1.5rem,56rem)] translate-y-0 gap-0 overflow-y-auto p-0 sm:max-w-4xl';
+
+  const formTabClassName =
+    'mt-0 grid grid-cols-1 gap-x-6 gap-y-5 p-1 sm:grid-cols-2 [&>div]:space-y-2 [&>p]:col-span-full';
+
+  const formTabSingleClassName = 'mt-0 space-y-5 p-1 [&>div]:space-y-2';
 
   const renderInventoryFormTabs = (mode: 'create' | 'edit') => (
     <Tabs value={formTab} onValueChange={setFormTab} className="w-full">
-      <TabsList className="flex h-auto w-full gap-0.5 p-1">
-        <TabsTrigger value="general" className="min-w-0 flex-1 px-2 text-xs sm:text-sm">
-          General
-        </TabsTrigger>
-        <TabsTrigger value="part-number" className="min-w-0 flex-1 px-2 text-xs sm:text-sm">
-          Part Number
-        </TabsTrigger>
-        <TabsTrigger value="holder" className="min-w-0 flex-1 px-2 text-xs sm:text-sm">
-          Holder
-        </TabsTrigger>
-        <TabsTrigger value="install" className="min-w-0 flex-1 px-2 text-xs sm:text-sm">
-          Install
-        </TabsTrigger>
-        <TabsTrigger value="picture" className="min-w-0 flex-1 px-2 text-xs sm:text-sm">
-          Picture
-        </TabsTrigger>
-        <TabsTrigger value="attachments" className="min-w-0 flex-1 px-2 text-xs sm:text-sm">
-          Attachments
-        </TabsTrigger>
-        {mode === 'edit' && inventoryUsesInstances(selectedEntityType) ? (
-          <TabsTrigger value="units" className="min-w-0 flex-1 px-2 text-xs sm:text-sm">
-            Units
+      <div className="border-b bg-muted/30 px-6 pt-2 pb-0">
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 rounded-none bg-transparent p-0">
+          <TabsTrigger
+            value="general"
+            className="rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
+            General
           </TabsTrigger>
-        ) : null}
-      </TabsList>
+          <TabsTrigger
+            value="part-number"
+            className="rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
+            Part Number
+          </TabsTrigger>
+          <TabsTrigger
+            value="holder"
+            className="rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
+            Holder
+          </TabsTrigger>
+          <TabsTrigger
+            value="install"
+            className="rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
+            Install
+          </TabsTrigger>
+          <TabsTrigger
+            value="picture"
+            className="rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
+            Picture
+          </TabsTrigger>
+          <TabsTrigger
+            value="attachments"
+            className="rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
+            Attachments
+          </TabsTrigger>
+          {mode === 'edit' && inventoryUsesInstances(selectedEntityType) ? (
+            <TabsTrigger
+              value="units"
+              className="rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
+              Units
+            </TabsTrigger>
+          ) : null}
+        </TabsList>
+      </div>
 
-      <TabsContent value="general" className="mt-4 space-y-4">
+      <div className="px-6 py-6">
+      <TabsContent value="general" className={formTabClassName}>
         <div>
           <Label>Inventory Type {mode === 'create' ? '*' : ''}</Label>
           {mode === 'create' ? (
@@ -865,7 +894,7 @@ export default function InventoryPage() {
               }}
               placeholder="Enter quantity"
             />
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               Component inventory can be stocked in bulk.
             </p>
           </div>
@@ -876,7 +905,7 @@ export default function InventoryPage() {
               value={mode === 'edit' ? String(formData.quantity || 0) : 'Calculated automatically'}
               disabled
             />
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               Quantity is the total number of serialized units sharing this part number.
             </p>
           </div>
@@ -914,7 +943,7 @@ export default function InventoryPage() {
           </div>
         ) : null}
 
-        <div>
+        <div className="sm:col-span-2">
           <Label>Description</Label>
           <Input
             value={formData.description}
@@ -924,7 +953,7 @@ export default function InventoryPage() {
         </div>
       </TabsContent>
 
-      <TabsContent value="part-number" className="mt-4 space-y-4">
+      <TabsContent value="part-number" className={formTabClassName}>
         <div>
           <Label>
             Serial Number
@@ -936,7 +965,7 @@ export default function InventoryPage() {
             placeholder="e.g., SN-2024-001"
           />
           {inventoryUsesInstances(selectedEntityType) ? (
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               Each serialized unit gets its own serial number.
             </p>
           ) : null}
@@ -991,7 +1020,7 @@ export default function InventoryPage() {
           </>
         ) : null}
 
-        <div>
+        <div className={mode === 'edit' ? undefined : 'sm:col-span-2'}>
           <Label>OEM Name</Label>
           <Input
             value={formData.oem_name}
@@ -1001,7 +1030,7 @@ export default function InventoryPage() {
         </div>
       </TabsContent>
 
-      <TabsContent value="holder" className="mt-4 space-y-4">
+      <TabsContent value="holder" className={formTabClassName}>
         {inventoryUsesInstances(selectedEntityType) && mode === 'edit' && editingInstanceId ? (
           <p className="text-sm text-muted-foreground">
             Holder details apply to the selected serialized unit.
@@ -1061,7 +1090,7 @@ export default function InventoryPage() {
         </div>
       </TabsContent>
 
-      <TabsContent value="install" className="mt-4 space-y-4">
+      <TabsContent value="install" className={formTabClassName}>
         <div>
           <Label>Installation Date</Label>
           <Input
@@ -1090,7 +1119,7 @@ export default function InventoryPage() {
         </div>
       </TabsContent>
 
-      <TabsContent value="picture" className="mt-4 space-y-4">
+      <TabsContent value="picture" className={formTabClassName}>
         <div>
           <Label>Picture</Label>
           <Input
@@ -1116,7 +1145,7 @@ export default function InventoryPage() {
         </div>
 
         {(formData.picture_url || pendingPictureFile) && !removePicture ? (
-          <div>
+          <div className="sm:col-span-2">
             <Button
               type="button"
               variant="outline"
@@ -1134,7 +1163,7 @@ export default function InventoryPage() {
         ) : null}
       </TabsContent>
 
-      <TabsContent value="attachments" className="mt-4 space-y-4">
+      <TabsContent value="attachments" className={formTabSingleClassName}>
         <EntityAttachmentsSection
           ownerType={
             inventoryUsesInstances(selectedEntityType) && editingInstanceId
@@ -1154,7 +1183,7 @@ export default function InventoryPage() {
       </TabsContent>
 
       {mode === 'edit' && inventoryUsesInstances(selectedEntityType) ? (
-        <TabsContent value="units" className="mt-4 space-y-4">
+        <TabsContent value="units" className={formTabSingleClassName}>
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm text-muted-foreground">
               {instances.length} serialized unit{instances.length === 1 ? '' : 's'} in this group
@@ -1222,6 +1251,7 @@ export default function InventoryPage() {
           </div>
         </TabsContent>
       ) : null}
+      </div>
     </Tabs>
   );
 
@@ -1284,14 +1314,14 @@ export default function InventoryPage() {
               </DialogTrigger>
             </Can>
             <DialogContent className={inventoryDialogClassName}>
-              <DialogHeader>
+              <DialogHeader className="space-y-1.5 border-b px-6 py-5 text-left">
                 <DialogTitle>Add Inventory Item</DialogTitle>
                 <DialogDescription>Add a new inventory item for any entity type</DialogDescription>
               </DialogHeader>
-              <div className="space-y-4">
+              <div>
                 {renderInventoryFormTabs('create')}
 
-                <div className="flex gap-2 justify-end pt-4">
+                <div className="flex justify-end gap-3 border-t px-6 py-4">
                   <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                     Cancel
                   </Button>
@@ -1546,14 +1576,14 @@ export default function InventoryPage() {
 
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className={inventoryDialogClassName}>
-          <DialogHeader>
+          <DialogHeader className="space-y-1.5 border-b px-6 py-5 text-left">
             <DialogTitle>Edit Inventory Item</DialogTitle>
             <DialogDescription>Update inventory details</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div>
             {renderInventoryFormTabs('edit')}
 
-            <div className="flex gap-2 justify-end pt-4">
+            <div className="flex justify-end gap-3 border-t px-6 py-4">
               <Button variant="outline" onClick={() => setIsEditOpen(false)}>
                 Cancel
               </Button>
