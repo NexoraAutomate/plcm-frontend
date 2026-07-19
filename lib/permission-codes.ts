@@ -190,6 +190,14 @@ export const NAV_PERMISSIONS: Record<string, PermissionCode | PermissionCode[]> 
   '/users': P.view_users,
   '/statuses': P.view_statuses,
   '/roles': P.view_roles,
+  '/settings': [
+    P.view_users,
+    P.view_roles,
+    P.view_statuses,
+    P.view_hierarchy,
+    P.manage_settings,
+    P.manage_notifications,
+  ],
   '/dashboard': P.view_executive_dashboard,
   '/maintenanceLogs': P.view_maintenance,
   '/reporting': P.view_reports,
@@ -199,6 +207,16 @@ export const NAV_PERMISSIONS: Record<string, PermissionCode | PermissionCode[]> 
   '/reporting/maintenance': P.view_reports,
   '/reporting/executive': P.view_executive_dashboard,
 };
+
+/** OR of permissions that grant access to the Settings module */
+export const SETTINGS_ACCESS_PERMISSIONS: PermissionCode[] = [
+  P.view_users,
+  P.view_roles,
+  P.view_statuses,
+  P.view_hierarchy,
+  P.manage_settings,
+  P.manage_notifications,
+];
 
 /**
  * Preferential landing routes after login — first match the user can access.
@@ -211,7 +229,7 @@ export const LANDING_CANDIDATES: Array<{ href: string; permission: PermissionCod
   { href: '/systems', permission: P.view_systems },
   { href: '/customers', permission: P.view_customers },
   { href: '/orders', permission: P.view_orders },
-  { href: '/users', permission: P.view_users },
+  { href: '/settings', permission: P.view_users },
 ];
 
 export function firstAccessiblePath(canFn: (p: string | string[]) => boolean): string {

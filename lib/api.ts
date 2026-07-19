@@ -66,10 +66,28 @@ export const auth = {
   login: (username: string, password: string) =>
     api.post<{ access_token: string; token_type: string }>("/auth/login", { username, password }),
   listRoles: (sort_by?: string, sort_order?: 'asc' | 'desc') =>
-    api.get("/auth/roles", { params: buildQueryParams({ sort_by, sort_order }) }),
+    api.get<Models.Role[]>("/auth/roles", { params: buildQueryParams({ sort_by, sort_order }) }),
   getMe: () => api.get("/auth/me"),
   register: (userData: any) => api.post("/auth/register", userData),
-  getRole: (id: number) => api.get(`/auth/roles/${id}`),
+  getRole: (id: number) => api.get<Models.Role>(`/auth/roles/${id}`),
+  createRole: (data: { name: string; description?: string; permission_ids?: number[] }) =>
+    api.post<Models.Role>("/auth/roles", data),
+  updateRole: (
+    id: number,
+    data: { name?: string; description?: string; permission_ids?: number[] }
+  ) => api.put<Models.Role>(`/auth/roles/${id}`, data),
+  deleteRole: (id: number) => api.delete(`/auth/roles/${id}`),
+  updateRolePermissions: (id: number, permission_ids: number[]) =>
+    api.put<Models.Role>(`/auth/roles/${id}/permissions`, { permission_ids }),
+  listPermissionRegistry: (sort_by?: string, sort_order?: 'asc' | 'desc') =>
+    api.get<Models.Permission[]>("/auth/permission-registry", {
+      params: buildQueryParams({ sort_by, sort_order }),
+    }),
+  createPermission: (data: { name: string; description?: string }) =>
+    api.post<Models.Permission>("/auth/permission-registry", data),
+  updatePermission: (id: number, data: { name?: string; description?: string }) =>
+    api.put<Models.Permission>(`/auth/permission-registry/${id}`, data),
+  deletePermission: (id: number) => api.delete(`/auth/permission-registry/${id}`),
   assignRole: (userId: number, roleId: number) =>
     api.post("/auth/assign-role", { user_id: userId, role_id: roleId }),
   removeRole: (userId: number, roleId: number) =>

@@ -34,11 +34,20 @@ export interface Customer {
 
 }
 
+// Permission
+export interface Permission {
+  id: number
+  name: string
+  description?: string
+}
+
 // Role
 export interface Role {
   id: number
   name: string
   description?: string
+  permissions?: Permission[]
+  user_count?: number
 }
 
 // Status

@@ -11,7 +11,6 @@ import {
   Rocket,
   Package,
   Wrench,
-  UserCog,
   LogOut,
   Gauge,
   Pin,
@@ -23,14 +22,14 @@ import {
   Puzzle,
   GitBranch,
   Bell,
-  Shield,
   FileText,
   ChevronDown,
   ChevronRight,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { NAV_PERMISSIONS, type PermissionCode } from "@/lib/permission-codes";
+import { NAV_PERMISSIONS, SETTINGS_ACCESS_PERMISSIONS, type PermissionCode } from "@/lib/permission-codes";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -180,32 +179,12 @@ const hierarchyItems: NavItem[] = [
   },
 ];
 
-const adminItems: NavItem[] = [
-  {
-    label: "Systems Hierarchy",
-    href: "/hierarchy",
-    icon: GitBranch,
-    permission: NAV_PERMISSIONS["/hierarchy"] as PermissionCode,
-  },
-  {
-    label: "Users",
-    href: "/users",
-    icon: UserCog,
-    permission: NAV_PERMISSIONS["/users"] as PermissionCode,
-  },
-  {
-    label: "Roles",
-    href: "/roles",
-    icon: Shield,
-    permission: NAV_PERMISSIONS["/roles"] as PermissionCode,
-  },
-  {
-    label: "Statuses",
-    href: "/statuses",
-    icon: Gauge,
-    permission: NAV_PERMISSIONS["/statuses"] as PermissionCode,
-  },
-];
+const settingsItem: NavItem = {
+  label: "Settings",
+  href: "/settings",
+  icon: Settings,
+  permission: SETTINGS_ACCESS_PERMISSIONS,
+};
 
 function NavLink({
   item,
@@ -276,10 +255,7 @@ export function AppSidebar() {
     () => hierarchyItems.filter((item) => !item.permission || can(item.permission)),
     [can]
   );
-  const visibleAdmin = useMemo(
-    () => adminItems.filter((item) => !item.permission || can(item.permission)),
-    [can]
-  );
+  const canSeeSettings = !settingsItem.permission || can(settingsItem.permission);
   const visibleReportingChildren = useMemo(
     () =>
       reportingGroup.children.filter(
@@ -464,25 +440,22 @@ export function AppSidebar() {
             </div>
           )}
 
-          {visibleAdmin.length > 0 && (
+          {canSeeSettings && (
             <div className="mt-6">
               {!collapsed && (
                 <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/40">
-                  Admin
+                  Administration
                 </p>
               )}
               {collapsed && (
                 <div className="mx-auto mb-2 h-px w-8 bg-sidebar-border" />
               )}
               <div className="space-y-1">
-                {visibleAdmin.map((item) => (
-                  <NavLink
-                    key={item.href}
-                    item={item}
-                    pathname={pathname}
-                    collapsed={collapsed}
-                  />
-                ))}
+                <NavLink
+                  item={settingsItem}
+                  pathname={pathname}
+                  collapsed={collapsed}
+                />
               </div>
             </div>
           )}
