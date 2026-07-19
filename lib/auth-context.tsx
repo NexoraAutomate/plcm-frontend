@@ -168,7 +168,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (!response.ok) {
-        throw new Error('Authentication failed');
+        let detail = 'Authentication failed';
+        try {
+          const errorBody = await response.json();
+          if (typeof errorBody?.detail === 'string' && errorBody.detail.trim()) {
+            detail = errorBody.detail;
+          }
+        } catch {
+          // ignore non-JSON error bodies
+        }
+        throw new Error(detail);
       }
 
       const data = await response.json();
@@ -197,6 +206,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      void fetch(`${apiBase()}/auth/logout`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {
+        // best-effort logout history recording
+      });
+    }
     setUser(null);
     localStorage.removeItem('sat-user');
     localStorage.removeItem('token');

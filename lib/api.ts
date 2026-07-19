@@ -65,6 +65,7 @@ export async function fetchStatusesByType(statusType: string): Promise<Models.St
 export const auth = {
   login: (username: string, password: string) =>
     api.post<{ access_token: string; token_type: string }>("/auth/login", { username, password }),
+  logout: () => api.post("/auth/logout"),
   listRoles: (sort_by?: string, sort_order?: 'asc' | 'desc') =>
     api.get<Models.Role[]>("/auth/roles", { params: buildQueryParams({ sort_by, sort_order }) }),
   getMe: () => api.get("/auth/me"),
@@ -93,6 +94,27 @@ export const auth = {
   removeRole: (userId: number, roleId: number) =>
     api.delete("/auth/remove-role", { data: { user_id: userId, role_id: roleId } }),
   deregister: (userId: number) => api.delete(`/users/${userId}/`),
+  getSecuritySettings: () => api.get<Models.SecuritySettings>("/auth/security-settings"),
+  updateSecuritySettings: (data: Partial<Models.SecuritySettings>) =>
+    api.put<Models.SecuritySettings>("/auth/security-settings", data),
+  listLoginHistory: (
+    skip = 0,
+    limit = 50,
+    params?: {
+      user_id?: number;
+      search?: string;
+      login_status?: string;
+      date_from?: string;
+      date_to?: string;
+      sort_by?: string;
+      sort_order?: 'asc' | 'desc';
+    }
+  ) =>
+    api.get<Models.UserLoginHistory[]>("/auth/login-history", {
+      params: buildQueryParams({ skip, limit, ...params }),
+    }),
+  runInactivityCheck: (dry_run = false) =>
+    api.post("/auth/run-inactivity-check", null, { params: { dry_run } }),
 };
 
 // Users
@@ -101,9 +123,29 @@ export const users = {
     api.get<Models.User[]>("/users/", { params: listParams(skip, limit, undefined, filters) }),
   usersWithRoles: () => api.get("/users/with-roles/"),
   get: (id: number) => api.get<Models.User>(`/users/${id}/`),
-  create: (data: Partial<Models.User>) => api.post<Models.User>("/users/", data),
-  update: (id: number, data: Partial<Models.User>) => api.put<Models.User>(`/users/${id}/`, data),
+  create: (data: Partial<Models.User> & { password?: string }) =>
+    api.post<Models.User>("/users/", data),
+  update: (id: number, data: Partial<Models.User> & { password?: string }) =>
+    api.put<Models.User>(`/users/${id}/`, data),
   delete: (id: number) => api.delete(`/users/${id}/`),
+  stats: () => api.get<Models.UserStatsSummary>("/users/stats/summary"),
+  activity: (id: number) => api.get<Models.UserActivitySummary>(`/users/${id}/activity/`),
+  loginHistory: (
+    id: number,
+    skip = 0,
+    limit = 50,
+    params?: {
+      search?: string;
+      login_status?: string;
+      date_from?: string;
+      date_to?: string;
+      sort_by?: string;
+      sort_order?: 'asc' | 'desc';
+    }
+  ) =>
+    api.get<Models.UserLoginHistory[]>(`/users/${id}/login-history/`, {
+      params: buildQueryParams({ skip, limit, ...params }),
+    }),
 };
 
 // Customers

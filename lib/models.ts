@@ -7,9 +7,76 @@ export interface User {
   full_name: string
   is_active: boolean
   created_at: string
+  updated_at?: string | null
+  last_login_at?: string | null
+  last_logout_at?: string | null
+  last_activity_at?: string | null
+  failed_login_count?: number
+  created_by_id?: number | null
   roles: string[]
   /** Flat permission codes from JWT /auth/me */
   permissions?: string[]
+}
+
+export interface UserStatsSummary {
+  total_users: number
+  active_users: number
+  inactive_users: number
+  currently_logged_in: number
+  failed_logins_today: number
+}
+
+export interface UserActivitySummary {
+  last_login?: string | null
+  last_logout?: string | null
+  last_activity?: string | null
+  last_ip_address?: string | null
+  last_device?: string | null
+  browser?: string | null
+  operating_system?: string | null
+  total_login_count: number
+  failed_login_count: number
+  created_at?: string | null
+  updated_at?: string | null
+  created_by_id?: number | null
+  is_active: boolean
+}
+
+export interface UserLoginHistory {
+  id: number
+  user_id?: number | null
+  username: string
+  login_time: string
+  logout_time?: string | null
+  session_id?: string | null
+  ip_address?: string | null
+  device_name?: string | null
+  browser?: string | null
+  operating_system?: string | null
+  login_status: 'Success' | 'Failed' | string
+  failure_reason?: string | null
+  last_activity?: string | null
+  session_duration?: number | null
+  authentication_method?: string | null
+  created_at?: string | null
+}
+
+export interface SecuritySettings {
+  id: number
+  min_password_length: number
+  password_expiry_days: number
+  require_uppercase: boolean
+  require_lowercase: boolean
+  require_numbers: boolean
+  require_special: boolean
+  password_history_length: number
+  max_login_attempts: number
+  lockout_duration_minutes: number
+  inactivity_deactivate_days: number
+  two_factor_enabled: boolean
+  two_factor_require_all: boolean
+  two_factor_require_admins_only: boolean
+  updated_at?: string | null
 }
 
 // Customer

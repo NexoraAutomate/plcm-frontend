@@ -117,6 +117,30 @@ export function SecurityPanel({ embedded = false }: SecurityPanelProps) {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="inactivity-days">Automatically Mark User Inactive After</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="inactivity-days"
+                  type="number"
+                  min={0}
+                  max={3650}
+                  className="md:w-32"
+                  value={passwordPolicy.inactivityDeactivateDays}
+                  onChange={(e) =>
+                    updatePasswordPolicy({
+                      inactivityDeactivateDays: Number(e.target.value) || 0,
+                    })
+                  }
+                />
+                <span className="text-sm text-muted-foreground">Days</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Users with no successful login within this period are deactivated automatically.
+                Use 0 to disable automatic deactivation.
+              </p>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="history-length">Password History Length</Label>
               <Input
                 id="history-length"

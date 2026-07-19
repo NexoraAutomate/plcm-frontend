@@ -5,6 +5,8 @@ export interface ListFilterParams {
   status_id?: number;
   /** String status enum (e.g. maintenance case `open` / `resolved`) */
   status?: string;
+  /** User account active filter */
+  is_active?: boolean;
   order_id?: number;
   customer_id?: number;
   project_id?: number;

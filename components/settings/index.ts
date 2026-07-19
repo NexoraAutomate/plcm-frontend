@@ -10,6 +10,9 @@ export { StatusesPanel } from './statuses-panel';
 export { HierarchyPanel } from './hierarchy-panel';
 export { SecurityPanel } from './security-panel';
 export { AlertsPanel } from './alerts-panel';
+export { UserStatusBadge } from './user-status-badge';
+export { UserLoginHistoryDialog } from './user-login-history-dialog';
+export { UserDetailsDialog } from './user-details-dialog';
 export {
   SETTINGS_TABS,
   SETTINGS_ACCESS_PERMISSIONS,
