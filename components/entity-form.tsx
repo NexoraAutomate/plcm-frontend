@@ -10,16 +10,21 @@ import { Textarea } from '@/components/ui/textarea';
 import { EntityPicture } from '@/components/entity-picture';
 import { isExternalPictureUrl } from '@/lib/picture-url';
 
-interface FormField {
+export interface FormField {
   name: string;
   label: string;
   type: 'text' | 'textarea' | 'select' | 'number' | 'date' | 'file' | 'picture';
   required: boolean;
   placeholder?: string;
   options?: Array<{ label: string; value: number | string }>;
+  /** Dynamic options based on current form values (overrides static options when provided). */
+  getOptions?: (
+    formData: Record<string, any>
+  ) => Array<{ label: string; value: number | string }>;
   accept?: string;
   ownerType?: string;
   ownerId?: number;
+  disabled?: boolean;
 }
 
 interface EntityFormProps {
@@ -29,6 +34,12 @@ interface EntityFormProps {
   onCancel?: () => void;
   initialValues?: Record<string, any>;
   submitLabel?: string;
+  /** Return a patch to merge into form state when a field changes. */
+  onFieldChange?: (
+    fieldName: string,
+    value: unknown,
+    formData: Record<string, any>
+  ) => Partial<Record<string, any>> | void;
 }
 
 export function EntityForm({
@@ -38,6 +49,7 @@ export function EntityForm({
   onCancel,
   initialValues = {},
   submitLabel = 'Save',
+  onFieldChange,
 }: EntityFormProps) {
   const [formData, setFormData] = useState<Record<string, any>>({
     picture_file: null,
@@ -69,9 +81,17 @@ export function EntityForm({
     return () => URL.revokeObjectURL(objectUrl);
   }, [formData.picture_file]);
 
+  const applyFieldChange = (fieldName: string, value: unknown) => {
+    setFormData((prev) => {
+      const next = { ...prev, [fieldName]: value };
+      const patch = onFieldChange?.(fieldName, value, next);
+      return patch ? { ...next, ...patch } : next;
+    });
+  };
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-    fields.forEach(field => {
+    fields.forEach((field) => {
       if (field.required && !formData[field.name]) {
         newErrors[field.name] = `${field.label} is required`;
       }
@@ -83,7 +103,7 @@ export function EntityForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
-    
+
     setIsSubmitting(true);
     try {
       await onSubmit(formData);
@@ -92,9 +112,14 @@ export function EntityForm({
     }
   };
 
+  const resolveOptions = (field: FormField) => {
+    if (field.getOptions) return field.getOptions(formData);
+    return field.options ?? [];
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {fields.map(field => (
+      {fields.map((field) => (
         <div key={field.name} className="space-y-2">
           <Label htmlFor={field.name}>
             {field.label}
@@ -106,7 +131,8 @@ export function EntityForm({
               id={field.name}
               placeholder={field.placeholder}
               value={formData[field.name] || ''}
-              onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
+              disabled={field.disabled}
+              onChange={(e) => applyFieldChange(field.name, e.target.value)}
               className={errors[field.name] ? 'border-red-500' : ''}
             />
           )}
@@ -116,23 +142,23 @@ export function EntityForm({
               id={field.name}
               placeholder={field.placeholder}
               value={formData[field.name] || ''}
-              onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
+              disabled={field.disabled}
+              onChange={(e) => applyFieldChange(field.name, e.target.value)}
               className={errors[field.name] ? 'border-red-500' : ''}
             />
           )}
 
           {field.type === 'select' && (
-            <Select 
-              value={formData[field.name]?.toString() || ''} 
-              onValueChange={(value) => {
-                setFormData({ ...formData, [field.name]: value });
-              }}
+            <Select
+              value={formData[field.name]?.toString() || ''}
+              disabled={field.disabled}
+              onValueChange={(value) => applyFieldChange(field.name, value)}
             >
               <SelectTrigger className={errors[field.name] ? 'border-red-500' : ''}>
                 <SelectValue placeholder={field.placeholder || `Select ${field.label.toLowerCase()}`} />
               </SelectTrigger>
               <SelectContent>
-                {field.options && field.options.map(opt => (
+                {resolveOptions(field).map((opt) => (
                   <SelectItem key={String(opt.value)} value={String(opt.value)}>
                     {opt.label}
                   </SelectItem>
@@ -147,11 +173,12 @@ export function EntityForm({
               type="number"
               placeholder={field.placeholder}
               value={formData[field.name] ?? ''}
+              disabled={field.disabled}
               onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  [field.name]: e.target.value === '' ? '' : Number(e.target.value),
-                })
+                applyFieldChange(
+                  field.name,
+                  e.target.value === '' ? '' : Number(e.target.value)
+                )
               }
               className={errors[field.name] ? 'border-red-500' : ''}
             />
@@ -162,7 +189,8 @@ export function EntityForm({
               id={field.name}
               type="date"
               value={formData[field.name] || ''}
-              onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
+              disabled={field.disabled}
+              onChange={(e) => applyFieldChange(field.name, e.target.value)}
               className={errors[field.name] ? 'border-red-500' : ''}
             />
           )}
@@ -172,8 +200,9 @@ export function EntityForm({
               id={field.name}
               type="file"
               accept={field.accept}
+              disabled={field.disabled}
               onChange={(e) =>
-                setFormData({ ...formData, [field.name]: e.target.files?.[0] ?? null })
+                applyFieldChange(field.name, e.target.files?.[0] ?? null)
               }
               className={errors[field.name] ? 'border-red-500' : ''}
             />
@@ -185,6 +214,7 @@ export function EntityForm({
                 id={field.name}
                 placeholder={field.placeholder || 'Path or URL to entity photo'}
                 value={formData.picture_url || ''}
+                disabled={field.disabled}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
@@ -202,6 +232,7 @@ export function EntityForm({
                   id={`${field.name}-file`}
                   type="file"
                   accept="image/*"
+                  disabled={field.disabled}
                   onChange={(e) =>
                     setFormData({
                       ...formData,

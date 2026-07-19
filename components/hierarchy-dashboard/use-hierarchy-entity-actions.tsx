@@ -18,31 +18,29 @@ import {
 import {
   hierarchyInstallFormFields,
   hierarchyInstallInitialValues,
-  inventoryToHierarchyCreatePayload,
   parseHierarchyInstallPayload,
 } from '@/lib/hierarchy-install-fields';
 import type { HierarchyDashboardSelection } from '@/lib/project-hierarchy-dashboard';
 import { syncEntityPicture } from '@/lib/entity-picture-upload';
-import { inventoryPartNumber, mergeInventoryWithInstance } from '@/lib/inventory-entity-fields';
+import { needsSerialSelection } from '@/lib/inventory-install';
+import { buildCreateEntityByType } from '@/lib/inventory-child-install';
 import {
-  buildInventoryAssetSources,
-  copyInventoryAssetsToEntity,
-  needsSerialSelection,
-} from '@/lib/inventory-install';
-import {
-  nextSerialNumberFromInventory,
-  serialNumberFromInventory,
-} from '@/lib/entity-hierarchy';
-import {
-  buildCreateEntityByType,
-  installDefinedInventoryChildren,
-  resolveInventoryInstanceSerial,
-} from '@/lib/inventory-child-install';
-import type { Hierarchy, Inventory, InventoryInstance, Status, System } from '@/lib/models';
+  buildParentField,
+  buildPartNumberField,
+  buildPartNumberOptions,
+  buildSerialOptionsForPartNumber,
+  createHierarchyEntityFromForm,
+  filterInventoryForHierarchy,
+  findInventoryByPartNumber,
+  findInventoryByName,
+  patchFormFromNameSelection,
+  patchFormFromPartNumberSelection,
+} from '@/lib/hierarchy-create-form';
+import type { Hierarchy, Inventory, Status, System } from '@/lib/models';
 import type { HierarchyEntityType } from '@/lib/system-hierarchy-graph';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { EntityForm } from '@/components/entity-form';
+import { EntityForm, type FormField } from '@/components/entity-form';
 import { InventorySerialSelectDialog } from '@/components/inventory-serial-select-dialog';
 
 type DialogMode = 'add-sibling' | 'add-child' | 'edit';
@@ -82,56 +80,13 @@ function formatAxiosError(error: unknown, fallback: string): string {
   return fallback;
 }
 
-function buildSerialNumber(name: string, partNumber: string): string {
-  if (name && partNumber) return `${name}-${partNumber}`;
-  return name || partNumber || '';
-}
-
-function filterInventoryForHierarchy(
-  items: Inventory[],
-  entityType: DashboardEntityType,
-  allowedNames: string[]
-): Inventory[] {
-  const allowed = new Set(allowedNames.map((name) => name.trim().toLowerCase()).filter(Boolean));
-  if (allowed.size === 0) return [];
-
-  return items.filter(
-    (item) =>
-      item.inventory_type === entityType &&
-      item.quantity > 0 &&
-      allowed.has(item.name?.trim().toLowerCase() ?? '')
-  );
-}
-
-function resolveInstallIdentity(
-  formData: Record<string, unknown>,
-  inventoryItems: Inventory[],
-  name: string
-) {
-  const partNumber = String(formData.partnumber || '').trim();
-  const inventoryMatch =
-    inventoryItems.find((item) => inventoryPartNumber(item) === partNumber) ??
-    inventoryItems.find((item) => item.name?.trim() === name);
-
-  if (inventoryMatch) {
-    const serial =
-      serialNumberFromInventory(inventoryMatch) ||
-      nextSerialNumberFromInventory(inventoryMatch, []);
-    return {
-      payload: inventoryToHierarchyCreatePayload(inventoryMatch, serial),
-      inventoryMatch,
-    };
-  }
-
-  return {
-    payload: {
-      part_number: partNumber,
-      serial_number: buildSerialNumber(name, partNumber),
-      configuration_item: partNumber || name,
-    },
-    inventoryMatch: undefined,
-  };
-}
+const PARENT_LABEL: Record<DashboardEntityType, string> = {
+  system: 'Project',
+  subsystem: 'System',
+  module: 'Subsystem',
+  unit: 'Module',
+  component: 'Unit',
+};
 
 export function useHierarchyEntityActions({
   selection,
@@ -146,6 +101,7 @@ export function useHierarchyEntityActions({
     modules,
     units,
     components,
+    projects,
     users,
     createSystem,
     updateSystem,
@@ -184,31 +140,6 @@ export function useHierarchyEntityActions({
         createComponent: async (data) => ({ id: (await createComponent(data as any)).id }),
       }),
     [createSystem, createSubsystem, createModule, createUnit, createComponent]
-  );
-
-  const installInventoryChildren = useCallback(
-    async (
-      parentInventoryItem: Inventory,
-      parentEntityId: number,
-      parentInstanceId?: number | null,
-      parentInstanceSerial?: string | null,
-      prefetchedChildren?: Parameters<typeof installDefinedInventoryChildren>[0]['prefetchedChildren']
-    ) => {
-      const childrenInstalled = await installDefinedInventoryChildren({
-        parentInventoryItem,
-        parentEntityId,
-        parentInstanceId,
-        parentInstanceSerial,
-        createEntityByType,
-        prefetchedChildren,
-      });
-      if (childrenInstalled > 0) {
-        toast.success(
-          `Also installed ${childrenInstalled} child entit${childrenInstalled === 1 ? 'y' : 'ies'} from inventory`
-        );
-      }
-    },
-    [createEntityByType]
   );
 
   const [dialogState, setDialogState] = useState<DialogState | null>(null);
@@ -381,135 +312,37 @@ export function useHierarchyEntityActions({
     formData: Record<string, unknown>,
     instanceId?: number
   ) => {
-    const name = String(formData.name || '');
-    const resolved = resolveInstallIdentity(
-      formData,
+    const formWithInstance =
+      instanceId != null
+        ? { ...formData, inventory_instance_id: String(instanceId) }
+        : formData;
+
+    const created = await createHierarchyEntityFromForm({
+      entityType,
+      parentId,
+      formData: formWithInstance,
       inventoryItems,
-      name
-    );
+      createEntity: (data) => createEntityByType(entityType, data),
+      createEntityByType,
+      extraPayload:
+        entityType === 'system'
+          ? parseHierarchyInstallPayload(formWithInstance)
+          : entityType === 'component'
+            ? { sku: String(formWithInstance.sku || '') }
+            : {},
+    });
 
-    const inventoryMatch = resolved.inventoryMatch;
-    let installPayload = resolved.payload;
-    let consumedInstanceForAssets: InventoryInstance | null = null;
-    let parentInventoryAfterConsume: Inventory | null = null;
-    // Resolve composition key before consume — deleting the instance clears parent_instance_id on links.
-    let parentInstanceIdForChildren: number | null = null;
-    let parentInstanceSerialForChildren: string | null = null;
-    let prefetchedChildren: Parameters<typeof installDefinedInventoryChildren>[0]['prefetchedChildren'];
-
-    if (inventoryMatch) {
-      const selectedInstanceId =
-        instanceId ??
-        (inventoryMatch.instances?.length === 1 ? inventoryMatch.instances[0].id : undefined);
-      parentInstanceIdForChildren = selectedInstanceId ?? null;
-      parentInstanceSerialForChildren =
-        resolveInventoryInstanceSerial(inventoryMatch, selectedInstanceId ?? null) ?? null;
-
-      try {
-        const childrenRes = await api.inventory.getChildren(inventoryMatch.id, {
-          parentInstanceId: parentInstanceIdForChildren ?? undefined,
-          parentInstanceSerial: parentInstanceSerialForChildren ?? undefined,
-        });
-        prefetchedChildren = childrenRes.data ?? [];
-      } catch (err) {
-        console.warn('Failed to prefetch inventory children before install:', err);
-      }
-
-      const consumeRes = await api.inventory.consume(
-        inventoryMatch.id,
-        selectedInstanceId
-      );
-      consumedInstanceForAssets = consumeRes.data?.consumed_instance ?? null;
-      parentInventoryAfterConsume = consumeRes.data?.inventory ?? inventoryMatch;
-
-      if (!parentInstanceSerialForChildren) {
-        parentInstanceSerialForChildren =
-          consumedInstanceForAssets?.original_serial_number?.trim() ||
-          consumedInstanceForAssets?.serial_number?.trim() ||
-          null;
-      }
-      if (parentInstanceIdForChildren == null && consumedInstanceForAssets?.id != null) {
-        parentInstanceIdForChildren = consumedInstanceForAssets.id;
-      }
-
-      const merged = mergeInventoryWithInstance(
-        { ...inventoryMatch, ...parentInventoryAfterConsume },
-        consumedInstanceForAssets
-      );
-
-      const serialForEntity =
-        parentInstanceSerialForChildren ||
-        consumedInstanceForAssets?.serial_number?.trim() ||
-        String((installPayload as { serial_number?: string }).serial_number || merged.serial_number || '');
-
-      installPayload = inventoryToHierarchyCreatePayload(merged, serialForEntity);
+    if (entityType === 'system') {
+      await syncEntityPicture('system', created.id, formWithInstance);
     }
 
-    const payload = {
-      name,
-      description: String(formData.description || ''),
-      status_id: Number(formData.id),
-      ...installPayload,
-    };
-
-    const afterInventoryCreate = async (createdId: number) => {
-      if (!inventoryMatch || !parentInventoryAfterConsume) return;
-      await copyInventoryAssetsToEntity(
-        entityType as HierarchyEntityType,
-        createdId,
-        buildInventoryAssetSources(inventoryMatch, consumedInstanceForAssets)
+    if (created.childrenInstalled > 0) {
+      toast.success(
+        `Also installed ${created.childrenInstalled} child entit${created.childrenInstalled === 1 ? 'y' : 'ies'} from inventory`
       );
-      await installInventoryChildren(
-        { ...inventoryMatch, ...parentInventoryAfterConsume },
-        createdId,
-        parentInstanceIdForChildren,
-        parentInstanceSerialForChildren,
-        prefetchedChildren
-      );
-    };
-
-    switch (entityType) {
-      case 'system': {
-        const created = await createSystem({
-          ...payload,
-          project_id: parentId,
-          ...(inventoryMatch ? {} : parseHierarchyInstallPayload(formData)),
-        });
-        await afterInventoryCreate(created.id);
-        await syncEntityPicture('system', created.id, formData);
-        updateSelection('systemId', created.id);
-        break;
-      }
-      case 'subsystem': {
-        const created = await createSubsystem({ ...payload, system_id: parentId });
-        await afterInventoryCreate(created.id);
-        updateSelection('subsystemId', created.id);
-        break;
-      }
-      case 'module': {
-        const created = await createModule({ ...payload, subsystem_id: parentId });
-        await afterInventoryCreate(created.id);
-        updateSelection('moduleId', created.id);
-        break;
-      }
-      case 'unit': {
-        const created = await createUnit({ ...payload, module_id: parentId });
-        await afterInventoryCreate(created.id);
-        updateSelection('unitId', created.id);
-        break;
-      }
-      case 'component': {
-        const created = await createComponent({
-          ...payload,
-          sku: String(formData.sku || ''),
-          unit_id: parentId,
-        });
-        await afterInventoryCreate(created.id);
-        updateSelection('componentId', created.id);
-        break;
-      }
     }
 
+    updateSelection(SELECTION_KEY_BY_ENTITY[entityType], created.id);
     await notifyEntityChanged();
   };
 
@@ -605,8 +438,12 @@ export function useHierarchyEntityActions({
 
     if (dialogState.mode !== 'edit') {
       const name = String(formData.name || '');
-      const { inventoryMatch } = resolveInstallIdentity(formData, inventoryItems, name);
-      if (inventoryMatch && needsSerialSelection(inventoryMatch)) {
+      const partNumber = String(formData.partnumber || '').trim();
+      const inventoryMatch =
+        findInventoryByPartNumber(inventoryItems, partNumber) ??
+        findInventoryByName(inventoryItems, name);
+      const hasSerialSelection = Boolean(String(formData.inventory_instance_id || '').trim());
+      if (inventoryMatch && needsSerialSelection(inventoryMatch) && !hasSerialSelection) {
         setPendingCreate({
           entityType: dialogState.entityType,
           parentId: dialogState.parentId,
@@ -733,69 +570,93 @@ export function useHierarchyEntityActions({
     ? getEntity(dialogState.entityType, dialogState.entityId)
     : undefined;
 
-  const partNumberOptions = useMemo(() => {
-    const options = new Map<string, string>();
-    for (const item of inventoryItems) {
-      const partNumber = inventoryPartNumber(item);
-      if (!partNumber) continue;
-      const label = item.name ? `${partNumber} — ${item.name}` : partNumber;
-      options.set(partNumber, label);
-    }
-    return Array.from(options.entries()).map(([value, label]) => ({ value, label }));
-  }, [inventoryItems]);
+  const partNumberOptions = useMemo(
+    () => buildPartNumberOptions(inventoryItems),
+    [inventoryItems]
+  );
 
-  const formFields = useMemo(() => {
+  const parentDisplay = useMemo(() => {
+    if (!dialogState || dialogState.mode === 'edit') return null;
+    const { entityType, parentId } = dialogState;
+    if (entityType === 'system') {
+      const project = projects.find((item) => item.id === parentId);
+      return project
+        ? { fieldName: 'project_id', label: PARENT_LABEL.system, id: project.id, name: project.name }
+        : null;
+    }
+    const parentEntity = getParentEntity(entityType, parentId);
+    if (!parentEntity) return null;
+    return {
+      fieldName: PARENT_ID_FIELD[entityType],
+      label: PARENT_LABEL[entityType],
+      id: parentEntity.id,
+      name: parentEntity.name,
+    };
+  }, [dialogState, getParentEntity, projects]);
+
+  const formFields = useMemo((): FormField[] => {
     if (!dialogState) return [];
 
-    const partNumberField =
-      partNumberOptions.length > 0
-        ? {
-            name: 'partnumber',
-            label: 'Part #',
-            type: 'select' as const,
-            required: false,
-            placeholder: 'Select part number from inventory',
-            options: partNumberOptions,
-          }
-        : {
-            name: 'partnumber',
-            label: 'Part #',
-            type: 'text' as const,
-            required: false,
-            placeholder: 'Enter part number',
-          };
-
-    const baseFields = [
+    const isCreate = dialogState.mode !== 'edit';
+    const fields: FormField[] = [
       {
         name: 'name',
         label: `${getEntityLabel(dialogState.entityType)} Name`,
-        type: 'select' as const,
+        type: 'select',
         required: true,
         options: hierarchyNames.map((item) => ({ label: item.name, value: item.name })),
       },
       {
         name: 'description',
         label: 'Description',
-        type: 'textarea' as const,
+        type: 'textarea',
         required: false,
         placeholder: `Enter ${dialogState.entityType} description`,
       },
-      partNumberField,
-      {
-        name: 'id',
-        label: 'Status',
-        type: 'select' as const,
-        required: true,
-        options: statuses.map((status) => ({
-          label: status.status_name,
-          value: status.id,
-        })),
-      },
     ];
+
+    if (isCreate && parentDisplay) {
+      fields.push(
+        buildParentField({
+          name: parentDisplay.fieldName,
+          label: parentDisplay.label,
+          parentId: parentDisplay.id,
+          parentName: parentDisplay.name,
+        })
+      );
+    }
+
+    fields.push(buildPartNumberField(partNumberOptions));
+
+    if (isCreate) {
+      fields.push({
+        name: 'inventory_instance_id',
+        label: 'Serial Number',
+        type: 'select',
+        required: false,
+        placeholder: 'Select serial number for part #',
+        getOptions: (formData) =>
+          buildSerialOptionsForPartNumber(
+            inventoryItems,
+            String(formData.partnumber || '')
+          ),
+      });
+    }
+
+    fields.push({
+      name: 'id',
+      label: 'Status',
+      type: 'select',
+      required: true,
+      options: statuses.map((status) => ({
+        label: status.status_name,
+        value: status.id,
+      })),
+    });
 
     if (dialogState.entityType === 'system' && dialogState.mode === 'edit' && dialogState.entityId) {
       return [
-        ...baseFields,
+        ...fields,
         ...hierarchyInstallFormFields({
           users,
           ownerType: 'system',
@@ -805,26 +666,54 @@ export function useHierarchyEntityActions({
     }
 
     if (dialogState.entityType === 'system' && dialogState.mode !== 'edit') {
-      return [...baseFields, ...hierarchyInstallFormFields({ users })];
+      return [...fields, ...hierarchyInstallFormFields({ users })];
     }
 
-    return baseFields;
-  }, [dialogState, hierarchyNames, partNumberOptions, statuses, users]);
+    return fields;
+  }, [
+    dialogState,
+    hierarchyNames,
+    inventoryItems,
+    parentDisplay,
+    partNumberOptions,
+    statuses,
+    users,
+  ]);
+
+  const handleCreateFieldChange = useCallback(
+    (fieldName: string, value: unknown, formData: Record<string, unknown>) => {
+      if (dialogState?.mode === 'edit') return undefined;
+      if (fieldName === 'name') {
+        return patchFormFromNameSelection(String(value || ''), inventoryItems, formData);
+      }
+      if (fieldName === 'partnumber') {
+        return patchFormFromPartNumberSelection(String(value || ''), inventoryItems);
+      }
+      return undefined;
+    },
+    [dialogState?.mode, inventoryItems]
+  );
 
   const initialValues = useMemo(() => {
-    if (!editingEntity || dialogState?.mode !== 'edit') return undefined;
+    if (editingEntity && dialogState?.mode === 'edit') {
+      return {
+        name: editingEntity.name,
+        description: editingEntity.description || '',
+        partnumber: editingEntity.part_number || '',
+        id: editingEntity.status_id,
+        sku: 'sku' in editingEntity ? editingEntity.sku || '' : '',
+        ...(dialogState.entityType === 'system'
+          ? hierarchyInstallInitialValues(editingEntity as System)
+          : {}),
+      };
+    }
 
-    return {
-      name: editingEntity.name,
-      description: editingEntity.description || '',
-      partnumber: editingEntity.part_number || '',
-      id: editingEntity.status_id,
-      sku: 'sku' in editingEntity ? editingEntity.sku || '' : '',
-      ...(dialogState.entityType === 'system'
-        ? hierarchyInstallInitialValues(editingEntity as System)
-        : {}),
-    };
-  }, [editingEntity, dialogState]);
+    if (dialogState && dialogState.mode !== 'edit' && parentDisplay) {
+      return { [parentDisplay.fieldName]: parentDisplay.id };
+    }
+
+    return undefined;
+  }, [editingEntity, dialogState, parentDisplay]);
 
   const entityActionDialogs = (
     <>
@@ -856,6 +745,7 @@ export function useHierarchyEntityActions({
               key={`${dialogState.mode}-${dialogState.entityType}-${dialogState.parentId}-${dialogState.entityId ?? 'new'}`}
               fields={formFields}
               initialValues={initialValues}
+              onFieldChange={handleCreateFieldChange}
               onSubmit={handleFormSubmit}
               isLoading={isSubmitting}
               onCancel={closeDialog}

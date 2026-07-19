@@ -15,7 +15,7 @@ import { EntityCards } from '@/components/entity-cards';
 import { P } from '@/lib/permission-codes';
 import { EntityForm } from '@/components/entity-form';
 import { EntityInventorySearch } from '@/components/entity-inventory-search';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import * as Models from '@/lib/models';
 import type { Inventory } from '@/lib/models';
@@ -38,6 +38,8 @@ import {
   systemHierarchyPath,
 } from '@/lib/entity-replacement';
 import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
+import { useHierarchyCreateFormOptions } from '@/hooks/use-hierarchy-create-form-options';
+import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
 
 export default function SubsystemDetailPage() {
   const params = useParams();
@@ -81,36 +83,79 @@ export default function SubsystemDetailPage() {
   const [loadingStatuses, setLoadingStatuses] = useState(true);
   const [subsystemHierarchyNames, setSubsystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
   const [moduleHierarchyNames, setModuleHierarchyNames] = useState<Models.Hierarchy[]>([]);
-  const moduleFormFields = [
-    {
-      name: 'name',
-      label: 'Module Name',
-      type: 'select' as const,
-      required: true,
-      options: moduleHierarchyNames.map((hierarchy) => ({ label: hierarchy.name, value: hierarchy.name })),
-    },
-    {
-      name: 'description',
-      label: 'Description',
-      type: 'textarea' as const,
-      required: false,
-      placeholder: 'Enter module description',
-    },
-    {
-      name: 'partnumber',
-      label: 'Part #',
-      type: 'text' as const,
-      required: false,
-      placeholder: 'Enter Part Number of Module',
-    },
-    {
-      name: 'id',
-      label: 'Status',
-      type: 'select' as const,
-      required: true,
-      options: statuses.map(s => ({ label: s.status_name, value: s.id })),
-    },
-  ];
+
+  const nameOptions = useMemo(
+    () =>
+      moduleHierarchyNames.map((hierarchy) => ({
+        label: hierarchy.name,
+        value: hierarchy.name,
+      })),
+    [moduleHierarchyNames]
+  );
+  const statusOptions = useMemo(
+    () => statuses.map((s) => ({ label: s.status_name, value: s.id })),
+    [statuses]
+  );
+  const allowedNames = useMemo(
+    () => moduleHierarchyNames.map((hierarchy) => hierarchy.name),
+    [moduleHierarchyNames]
+  );
+
+  const {
+    inventoryItems,
+    createFormFields: moduleCreateFormFields,
+    handleFieldChange: handleModuleCreateFieldChange,
+    createInitialValues: moduleCreateInitialValues,
+  } = useHierarchyCreateFormOptions({
+    entityType: 'module',
+    entityLabel: 'Module',
+    nameOptions,
+    statusOptions,
+    allowedNames,
+    parent: subsystem
+      ? {
+          fieldName: 'subsystem_id',
+          label: 'Subsystem',
+          id: subsystem.id,
+          name: subsystem.name,
+        }
+      : undefined,
+    enabled: isAddOpen,
+  });
+
+  const moduleEditFormFields = useMemo(
+    () => [
+      {
+        name: 'name',
+        label: 'Module Name',
+        type: 'select' as const,
+        required: true,
+        options: nameOptions,
+      },
+      {
+        name: 'description',
+        label: 'Description',
+        type: 'textarea' as const,
+        required: false,
+        placeholder: 'Enter module description',
+      },
+      {
+        name: 'partnumber',
+        label: 'Part #',
+        type: 'text' as const,
+        required: false,
+        placeholder: 'Enter Part Number of Module',
+      },
+      {
+        name: 'id',
+        label: 'Status',
+        type: 'select' as const,
+        required: true,
+        options: statusOptions,
+      },
+    ],
+    [nameOptions, statusOptions]
+  );
 
   async function handleAddModule(formData: Record<string, any>) {
     if (!subsystem) {
@@ -119,18 +164,28 @@ export default function SubsystemDetailPage() {
     }
     setIsSubmitting(true);
     try {
-      await createModule({
-        name: formData.name,
-        description: formData.description || '',
-        subsystem_id: subsystem.id,
-        status_id: Number(formData.id),
-        part_number: formData.partnumber,
-        serial_number: formData.name && formData.partnumber
-          ? `${formData.name}-${formData.partnumber}`
-          : formData.name || formData.partnumber || ""
+      const createEntityByType = buildCreateEntityByType({
+        createSystem: async (data) => ({ id: (await createSystem(data as any)).id }),
+        createSubsystem: async (data) => ({ id: (await createSubsystem(data as any)).id }),
+        createModule: async (data) => ({ id: (await createModule(data as any)).id }),
+        createUnit: async (data) => ({ id: (await createUnit(data as any)).id }),
+        createComponent: async (data) => ({ id: (await createComponent(data as any)).id }),
+      });
+
+      const created = await createHierarchyEntityFromForm({
+        entityType: 'module',
+        parentId: subsystem.id,
+        formData,
+        inventoryItems,
+        createEntity: (data) => createEntityByType('module', data),
+        createEntityByType,
       });
       setIsAddOpen(false);
-      toast.success('Module added successfully');
+      toast.success(
+        created.childrenInstalled > 0
+          ? `Module added and ${created.childrenInstalled} child entit${created.childrenInstalled === 1 ? 'y' : 'ies'} installed from inventory`
+          : 'Module added successfully'
+      );
     } catch (error) {
       console.error('Module creation error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to add module';
@@ -412,7 +467,10 @@ export default function SubsystemDetailPage() {
             <DialogDescription>Create a new module for {subsystem.name}</DialogDescription>
           </DialogHeader>
           <EntityForm
-            fields={moduleFormFields}
+            key={`add-module-${subsystem.id}`}
+            fields={moduleCreateFormFields}
+            initialValues={moduleCreateInitialValues}
+            onFieldChange={handleModuleCreateFieldChange}
             onSubmit={handleAddModule}
             isLoading={isSubmitting}
             onCancel={() => setIsAddOpen(false)}
@@ -430,7 +488,7 @@ export default function SubsystemDetailPage() {
           {editingModule ? (
             <EntityForm
               key={editingModule.id}
-              fields={moduleFormFields}
+              fields={moduleEditFormFields}
               initialValues={{
                 name: editingModule.name,
                 description: editingModule.description || '',

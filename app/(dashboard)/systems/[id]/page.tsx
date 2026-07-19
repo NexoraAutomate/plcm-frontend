@@ -15,7 +15,7 @@ import { EntityCards } from '@/components/entity-cards';
 import { P } from '@/lib/permission-codes';
 import { EntityForm } from '@/components/entity-form';
 import { EntityInventorySearch } from '@/components/entity-inventory-search';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import * as api from '@/lib/api';
@@ -39,6 +39,8 @@ import {
   systemHierarchyPath,
 } from '@/lib/entity-replacement';
 import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
+import { useHierarchyCreateFormOptions } from '@/hooks/use-hierarchy-create-form-options';
+import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
 
 export default function SystemDetailPage() {
   const params = useParams();
@@ -74,37 +76,79 @@ export default function SystemDetailPage() {
   const [loadingStatuses, setLoadingStatuses] = useState(true);
   const [systemHierarchyNames, setSystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
   const [subsystemHierarchyNames, setSubsystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
-  const subsystemFormFields = [
-    {
-      name: 'name',
-      label: 'Subsystem Name',
-      type: 'select' as const,
-      required: true,
-      options: subsystemHierarchyNames.map((hierarchy) => ({ label: hierarchy.name, value: hierarchy.name })),
-    },
-    {
-      name: 'description',
-      label: 'Description',
-      type: 'textarea' as const,
-      required: false,
-      placeholder: 'Enter subsystem description',
-    },
-    {
-      name: 'partnumber',
-      label: 'Part #',
-      type: 'text' as const,
-      required: false,
-      placeholder: 'Enter Part Number of SubSystem',
-    },
-    {
-      name: 'id',
-      label: 'Status',
-      type: 'select' as const,
-      required: true,
-      options: statuses.map(s => ({ label: s.status_name, value: s.id })),
-    },
 
-  ];
+  const nameOptions = useMemo(
+    () =>
+      subsystemHierarchyNames.map((hierarchy) => ({
+        label: hierarchy.name,
+        value: hierarchy.name,
+      })),
+    [subsystemHierarchyNames]
+  );
+  const statusOptions = useMemo(
+    () => statuses.map((s) => ({ label: s.status_name, value: s.id })),
+    [statuses]
+  );
+  const allowedNames = useMemo(
+    () => subsystemHierarchyNames.map((hierarchy) => hierarchy.name),
+    [subsystemHierarchyNames]
+  );
+
+  const {
+    inventoryItems,
+    createFormFields: subsystemCreateFormFields,
+    handleFieldChange: handleSubsystemCreateFieldChange,
+    createInitialValues: subsystemCreateInitialValues,
+  } = useHierarchyCreateFormOptions({
+    entityType: 'subsystem',
+    entityLabel: 'Subsystem',
+    nameOptions,
+    statusOptions,
+    allowedNames,
+    parent: system
+      ? {
+          fieldName: 'system_id',
+          label: 'System',
+          id: system.id,
+          name: system.name,
+        }
+      : undefined,
+    enabled: isAddOpen,
+  });
+
+  const subsystemEditFormFields = useMemo(
+    () => [
+      {
+        name: 'name',
+        label: 'Subsystem Name',
+        type: 'select' as const,
+        required: true,
+        options: nameOptions,
+      },
+      {
+        name: 'description',
+        label: 'Description',
+        type: 'textarea' as const,
+        required: false,
+        placeholder: 'Enter subsystem description',
+      },
+      {
+        name: 'partnumber',
+        label: 'Part #',
+        type: 'text' as const,
+        required: false,
+        placeholder: 'Enter Part Number of SubSystem',
+      },
+      {
+        name: 'id',
+        label: 'Status',
+        type: 'select' as const,
+        required: true,
+        options: statusOptions,
+      },
+    ],
+    [nameOptions, statusOptions]
+  );
 
   async function handleAddSubsystem(formData: Record<string, any>) {
     if (!system) {
@@ -113,19 +157,28 @@ export default function SystemDetailPage() {
     }
     setIsSubmitting(true);
     try {
-      await createSubsystem({
-        name: formData.name,
-        description: formData.description || '',
-        system_id: system.id,
-        status_id: Number(formData.id),
-        part_number: formData.partnumber,
-        serial_number: formData.name && formData.partnumber
-          ? `${formData.name}-${formData.partnumber}`
-          : formData.name || formData.partnumber || "",
-        configuration_item: formData.partnumber || formData.name,
+      const createEntityByType = buildCreateEntityByType({
+        createSystem: async (data) => ({ id: (await createSystem(data as any)).id }),
+        createSubsystem: async (data) => ({ id: (await createSubsystem(data as any)).id }),
+        createModule: async (data) => ({ id: (await createModule(data as any)).id }),
+        createUnit: async (data) => ({ id: (await createUnit(data as any)).id }),
+        createComponent: async (data) => ({ id: (await createComponent(data as any)).id }),
+      });
+
+      const created = await createHierarchyEntityFromForm({
+        entityType: 'subsystem',
+        parentId: system.id,
+        formData,
+        inventoryItems,
+        createEntity: (data) => createEntityByType('subsystem', data),
+        createEntityByType,
       });
       setIsAddOpen(false);
-      toast.success('Subsystem added successfully');
+      toast.success(
+        created.childrenInstalled > 0
+          ? `Subsystem added and ${created.childrenInstalled} child entit${created.childrenInstalled === 1 ? 'y' : 'ies'} installed from inventory`
+          : 'Subsystem added successfully'
+      );
     } catch (error) {
       console.error('[v0] Subsystem creation error:', error);
       let errorMessage = 'Failed to add subsystem';
@@ -419,7 +472,10 @@ export default function SystemDetailPage() {
             <DialogDescription>Create a new subsystem for {system.name}</DialogDescription>
           </DialogHeader>
           <EntityForm
-            fields={subsystemFormFields}
+            key={`add-subsystem-${system.id}`}
+            fields={subsystemCreateFormFields}
+            initialValues={subsystemCreateInitialValues}
+            onFieldChange={handleSubsystemCreateFieldChange}
             onSubmit={handleAddSubsystem}
             isLoading={isSubmitting}
             onCancel={() => setIsAddOpen(false)}
@@ -437,7 +493,7 @@ export default function SystemDetailPage() {
           {editingSubsystem ? (
             <EntityForm
               key={editingSubsystem.id}
-              fields={subsystemFormFields}
+              fields={subsystemEditFormFields}
               initialValues={{
                 name: editingSubsystem.name,
                 description: editingSubsystem.description || '',

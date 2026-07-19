@@ -15,7 +15,7 @@ import { EntityCards } from '@/components/entity-cards';
 import { P } from '@/lib/permission-codes';
 import { EntityForm } from '@/components/entity-form';
 import { EntityInventorySearch } from '@/components/entity-inventory-search';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import * as Models from '@/lib/models';
@@ -39,6 +39,8 @@ import {
   systemHierarchyPath,
 } from '@/lib/entity-replacement';
 import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
+import { useHierarchyCreateFormOptions } from '@/hooks/use-hierarchy-create-form-options';
+import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
 
 export default function UnitDetailPage() {
   const params = useParams();
@@ -100,43 +102,78 @@ export default function UnitDetailPage() {
   const [unitHierarchyNames, setUnitHierarchyNames] = useState<Models.Hierarchy[]>([]);
   const [componentHierarchyNames, setComponentHierarchyNames] = useState<Models.Hierarchy[]>([]);
 
-  const componentFormFields = [
-    {
-      name: 'name',
-      label: 'Component Name',
-      type: 'select' as const,
-      required: true,
-      options: componentHierarchyNames.map((hierarchy) => ({ label: hierarchy.name, value: hierarchy.name })),
-    },
-    {
-      name: 'description',
-      label: 'Description',
-      type: 'textarea' as const,
-      required: false,
-      placeholder: 'Enter component description',
-    },
-    {
-      name: 'partnumber',
-      label: 'Part #',
-      type: 'text' as const,
-      required: false,
-      placeholder: 'Enter Part Number of Component',
-    },
-    // {
-    //   name: 'sku',
-    //   label: 'SKU',
-    //   type: 'text' as const,
-    //   required: false,
-    //   placeholder: 'Enter component SKU',
-    // },
-    {
-      name: 'id',
-      label: 'Status',
-      type: 'select' as const,
-      required: true,
-      options: statuses.map(s => ({ label: s.status_name, value: s.id })),
-    },
-  ];
+  const nameOptions = useMemo(
+    () =>
+      componentHierarchyNames.map((hierarchy) => ({
+        label: hierarchy.name,
+        value: hierarchy.name,
+      })),
+    [componentHierarchyNames]
+  );
+  const statusOptions = useMemo(
+    () => statuses.map((s) => ({ label: s.status_name, value: s.id })),
+    [statuses]
+  );
+  const allowedNames = useMemo(
+    () => componentHierarchyNames.map((hierarchy) => hierarchy.name),
+    [componentHierarchyNames]
+  );
+
+  const {
+    inventoryItems,
+    createFormFields: componentCreateFormFields,
+    handleFieldChange: handleComponentCreateFieldChange,
+    createInitialValues: componentCreateInitialValues,
+  } = useHierarchyCreateFormOptions({
+    entityType: 'component',
+    entityLabel: 'Component',
+    nameOptions,
+    statusOptions,
+    allowedNames,
+    parent: unit
+      ? {
+          fieldName: 'unit_id',
+          label: 'Unit',
+          id: unit.id,
+          name: unit.name,
+        }
+      : undefined,
+    enabled: isAddOpen,
+  });
+
+  const componentEditFormFields = useMemo(
+    () => [
+      {
+        name: 'name',
+        label: 'Component Name',
+        type: 'select' as const,
+        required: true,
+        options: nameOptions,
+      },
+      {
+        name: 'description',
+        label: 'Description',
+        type: 'textarea' as const,
+        required: false,
+        placeholder: 'Enter component description',
+      },
+      {
+        name: 'partnumber',
+        label: 'Part #',
+        type: 'text' as const,
+        required: false,
+        placeholder: 'Enter Part Number of Component',
+      },
+      {
+        name: 'id',
+        label: 'Status',
+        type: 'select' as const,
+        required: true,
+        options: statusOptions,
+      },
+    ],
+    [nameOptions, statusOptions]
+  );
 
   async function handleAddComponent(formData: Record<string, any>) {
     if (!unit) {
@@ -145,19 +182,29 @@ export default function UnitDetailPage() {
     }
     setIsSubmitting(true);
     try {
-      await createComponent({
-        name: formData.name,
-        description: formData.description || '',
-        sku: formData.sku || '',
-        unit_id: unit.id,
-        status_id: Number(formData.id),
-        part_number: formData.partnumber,
-        serial_number: formData.name && formData.partnumber
-          ? `${formData.name}-${formData.partnumber}`
-          : formData.name || formData.partnumber || ""
+      const createEntityByType = buildCreateEntityByType({
+        createSystem: async (data) => ({ id: (await createSystem(data as any)).id }),
+        createSubsystem: async (data) => ({ id: (await createSubsystem(data as any)).id }),
+        createModule: async (data) => ({ id: (await createModule(data as any)).id }),
+        createUnit: async (data) => ({ id: (await createUnit(data as any)).id }),
+        createComponent: async (data) => ({ id: (await createComponent(data as any)).id }),
+      });
+
+      const created = await createHierarchyEntityFromForm({
+        entityType: 'component',
+        parentId: unit.id,
+        formData,
+        inventoryItems,
+        createEntity: (data) => createEntityByType('component', data),
+        createEntityByType,
+        extraPayload: { sku: String(formData.sku || '') },
       });
       setIsAddOpen(false);
-      toast.success('Component added successfully');
+      toast.success(
+        created.childrenInstalled > 0
+          ? `Component added and ${created.childrenInstalled} child entit${created.childrenInstalled === 1 ? 'y' : 'ies'} installed from inventory`
+          : 'Component added successfully'
+      );
     } catch (error) {
       console.error('[v0] Component creation error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to add component';
@@ -434,7 +481,10 @@ export default function UnitDetailPage() {
             <DialogDescription>Create a new component for {unit.name}</DialogDescription>
           </DialogHeader>
           <EntityForm
-            fields={componentFormFields}
+            key={`add-component-${unit.id}`}
+            fields={componentCreateFormFields}
+            initialValues={componentCreateInitialValues}
+            onFieldChange={handleComponentCreateFieldChange}
             onSubmit={handleAddComponent}
             isLoading={isSubmitting}
             onCancel={() => setIsAddOpen(false)}
@@ -452,7 +502,7 @@ export default function UnitDetailPage() {
           {editingComponent ? (
             <EntityForm
               key={editingComponent.id}
-              fields={componentFormFields}
+              fields={componentEditFormFields}
               initialValues={{
                 name: editingComponent.name,
                 description: editingComponent.description || '',

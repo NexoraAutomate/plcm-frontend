@@ -14,7 +14,7 @@ import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
 import { P } from '@/lib/permission-codes';
 import { EntityForm } from '@/components/entity-form';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import * as Models from '@/lib/models';
@@ -39,6 +39,8 @@ import {
   systemHierarchyPath,
 } from '@/lib/entity-replacement';
 import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
+import { useHierarchyCreateFormOptions } from '@/hooks/use-hierarchy-create-form-options';
+import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
 
 export default function ModuleDetailPage() {
   const params = useParams();
@@ -99,36 +101,78 @@ export default function ModuleDetailPage() {
   const [moduleHierarchyNames, setModuleHierarchyNames] = useState<Models.Hierarchy[]>([]);
   const [unitHierarchyNames, setUnitHierarchyNames] = useState<Models.Hierarchy[]>([]);
 
-  const unitFormFields = [
-    {
-      name: 'name',
-      label: 'Unit Name',
-      type: 'select' as const,
-      required: true,
-      options: unitHierarchyNames.map((hierarchy) => ({ label: hierarchy.name, value: hierarchy.name })),
-    },
-    {
-      name: 'description',
-      label: 'Description',
-      type: 'textarea' as const,
-      required: false,
-      placeholder: 'Enter unit description',
-    },
-    {
-      name: 'partnumber',
-      label: 'Part #',
-      type: 'text' as const,
-      required: false,
-      placeholder: 'Enter Part Number of Unit',
-    },
-    {
-      name: 'id',
-      label: 'Status',
-      type: 'select' as const,
-      required: true,
-      options: statuses.map(s => ({ label: s.status_name, value: s.id })),
-    },
-  ];
+  const nameOptions = useMemo(
+    () =>
+      unitHierarchyNames.map((hierarchy) => ({
+        label: hierarchy.name,
+        value: hierarchy.name,
+      })),
+    [unitHierarchyNames]
+  );
+  const statusOptions = useMemo(
+    () => statuses.map((s) => ({ label: s.status_name, value: s.id })),
+    [statuses]
+  );
+  const allowedNames = useMemo(
+    () => unitHierarchyNames.map((hierarchy) => hierarchy.name),
+    [unitHierarchyNames]
+  );
+
+  const {
+    inventoryItems,
+    createFormFields: unitCreateFormFields,
+    handleFieldChange: handleUnitCreateFieldChange,
+    createInitialValues: unitCreateInitialValues,
+  } = useHierarchyCreateFormOptions({
+    entityType: 'unit',
+    entityLabel: 'Unit',
+    nameOptions,
+    statusOptions,
+    allowedNames,
+    parent: module
+      ? {
+          fieldName: 'module_id',
+          label: 'Module',
+          id: module.id,
+          name: module.name,
+        }
+      : undefined,
+    enabled: isAddOpen,
+  });
+
+  const unitEditFormFields = useMemo(
+    () => [
+      {
+        name: 'name',
+        label: 'Unit Name',
+        type: 'select' as const,
+        required: true,
+        options: nameOptions,
+      },
+      {
+        name: 'description',
+        label: 'Description',
+        type: 'textarea' as const,
+        required: false,
+        placeholder: 'Enter unit description',
+      },
+      {
+        name: 'partnumber',
+        label: 'Part #',
+        type: 'text' as const,
+        required: false,
+        placeholder: 'Enter Part Number of Unit',
+      },
+      {
+        name: 'id',
+        label: 'Status',
+        type: 'select' as const,
+        required: true,
+        options: statusOptions,
+      },
+    ],
+    [nameOptions, statusOptions]
+  );
 
   async function handleAddUnit(formData: Record<string, any>) {
     if (!module) {
@@ -137,18 +181,28 @@ export default function ModuleDetailPage() {
     }
     setIsSubmitting(true);
     try {
-      await createUnit({
-        name: formData.name,
-        description: formData.description || '',
-        module_id: module.id,
-        status_id: Number(formData.id),
-        part_number: formData.partnumber,
-        serial_number: formData.name && formData.partnumber
-          ? `${formData.name}-${formData.partnumber}`
-          : formData.name || formData.partnumber || ""
+      const createEntityByType = buildCreateEntityByType({
+        createSystem: async (data) => ({ id: (await createSystem(data as any)).id }),
+        createSubsystem: async (data) => ({ id: (await createSubsystem(data as any)).id }),
+        createModule: async (data) => ({ id: (await createModule(data as any)).id }),
+        createUnit: async (data) => ({ id: (await createUnit(data as any)).id }),
+        createComponent: async (data) => ({ id: (await createComponent(data as any)).id }),
+      });
+
+      const created = await createHierarchyEntityFromForm({
+        entityType: 'unit',
+        parentId: module.id,
+        formData,
+        inventoryItems,
+        createEntity: (data) => createEntityByType('unit', data),
+        createEntityByType,
       });
       setIsAddOpen(false);
-      toast.success('Unit added successfully');
+      toast.success(
+        created.childrenInstalled > 0
+          ? `Unit added and ${created.childrenInstalled} child entit${created.childrenInstalled === 1 ? 'y' : 'ies'} installed from inventory`
+          : 'Unit added successfully'
+      );
     } catch (error) {
       console.error('[v0] Unit creation error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to add unit';
@@ -426,7 +480,10 @@ export default function ModuleDetailPage() {
             <DialogDescription>Create a new unit for {module.name}</DialogDescription>
           </DialogHeader>
           <EntityForm
-            fields={unitFormFields}
+            key={`add-unit-${module.id}`}
+            fields={unitCreateFormFields}
+            initialValues={unitCreateInitialValues}
+            onFieldChange={handleUnitCreateFieldChange}
             onSubmit={handleAddUnit}
             isLoading={isSubmitting}
             onCancel={() => setIsAddOpen(false)}
@@ -444,7 +501,7 @@ export default function ModuleDetailPage() {
           {editingUnit ? (
             <EntityForm
               key={editingUnit.id}
-              fields={unitFormFields}
+              fields={unitEditFormFields}
               initialValues={{
                 name: editingUnit.name,
                 description: editingUnit.description || '',

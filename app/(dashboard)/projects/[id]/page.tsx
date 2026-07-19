@@ -33,6 +33,8 @@ import {
   parseHierarchyInstallPayload,
 } from '@/lib/hierarchy-install-fields';
 import { syncEntityPicture } from '@/lib/entity-picture-upload';
+import { useHierarchyCreateFormOptions } from '@/hooks/use-hierarchy-create-form-options';
+import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
 
 export default function ProjectDetailPage() {
   const params = useParams();
@@ -66,17 +68,58 @@ export default function ProjectDetailPage() {
 
 
 
-  const systemFormFields = useMemo(
+  const nameOptions = useMemo(
+    () =>
+      systemHierarchyNames.map((hierarchy) => ({
+        label: hierarchy.name,
+        value: hierarchy.name,
+      })),
+    [systemHierarchyNames]
+  );
+  const statusOptions = useMemo(
+    () => statuses.map((s) => ({ label: s.status_name, value: s.id })),
+    [statuses]
+  );
+  const allowedSystemNames = useMemo(
+    () => systemHierarchyNames.map((hierarchy) => hierarchy.name),
+    [systemHierarchyNames]
+  );
+  const installFields = useMemo(
+    () => hierarchyInstallFormFields({ users }),
+    [users]
+  );
+
+  const {
+    inventoryItems,
+    createFormFields: systemCreateFormFields,
+    handleFieldChange: handleSystemCreateFieldChange,
+    createInitialValues: systemCreateInitialValues,
+  } = useHierarchyCreateFormOptions({
+    entityType: 'system',
+    entityLabel: 'System',
+    nameOptions,
+    statusOptions,
+    allowedNames: allowedSystemNames,
+    parent: project
+      ? {
+          fieldName: 'project_id',
+          label: 'Project',
+          id: project.id,
+          name: project.name,
+        }
+      : undefined,
+    extraFields: installFields,
+    enabled: isAddOpen,
+  });
+
+  const systemEditFormFields = useMemo(
     () => [
       {
         name: 'name',
         label: 'System Name',
         type: 'select' as const,
         required: true,
-        options: systemHierarchyNames.map((hierarchy) => ({
-          label: hierarchy.name,
-          value: hierarchy.name,
-        })),
+        options: nameOptions,
       },
       {
         name: 'description',
@@ -104,7 +147,7 @@ export default function ProjectDetailPage() {
         label: 'Status',
         type: 'select' as const,
         required: true,
-        options: statuses.map((s) => ({ label: s.status_name, value: s.id })),
+        options: statusOptions,
       },
       ...hierarchyInstallFormFields({
         users,
@@ -112,7 +155,7 @@ export default function ProjectDetailPage() {
         ownerId: editingId ?? undefined,
       }),
     ],
-    [systemHierarchyNames, projects, statuses, users, editingId]
+    [nameOptions, projects, statusOptions, users, editingId]
   );
 
   async function handleAddSystem(formData: Record<string, any>) {
@@ -120,28 +163,36 @@ export default function ProjectDetailPage() {
       toast.error('Project not found');
       return;
     }
-    if (!formData.name.trim() || !formData.description  || !formData.id) {
-          toast.error('Please fill in all required fields');
-          return;
-        }
+    if (!formData.name?.trim() || !formData.id) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
     setIsSubmitting(true);
     try {
-      console.log("my project ID is ", project.id)
-      const created = await createSystem({
-        name: formData.name,
-        description: formData.description || '',
-        project_id: formData.project_id ? Number(formData.project_id) : project.id,
-        status_id: Number(formData.id),
-        part_number: formData.partnumber,
-        serial_number: formData.name && formData.partnumber
-                        ? `${formData.name}-${formData.partnumber}`
-                        : formData.name || formData.partnumber || "",
-        configuration_item: formData.partnumber || formData.name,
-        ...parseHierarchyInstallPayload(formData),
+      const createEntityByType = buildCreateEntityByType({
+        createSystem: async (data) => ({ id: (await createSystem(data as any)).id }),
+        createSubsystem: async (data) => ({ id: (await createSubsystem(data as any)).id }),
+        createModule: async (data) => ({ id: (await createModule(data as any)).id }),
+        createUnit: async (data) => ({ id: (await createUnit(data as any)).id }),
+        createComponent: async (data) => ({ id: (await createComponent(data as any)).id }),
+      });
+
+      const created = await createHierarchyEntityFromForm({
+        entityType: 'system',
+        parentId: project.id,
+        formData,
+        inventoryItems,
+        createEntity: (data) => createEntityByType('system', data),
+        createEntityByType,
+        extraPayload: parseHierarchyInstallPayload(formData),
       });
       await syncEntityPicture('system', created.id, formData);
       setIsAddOpen(false);
-      toast.success('System added successfully');
+      toast.success(
+        created.childrenInstalled > 0
+          ? `System added and ${created.childrenInstalled} child entit${created.childrenInstalled === 1 ? 'y' : 'ies'} installed from inventory`
+          : 'System added successfully'
+      );
     } catch (error) {
       console.error('System creation error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to add system';
@@ -392,7 +443,10 @@ export default function ProjectDetailPage() {
             <DialogDescription>Create a new system for this project</DialogDescription>
           </DialogHeader>
           <EntityForm
-            fields={systemFormFields}
+            key={`add-system-${project.id}`}
+            fields={systemCreateFormFields}
+            initialValues={systemCreateInitialValues}
+            onFieldChange={handleSystemCreateFieldChange}
             onSubmit={handleAddSystem}
             isLoading={isSubmitting}
             onCancel={() => setIsAddOpen(false)}
@@ -410,7 +464,7 @@ export default function ProjectDetailPage() {
           {editingSystem ? (
             <EntityForm
               key={editingSystem.id}
-              fields={systemFormFields}
+              fields={systemEditFormFields}
               initialValues={{
                 name: editingSystem.name,
                 description: editingSystem.description || '',
