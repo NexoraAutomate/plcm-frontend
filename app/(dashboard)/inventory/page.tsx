@@ -41,6 +41,12 @@ import {
   resolveInventoryQuantity,
 } from '@/lib/entity-hierarchy';
 import {
+  calculateInventoryTotalUsed,
+  canSuggestInventorySerial,
+  inventoryEntitiesForType,
+  suggestNextInventorySerial,
+} from '@/lib/inventory-serial';
+import {
   canAddInventoryChildren,
   resolveInventoryInstanceSerial,
 } from '@/lib/inventory-child-install';
@@ -55,6 +61,18 @@ import { cn } from '@/lib/utils';
 import { Can } from '@/components/auth/can';
 import { useAuth } from '@/lib/auth-context';
 import { P } from '@/lib/permission-codes';
+
+const ACTION_BTN =
+  'h-7 w-7 bg-transparent shadow-none border-0 hover:bg-transparent';
+
+const ACTION_ICON = {
+  add: 'size-3.5 text-muted-foreground transition-colors group-hover/add:text-emerald-600',
+  children: 'size-3.5 text-muted-foreground transition-colors group-hover/children:text-violet-600',
+  hierarchy: 'size-3.5 text-muted-foreground transition-colors group-hover/hierarchy:text-cyan-600',
+  duplicate: 'size-3.5 text-muted-foreground transition-colors group-hover/duplicate:text-amber-600',
+  edit: 'size-3.5 text-muted-foreground transition-colors group-hover/edit:text-blue-600',
+  delete: 'size-3.5 text-muted-foreground transition-colors group-hover/delete:text-red-600',
+} as const;
 
 type EntityType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
 type StockFilter = 'all' | 'available' | 'out_of_stock';
@@ -126,7 +144,16 @@ interface InventoryItem extends Inventory {
   partNumber?: string;
   holderName?: string;
   displayLocation?: string;
+  totalUsed?: number;
 }
+
+type HierarchyEntityPools = {
+  systems: { part_number?: string | null; original_part_number?: string | null; serial_number?: string | null; original_serial_number?: string | null }[];
+  subsystems: { part_number?: string | null; original_part_number?: string | null; serial_number?: string | null; original_serial_number?: string | null }[];
+  modules: { part_number?: string | null; original_part_number?: string | null; serial_number?: string | null; original_serial_number?: string | null }[];
+  units: { part_number?: string | null; original_part_number?: string | null; serial_number?: string | null; original_serial_number?: string | null }[];
+  components: { part_number?: string | null; original_part_number?: string | null; serial_number?: string | null; original_serial_number?: string | null }[];
+};
 
 function resolveInventoryHolderId(item: Inventory): number | undefined {
   if (item.holder_user_id) return item.holder_user_id;
@@ -153,7 +180,11 @@ function getExpandableSerialInstances(item: Inventory): InventoryInstance[] {
   return selectable.filter((instance) => Boolean(instanceSerialNumber(instance)));
 }
 
-function enrichInventoryItems(items: Inventory[], users: User[]): InventoryItem[] {
+function enrichInventoryItems(
+  items: Inventory[],
+  users: User[],
+  entityPools: HierarchyEntityPools
+): InventoryItem[] {
   return items.map((item) => {
     const holderId = resolveInventoryHolderId(item);
     const holder = holderId ? users.find((user) => user.id === holderId) : undefined;
@@ -163,6 +194,7 @@ function enrichInventoryItems(items: Inventory[], users: User[]): InventoryItem[
       getExpandableSerialInstances(item)
         .map(instanceSerialNumber)
         .find(Boolean) || serialNumbers[0];
+    const relatedEntities = inventoryEntitiesForType(item.inventory_type, entityPools);
 
     return {
       ...item,
@@ -172,6 +204,7 @@ function enrichInventoryItems(items: Inventory[], users: User[]): InventoryItem[
       partNumber: inventoryPartNumber(item),
       holderName: holder ? formatUserRef(holder) : '—',
       displayLocation: resolveInventoryLocation(item),
+      totalUsed: calculateInventoryTotalUsed(item, relatedEntities),
     };
   });
 }
@@ -182,7 +215,8 @@ export default function InventoryPage() {
   const canCreateInventory = can(P.create_inventory);
   const canEditInventory = can(P.edit_inventory);
   const canAddStock = canCreateInventory || canEditInventory;
-  const { users, statuses } = useDataStore();
+  const { users, statuses, systems, subsystems, modules, units, components, ensureHierarchyLoaded } =
+    useDataStore();
   const [search, setSearch] = useState('');
   const [entityTypeFilter, setEntityTypeFilter] = useState<EntityType | 'all'>('all');
   const [stockFilter, setStockFilter] = useState<StockFilter>('all');
@@ -195,11 +229,19 @@ export default function InventoryPage() {
       fetchInventoryPage(skip, limit, inventoryTypeParam, filters),
     filters: listFilters,
   });
+  const entityPools = useMemo(
+    () => ({ systems, subsystems, modules, units, components }),
+    [systems, subsystems, modules, units, components]
+  );
   const inventory = useMemo(
-    () => enrichInventoryItems(pagination.items, users),
-    [pagination.items, users]
+    () => enrichInventoryItems(pagination.items, users, entityPools),
+    [pagination.items, users, entityPools]
   );
   const loading = pagination.loading;
+
+  useEffect(() => {
+    void ensureHierarchyLoaded();
+  }, [ensureHierarchyLoaded]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -377,8 +419,16 @@ export default function InventoryPage() {
   }
 
   function openAddMore(item: InventoryItem) {
+    const relatedEntities = inventoryEntitiesForType(item.inventory_type, entityPools);
+    const nextSerial = canSuggestInventorySerial(item)
+      ? suggestNextInventorySerial(item, relatedEntities)
+      : '';
     setAddMoreItem(item);
-    setAddMoreForm({ serial_number: '', holder_user_id: '', location: '' });
+    setAddMoreForm({
+      serial_number: nextSerial,
+      holder_user_id: '',
+      location: '',
+    });
   }
 
   async function handleAddMore() {
@@ -604,22 +654,49 @@ export default function InventoryPage() {
   }
 
   async function handleAddInstance() {
-    if (!editingId) return;
+    if (!editingId || !editingGroup) return;
     if (!formData.location.trim()) {
       toast.error('Location is required for each serialized unit');
       return;
     }
 
+    const relatedEntities = inventoryEntitiesForType(editingGroup.inventory_type, entityPools);
+    const groupWithInstances = { ...editingGroup, instances };
+    const nextSerial = suggestNextInventorySerial(groupWithInstances, relatedEntities);
+
+    if (!nextSerial) {
+      toast.error('Could not determine the next serial number');
+      return;
+    }
+
     try {
-      const created = await api.inventory.createInstance(editingId, buildInstancePayload());
+      const created = await api.inventory.createInstance(editingId, {
+        ...buildInstancePayload(),
+        serial_number: nextSerial,
+        original_serial_number: formData.original_serial_number.trim() || nextSerial,
+      });
       if (created.data?.id) {
         await syncMedia('inventory_instance', created.data.id);
       }
       const refreshed = await api.inventory.get(editingId);
       const nextInstances = refreshed.data?.instances ?? [];
       setInstances(nextInstances);
+      if (refreshed.data) {
+        setEditingGroup(refreshed.data);
+      }
       if (created.data) {
         loadInstanceIntoForm(created.data, refreshed.data ?? undefined);
+      }
+      const suggested = suggestNextInventorySerial(
+        { ...(refreshed.data ?? editingGroup), instances: nextInstances },
+        relatedEntities
+      );
+      if (suggested) {
+        setFormData((prev) => ({
+          ...prev,
+          serial_number: suggested,
+          original_serial_number: suggested,
+        }));
       }
       toast.success('Serialized unit added');
       pagination.invalidate();
@@ -1258,7 +1335,9 @@ export default function InventoryPage() {
                   <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Category</SortableTableHead>
                   <SortableTableHead column="inventory_type" sort={sort} onSort={cycleSort}>Type</SortableTableHead>
                   <SortableTableHead column="part_number" sort={sort} onSort={cycleSort}>Part Number</SortableTableHead>
-                  <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>Serial Number</SortableTableHead>
+                  <TableHead title="Units of this part number already installed into entities">
+                    Total Used
+                  </TableHead>
                   <SortableTableHead column="quantity" sort={sort} onSort={cycleSort}>Quantity</SortableTableHead>
                   <SortableTableHead column="holder_user_id" sort={sort} onSort={cycleSort}>Inventory Holder</SortableTableHead>
                   <SortableTableHead column="location" sort={sort} onSort={cycleSort}>Location</SortableTableHead>
@@ -1324,77 +1403,81 @@ export default function InventoryPage() {
                             )}
                           </TableCell>
                           <TableCell>{item.partNumber || '—'}</TableCell>
-                          <TableCell>
-                            <span className="font-mono text-sm">{item.serialNumber || '—'}</span>
-                          </TableCell>
+                          <TableCell>{item.totalUsed ?? 0}</TableCell>
                           <TableCell>{item.quantity}</TableCell>
                           <TableCell>{item.holderName || '—'}</TableCell>
                           <TableCell>{item.displayLocation || '—'}</TableCell>
                           <TableCell className="text-right">
-                            <div className="flex gap-1 justify-end">
+                            <div className="flex gap-0.5 justify-end">
                               {item.quantity >= 0 && canAddStock ? (
                                 <Button
                                   size="icon-sm"
-                                  variant="secondary"
+                                  variant="ghost"
+                                  className={cn(ACTION_BTN, 'group/add')}
                                   onClick={() => openAddMore(item)}
                                   title="Add More"
                                   aria-label="Add More"
                                 >
-                                  <Plus className="h-4 w-4" />
+                                  <Plus className={ACTION_ICON.add} />
                                 </Button>
                               ) : null}
                               {canAddInventoryChildren(item.inventory_type) && canAddStock ? (
                                 <Button
                                   size="icon-sm"
-                                  variant="secondary"
+                                  variant="ghost"
+                                  className={cn(ACTION_BTN, 'group/children')}
                                   onClick={() => handleAddChildrenClick(item)}
                                   title="Add Children"
                                   aria-label="Add Children"
                                 >
-                                  <Layers className="h-4 w-4" />
+                                  <Layers className={ACTION_ICON.children} />
                                 </Button>
                               ) : null}
                               <Button
                                 size="icon-sm"
-                                variant="secondary"
+                                variant="ghost"
+                                className={cn(ACTION_BTN, 'group/hierarchy')}
                                 onClick={() => handleViewHierarchyClick(item)}
                                 title="View Hierarchy"
                                 aria-label="View Hierarchy"
                               >
-                                <Network className="h-4 w-4" />
+                                <Network className={ACTION_ICON.hierarchy} />
                               </Button>
                               {canAddStock ? (
                                 <Button
                                   size="icon-sm"
-                                  variant="secondary"
+                                  variant="ghost"
+                                  className={cn(ACTION_BTN, 'group/duplicate')}
                                   onClick={() => handleDuplicateClick(item)}
                                   disabled={duplicating}
                                   title="Duplicate"
                                   aria-label="Duplicate"
                                 >
-                                  <Copy className="h-4 w-4" />
+                                  <Copy className={ACTION_ICON.duplicate} />
                                 </Button>
                               ) : null}
                               <Can permission={P.edit_inventory}>
                                 <Button
                                   size="icon-sm"
-                                  variant="outline"
+                                  variant="ghost"
+                                  className={cn(ACTION_BTN, 'group/edit')}
                                   onClick={() => openEdit(item)}
                                   title="Edit"
                                   aria-label="Edit"
                                 >
-                                  <Edit className="h-4 w-4" />
+                                  <Edit className={ACTION_ICON.edit} />
                                 </Button>
                               </Can>
                               <Can permission={P.delete_inventory}>
                                 <Button
                                   size="icon-sm"
-                                  variant="destructive"
+                                  variant="ghost"
+                                  className={cn(ACTION_BTN, 'group/delete')}
                                   onClick={() => setDeleteTarget(item)}
                                   title="Delete"
                                   aria-label="Delete"
                                 >
-                                  <Trash2 className="h-4 w-4" />
+                                  <Trash2 className={ACTION_ICON.delete} />
                                 </Button>
                               </Can>
                             </div>
@@ -1645,7 +1728,7 @@ export default function InventoryPage() {
             <DialogTitle>Add More Stock</DialogTitle>
             <DialogDescription>
               {addMoreItem
-                ? `Add another ${addMoreItem.name} (${addMoreItem.inventory_type}) with a new serial number, holder, and location.`
+                ? `Add another ${addMoreItem.name} (${addMoreItem.inventory_type}). Serial number is suggested as one greater than the last existing unit.`
                 : 'Add another unit of this inventory item.'}
             </DialogDescription>
           </DialogHeader>
@@ -1658,7 +1741,7 @@ export default function InventoryPage() {
                 onChange={(e) =>
                   setAddMoreForm((prev) => ({ ...prev, serial_number: e.target.value }))
                 }
-                placeholder="e.g., SN-2024-001"
+                placeholder="Auto-suggested from last serial"
                 disabled={addMoreSubmitting}
               />
             </div>
