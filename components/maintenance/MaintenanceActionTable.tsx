@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,6 +14,9 @@ import {
 import { ActionOutcomeBadge } from '@/components/maintenance/badges';
 import { getActionTypeMeta } from '@/lib/maintenance-workflow';
 import type { FaultyEntity, MaintenanceAction } from '@/lib/models';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useTableSorting } from '@/hooks/use-table-sorting';
+import { sortRowsByState } from '@/lib/sorting';
 
 interface MaintenanceActionTableProps {
   actions: MaintenanceAction[];
@@ -39,6 +42,19 @@ export function MaintenanceActionTable({
   onDelete,
   isLoading = false,
 }: MaintenanceActionTableProps) {
+  const { sort, cycleSort } = useTableSorting({
+    initial: { sortBy: 'performed_at', sortOrder: 'desc' },
+  });
+
+  const sortedActions = useMemo(
+    () =>
+      sortRowsByState(
+        actions as unknown as Record<string, unknown>[],
+        sort
+      ) as unknown as MaintenanceAction[],
+    [actions, sort]
+  );
+
   if (isLoading) {
     return (
       <div className="text-sm text-muted-foreground py-4">
@@ -55,21 +71,29 @@ export function MaintenanceActionTable({
     );
   }
 
-  const sortedActions = [...actions].sort(
-    (a, b) => new Date(b.performed_at).getTime() - new Date(a.performed_at).getTime()
-  );
-
   return (
     <div className="border rounded-lg overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/50">
-            <TableHead>Action Type</TableHead>
-            <TableHead>Entity</TableHead>
-            <TableHead>Outcome</TableHead>
-            <TableHead>Notes</TableHead>
-            <TableHead>Performed At</TableHead>
-            <TableHead>Engineer</TableHead>
+            <SortableTableHead column="action_type" sort={sort} onSort={cycleSort}>
+              Action Type
+            </SortableTableHead>
+            <SortableTableHead column="faulty_entity_id" sort={sort} onSort={cycleSort}>
+              Entity
+            </SortableTableHead>
+            <SortableTableHead column="outcome" sort={sort} onSort={cycleSort}>
+              Outcome
+            </SortableTableHead>
+            <SortableTableHead column="notes" sort={sort} onSort={cycleSort}>
+              Notes
+            </SortableTableHead>
+            <SortableTableHead column="performed_at" sort={sort} onSort={cycleSort}>
+              Performed At
+            </SortableTableHead>
+            <SortableTableHead column="performed_by" sort={sort} onSort={cycleSort}>
+              Engineer
+            </SortableTableHead>
             <TableHead className="w-24">Actions</TableHead>
           </TableRow>
         </TableHeader>

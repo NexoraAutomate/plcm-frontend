@@ -24,12 +24,14 @@ import { fetchOrdersPage } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
 import { usePaginatedList } from '@/hooks/use-paginated-list';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { useTableSorting } from '@/hooks/use-table-sorting';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
 import { ListPageError } from '@/components/list-page-error';
 import { useListPageLoader } from '@/hooks/use-list-page-loader';
 import { OrdersMiniDashboard } from '@/components/orders/orders-mini-dashboard';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
@@ -73,6 +75,7 @@ export default function OrdersPage() {
   const faultMap = useEntityFaultMap();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
+  const { sort, cycleSort, listFilterPatch } = useTableSorting();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [customerFilter, setCustomerFilter] = useState<string>('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -99,8 +102,9 @@ export default function OrdersPage() {
         search: debouncedSearch,
         statusId: statusFilter !== 'all' ? Number(statusFilter) : null,
         customerId: customerFilter !== 'all' ? Number(customerFilter) : null,
+        ...listFilterPatch,
       }),
-    [debouncedSearch, statusFilter, customerFilter]
+    [debouncedSearch, statusFilter, customerFilter, listFilterPatch]
   );
 
   const pagination = usePaginatedList({
@@ -511,15 +515,15 @@ export default function OrdersPage() {
             <Table>
               <TableHeader>
                 <TableRow className='bg-slate-200 dark:bg-black hover:bg-slate-200'>
-                  <TableHead>Order No.</TableHead>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Contract / PO</TableHead>
-                  <TableHead>Value</TableHead>
-                  <TableHead>Status</TableHead>
+                  <SortableTableHead column="order_number" sort={sort} onSort={cycleSort}>Order No.</SortableTableHead>
+                  <SortableTableHead column="title" sort={sort} onSort={cycleSort}>Title</SortableTableHead>
+                  <SortableTableHead column="customer_id" sort={sort} onSort={cycleSort}>Customer</SortableTableHead>
+                  <SortableTableHead column="contract_number" sort={sort} onSort={cycleSort}>Contract / PO</SortableTableHead>
+                  <SortableTableHead column="total_value" sort={sort} onSort={cycleSort}>Value</SortableTableHead>
+                  <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
                   <TableHead>Projects</TableHead>
-                  <TableHead>Delivery</TableHead>
-                  <TableHead>PM</TableHead>
+                  <SortableTableHead column="delivery_date" sort={sort} onSort={cycleSort}>Delivery</SortableTableHead>
+                  <SortableTableHead column="project_manager" sort={sort} onSort={cycleSort}>PM</SortableTableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>

@@ -156,8 +156,8 @@ export const fetchUnitsPage = (skip: number, limit: number, filters?: ListFilter
 export const fetchComponentsPage = (skip: number, limit: number, filters?: ListFilterParams) =>
   fetchPaginatedList((s, l, f) => api.components.list(s, l, undefined, f), skip, limit, filters);
 
-export const fetchMaintenanceLogsPage = (skip: number, limit: number) =>
-  fetchPaginatedList((s, l) => api.maintenanceLogs.list(s, l), skip, limit);
+export const fetchMaintenanceLogsPage = (skip: number, limit: number, filters?: ListFilterParams) =>
+  fetchPaginatedList((s, l, f) => api.maintenanceLogs.list(s, l, f), skip, limit, filters);
 
 export const fetchMaintenanceCasesPage = (
   skip: number,

@@ -45,7 +45,8 @@ export const queryKeys = {
     ['units', 'page', stableFiltersKey(filters)] as const,
   componentsPage: (filters?: ListFilterParams) =>
     ['components', 'page', stableFiltersKey(filters)] as const,
-  maintenanceLogsPage: () => ['maintenanceLogs', 'page'] as const,
+  maintenanceLogsPage: (filters?: ListFilterParams) =>
+    ['maintenanceLogs', 'page', stableFiltersKey(filters)] as const,
   maintenanceCasesPage: (filters?: ListFilterParams) =>
     ['maintenanceCases', 'page', stableFiltersKey(filters)] as const,
   maintenanceCaseStatusCounts: () => ['maintenanceCases', 'statusCounts'] as const,

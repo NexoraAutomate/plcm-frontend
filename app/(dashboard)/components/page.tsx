@@ -26,12 +26,14 @@ import { fetchComponentsPage } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
 import { usePaginatedList } from '@/hooks/use-paginated-list';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { useTableSorting } from '@/hooks/use-table-sorting';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
 import { ListPageError } from '@/components/list-page-error';
 import { HierarchyListDashboard } from '@/components/hierarchy/hierarchy-list-dashboard';
 import { ParentEntityLink } from '@/components/entity-link';
 import { buildHierarchyPageUrl } from '@/lib/hierarchy-page-filters';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import {
   COMPONENTS_DASHBOARD_CONFIG,
@@ -52,6 +54,7 @@ export default function ComponentsPage() {
   const [parentFilter, setParentFilter] = useState<string>(parentFilterParam || 'all');
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
+  const { sort, cycleSort, listFilterPatch } = useTableSorting();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -66,8 +69,9 @@ export default function ComponentsPage() {
         statusName: statusFilter,
         statuses,
         unitId: parentFilter !== 'all' ? Number(parentFilter) : null,
+        ...listFilterPatch,
       }),
-    [debouncedSearch, statusFilter, statuses, parentFilter]
+    [debouncedSearch, statusFilter, statuses, parentFilter, listFilterPatch]
   );
 
   const pagination = usePaginatedList({
@@ -131,12 +135,12 @@ export default function ComponentsPage() {
 
   const applyStatusFilter = (statusName: string) => {
     setStatusFilter(statusName);
-    router.push(buildHierarchyPageUrl('/components', statusName, parentFilter, 'unit_id'));
+    router.push(buildHierarchyPageUrl('/components', statusName, parentFilter, 'unit_id', listFilterPatch));
   };
 
   const applyParentFilter = (parentId: string) => {
     setParentFilter(parentId);
-    router.push(buildHierarchyPageUrl('/components', statusFilter, parentId, 'unit_id'));
+    router.push(buildHierarchyPageUrl('/components', statusFilter, parentId, 'unit_id', listFilterPatch));
   };
 
   useEffect(() => {
@@ -374,9 +378,9 @@ export default function ComponentsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Unit</TableHead>
-                  <TableHead>Status</TableHead>
+                  <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Name</SortableTableHead>
+                  <SortableTableHead column="unit_id" sort={sort} onSort={cycleSort}>Unit</SortableTableHead>
+                  <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
                   <TableHead>Inventory Qty</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>

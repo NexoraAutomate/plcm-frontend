@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,17 +16,22 @@ import { P } from '@/lib/permission-codes';
 import * as api from '@/lib/api';
 import type * as Models from '@/lib/models';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { fetchUsersPage } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
 import { usePaginatedList } from '@/hooks/use-paginated-list';
+import { useTableSorting } from '@/hooks/use-table-sorting';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
 import { formatRoleNames, roleName } from '@/lib/user-display';
 
 export default function UsersPage() {
+  const { sort, cycleSort, listFilterPatch } = useTableSorting();
+  const listFilters = useMemo(() => ({ ...listFilterPatch }), [listFilterPatch]);
   const pagination = usePaginatedList({
-    queryKey: queryKeys.usersPage(),
+    queryKey: queryKeys.usersPage(listFilters),
     fetchPage: fetchUsersPage,
+    filters: listFilters,
   });
   const users = pagination.items;
   const loading = pagination.loading;
@@ -283,9 +288,9 @@ export default function UsersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Email</TableHead>
+                  <SortableTableHead column="full_name" sort={sort} onSort={cycleSort}>Name</SortableTableHead>
+                  <SortableTableHead column="username" sort={sort} onSort={cycleSort}>Username</SortableTableHead>
+                  <SortableTableHead column="email" sort={sort} onSort={cycleSort}>Email</SortableTableHead>
                   <TableHead>Roles</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>

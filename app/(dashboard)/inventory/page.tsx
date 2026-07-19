@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { Fragment, useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Edit, Trash2, Search, Layers, Network, Copy } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Layers, Network, Copy, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import { EntityAttachmentsSection, type PendingAttachmentUpload } from '@/components/entity-attachments-section';
@@ -30,8 +30,10 @@ import { useHierarchiesQuery } from '@/hooks/queries';
 import { fetchInventoryPage } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
 import { usePaginatedList } from '@/hooks/use-paginated-list';
+import { useTableSorting } from '@/hooks/use-table-sorting';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import {
   getInventorySerialNumbers,
   inventorySupportsQuantity,
@@ -126,8 +128,6 @@ interface InventoryItem extends Inventory {
   displayLocation?: string;
 }
 
-const SERIAL_PREVIEW_LIMIT = 2;
-
 function resolveInventoryHolderId(item: Inventory): number | undefined {
   if (item.holder_user_id) return item.holder_user_id;
   return item.instances?.find((instance) => instance.holder_user_id)?.holder_user_id;
@@ -142,17 +142,33 @@ function resolveInventoryLocation(item: Inventory): string {
   return [...new Set(locations)].join(', ');
 }
 
+function instanceSerialNumber(instance: InventoryInstance): string {
+  return instance.original_serial_number?.trim() || instance.serial_number?.trim() || '';
+}
+
+/** Serial numbers for expandable rows: one per in-stock instance when present. */
+function getExpandableSerialInstances(item: Inventory): InventoryInstance[] {
+  if (!inventoryUsesInstances(item.inventory_type as EntityType)) return [];
+  const selectable = getSelectableInstances(item);
+  return selectable.filter((instance) => Boolean(instanceSerialNumber(instance)));
+}
+
 function enrichInventoryItems(items: Inventory[], users: User[]): InventoryItem[] {
   return items.map((item) => {
     const holderId = resolveInventoryHolderId(item);
     const holder = holderId ? users.find((user) => user.id === holderId) : undefined;
 
     const serialNumbers = getInventorySerialNumbers(item);
+    const firstAvailable =
+      getExpandableSerialInstances(item)
+        .map(instanceSerialNumber)
+        .find(Boolean) || serialNumbers[0];
+
     return {
       ...item,
       entityName: item.name,
       serialNumbers,
-      serialNumber: serialNumbers.length > 0 ? serialNumbers.join(', ') : '—',
+      serialNumber: firstAvailable || '—',
       partNumber: inventoryPartNumber(item),
       holderName: holder ? formatUserRef(holder) : '—',
       displayLocation: resolveInventoryLocation(item),
@@ -170,10 +186,14 @@ export default function InventoryPage() {
   const [search, setSearch] = useState('');
   const [entityTypeFilter, setEntityTypeFilter] = useState<EntityType | 'all'>('all');
   const [stockFilter, setStockFilter] = useState<StockFilter>('all');
+  const { sort, cycleSort, listFilterPatch } = useTableSorting();
   const inventoryTypeParam = entityTypeFilter !== 'all' ? entityTypeFilter : undefined;
+  const listFilters = useMemo(() => ({ ...listFilterPatch }), [listFilterPatch]);
   const pagination = usePaginatedList({
-    queryKey: queryKeys.inventoryPage(inventoryTypeParam),
-    fetchPage: (skip, limit) => fetchInventoryPage(skip, limit, inventoryTypeParam),
+    queryKey: queryKeys.inventoryPage(inventoryTypeParam, listFilters),
+    fetchPage: (skip, limit, filters) =>
+      fetchInventoryPage(skip, limit, inventoryTypeParam, filters),
+    filters: listFilters,
   });
   const inventory = useMemo(
     () => enrichInventoryItems(pagination.items, users),
@@ -208,7 +228,7 @@ export default function InventoryPage() {
     holder_user_id: '',
     location: '',
   });
-  const [serialListItem, setSerialListItem] = useState<InventoryItem | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [addMoreItem, setAddMoreItem] = useState<InventoryItem | null>(null);
   const [addMoreSubmitting, setAddMoreSubmitting] = useState(false);
   const [addMoreForm, setAddMoreForm] = useState({
@@ -230,12 +250,14 @@ export default function InventoryPage() {
   }, [search, entityTypeFilter, stockFilter]);
 
   const filtered = inventory.filter((item) => {
+    const searchLower = search.toLowerCase();
     const matchesType = entityTypeFilter === 'all' || item.inventory_type === entityTypeFilter;
     const matchesSearch =
       search === '' ||
-      item.entityName?.toLowerCase().includes(search.toLowerCase()) ||
-      item.serialNumber?.toLowerCase().includes(search.toLowerCase()) ||
-      item.partNumber?.toLowerCase().includes(search.toLowerCase());
+      item.entityName?.toLowerCase().includes(searchLower) ||
+      item.serialNumber?.toLowerCase().includes(searchLower) ||
+      item.serialNumbers?.some((serial) => serial.toLowerCase().includes(searchLower)) ||
+      item.partNumber?.toLowerCase().includes(searchLower);
     const inStock = isInventoryInStock(item);
     const matchesStock =
       stockFilter === 'all' ||
@@ -243,6 +265,15 @@ export default function InventoryPage() {
       (stockFilter === 'out_of_stock' && !inStock);
     return matchesType && matchesSearch && matchesStock;
   });
+
+  function toggleExpandedRow(id: number) {
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   function navigateToAddChildren(item: InventoryItem, instanceId?: number) {
     const query = instanceId != null ? `?instanceId=${instanceId}` : '';
@@ -1223,140 +1254,193 @@ export default function InventoryPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Part Number</TableHead>
-                  <TableHead>Serial Number</TableHead>
-                  <TableHead>Quantity</TableHead>
-                  <TableHead>Inventory Holder</TableHead>
-                  <TableHead>Location</TableHead>
+                  <TableHead className="w-10" />
+                  <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Category</SortableTableHead>
+                  <SortableTableHead column="inventory_type" sort={sort} onSort={cycleSort}>Type</SortableTableHead>
+                  <SortableTableHead column="part_number" sort={sort} onSort={cycleSort}>Part Number</SortableTableHead>
+                  <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>Serial Number</SortableTableHead>
+                  <SortableTableHead column="quantity" sort={sort} onSort={cycleSort}>Quantity</SortableTableHead>
+                  <SortableTableHead column="holder_user_id" sort={sort} onSort={cycleSort}>Inventory Holder</SortableTableHead>
+                  <SortableTableHead column="location" sort={sort} onSort={cycleSort}>Location</SortableTableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                       No inventory items found
                     </TableCell>
                   </TableRow>
                 ) : (
                   filtered.map((item) => {
-                    const serials = item.serialNumbers ?? [];
-                    const hasExtraSerials = serials.length > SERIAL_PREVIEW_LIMIT;
+                    const serialInstances = getExpandableSerialInstances(item);
+                    const isExpandable = serialInstances.length > 1;
+                    const isExpanded = expandedRows.has(item.id);
+
                     return (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium">{item.entityName || 'N/A'}</TableCell>
-                      <TableCell>
-                        {item.inventory_type ? (
-                          <StatusBadge
-                            status={
-                              item.inventory_type.charAt(0).toUpperCase() +
-                              item.inventory_type.slice(1)
-                            }
-                          />
-                        ) : (
-                          '—'
-                        )}
-                      </TableCell>
-                      <TableCell>{item.partNumber || '—'}</TableCell>
-                      <TableCell>
-                        {serials.length === 0 ? (
-                          '—'
-                        ) : hasExtraSerials ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="truncate">
-                              {serials.slice(0, SERIAL_PREVIEW_LIMIT).join(', ')}
-                            </span>
-                            <Button
-                              type="button"
-                              size="icon-sm"
-                              variant="ghost"
-                              className="h-6 w-6 shrink-0 text-xs"
-                              title={`View all ${serials.length} serial numbers`}
-                              aria-label={`View all ${serials.length} serial numbers`}
-                              onClick={() => setSerialListItem(item)}
-                            >
-                              ...
-                            </Button>
-                          </div>
-                        ) : (
-                          serials.join(', ')
-                        )}
-                      </TableCell>
-                      <TableCell>{item.quantity}</TableCell>
-                      <TableCell>{item.holderName || '—'}</TableCell>
-                      <TableCell>{item.displayLocation || '—'}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex gap-1 justify-end">
-                          {item.quantity >= 0 && canAddStock ? (
-                            <Button
-                              size="icon-sm"
-                              variant="secondary"
-                              onClick={() => openAddMore(item)}
-                              title="Add More"
-                              aria-label="Add More"
-                            >
-                              <Plus className="h-4 w-4" />
-                            </Button>
-                          ) : null}
-                          {canAddInventoryChildren(item.inventory_type) && canAddStock ? (
-                            <Button
-                              size="icon-sm"
-                              variant="secondary"
-                              onClick={() => handleAddChildrenClick(item)}
-                              title="Add Children"
-                              aria-label="Add Children"
-                            >
-                              <Layers className="h-4 w-4" />
-                            </Button>
-                          ) : null}
-                          <Button
-                            size="icon-sm"
-                            variant="secondary"
-                            onClick={() => handleViewHierarchyClick(item)}
-                            title="View Hierarchy"
-                            aria-label="View Hierarchy"
-                          >
-                            <Network className="h-4 w-4" />
-                          </Button>
-                          {canAddStock ? (
-                            <Button
-                              size="icon-sm"
-                              variant="secondary"
-                              onClick={() => handleDuplicateClick(item)}
-                              disabled={duplicating}
-                              title="Duplicate"
-                              aria-label="Duplicate"
-                            >
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                          ) : null}
-                          <Can permission={P.edit_inventory}>
-                            <Button
-                              size="icon-sm"
-                              variant="outline"
-                              onClick={() => openEdit(item)}
-                              title="Edit"
-                              aria-label="Edit"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </Can>
-                          <Can permission={P.delete_inventory}>
-                            <Button
-                              size="icon-sm"
-                              variant="destructive"
-                              onClick={() => setDeleteTarget(item)}
-                              title="Delete"
-                              aria-label="Delete"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </Can>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                      <Fragment key={item.id}>
+                        <TableRow className={cn(isExpanded && 'bg-muted/30')}>
+                          <TableCell className="p-2 w-10">
+                            {isExpandable ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={() => toggleExpandedRow(item.id)}
+                                aria-expanded={isExpanded}
+                                aria-label={
+                                  isExpanded
+                                    ? 'Collapse serial numbers'
+                                    : `Expand ${serialInstances.length} serial numbers`
+                                }
+                                title={
+                                  isExpanded
+                                    ? 'Collapse'
+                                    : `Show all ${serialInstances.length} serial numbers`
+                                }
+                              >
+                                <ChevronDown
+                                  className={cn(
+                                    'h-4 w-4 transition-transform',
+                                    isExpanded && 'rotate-180'
+                                  )}
+                                />
+                              </Button>
+                            ) : null}
+                          </TableCell>
+                          <TableCell className="font-medium">{item.entityName || 'N/A'}</TableCell>
+                          <TableCell>
+                            {item.inventory_type ? (
+                              <StatusBadge
+                                status={
+                                  item.inventory_type.charAt(0).toUpperCase() +
+                                  item.inventory_type.slice(1)
+                                }
+                              />
+                            ) : (
+                              '—'
+                            )}
+                          </TableCell>
+                          <TableCell>{item.partNumber || '—'}</TableCell>
+                          <TableCell>
+                            <span className="font-mono text-sm">{item.serialNumber || '—'}</span>
+                          </TableCell>
+                          <TableCell>{item.quantity}</TableCell>
+                          <TableCell>{item.holderName || '—'}</TableCell>
+                          <TableCell>{item.displayLocation || '—'}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex gap-1 justify-end">
+                              {item.quantity >= 0 && canAddStock ? (
+                                <Button
+                                  size="icon-sm"
+                                  variant="secondary"
+                                  onClick={() => openAddMore(item)}
+                                  title="Add More"
+                                  aria-label="Add More"
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                              ) : null}
+                              {canAddInventoryChildren(item.inventory_type) && canAddStock ? (
+                                <Button
+                                  size="icon-sm"
+                                  variant="secondary"
+                                  onClick={() => handleAddChildrenClick(item)}
+                                  title="Add Children"
+                                  aria-label="Add Children"
+                                >
+                                  <Layers className="h-4 w-4" />
+                                </Button>
+                              ) : null}
+                              <Button
+                                size="icon-sm"
+                                variant="secondary"
+                                onClick={() => handleViewHierarchyClick(item)}
+                                title="View Hierarchy"
+                                aria-label="View Hierarchy"
+                              >
+                                <Network className="h-4 w-4" />
+                              </Button>
+                              {canAddStock ? (
+                                <Button
+                                  size="icon-sm"
+                                  variant="secondary"
+                                  onClick={() => handleDuplicateClick(item)}
+                                  disabled={duplicating}
+                                  title="Duplicate"
+                                  aria-label="Duplicate"
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </Button>
+                              ) : null}
+                              <Can permission={P.edit_inventory}>
+                                <Button
+                                  size="icon-sm"
+                                  variant="outline"
+                                  onClick={() => openEdit(item)}
+                                  title="Edit"
+                                  aria-label="Edit"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              </Can>
+                              <Can permission={P.delete_inventory}>
+                                <Button
+                                  size="icon-sm"
+                                  variant="destructive"
+                                  onClick={() => setDeleteTarget(item)}
+                                  title="Delete"
+                                  aria-label="Delete"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </Can>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        {isExpanded && isExpandable ? (
+                          <TableRow className="bg-muted/20 hover:bg-muted/20">
+                            <TableCell colSpan={9} className="p-0">
+                              <div className="px-6 py-3">
+                                <p className="mb-2 text-xs font-medium text-muted-foreground">
+                                  All serial numbers for part {item.partNumber || item.entityName || '—'}
+                                </p>
+                                <div className="overflow-x-auto rounded-md border bg-background">
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead>Serial Number</TableHead>
+                                        <TableHead>Inventory Holder</TableHead>
+                                        <TableHead>Location</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {serialInstances.map((instance) => {
+                                        const holder = instance.holder_user_id
+                                          ? users.find((user) => user.id === instance.holder_user_id)
+                                          : undefined;
+                                        return (
+                                          <TableRow key={instance.id}>
+                                            <TableCell className="font-mono text-sm">
+                                              {instanceSerialNumber(instance) || '—'}
+                                            </TableCell>
+                                            <TableCell>
+                                              {holder ? formatUserRef(holder) : '—'}
+                                            </TableCell>
+                                            <TableCell>{instance.location?.trim() || '—'}</TableCell>
+                                          </TableRow>
+                                        );
+                                      })}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ) : null}
+                      </Fragment>
                     );
                   })
                 )}
@@ -1444,33 +1528,6 @@ export default function InventoryPage() {
           if (!open) setHierarchyView(null);
         }}
       />
-
-      <Dialog
-        open={serialListItem != null}
-        onOpenChange={(open) => {
-          if (!open) setSerialListItem(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Serial Numbers</DialogTitle>
-            <DialogDescription>
-              {serialListItem
-                ? `All serial numbers for ${serialListItem.entityName || serialListItem.name}`
-                : 'Associated serial numbers'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-64 overflow-y-auto rounded-md border">
-            <ul className="divide-y">
-              {(serialListItem?.serialNumbers ?? []).map((serial) => (
-                <li key={serial} className="px-3 py-2 text-sm font-mono">
-                  {serial}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <InventorySerialSelectDialog
         item={duplicateSerialSelectItem}

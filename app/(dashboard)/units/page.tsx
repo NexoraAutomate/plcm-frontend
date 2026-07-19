@@ -27,12 +27,14 @@ import { fetchUnitsPage } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
 import { usePaginatedList } from '@/hooks/use-paginated-list';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { useTableSorting } from '@/hooks/use-table-sorting';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
 import { ListPageError } from '@/components/list-page-error';
 import { useListPageLoader } from '@/hooks/use-list-page-loader';
 import { ParentEntityLink } from '@/components/entity-link';
 import { buildHierarchyPageUrl } from '@/lib/hierarchy-page-filters';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { UNITS_DASHBOARD_CONFIG, UNIT_STATUS_NAMES } from '@/lib/hierarchy-dashboard-configs';
 import { Can } from '@/components/auth/can';
@@ -50,6 +52,7 @@ export default function UnitsPage() {
   const [parentFilter, setParentFilter] = useState<string>(parentFilterParam || 'all');
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
+  const { sort, cycleSort, listFilterPatch } = useTableSorting();
   const { data: statuses = [] } = useStatusesByTypeQuery('units');
 
   const listFilters = useMemo(
@@ -59,8 +62,9 @@ export default function UnitsPage() {
         statusName: statusFilter,
         statuses,
         moduleId: parentFilter !== 'all' ? Number(parentFilter) : null,
+        ...listFilterPatch,
       }),
-    [debouncedSearch, statusFilter, statuses, parentFilter]
+    [debouncedSearch, statusFilter, statuses, parentFilter, listFilterPatch]
   );
 
   const pagination = usePaginatedList({
@@ -141,12 +145,12 @@ export default function UnitsPage() {
 
   const applyStatusFilter = (statusName: string) => {
     setStatusFilter(statusName);
-    router.push(buildHierarchyPageUrl('/units', statusName, parentFilter, 'module_id'));
+    router.push(buildHierarchyPageUrl('/units', statusName, parentFilter, 'module_id', listFilterPatch));
   };
 
   const applyParentFilter = (parentId: string) => {
     setParentFilter(parentId);
-    router.push(buildHierarchyPageUrl('/units', statusFilter, parentId, 'module_id'));
+    router.push(buildHierarchyPageUrl('/units', statusFilter, parentId, 'module_id', listFilterPatch));
   };
 
   useEffect(() => {
@@ -385,9 +389,9 @@ export default function UnitsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Module</TableHead>
-                  <TableHead>Status</TableHead>
+                  <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Name</SortableTableHead>
+                  <SortableTableHead column="module_id" sort={sort} onSort={cycleSort}>Module</SortableTableHead>
+                  <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
                   <TableHead>Components</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>

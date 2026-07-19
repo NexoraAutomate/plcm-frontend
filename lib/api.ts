@@ -65,7 +65,8 @@ export async function fetchStatusesByType(statusType: string): Promise<Models.St
 export const auth = {
   login: (username: string, password: string) =>
     api.post<{ access_token: string; token_type: string }>("/auth/login", { username, password }),
-  listRoles: () => api.get("/auth/roles"),
+  listRoles: (sort_by?: string, sort_order?: 'asc' | 'desc') =>
+    api.get("/auth/roles", { params: buildQueryParams({ sort_by, sort_order }) }),
   getMe: () => api.get("/auth/me"),
   register: (userData: any) => api.post("/auth/register", userData),
   getRole: (id: number) => api.get(`/auth/roles/${id}`),
@@ -258,7 +259,10 @@ export const statuses = {
 
 // Entities
 export const entities = {
-  list: (skip = 0, limit = 100) => api.get<Models.Entity[]>("/entities/", { params: { skip, limit } }),
+  list: (skip = 0, limit = 100, filters?: ListFilterParams) =>
+    api.get<Models.Entity[]>("/entities/", {
+      params: listParams(skip, limit, undefined, filters),
+    }),
   lookup: (entityType: string, entityPk: number) =>
     api.get<Models.Entity>('/entities/lookup/', {
       params: buildQueryParams({ entity_type: entityType, entity_pk: entityPk }),
@@ -290,9 +294,9 @@ export const entityStatusHistory = {
 
 // maintenanceLogs Logs
 export const maintenanceLogs = {
-  list: (skip?: number, limit?: number) =>
+  list: (skip = 0, limit = 100, filters?: ListFilterParams) =>
     api.get<Models.MaintenanceLog[]>('/maintenance-logs/', {
-      params: buildQueryParams({ skip, limit }),
+      params: listParams(skip, limit, undefined, filters),
     }),
   get: (id: number) => api.get<Models.MaintenanceLog>(`/maintenance-logs/${id}/`),
   create: (data: Partial<Models.MaintenanceLog>) => api.post<Models.MaintenanceLog>('/maintenance-logs/', data),

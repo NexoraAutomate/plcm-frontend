@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { CheckCircle2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,6 +13,9 @@ import {
 } from '@/components/ui/table';
 import { StatusBadge } from '@/components/status-badge';
 import type { MaintenanceDelivery } from '@/lib/models';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useTableSorting } from '@/hooks/use-table-sorting';
+import { sortRowsByState } from '@/lib/sorting';
 
 interface MaintenanceDeliveryTableProps {
   deliveries: MaintenanceDelivery[];
@@ -27,6 +30,19 @@ export function MaintenanceDeliveryTable({
   onDelete,
   isLoading = false,
 }: MaintenanceDeliveryTableProps) {
+  const { sort, cycleSort } = useTableSorting({
+    initial: { sortBy: 'created_at', sortOrder: 'desc' },
+  });
+
+  const sortedDeliveries = useMemo(
+    () =>
+      sortRowsByState(
+        deliveries as unknown as Record<string, unknown>[],
+        sort
+      ) as unknown as MaintenanceDelivery[],
+    [deliveries, sort]
+  );
+
   if (isLoading) {
     return (
       <div className="text-sm text-muted-foreground py-4">
@@ -48,15 +64,23 @@ export function MaintenanceDeliveryTable({
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/50">
-            <TableHead>Delivery Type</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Delivered At</TableHead>
-            <TableHead>Received By</TableHead>
+            <SortableTableHead column="delivery_type" sort={sort} onSort={cycleSort}>
+              Delivery Type
+            </SortableTableHead>
+            <SortableTableHead column="status" sort={sort} onSort={cycleSort}>
+              Status
+            </SortableTableHead>
+            <SortableTableHead column="delivered_at" sort={sort} onSort={cycleSort}>
+              Delivered At
+            </SortableTableHead>
+            <SortableTableHead column="received_by" sort={sort} onSort={cycleSort}>
+              Received By
+            </SortableTableHead>
             <TableHead className="w-24">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {deliveries.map((delivery) => (
+          {sortedDeliveries.map((delivery) => (
             <TableRow key={delivery.id} className="hover:bg-muted/50">
               <TableCell className="text-sm capitalize">
                 {delivery.delivery_type.replace(/_/g, ' ')}

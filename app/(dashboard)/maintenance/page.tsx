@@ -34,6 +34,7 @@ import { PageLoader } from '@/components/page-loader';
 import type { ListFilterParams } from '@/lib/list-filters';
 import { useAuth } from '@/lib/auth-context';
 import { P } from '@/lib/permission-codes';
+import { useTableSorting } from '@/hooks/use-table-sorting';
 
 export default function MaintenancePage() {
   const router = useRouter();
@@ -43,6 +44,7 @@ export default function MaintenancePage() {
   const canCreateCase = can(P.create_maintenance_cases);
   const canEditCase = can(P.edit_maintenance_cases);
   const canDeleteCase = can(P.delete_maintenance_cases);
+  const { sort, cycleSort, listFilterPatch } = useTableSorting();
   const {
     projects,
     createMaintenanceCase,
@@ -71,11 +73,11 @@ export default function MaintenancePage() {
   const [maintenanceDeliveries, setMaintenanceDeliveries] = useState<MaintenanceTypes.MaintenanceDelivery[]>([]);
 
   const listFilters = useMemo((): ListFilterParams | undefined => {
-    const filters: ListFilterParams = {};
+    const filters: ListFilterParams = { ...listFilterPatch };
     if (statusFilter !== 'all') filters.status = statusFilter;
     if (projectFilter !== 'all') filters.project_id = Number(projectFilter);
     return Object.keys(filters).length > 0 ? filters : undefined;
-  }, [statusFilter, projectFilter]);
+  }, [statusFilter, projectFilter, listFilterPatch]);
 
   const pagination = usePaginatedList({
     queryKey: queryKeys.maintenanceCasesPage(listFilters),
@@ -411,6 +413,8 @@ export default function MaintenancePage() {
           getFaultyEntities={getFaultyEntities}
           getMaintenanceActions={getMaintenanceActions}
           getMaintenanceDeliveries={getMaintenanceDeliveries}
+          sort={sort}
+          onSort={cycleSort}
         />
         <EntityListPagination
           page={pagination.page}

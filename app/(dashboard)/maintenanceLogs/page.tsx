@@ -1,14 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type * as Models from '@/lib/models';
 import { entities, maintenanceCases } from '@/lib/api';
 import { useDataStore } from '@/lib/data-store';
 import { fetchMaintenanceLogsPage } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
 import { usePaginatedList } from '@/hooks/use-paginated-list';
+import { useTableSorting } from '@/hooks/use-table-sorting';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -21,9 +23,12 @@ import { toast } from 'sonner';
 
 export default function MaintenancePage() {
   const { users, createMaintenanceLog } = useDataStore();
+  const { sort, cycleSort, listFilterPatch } = useTableSorting();
+  const listFilters = useMemo(() => ({ ...listFilterPatch }), [listFilterPatch]);
   const pagination = usePaginatedList({
-    queryKey: queryKeys.maintenanceLogsPage(),
+    queryKey: queryKeys.maintenanceLogsPage(listFilters),
     fetchPage: fetchMaintenanceLogsPage,
+    filters: listFilters,
   });
   const maintenanceLogs = pagination.items;
   const loading = pagination.loading;
@@ -297,10 +302,10 @@ export default function MaintenancePage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Entity</TableHead>
+                  <SortableTableHead column="entity_id" sort={sort} onSort={cycleSort}>Entity</SortableTableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Technician</TableHead>
-                  <TableHead>Date</TableHead>
+                  <SortableTableHead column="performed_by" sort={sort} onSort={cycleSort}>Technician</SortableTableHead>
+                  <SortableTableHead column="performed_at" sort={sort} onSort={cycleSort}>Date</SortableTableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>

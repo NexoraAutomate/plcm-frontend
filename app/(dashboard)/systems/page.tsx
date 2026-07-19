@@ -29,11 +29,13 @@ import { fetchSystemsPage } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
 import { usePaginatedList } from '@/hooks/use-paginated-list';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { useTableSorting } from '@/hooks/use-table-sorting';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
 import { ListPageError } from '@/components/list-page-error';
 import { useListPageLoader } from '@/hooks/use-list-page-loader';
 import { SystemsListDashboard } from '@/components/systems/systems-list-dashboard';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { ParentEntityLink } from '@/components/entity-link';
 import { Can } from '@/components/auth/can';
@@ -51,6 +53,7 @@ export default function SystemsPage() {
   const faultMap = useEntityFaultMap();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
+  const { sort, cycleSort, listFilterPatch } = useTableSorting();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -69,8 +72,9 @@ export default function SystemsPage() {
         statusName: statusFilter,
         statuses,
         projectId: projectFilter !== 'all' ? Number(projectFilter) : null,
+        ...listFilterPatch,
       }),
-    [debouncedSearch, statusFilter, statuses, projectFilter]
+    [debouncedSearch, statusFilter, statuses, projectFilter, listFilterPatch]
   );
 
   const pagination = usePaginatedList({
@@ -114,6 +118,8 @@ export default function SystemsPage() {
     const params = new URLSearchParams();
     if (statusName !== 'all') params.set('status', statusName);
     if (projectFilter !== 'all') params.set('project_id', projectFilter);
+    if (listFilterPatch.sort_by) params.set('sort_by', listFilterPatch.sort_by);
+    if (listFilterPatch.sort_order) params.set('sort_order', listFilterPatch.sort_order);
     const qs = params.toString();
     router.push(qs ? `/systems?${qs}` : '/systems');
   };
@@ -123,6 +129,8 @@ export default function SystemsPage() {
     const params = new URLSearchParams();
     if (statusFilter !== 'all') params.set('status', statusFilter);
     if (projectId !== 'all') params.set('project_id', projectId);
+    if (listFilterPatch.sort_by) params.set('sort_by', listFilterPatch.sort_by);
+    if (listFilterPatch.sort_order) params.set('sort_order', listFilterPatch.sort_order);
     const qs = params.toString();
     router.push(qs ? `/systems?${qs}` : '/systems');
   };
@@ -457,11 +465,11 @@ export default function SystemsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Project</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Install Date</TableHead>
-                  <TableHead>Installer</TableHead>
+                  <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Name</SortableTableHead>
+                  <SortableTableHead column="project_id" sort={sort} onSort={cycleSort}>Project</SortableTableHead>
+                  <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
+                  <SortableTableHead column="installation_date" sort={sort} onSort={cycleSort}>Install Date</SortableTableHead>
+                  <SortableTableHead column="installed_by_id" sort={sort} onSort={cycleSort}>Installer</SortableTableHead>
                   <TableHead>Subsystems</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>

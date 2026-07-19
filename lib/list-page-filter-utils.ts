@@ -25,6 +25,8 @@ export function buildListFilters(input: {
   moduleId?: number | null;
   unitId?: number | null;
   inventoryType?: string;
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
 }): ListFilterParams | undefined {
   const status_id =
     input.statusId ??
@@ -43,5 +45,7 @@ export function buildListFilters(input: {
     module_id: input.moduleId ?? undefined,
     unit_id: input.unitId ?? undefined,
     inventory_type: input.inventoryType,
+    sort_by: input.sort_by,
+    sort_order: input.sort_order,
   });
 }

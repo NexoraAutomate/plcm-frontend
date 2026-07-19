@@ -23,11 +23,13 @@ import { fetchProjectsPage } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
 import { usePaginatedList } from '@/hooks/use-paginated-list';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { useTableSorting } from '@/hooks/use-table-sorting';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
 import { ListPageError } from '@/components/list-page-error';
 import { useListPageLoader } from '@/hooks/use-list-page-loader';
 import { ProjectsMiniDashboard } from '@/components/projects/projects-mini-dashboard';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { toDateInputValue } from '@/lib/hierarchy-install-fields';
 import { getSystemCountByProjectId, getCount } from '@/lib/entity-counts';
@@ -65,6 +67,7 @@ export default function ProjectsPage(){
   const faultMap = useEntityFaultMap();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
+  const { sort, cycleSort, listFilterPatch } = useTableSorting();
   
   const statusFilterParam = searchParams.get('status');
   const orderFilterParam = searchParams.get('order_id');
@@ -116,8 +119,9 @@ export default function ProjectsPage(){
         statuses,
         allStatusValue: 'Total',
         orderId: orderFilterId,
+        ...listFilterPatch,
       }),
-    [debouncedSearch, statusFilter, statuses, orderFilterId]
+    [debouncedSearch, statusFilter, statuses, orderFilterId, listFilterPatch]
   );
 
   const pagination = usePaginatedList({
@@ -492,13 +496,13 @@ export default function ProjectsPage(){
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Owner</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Start Date</TableHead>
-                  <TableHead>End Date</TableHead>
+                  <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Name</SortableTableHead>
+                  <SortableTableHead column="owner_id" sort={sort} onSort={cycleSort}>Owner</SortableTableHead>
+                  <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
+                  <SortableTableHead column="start_date" sort={sort} onSort={cycleSort}>Start Date</SortableTableHead>
+                  <SortableTableHead column="end_date" sort={sort} onSort={cycleSort}>End Date</SortableTableHead>
                   <TableHead>Systems</TableHead>
-                  <TableHead>% Progress</TableHead>
+                  <SortableTableHead column="progress" sort={sort} onSort={cycleSort}>% Progress</SortableTableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>

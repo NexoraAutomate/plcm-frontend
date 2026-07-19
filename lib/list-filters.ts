@@ -13,6 +13,10 @@ export interface ListFilterParams {
   module_id?: number;
   unit_id?: number;
   inventory_type?: string;
+  /** Server-side sort column (model field name) */
+  sort_by?: string;
+  /** Server-side sort direction */
+  sort_order?: 'asc' | 'desc';
 }
 
 export function normalizeListFilters(filters?: ListFilterParams): ListFilterParams | undefined {

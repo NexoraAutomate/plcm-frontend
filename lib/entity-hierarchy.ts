@@ -57,7 +57,7 @@ export function getInventorySerialNumbers(item: Inventory): string[] {
 
 export function formatInventorySerialNumbers(item: Inventory): string {
   const serials = getInventorySerialNumbers(item);
-  return serials.length > 0 ? serials.join(', ') : '—';
+  return serials.length > 0 ? serials[0] : '—';
 }
 
 export function serialNumberFromInventory(

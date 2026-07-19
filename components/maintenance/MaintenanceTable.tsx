@@ -21,6 +21,8 @@ import type { MaintenanceCase, FaultyEntity, MaintenanceAction, MaintenanceDeliv
 import { FaultyEntityTable } from './FaultyEntityTable';
 import { MaintenanceActionTable } from './MaintenanceActionTable';
 import { MaintenanceDeliveryTable } from './MaintenanceDeliveryTable';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { EMPTY_SORT, type TableSortState } from '@/lib/sorting';
 
 interface MaintenanceTableProps {
   cases: MaintenanceCase[];
@@ -31,6 +33,8 @@ interface MaintenanceTableProps {
   getFaultyEntities?: (caseId: number) => Promise<FaultyEntity[]>;
   getMaintenanceActions?: (caseId: number, faultyEntityIds: number[]) => Promise<MaintenanceAction[]>;
   getMaintenanceDeliveries?: (caseId: number) => Promise<MaintenanceDelivery[]>;
+  sort?: TableSortState;
+  onSort?: (column: string) => void;
 }
 
 interface ExpandedRow {
@@ -50,6 +54,8 @@ export function MaintenanceTable({
   getFaultyEntities,
   getMaintenanceActions,
   getMaintenanceDeliveries,
+  sort = EMPTY_SORT,
+  onSort,
 }: MaintenanceTableProps) {
   const { can } = useAuth();
   const canEditCase = can(P.edit_maintenance_cases);
@@ -161,11 +167,23 @@ export function MaintenanceTable({
           <TableHeader>
             <TableRow className="bg-muted/50">
               <TableHead className="w-12"></TableHead>
-              <TableHead>Case Number</TableHead>
-              <TableHead>Project</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Reported At</TableHead>
+              {onSort ? (
+                <>
+                  <SortableTableHead column="case_number" sort={sort} onSort={onSort}>Case Number</SortableTableHead>
+                  <SortableTableHead column="project_id" sort={sort} onSort={onSort}>Project</SortableTableHead>
+                  <SortableTableHead column="description" sort={sort} onSort={onSort}>Description</SortableTableHead>
+                  <SortableTableHead column="status" sort={sort} onSort={onSort}>Status</SortableTableHead>
+                  <SortableTableHead column="reported_at" sort={sort} onSort={onSort}>Reported At</SortableTableHead>
+                </>
+              ) : (
+                <>
+                  <TableHead>Case Number</TableHead>
+                  <TableHead>Project</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Reported At</TableHead>
+                </>
+              )}
               <TableHead className="w-32">Actions</TableHead>
             </TableRow>
           </TableHeader>

@@ -203,9 +203,21 @@ export const reportsApi = {
   verify: (reportUuid: string) =>
     api.get<ReportVerifyResponse>(`/reports/verify/${reportUuid}`),
 
-  history: (page = 1, pageSize = 20, reportType?: string) =>
+  history: (
+    page = 1,
+    pageSize = 20,
+    reportType?: string,
+    sort_by?: string,
+    sort_order?: 'asc' | 'desc'
+  ) =>
     api.get('/reports/history', {
-      params: buildQueryParams({ page, page_size: pageSize, report_type: reportType }),
+      params: buildQueryParams({
+        page,
+        page_size: pageSize,
+        report_type: reportType,
+        sort_by,
+        sort_order,
+      }),
     }),
 
   buildHistory: (projectId: number) =>

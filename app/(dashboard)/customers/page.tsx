@@ -19,6 +19,7 @@ import { fetchCustomersPage } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
 import { usePaginatedList } from '@/hooks/use-paginated-list';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { useTableSorting } from '@/hooks/use-table-sorting';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
 import { ListPageError } from '@/components/list-page-error';
@@ -29,6 +30,7 @@ import * as Models from '@/lib/models';
 import { getOrderCountByCustomerId, getProjectCountByCustomerId, getCount } from '@/lib/entity-counts';
 import { EntityCountCell } from '@/components/entity-count-cell';
 import { CustomersListDashboard } from '@/components/customers/customers-list-dashboard';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Can } from '@/components/auth/can';
@@ -66,6 +68,7 @@ export default function CustomersPage() {
   } = useDataStore();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
+  const { sort, cycleSort, listFilterPatch } = useTableSorting();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -81,8 +84,9 @@ export default function CustomersPage() {
       buildListFilters({
         search: debouncedSearch,
         statusId: statusFilter !== 'all' ? Number(statusFilter) : null,
+        ...listFilterPatch,
       }),
-    [debouncedSearch, statusFilter]
+    [debouncedSearch, statusFilter, listFilterPatch]
   );
 
   const pagination = usePaginatedList({
@@ -466,10 +470,10 @@ export default function CustomersPage() {
             <Table>
               <TableHeader  className='bg-slate-200 dark:bg-black hover:bg-slate-200'>
                 <TableRow>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Status</TableHead>
+                  <SortableTableHead column="customer_code" sort={sort} onSort={cycleSort}>Code</SortableTableHead>
+                  <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Customer</SortableTableHead>
+                  <SortableTableHead column="primary_contact_name" sort={sort} onSort={cycleSort}>Contact</SortableTableHead>
+                  <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
                   <TableHead>Orders</TableHead>
                   <TableHead>Projects</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
