@@ -20,6 +20,8 @@ import {
   isTerminalDisplayStatus,
   mapFaultyEntityStatusFromApi,
 } from '@/lib/maintenance-workflow';
+import { useAuth } from '@/lib/auth-context';
+import { P } from '@/lib/permission-codes';
 
 interface EntityDetailSheetProps {
   entity: FaultyEntity | null;
@@ -44,6 +46,9 @@ export function EntityDetailSheet({
   onFaultTypeChange,
   onResolve,
 }: EntityDetailSheetProps) {
+  const { can } = useAuth();
+  const canConfirmFault = can(P.confirm_faults);
+  const canResolve = can(P.edit_faulty_entities);
   const [selectedFaultType, setSelectedFaultType] = useState<string>('');
 
   useEffect(() => {
@@ -158,17 +163,19 @@ export function EntityDetailSheet({
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant="default"
-                onClick={onConfirmFaulty}
-                disabled={
-                  !entity ||
-                  displayStatus === FaultyEntityWorkflowStatus.CONFIRMED_FAULTY ||
-                  isTerminal
-                }
-              >
-                Confirm Fault
-              </Button>
+              {canConfirmFault ? (
+                <Button
+                  variant="default"
+                  onClick={onConfirmFaulty}
+                  disabled={
+                    !entity ||
+                    displayStatus === FaultyEntityWorkflowStatus.CONFIRMED_FAULTY ||
+                    isTerminal
+                  }
+                >
+                  Confirm Fault
+                </Button>
+              ) : null}
               <Button
                 variant="secondary"
                 onClick={onNoFaultFound}
@@ -176,9 +183,11 @@ export function EntityDetailSheet({
               >
                 No Fault Found
               </Button>
-              <Button variant="default" onClick={onResolve} disabled={!entity || isTerminal}>
-                Resolve
-              </Button>
+              {canResolve ? (
+                <Button variant="default" onClick={onResolve} disabled={!entity || isTerminal}>
+                  Resolve
+                </Button>
+              ) : null}
             </div>
           </div>
         )}

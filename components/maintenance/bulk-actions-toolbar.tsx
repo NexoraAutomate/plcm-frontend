@@ -2,6 +2,8 @@
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth-context';
+import { P } from '@/lib/permission-codes';
 
 interface BulkActionsToolbarProps {
   selectedCount: number;
@@ -20,6 +22,10 @@ export function BulkActionsToolbar({
   onNoFaultFound,
   onResolve,
 }: BulkActionsToolbarProps) {
+  const { can } = useAuth();
+  const canConfirmFaulty = can(P.confirm_faults);
+  const canResolve = can(P.edit_faulty_entities);
+
   if (selectedCount === 0) {
     return null;
   }
@@ -39,15 +45,19 @@ export function BulkActionsToolbar({
           <Button variant="secondary" size="sm" onClick={onStartInspection} disabled={isLoading}>
             Start Inspection
           </Button>
-          <Button variant="secondary" size="sm" onClick={onConfirmFaulty} disabled={isLoading}>
-            Confirm Fault
-          </Button>
+          {canConfirmFaulty ? (
+            <Button variant="secondary" size="sm" onClick={onConfirmFaulty} disabled={isLoading}>
+              Confirm Fault
+            </Button>
+          ) : null}
           <Button variant="secondary" size="sm" onClick={onNoFaultFound} disabled={isLoading}>
             No Fault Found
           </Button>
-          <Button variant="secondary" size="sm" onClick={onResolve} disabled={isLoading}>
-            Resolve Selected
-          </Button>
+          {canResolve ? (
+            <Button variant="secondary" size="sm" onClick={onResolve} disabled={isLoading}>
+              Resolve Selected
+            </Button>
+          ) : null}
         </div>
       </div>
     </div>

@@ -73,7 +73,7 @@ export const auth = {
     api.post("/auth/assign-role", { user_id: userId, role_id: roleId }),
   removeRole: (userId: number, roleId: number) =>
     api.delete("/auth/remove-role", { data: { user_id: userId, role_id: roleId } }),
-  deregister: (userId: number) => api.delete(`/auth/deregister/${userId}`),
+  deregister: (userId: number) => api.delete(`/users/${userId}/`),
 };
 
 // Users

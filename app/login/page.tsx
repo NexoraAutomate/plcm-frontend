@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Satellite, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
+import { firstAccessiblePath } from '@/lib/permission-codes';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -14,15 +15,15 @@ export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login, isAuthenticated, authReady } = useAuth();
+  const { login, isAuthenticated, authReady, can } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (!authReady) return;
     if (isAuthenticated) {
-      router.replace('/executive-dashboard');
+      router.replace(firstAccessiblePath(can));
     }
-  }, [isAuthenticated, authReady, router]);
+  }, [isAuthenticated, authReady, router, can]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -35,7 +36,21 @@ export default function LoginPage() {
     try {
       await login(username, password);
       toast.success('Logged in successfully');
-      router.push('/executive-dashboard');
+      const stored = localStorage.getItem('sat-user');
+      let destination = '/executive-dashboard';
+      if (stored) {
+        try {
+          const user = JSON.parse(stored) as { permissions?: string[] };
+          const perms = user.permissions ?? [];
+          destination = firstAccessiblePath((p) => {
+            const list = Array.isArray(p) ? p : [p];
+            return list.some((code) => perms.includes(code));
+          });
+        } catch {
+          /* keep default */
+        }
+      }
+      router.push(destination);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Authentication failed';
       toast.error(message);

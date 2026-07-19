@@ -62,10 +62,9 @@ export function usePaginatedList<T>({
     if (hasPrev) setPage((p) => Math.max(0, p - 1));
   }, [hasPrev]);
 
-  const invalidate = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey });
-    void refetch();
-  }, [queryClient, queryKey, refetch]);
+  const invalidate = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey });
+  }, [queryClient, queryKey]);
 
   const rangeLabel = useMemo(() => {
     if (total === 0) return '0 of 0';

@@ -1,0 +1,18 @@
+# Production-style frontend stack.
+# Builds the Next.js standalone image from Dockerfile.
+# Expects the backend API at NEXT_PUBLIC_API_URL (baked in at build time).
+
+services:
+  frontend:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api}
+    container_name: satlife-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+      NEXT_TELEMETRY_DISABLED: "1"

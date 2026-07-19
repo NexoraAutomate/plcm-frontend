@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
+import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -39,9 +40,13 @@ import {
   createCompleteHierarchy,
   summarizeHierarchyCounts,
 } from '@/lib/create-complete-hierarchy';
+import { Can } from '@/components/auth/can';
+import { P } from '@/lib/permission-codes';
 
 export default function ProjectsPage(){
   const router = useRouter();
+  const { can } = useAuth();
+  const canEditProjects = can(P.edit_projects);
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({
     open: false,
     id: null,
@@ -313,12 +318,14 @@ export default function ProjectsPage(){
             if (!open) resetCreateForm();
           }}
         >
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              New Project
-            </Button>
-          </DialogTrigger>
+          <Can permission={P.create_projects}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                New Project
+              </Button>
+            </DialogTrigger>
+          </Can>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create Project</DialogTitle>
@@ -534,15 +541,15 @@ export default function ProjectsPage(){
                           className="min-w-[140px]"
                           onClick={(e) => {
                             e.stopPropagation();
-                            openProgressEdit(project);
+                            if (canEditProjects) openProgressEdit(project);
                           }}
                         >
-                          <div className="flex cursor-pointer items-center gap-2 rounded-md p-1 hover:bg-muted/50">
+                          <div className={`flex items-center gap-2 rounded-md p-1 ${canEditProjects ? 'cursor-pointer hover:bg-muted/50' : ''}`}>
                             <Progress value={project.progress ?? 0} className="h-2 flex-1" />
                             <span className="w-10 text-right text-xs font-medium tabular-nums">
                               {project.progress ?? 0}%
                             </span>
-                            <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
+                            {canEditProjects && <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />}
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
@@ -552,26 +559,30 @@ export default function ProjectsPage(){
                                 View
                               </Button>
                             </Link>
-                            <button
-                              type="button"
-                              className="rounded p-1 hover:bg-muted"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openEdit(project);
-                              }}
-                            >
-                              <Edit className="h-4 w-4 text-accent-foreground hover:text-blue-600" />
-                            </button>
-                            <button
-                              type="button"
-                              className="rounded p-1 hover:bg-muted"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDeleteConfirm({ open: true, id: project.id });
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 text-accent-foreground hover:text-red-600" />
-                            </button>
+                            <Can permission={P.edit_projects}>
+                              <button
+                                type="button"
+                                className="rounded p-1 hover:bg-muted"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEdit(project);
+                                }}
+                              >
+                                <Edit className="h-4 w-4 text-accent-foreground hover:text-blue-600" />
+                              </button>
+                            </Can>
+                            <Can permission={P.delete_projects}>
+                              <button
+                                type="button"
+                                className="rounded p-1 hover:bg-muted"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteConfirm({ open: true, id: project.id });
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 text-accent-foreground hover:text-red-600" />
+                              </button>
+                            </Can>
                           </div>
                         </TableCell>
                       </TableRow>

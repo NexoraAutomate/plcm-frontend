@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useAuth } from '@/lib/auth-context';
+import { P } from '@/lib/permission-codes';
 import { useDataStore } from '@/lib/data-store';
 import { formatUserRef } from '@/lib/user-display';
 import {
@@ -55,19 +56,6 @@ interface EntityResolutionDialogProps {
   onCompleted?: () => void;
 }
 
-function canAdminReplace(
-  user: { roles?: string[] } | null,
-  hasAccess: (roles?: string[], permissions?: string[]) => boolean
-) {
-  if (!user) return false;
-  const roles = user.roles ?? [];
-  if (roles.some((role) => role.toLowerCase() === 'admin')) return true;
-  return (
-    hasAccess(undefined, ['edit_maintenance_cases']) &&
-    hasAccess(undefined, ['create_faulty_entities'])
-  );
-}
-
 function stockRowKey(row: ReplacementStockRow): string {
   return row.instanceId != null ? `i-${row.instanceId}` : `inv-${row.inventoryId}-${row.srNo}`;
 }
@@ -86,7 +74,7 @@ export function EntityResolutionDialog({
   deliveries = [],
   onCompleted,
 }: EntityResolutionDialogProps) {
-  const { user, hasAccess } = useAuth();
+  const { can } = useAuth();
   const { users, refreshData, ensureHierarchyLoaded } = useDataStore();
   const [replacementOpen, setReplacementOpen] = useState(false);
   const [replaceFormOpen, setReplaceFormOpen] = useState(false);
@@ -215,7 +203,7 @@ export function EntityResolutionDialog({
     }
   };
 
-  const showAdminReplace = canAdminReplace(user, hasAccess);
+  const showAdminReplace = can(P.edit_maintenance_cases) && can(P.create_faulty_entities);
 
   return (
     <>

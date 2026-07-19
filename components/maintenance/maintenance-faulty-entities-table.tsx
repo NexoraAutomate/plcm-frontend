@@ -11,6 +11,8 @@ import {
   isTerminalDisplayStatus,
   mapFaultyEntityStatusFromApi,
 } from '@/lib/maintenance-workflow';
+import { useAuth } from '@/lib/auth-context';
+import { P } from '@/lib/permission-codes';
 
 interface MaintenanceFaultyEntitiesTableProps {
   entities: FaultyEntity[];
@@ -37,6 +39,9 @@ export function MaintenanceFaultyEntitiesTable({
   onResolve,
   isLoading = false,
 }: MaintenanceFaultyEntitiesTableProps) {
+  const { can } = useAuth();
+  const canConfirmFault = can(P.confirm_faults);
+  const canResolve = can(P.edit_faulty_entities);
   const allSelected = useMemo(
     () => entities.length > 0 && selectedIds.length === entities.length,
     [entities.length, selectedIds]
@@ -89,6 +94,7 @@ export function MaintenanceFaultyEntitiesTable({
                 </Button>
               ) : null}
               {onConfirmFaulty &&
+              canConfirmFault &&
               displayStatus !== FaultyEntityWorkflowStatus.CONFIRMED_FAULTY &&
               !isTerminal ? (
                 <Button
@@ -101,7 +107,7 @@ export function MaintenanceFaultyEntitiesTable({
                   ✓
                 </Button>
               ) : null}
-              {onResolve && !isTerminal ? (
+              {onResolve && canResolve && !isTerminal ? (
                 <Button
                   variant="ghost"
                   size="sm"

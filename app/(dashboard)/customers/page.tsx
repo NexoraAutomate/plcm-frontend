@@ -31,6 +31,8 @@ import { EntityCountCell } from '@/components/entity-count-cell';
 import { CustomersListDashboard } from '@/components/customers/customers-list-dashboard';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { Can } from '@/components/auth/can';
+import { P } from '@/lib/permission-codes';
 
 const emptyCustomerForm: CustomerForm = {
   customer_code: '',
@@ -285,12 +287,14 @@ export default function CustomersPage() {
         </Select>
 
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add Customer
-            </Button>
-          </DialogTrigger>
+          <Can permission={P.create_customers}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                Add Customer
+              </Button>
+            </DialogTrigger>
+          </Can>
           <DialogContent className="sm:max-w-150">
             <DialogHeader>
               <DialogTitle>Add New Customer</DialogTitle>
@@ -567,18 +571,20 @@ export default function CustomersPage() {
 
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2 text-accent">
-                              <UserRoundPen className='w-4.5 text-accent-foreground hover:text-blue-600'
-                              onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleEdit(customer);}}
-                            />
-                            
-                            |
-                            <Trash2 className='w-4.5 text-accent-foreground hover:text-red-600'
-                              onClick={(e) => {
-                                    e.stopPropagation();
-                                    prepareDelete(customer);}}
-                            />
+                              <Can permission={P.edit_customers}>
+                                <UserRoundPen className='w-4.5 text-accent-foreground hover:text-blue-600'
+                                onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEdit(customer);}}
+                              />
+                              </Can>
+                            <Can permission={P.delete_customers}>
+                              <Trash2 className='w-4.5 text-accent-foreground hover:text-red-600'
+                                onClick={(e) => {
+                                      e.stopPropagation();
+                                      prepareDelete(customer);}}
+                              />
+                            </Can>
                         </div>
                       </TableCell>
                     </TableRow>

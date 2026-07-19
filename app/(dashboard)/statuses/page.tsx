@@ -12,6 +12,8 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { toast } from "sonner";
 import * as api from "@/lib/api";
 import * as Models from "@/lib/models";
+import { Can } from "@/components/auth/can";
+import { P } from "@/lib/permission-codes";
 
 const STATUS_TYPES = [
   { key: "projects", label: "Projects" },
@@ -172,52 +174,56 @@ export default function StatusesPage() {
           <h1 className="text-3xl font-bold tracking-tight">Statuses</h1>
           <p className="text-muted-foreground mt-2">Create and manage all status values used across the app.</p>
         </div>
-        <Button variant="secondary" onClick={() => addSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Status
-        </Button>
+        <Can permission={P.create_statuses}>
+          <Button variant="secondary" onClick={() => addSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Status
+          </Button>
+        </Can>
       </div>
 
-      <div ref={addSectionRef}>
-        <Card className="shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold text-card-foreground">Add Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="space-y-2">
-                <Label>Status Name</Label>
-                <Input value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="e.g. Ready" />
+      <Can permission={P.create_statuses}>
+        <div ref={addSectionRef}>
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold text-card-foreground">Add Status</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>Status Name</Label>
+                  <Input value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="e.g. Ready" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Status Type</Label>
+                  <Select value={newStatusType} onValueChange={setNewStatusType}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS_TYPES.map((type) => (
+                        <SelectItem key={type.key} value={type.key}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Description</Label>
+                  <Input value={newDescription} onChange={(event) => setNewDescription(event.target.value)} placeholder="Optional description" />
+                </div>
+                <div className="md:col-span-3 flex items-end">
+                  <Button onClick={handleCreateStatus} disabled={saving}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    {saving ? "Saving..." : "Create Status"}
+                  </Button>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Status Type</Label>
-                <Select value={newStatusType} onValueChange={setNewStatusType}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUS_TYPES.map((type) => (
-                      <SelectItem key={type.key} value={type.key}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Description</Label>
-                <Input value={newDescription} onChange={(event) => setNewDescription(event.target.value)} placeholder="Optional description" />
-              </div>
-              <div className="md:col-span-3 flex items-end">
-                <Button onClick={handleCreateStatus} disabled={saving}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  {saving ? "Saving..." : "Create Status"}
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
+      </Can>
 
       <Card className="shadow-sm">
         <CardHeader className="pb-3">
@@ -255,12 +261,16 @@ export default function StatusesPage() {
                       <div className="text-sm text-muted-foreground">{status.description || "No description."}</div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => openEditDialog(status)} aria-label="Edit status">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => prepareDelete(status)} aria-label="Delete status">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <Can permission={P.edit_statuses}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => openEditDialog(status)} aria-label="Edit status">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </Can>
+                      <Can permission={P.delete_statuses}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => prepareDelete(status)} aria-label="Delete status">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </Can>
                     </div>
                   </CardContent>
                 </Card>

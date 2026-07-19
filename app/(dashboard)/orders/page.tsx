@@ -31,6 +31,8 @@ import { useListPageLoader } from '@/hooks/use-list-page-loader';
 import { OrdersMiniDashboard } from '@/components/orders/orders-mini-dashboard';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
+import { Can } from '@/components/auth/can';
+import { P } from '@/lib/permission-codes';
 
 type OrderForm = {
   order_number?: string
@@ -292,12 +294,14 @@ export default function OrdersPage() {
         </Select>
 
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add Order
-            </Button>
-          </DialogTrigger>
+          <Can permission={P.create_orders}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                Add Order
+              </Button>
+            </DialogTrigger>
+          </Can>
 
           <DialogContent className="sm:max-w-190 p-0">
             <DialogHeader className="border-b px-6 py-4">
@@ -615,16 +619,19 @@ export default function OrdersPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2 text-accent">
-                            <Pencil  className='w-4.5 text-accent-foreground hover:text-blue-600'
-                              onClick={(e) => { e.stopPropagation(); openEdit(order); }}
-                            />
-                            |
-                            <Trash2 className='w-4.5 text-accent-foreground hover:text-red-600'
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDeleteConfirm({ open: true, id: order.id });
-                              }}
-                            />
+                            <Can permission={P.edit_orders}>
+                              <Pencil  className='w-4.5 text-accent-foreground hover:text-blue-600'
+                                onClick={(e) => { e.stopPropagation(); openEdit(order); }}
+                              />
+                            </Can>
+                            <Can permission={P.delete_orders}>
+                              <Trash2 className='w-4.5 text-accent-foreground hover:text-red-600'
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteConfirm({ open: true, id: order.id });
+                                }}
+                              />
+                            </Can>
                         </div>
                       </TableCell>
                       </TableRow>   

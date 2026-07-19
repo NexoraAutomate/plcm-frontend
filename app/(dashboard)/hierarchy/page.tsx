@@ -24,7 +24,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { useAuth } from "@/lib/auth-context";
+import { Can } from "@/components/auth/can";
+import { P } from "@/lib/permission-codes";
 import { toast } from "sonner";
 import * as api from "@/lib/api";
 import type { Hierarchy } from "@/lib/models";
@@ -71,9 +72,6 @@ function getHierarchyLabel(level: HierarchyLevel) {
 }
 
 export default function HierarchyPage() {
-  const { hasAccess } = useAuth();
-  const isAdmin = hasAccess(["Admin"]);
-
   const [hierarchies, setHierarchies] = useState<Hierarchy[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -291,33 +289,39 @@ export default function HierarchyPage() {
               <div className="text-xs text-muted-foreground">System</div>
             </div>
             <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-muted-foreground hover:text-primary"
-                onClick={() => openEditDialog(system)}
-                aria-label="Edit system"
-              >
-                <Edit className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                onClick={() => prepareAddChild("subsystem", system)}
-                aria-label="Add subsystem"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                onClick={() => prepareDelete(system)}
-                aria-label="Delete system"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              <Can permission={P.edit_hierarchy}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-primary"
+                  onClick={() => openEditDialog(system)}
+                  aria-label="Edit system"
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </Can>
+              <Can permission={P.create_hierarchy}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                  onClick={() => prepareAddChild("subsystem", system)}
+                  aria-label="Add subsystem"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </Can>
+              <Can permission={P.delete_hierarchy}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                  onClick={() => prepareDelete(system)}
+                  aria-label="Delete system"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </Can>
             </div>
           </div>
         </CardHeader>
@@ -337,33 +341,39 @@ export default function HierarchyPage() {
                           <div className="text-xs text-muted-foreground">Subsystem</div>
                         </div>
                         <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-primary"
-                            onClick={() => openEditDialog(subsystem)}
-                            aria-label="Edit subsystem"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                            onClick={() => prepareAddChild("module", subsystem)}
-                            aria-label="Add module"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            onClick={() => prepareDelete(subsystem)}
-                            aria-label="Delete subsystem"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <Can permission={P.edit_hierarchy}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-primary"
+                              onClick={() => openEditDialog(subsystem)}
+                              aria-label="Edit subsystem"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </Can>
+                          <Can permission={P.create_hierarchy}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                              onClick={() => prepareAddChild("module", subsystem)}
+                              aria-label="Add module"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </Can>
+                          <Can permission={P.delete_hierarchy}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              onClick={() => prepareDelete(subsystem)}
+                              aria-label="Delete subsystem"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </Can>
                         </div>
                       </div>
                       <div className="space-y-2">
@@ -381,33 +391,39 @@ export default function HierarchyPage() {
                                       <div className="text-xs text-muted-foreground">Module</div>
                                     </div>
                                     <div className="flex items-center gap-1">
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-muted-foreground hover:text-primary"
-                                        onClick={() => openEditDialog(module)}
-                                        aria-label="Edit module"
-                                      >
-                                        <Edit className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                        onClick={() => prepareAddChild("unit", module)}
-                                        aria-label="Add unit"
-                                      >
-                                        <Plus className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                        onClick={() => prepareDelete(module)}
-                                        aria-label="Delete module"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
+                                      <Can permission={P.edit_hierarchy}>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                          onClick={() => openEditDialog(module)}
+                                          aria-label="Edit module"
+                                        >
+                                          <Edit className="h-4 w-4" />
+                                        </Button>
+                                      </Can>
+                                      <Can permission={P.create_hierarchy}>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                          onClick={() => prepareAddChild("unit", module)}
+                                          aria-label="Add unit"
+                                        >
+                                          <Plus className="h-4 w-4" />
+                                        </Button>
+                                      </Can>
+                                      <Can permission={P.delete_hierarchy}>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                          onClick={() => prepareDelete(module)}
+                                          aria-label="Delete module"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </Can>
                                     </div>
                                   </div>
                                   {grouped.unit.filter((unit) => unit.parent_id === module.id).length === 0 ? (
@@ -423,33 +439,39 @@ export default function HierarchyPage() {
                                               <div className="text-xs text-muted-foreground">Unit</div>
                                             </div>
                                             <div className="flex items-center gap-1">
-                                              <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-muted-foreground hover:text-primary"
-                                                onClick={() => openEditDialog(unit)}
-                                                aria-label="Edit unit"
-                                              >
-                                                <Edit className="h-4 w-4" />
-                                              </Button>
-                                              <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                                onClick={() => prepareAddChild("component", unit)}
-                                                aria-label="Add component"
-                                              >
-                                                <Plus className="h-4 w-4" />
-                                              </Button>
-                                              <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                                onClick={() => prepareDelete(unit)}
-                                                aria-label="Delete unit"
-                                              >
-                                                <Trash2 className="h-4 w-4" />
-                                              </Button>
+                                              <Can permission={P.edit_hierarchy}>
+                                                <Button
+                                                  variant="ghost"
+                                                  size="icon"
+                                                  className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                                  onClick={() => openEditDialog(unit)}
+                                                  aria-label="Edit unit"
+                                                >
+                                                  <Edit className="h-4 w-4" />
+                                                </Button>
+                                              </Can>
+                                              <Can permission={P.create_hierarchy}>
+                                                <Button
+                                                  variant="ghost"
+                                                  size="icon"
+                                                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                                  onClick={() => prepareAddChild("component", unit)}
+                                                  aria-label="Add component"
+                                                >
+                                                  <Plus className="h-4 w-4" />
+                                                </Button>
+                                              </Can>
+                                              <Can permission={P.delete_hierarchy}>
+                                                <Button
+                                                  variant="ghost"
+                                                  size="icon"
+                                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                                  onClick={() => prepareDelete(unit)}
+                                                  aria-label="Delete unit"
+                                                >
+                                                  <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                              </Can>
                                             </div>
                                           </div>
                                           {grouped.component.filter((component) => component.parent_id === unit.id).length === 0 ? (
@@ -465,23 +487,27 @@ export default function HierarchyPage() {
                                                   >
                                                     <span>{component.name}</span>
                                                     <div className="flex items-center gap-1">
-                                                      <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-6 w-6 text-muted-foreground hover:text-primary"
-                                                        onClick={() => openEditDialog(component)}
-                                                        aria-label="Edit component"
-                                                      >
-                                                        <Edit className="h-3.5 w-3.5" />
-                                                      </Button>
-                                                      <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                                                        onClick={() => prepareDelete(component)}
-                                                      >
-                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                      </Button>
+                                                      <Can permission={P.edit_hierarchy}>
+                                                        <Button
+                                                          variant="ghost"
+                                                          size="icon"
+                                                          className="h-6 w-6 text-muted-foreground hover:text-primary"
+                                                          onClick={() => openEditDialog(component)}
+                                                          aria-label="Edit component"
+                                                        >
+                                                          <Edit className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                      </Can>
+                                                      <Can permission={P.delete_hierarchy}>
+                                                        <Button
+                                                          variant="ghost"
+                                                          size="icon"
+                                                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                                          onClick={() => prepareDelete(component)}
+                                                        >
+                                                          <Trash2 className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                      </Can>
                                                     </div>
                                                   </Badge>
                                                 ))}
@@ -514,6 +540,7 @@ export default function HierarchyPage() {
         </p>
       </div>
 
+      <Can permission={P.create_hierarchy}>
       <div ref={addSectionRef}>
         <Card className="shadow-sm">
           <CardHeader className="pb-3">
@@ -599,6 +626,7 @@ export default function HierarchyPage() {
           </CardContent>
       </Card>
       </div>
+      </Can>
 
       <Card className="shadow-sm">
         <CardHeader className="pb-3">

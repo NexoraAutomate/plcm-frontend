@@ -12,6 +12,7 @@ import { ArrowLeft, Calendar, Layers } from 'lucide-react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
+import { P } from '@/lib/permission-codes';
 import { EntityForm } from '@/components/entity-form';
 import { EntityInventorySearch } from '@/components/entity-inventory-search';
 import { useState, useEffect } from 'react';
@@ -390,6 +391,9 @@ export default function SubsystemDetailPage() {
         addButtonLabel="Add Module"
         emptyMessage="No modules yet. Click 'Add Module' to create one."
         childEntityType="module"
+        createPermission={P.create_modules}
+        editPermission={P.edit_modules}
+        deletePermission={P.delete_modules}
       />
 
       {/* Inventory Items */}

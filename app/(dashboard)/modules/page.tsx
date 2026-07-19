@@ -35,6 +35,8 @@ import { ParentEntityLink } from '@/components/entity-link';
 import { buildHierarchyPageUrl } from '@/lib/hierarchy-page-filters';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { MODULES_DASHBOARD_CONFIG, MODULE_STATUS_NAMES } from '@/lib/hierarchy-dashboard-configs';
+import { Can } from '@/components/auth/can';
+import { P } from '@/lib/permission-codes';
 
 export default function ModulesPage() {
   const router = useRouter();
@@ -296,12 +298,14 @@ export default function ModulesPage() {
           </SelectContent>
         </Select>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              New Module
-            </Button>
-          </DialogTrigger>
+          <Can permission={P.create_modules}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                New Module
+              </Button>
+            </DialogTrigger>
+          </Can>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create Module</DialogTitle>
@@ -432,13 +436,15 @@ export default function ModulesPage() {
                                 View
                               </Button>
                             </Link>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={(e) => { e.stopPropagation(); openEdit(module)}}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
+                            <Can permission={P.edit_modules}>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => { e.stopPropagation(); openEdit(module)}}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </Can>
                             {/* <ConfirmDialog
                               title="Delete Module"
                               description="Are you sure you want to delete this module?"

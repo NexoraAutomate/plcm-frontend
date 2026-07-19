@@ -8,6 +8,8 @@ export interface User {
   is_active: boolean
   created_at: string
   roles: string[]
+  /** Flat permission codes from JWT /auth/me */
+  permissions?: string[]
 }
 
 // Customer

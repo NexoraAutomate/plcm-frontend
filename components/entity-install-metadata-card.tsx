@@ -30,8 +30,18 @@ import {
 } from '@/components/replace-from-inventory-dialog';
 import type { HierarchyEntityType } from '@/lib/entity-hierarchy';
 import { HARDWARE_ENTITY_DETAIL_PATH } from '@/lib/entity-replacement';
+import { useAuth } from '@/lib/auth-context';
+import { P } from '@/lib/permission-codes';
 
 type HardwareOwnerType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
+
+const EDIT_PERMISSION_BY_OWNER_TYPE: Record<HardwareOwnerType, string> = {
+  system: P.edit_systems,
+  subsystem: P.edit_subsystems,
+  module: P.edit_modules,
+  unit: P.edit_units,
+  component: P.edit_components,
+};
 
 function MetadataField({ label, value }: { label: string; value?: string | null }) {
   return (
@@ -73,6 +83,8 @@ export function EntityInstallMetadataCard({
   hierarchyHref,
 }: EntityInstallMetadataCardProps) {
   const { users } = useDataStore();
+  const { can } = useAuth();
+  const canEdit = can(EDIT_PERMISSION_BY_OWNER_TYPE[ownerType]);
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
   const [replaceOpen, setReplaceOpen] = useState(false);
@@ -240,16 +252,18 @@ export function EntityInstallMetadataCard({
                 </Link>
               </Button>
             ) : null}
-            {allowReplace && projectId ? (
+            {allowReplace && projectId && canEdit ? (
               <Button type="button" variant="outline" size="sm" onClick={() => setReplaceOpen(true)}>
                 <Replace className="mr-2 h-4 w-4" />
                 Replace
               </Button>
             ) : null}
-            <Button type="button" variant="outline" size="sm" onClick={() => setEditOpen(true)}>
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit
-            </Button>
+            {canEdit ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
+            ) : null}
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -295,15 +309,17 @@ export function EntityInstallMetadataCard({
             <div>
               <div className="mb-2 flex items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">Primary Photo</p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void handleRemovePicture()}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Remove
-                </Button>
+                {canEdit ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void handleRemovePicture()}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Remove
+                  </Button>
+                ) : null}
               </div>
               <EntityPicture
                 src={entity.picture_url}

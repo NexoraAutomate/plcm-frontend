@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 import {
-  LayoutDashboard,
   BarChart3,
   Users,
   ShoppingCart,
@@ -14,7 +13,6 @@ import {
   Wrench,
   UserCog,
   LogOut,
-  Satellite,
   Gauge,
   Pin,
   PinOff,
@@ -25,9 +23,14 @@ import {
   Puzzle,
   GitBranch,
   Bell,
+  Shield,
+  FileText,
+  ChevronDown,
+  ChevronRight,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { NAV_PERMISSIONS, type PermissionCode } from "@/lib/permission-codes";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,32 +46,165 @@ type NavItem = {
   label: string;
   href: string;
   icon: LucideIcon;
+  permission?: PermissionCode | PermissionCode[];
+};
+
+type NavGroup = {
+  label: string;
+  icon: LucideIcon;
+  href: string;
+  permission?: PermissionCode | PermissionCode[];
+  children: NavItem[];
 };
 
 const navItems: NavItem[] = [
-  //{ label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Executive Dashboard", href: "/executive-dashboard", icon: BarChart3 },
-  { label: "Customers", href: "/customers", icon: Users },
-  { label: "Orders", href: "/orders", icon: ShoppingCart },
-  { label: "Projects", href: "/projects", icon: Rocket },
-  { label: "Inventory", href: "/inventory", icon: Package },
-  { label: "Maintenance", href: "/maintenance", icon: Wrench },
-  { label: "Notifications", href: "/notifications", icon: Bell },
+  {
+    label: "Executive Dashboard",
+    href: "/executive-dashboard",
+    icon: BarChart3,
+    permission: NAV_PERMISSIONS["/executive-dashboard"] as PermissionCode,
+  },
+  {
+    label: "Customers",
+    href: "/customers",
+    icon: Users,
+    permission: NAV_PERMISSIONS["/customers"] as PermissionCode,
+  },
+  {
+    label: "Orders",
+    href: "/orders",
+    icon: ShoppingCart,
+    permission: NAV_PERMISSIONS["/orders"] as PermissionCode,
+  },
+  {
+    label: "Projects",
+    href: "/projects",
+    icon: Rocket,
+    permission: NAV_PERMISSIONS["/projects"] as PermissionCode,
+  },
+  {
+    label: "Inventory",
+    href: "/inventory",
+    icon: Package,
+    permission: NAV_PERMISSIONS["/inventory"] as PermissionCode,
+  },
+  {
+    label: "Maintenance",
+    href: "/maintenance",
+    icon: Wrench,
+    permission: NAV_PERMISSIONS["/maintenance"] as PermissionCode,
+  },
+  {
+    label: "Notifications",
+    href: "/notifications",
+    icon: Bell,
+    permission: NAV_PERMISSIONS["/notifications"] as PermissionCode,
+  },
 ];
 
+const reportingGroup: NavGroup = {
+  label: "Reporting",
+  icon: FileText,
+  href: "/reporting",
+  permission: NAV_PERMISSIONS["/reporting"] as PermissionCode,
+  children: [
+    {
+      label: "Build History Dossier",
+      href: "/reporting/build-history",
+      icon: FileText,
+      permission: NAV_PERMISSIONS["/reporting/build-history"] as PermissionCode,
+    },
+    {
+      label: "Maintenance History Dossier",
+      href: "/reporting/maintenance-history",
+      icon: Wrench,
+      permission: NAV_PERMISSIONS["/reporting/maintenance-history"] as PermissionCode,
+    },
+    {
+      label: "Inventory Reports",
+      href: "/reporting/inventory",
+      icon: Package,
+      permission: NAV_PERMISSIONS["/reporting/inventory"] as PermissionCode,
+    },
+    {
+      label: "Maintenance Reports",
+      href: "/reporting/maintenance",
+      icon: Gauge,
+      permission: NAV_PERMISSIONS["/reporting/maintenance"] as PermissionCode,
+    },
+    {
+      label: "Executive Reports",
+      href: "/reporting/executive",
+      icon: BarChart3,
+      permission: NAV_PERMISSIONS["/reporting/executive"] as PermissionCode,
+    },
+  ],
+};
+
 const hierarchyItems: NavItem[] = [
-  { label: "Hierarchy Dashboard", href: "/hierarchy-dashboard", icon: GitBranch },
-  { label: "Systems", href: "/systems", icon: Server },
-  { label: "Subsystems", href: "/subsystems", icon: Network },
-  { label: "Modules", href: "/modules", icon: Box },
-  { label: "Units", href: "/units", icon: Cpu },
-  { label: "Components", href: "/components", icon: Puzzle },
+  {
+    label: "Hierarchy Dashboard",
+    href: "/hierarchy-dashboard",
+    icon: GitBranch,
+    permission: NAV_PERMISSIONS["/hierarchy-dashboard"] as PermissionCode,
+  },
+  {
+    label: "Systems",
+    href: "/systems",
+    icon: Server,
+    permission: NAV_PERMISSIONS["/systems"] as PermissionCode,
+  },
+  {
+    label: "Subsystems",
+    href: "/subsystems",
+    icon: Network,
+    permission: NAV_PERMISSIONS["/subsystems"] as PermissionCode,
+  },
+  {
+    label: "Modules",
+    href: "/modules",
+    icon: Box,
+    permission: NAV_PERMISSIONS["/modules"] as PermissionCode,
+  },
+  {
+    label: "Units",
+    href: "/units",
+    icon: Cpu,
+    permission: NAV_PERMISSIONS["/units"] as PermissionCode,
+  },
+  {
+    label: "Components",
+    href: "/components",
+    icon: Puzzle,
+    permission: NAV_PERMISSIONS["/components"] as PermissionCode,
+  },
 ];
 
 const adminItems: NavItem[] = [
-  { label: "Systems Hierarchy", href: "/hierarchy", icon: GitBranch },
-  { label: "Users", href: "/users", icon: UserCog },
-  { label: "Statuses", href: "/statuses", icon: Gauge },
+  {
+    label: "Systems Hierarchy",
+    href: "/hierarchy",
+    icon: GitBranch,
+    permission: NAV_PERMISSIONS["/hierarchy"] as PermissionCode,
+  },
+  {
+    label: "Users",
+    href: "/users",
+    icon: UserCog,
+    permission: NAV_PERMISSIONS["/users"] as PermissionCode,
+  },
+  {
+    label: "Roles",
+    href: "/roles",
+    icon: Shield,
+    permission: NAV_PERMISSIONS["/roles"] as PermissionCode,
+  },
+  {
+    label: "Statuses",
+    href: "/statuses",
+    icon: Gauge,
+    permission: NAV_PERMISSIONS["/statuses"] as PermissionCode,
+  },
 ];
 
 function NavLink({
@@ -113,9 +249,10 @@ function NavLink({
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { logout, can } = useAuth();
   const [pinned, setPinned] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [reportingOpen, setReportingOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -123,7 +260,36 @@ export function AppSidebar() {
     setPinned(stored === "true");
   }, []);
 
+  useEffect(() => {
+    if (pathname.startsWith("/reporting")) {
+      setReportingOpen(true);
+    }
+  }, [pathname]);
+
   const collapsed = !pinned;
+
+  const visibleNav = useMemo(
+    () => navItems.filter((item) => !item.permission || can(item.permission)),
+    [can]
+  );
+  const visibleHierarchy = useMemo(
+    () => hierarchyItems.filter((item) => !item.permission || can(item.permission)),
+    [can]
+  );
+  const visibleAdmin = useMemo(
+    () => adminItems.filter((item) => !item.permission || can(item.permission)),
+    [can]
+  );
+  const visibleReportingChildren = useMemo(
+    () =>
+      reportingGroup.children.filter(
+        (item) => !item.permission || can(item.permission)
+      ),
+    [can]
+  );
+  const canSeeReporting =
+    (!reportingGroup.permission || can(reportingGroup.permission)) &&
+    visibleReportingChildren.length > 0;
 
   const togglePin = () => {
     setPinned((current) => {
@@ -184,7 +350,6 @@ export function AppSidebar() {
               alt="Backend"
               className="dark:invert"
             />
-            {/* <Satellite className="h-5 w-5 text-sidebar-primary-foreground" /> */}
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1 pr-6">
@@ -200,7 +365,7 @@ export function AppSidebar() {
 
         <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-4">
           <div className="space-y-1">
-            {navItems.map((item) => (
+            {visibleNav.map((item) => (
               <NavLink
                 key={item.href}
                 item={item}
@@ -210,28 +375,96 @@ export function AppSidebar() {
             ))}
           </div>
 
-          <div className="mt-6">
-            {!collapsed && (
-              <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/40">
-                Hierarchy
-              </p>
-            )}
-            {collapsed && (
-              <div className="mx-auto mb-2 h-px w-8 bg-sidebar-border" />
-            )}
-            <div className="space-y-1">
-              {hierarchyItems.map((item) => (
-                <NavLink
-                  key={item.href}
-                  item={item}
-                  pathname={pathname}
-                  collapsed={collapsed}
-                />
-              ))}
+          {canSeeReporting && (
+            <div className="mt-6">
+              {!collapsed && (
+                <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/40">
+                  Reporting
+                </p>
+              )}
+              {collapsed && (
+                <div className="mx-auto mb-2 h-px w-8 bg-sidebar-border" />
+              )}
+              <div className="space-y-1">
+                {collapsed ? (
+                  <NavLink
+                    item={{
+                      label: reportingGroup.label,
+                      href: reportingGroup.href,
+                      icon: reportingGroup.icon,
+                    }}
+                    pathname={pathname}
+                    collapsed={collapsed}
+                  />
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setReportingOpen((o) => !o)}
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                        pathname.startsWith("/reporting")
+                          ? "bg-sidebar-accent text-sidebar-primary"
+                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                      )}
+                    >
+                      <reportingGroup.icon className="h-4.5 w-4.5 shrink-0" />
+                      <span className="flex-1 truncate text-left">
+                        {reportingGroup.label}
+                      </span>
+                      {reportingOpen ? (
+                        <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 shrink-0 opacity-70" />
+                      )}
+                    </button>
+                    {reportingOpen &&
+                      visibleReportingChildren.map((item) => (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={cn(
+                            "ml-3 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                            pathname === item.href ||
+                              pathname.startsWith(item.href + "/")
+                              ? "bg-sidebar-accent text-sidebar-primary"
+                              : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                          )}
+                        >
+                          <item.icon className="h-4 w-4 shrink-0" />
+                          <span className="truncate">{item.label}</span>
+                        </Link>
+                      ))}
+                  </>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
-          {user?.roles?.includes("Admin") && (
+          {visibleHierarchy.length > 0 && (
+            <div className="mt-6">
+              {!collapsed && (
+                <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/40">
+                  Hierarchy
+                </p>
+              )}
+              {collapsed && (
+                <div className="mx-auto mb-2 h-px w-8 bg-sidebar-border" />
+              )}
+              <div className="space-y-1">
+                {visibleHierarchy.map((item) => (
+                  <NavLink
+                    key={item.href}
+                    item={item}
+                    pathname={pathname}
+                    collapsed={collapsed}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {visibleAdmin.length > 0 && (
             <div className="mt-6">
               {!collapsed && (
                 <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/40">
@@ -242,7 +475,7 @@ export function AppSidebar() {
                 <div className="mx-auto mb-2 h-px w-8 bg-sidebar-border" />
               )}
               <div className="space-y-1">
-                {adminItems.map((item) => (
+                {visibleAdmin.map((item) => (
                   <NavLink
                     key={item.href}
                     item={item}

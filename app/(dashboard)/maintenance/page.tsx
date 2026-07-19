@@ -32,11 +32,17 @@ import { useMaintenanceCaseStatusCounts } from '@/hooks/use-maintenance-case-sta
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
 import type { ListFilterParams } from '@/lib/list-filters';
+import { useAuth } from '@/lib/auth-context';
+import { P } from '@/lib/permission-codes';
 
 export default function MaintenancePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
+  const { can } = useAuth();
+  const canCreateCase = can(P.create_maintenance_cases);
+  const canEditCase = can(P.edit_maintenance_cases);
+  const canDeleteCase = can(P.delete_maintenance_cases);
   const {
     projects,
     createMaintenanceCase,
@@ -314,10 +320,12 @@ export default function MaintenancePage() {
             <Search className="h-4 w-4" />
             Lookup by Serial Number
           </Button>
-          <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add New Case
-          </Button>
+          {canCreateCase ? (
+            <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Add New Case
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -396,8 +404,8 @@ export default function MaintenancePage() {
         </p>
         <MaintenanceTable
           cases={filtered}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
+          onEdit={canEditCase ? handleEdit : undefined}
+          onDelete={canDeleteCase ? handleDelete : undefined}
           onView={handleView}
           isLoading={isMutating || pagination.loading}
           getFaultyEntities={getFaultyEntities}

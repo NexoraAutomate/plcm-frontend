@@ -15,6 +15,7 @@ import { Plus, Edit, Trash2, Search, Clock, AlertTriangle, Zap, Pause, CheckCirc
 import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
 import { EntityForm } from '@/components/entity-form';
+import { P } from '@/lib/permission-codes';
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
@@ -367,6 +368,9 @@ export default function ProjectDetailPage() {
         addButtonLabel="Add System"
         emptyMessage="No systems yet. Click 'Add System' to create one."
         childEntityType="system"
+        createPermission={P.create_systems}
+        editPermission={P.edit_systems}
+        deletePermission={P.delete_systems}
       />
 
       {/* Inventory Items */}

@@ -50,6 +50,9 @@ import { InventoryHierarchyDialog } from '@/components/inventory-hierarchy-dialo
 import { isInventoryInStock } from '@/lib/inventory-filter';
 import { StatusBadge } from '@/components/status-badge';
 import { cn } from '@/lib/utils';
+import { Can } from '@/components/auth/can';
+import { useAuth } from '@/lib/auth-context';
+import { P } from '@/lib/permission-codes';
 
 type EntityType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
 type StockFilter = 'all' | 'available' | 'out_of_stock';
@@ -159,6 +162,10 @@ function enrichInventoryItems(items: Inventory[], users: User[]): InventoryItem[
 
 export default function InventoryPage() {
   const router = useRouter();
+  const { can } = useAuth();
+  const canCreateInventory = can(P.create_inventory);
+  const canEditInventory = can(P.edit_inventory);
+  const canAddStock = canCreateInventory || canEditInventory;
   const { users, statuses } = useDataStore();
   const [search, setSearch] = useState('');
   const [entityTypeFilter, setEntityTypeFilter] = useState<EntityType | 'all'>('all');
@@ -1044,10 +1051,12 @@ export default function InventoryPage() {
             <p className="text-sm text-muted-foreground">
               {instances.length} serialized unit{instances.length === 1 ? '' : 's'} in this group
             </p>
-            <Button type="button" size="sm" variant="outline" onClick={handleAddInstance}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Unit
-            </Button>
+            {canCreateInventory ? (
+              <Button type="button" size="sm" variant="outline" onClick={handleAddInstance}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Unit
+              </Button>
+            ) : null}
           </div>
           <div className="overflow-x-auto rounded-md border">
             <Table>
@@ -1075,22 +1084,26 @@ export default function InventoryPage() {
                       <TableCell>{instance.location || '—'}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => editingGroup && loadInstanceIntoForm(instance, editingGroup)}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleDeleteInstance(instance.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <Can permission={P.edit_inventory}>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => editingGroup && loadInstanceIntoForm(instance, editingGroup)}
+                            >
+                              Edit
+                            </Button>
+                          </Can>
+                          <Can permission={P.delete_inventory}>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDeleteInstance(instance.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </Can>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1154,12 +1167,14 @@ export default function InventoryPage() {
               if (open) setFormTab('general');
             }}
           >
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Item
-              </Button>
-            </DialogTrigger>
+            <Can permission={P.create_inventory}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Item
+                </Button>
+              </DialogTrigger>
+            </Can>
             <DialogContent className={inventoryDialogClassName}>
               <DialogHeader>
                 <DialogTitle>Add Inventory Item</DialogTitle>
@@ -1274,7 +1289,7 @@ export default function InventoryPage() {
                       <TableCell>{item.displayLocation || '—'}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-1 justify-end">
-                          {item.quantity >= 0 ? (
+                          {item.quantity >= 0 && canAddStock ? (
                             <Button
                               size="icon-sm"
                               variant="secondary"
@@ -1285,7 +1300,7 @@ export default function InventoryPage() {
                               <Plus className="h-4 w-4" />
                             </Button>
                           ) : null}
-                          {canAddInventoryChildren(item.inventory_type) ? (
+                          {canAddInventoryChildren(item.inventory_type) && canAddStock ? (
                             <Button
                               size="icon-sm"
                               variant="secondary"
@@ -1305,34 +1320,40 @@ export default function InventoryPage() {
                           >
                             <Network className="h-4 w-4" />
                           </Button>
-                          <Button
-                            size="icon-sm"
-                            variant="secondary"
-                            onClick={() => handleDuplicateClick(item)}
-                            disabled={duplicating}
-                            title="Duplicate"
-                            aria-label="Duplicate"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon-sm"
-                            variant="outline"
-                            onClick={() => openEdit(item)}
-                            title="Edit"
-                            aria-label="Edit"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon-sm"
-                            variant="destructive"
-                            onClick={() => setDeleteTarget(item)}
-                            title="Delete"
-                            aria-label="Delete"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {canAddStock ? (
+                            <Button
+                              size="icon-sm"
+                              variant="secondary"
+                              onClick={() => handleDuplicateClick(item)}
+                              disabled={duplicating}
+                              title="Duplicate"
+                              aria-label="Duplicate"
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          ) : null}
+                          <Can permission={P.edit_inventory}>
+                            <Button
+                              size="icon-sm"
+                              variant="outline"
+                              onClick={() => openEdit(item)}
+                              title="Edit"
+                              aria-label="Edit"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </Can>
+                          <Can permission={P.delete_inventory}>
+                            <Button
+                              size="icon-sm"
+                              variant="destructive"
+                              onClick={() => setDeleteTarget(item)}
+                              title="Delete"
+                              aria-label="Delete"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </Can>
                         </div>
                       </TableCell>
                     </TableRow>

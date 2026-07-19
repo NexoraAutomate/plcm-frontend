@@ -35,6 +35,8 @@ import { ParentEntityLink } from '@/components/entity-link';
 import { buildHierarchyPageUrl } from '@/lib/hierarchy-page-filters';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { UNITS_DASHBOARD_CONFIG, UNIT_STATUS_NAMES } from '@/lib/hierarchy-dashboard-configs';
+import { Can } from '@/components/auth/can';
+import { P } from '@/lib/permission-codes';
 
 export default function UnitsPage() {
   const router = useRouter();
@@ -302,12 +304,14 @@ export default function UnitsPage() {
           </SelectContent>
         </Select>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              New Unit
-            </Button>
-          </DialogTrigger>
+          <Can permission={P.create_units}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                New Unit
+              </Button>
+            </DialogTrigger>
+          </Can>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create Unit</DialogTitle>
@@ -438,13 +442,15 @@ export default function UnitsPage() {
                                 View
                               </Button>
                             </Link>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={(e) => { e.stopPropagation(); openEdit(unit)}}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
+                            <Can permission={P.edit_units}>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => { e.stopPropagation(); openEdit(unit)}}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </Can>
                             {/* <ConfirmDialog
                               title="Delete Unit"
                               description="Are you sure you want to delete this unit?"

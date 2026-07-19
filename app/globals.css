@@ -262,3 +262,23 @@
       calc(2 * 100% / 3) calc(2 * 100% / 3);
   }
 }
+
+@media print {
+  aside,
+  nav,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  .report-print-root {
+    box-shadow: none !important;
+    border: none !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+
+  .break-inside-avoid {
+    break-inside: avoid;
+  }
+}
+

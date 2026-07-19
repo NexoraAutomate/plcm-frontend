@@ -30,6 +30,10 @@ import {
   needsSerialSelection,
 } from '@/lib/inventory-install';
 import {
+  nextSerialNumberFromInventory,
+  serialNumberFromInventory,
+} from '@/lib/entity-hierarchy';
+import {
   buildCreateEntityByType,
   installDefinedInventoryChildren,
   resolveInventoryInstanceSerial,
@@ -110,10 +114,9 @@ function resolveInstallIdentity(
     inventoryItems.find((item) => item.name?.trim() === name);
 
   if (inventoryMatch) {
-    const serial = buildSerialNumber(
-      name,
-      inventoryPartNumber(inventoryMatch) || partNumber
-    );
+    const serial =
+      serialNumberFromInventory(inventoryMatch) ||
+      nextSerialNumberFromInventory(inventoryMatch, []);
     return {
       payload: inventoryToHierarchyCreatePayload(inventoryMatch, serial),
       inventoryMatch,

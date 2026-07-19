@@ -8,6 +8,8 @@ import { attachmentDisplayTitle, attachmentTypeLabel } from '@/lib/attachment-ty
 import type { EntityAttachment } from '@/lib/models';
 import * as api from '@/lib/api';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/auth-context';
+import { P } from '@/lib/permission-codes';
 
 type AttachmentOwnerType =
   | 'system'
@@ -43,6 +45,10 @@ export function EntityAttachmentsSection({
   pendingAttachments = [],
   onPendingAttachmentsChange,
 }: EntityAttachmentsSectionProps) {
+  const { can } = useAuth();
+  const canUpload = can(P.upload_attachments);
+  const canDelete = can(P.delete_attachments);
+  const canDownload = can(P.download_attachments);
   const [attachments, setAttachments] = useState<EntityAttachment[]>([]);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
@@ -143,7 +149,7 @@ export function EntityAttachmentsSection({
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-2">
           <p className="text-sm font-medium">Attachments</p>
-          {onPendingAttachmentsChange ? (
+          {onPendingAttachmentsChange && canUpload ? (
             <Button type="button" variant="outline" size="sm" onClick={() => setQueueOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Add
@@ -195,10 +201,12 @@ export function EntityAttachmentsSection({
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-medium">Attachments</p>
-        <Button type="button" variant="outline" size="sm" onClick={() => setUploadOpen(true)}>
-          <Upload className="mr-2 h-4 w-4" />
-          Upload
-        </Button>
+        {canUpload ? (
+          <Button type="button" variant="outline" size="sm" onClick={() => setUploadOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Upload
+          </Button>
+        ) : null}
       </div>
       {attachments.length === 0 ? (
         <p className="text-sm text-muted-foreground">No attachments yet.</p>
@@ -210,36 +218,44 @@ export function EntityAttachmentsSection({
               className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
             >
               <div className="min-w-0 flex-1">
-                <button
-                  type="button"
-                  className="truncate text-left font-medium text-primary hover:underline"
-                  onClick={() => void api.attachments.download(attachment.id, attachment.file_name)}
-                >
-                  {attachmentDisplayTitle(attachment)}
-                </button>
+                {canDownload ? (
+                  <button
+                    type="button"
+                    className="truncate text-left font-medium text-primary hover:underline"
+                    onClick={() => void api.attachments.download(attachment.id, attachment.file_name)}
+                  >
+                    {attachmentDisplayTitle(attachment)}
+                  </button>
+                ) : (
+                  <p className="truncate font-medium">{attachmentDisplayTitle(attachment)}</p>
+                )}
                 <p className="truncate text-xs text-muted-foreground">
                   {attachmentTypeLabel(attachment.attachment_type)} · {attachment.file_name}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setEditingAttachment(attachment)}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => void handleDeleteAttachment(attachment.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {canUpload ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setEditingAttachment(attachment)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                ) : null}
+                {canDelete ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => void handleDeleteAttachment(attachment.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                ) : null}
               </div>
             </li>
           ))}

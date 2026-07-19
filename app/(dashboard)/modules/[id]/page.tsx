@@ -12,6 +12,7 @@ import { ArrowLeft, Calendar, Layers } from 'lucide-react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
+import { P } from '@/lib/permission-codes';
 import { EntityForm } from '@/components/entity-form';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
@@ -404,6 +405,9 @@ export default function ModuleDetailPage() {
         addButtonLabel="Add Unit"
         emptyMessage="No units yet. Click 'Add Unit' to create one."
         childEntityType="unit"
+        createPermission={P.create_units}
+        editPermission={P.edit_units}
+        deletePermission={P.delete_units}
       />
 
       {/* Inventory Items */}

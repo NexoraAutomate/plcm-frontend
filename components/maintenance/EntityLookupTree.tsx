@@ -4,6 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EntityLookupFlow } from './EntityLookupFlow';
 import type { EntityLookupNode, lookUpResponse } from '@/lib/models';
+import { useAuth } from '@/lib/auth-context';
+import { P } from '@/lib/permission-codes';
 
 interface EntityLookupTreeProps {
   response: lookUpResponse;
@@ -18,6 +20,9 @@ export function EntityLookupTree({
   onSuspectChildren,
   onConfirmFault,
 }: EntityLookupTreeProps) {
+  const { can } = useAuth();
+  const canSuspectChildren = can(P.suspect_children);
+
   return (
     <div className="flex min-h-0 flex-col gap-4">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -58,7 +63,7 @@ export function EntityLookupTree({
         onConfirmFault={onConfirmFault}
       />
 
-      {caseId && onSuspectChildren ? (
+      {caseId && onSuspectChildren && canSuspectChildren ? (
         <div className="flex justify-end">
           <Button variant="secondary" onClick={onSuspectChildren}>
             Suspect Children for Case #{caseId}

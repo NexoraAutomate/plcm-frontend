@@ -40,6 +40,8 @@ import {
 } from '@/lib/entity-lookup-flow';
 import type { EntityLookupNode, lookUpResponse } from '@/lib/models';
 import { EntityFlowFieldSlicer } from './EntityFlowFieldSlicer';
+import { useAuth } from '@/lib/auth-context';
+import { P } from '@/lib/permission-codes';
 
 interface EntityLookupFlowContextValue {
   caseId?: number | null;
@@ -64,6 +66,8 @@ const roleStyles: Record<EntityFlowNodeData['role'], string> = {
 function EntityFlowNodeComponent({ data }: NodeProps) {
   const nodeData = data as EntityFlowNodeData;
   const { caseId, onConfirmFault, visibleFields } = useContext(EntityLookupFlowContext);
+  const { can } = useAuth();
+  const canConfirmFault = can(P.confirm_faults);
 
   return (
     <div
@@ -109,7 +113,7 @@ function EntityFlowNodeComponent({ data }: NodeProps) {
         ) : null}
       </div>
 
-      {caseId && onConfirmFault && nodeData.role === 'descendant' ? (
+      {caseId && onConfirmFault && canConfirmFault && nodeData.role === 'descendant' ? (
         <Button
           variant="outline"
           size="sm"

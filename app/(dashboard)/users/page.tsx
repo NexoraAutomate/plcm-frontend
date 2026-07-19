@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useDataStore } from '@/lib/data-store';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,9 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Search, ShieldAlert } from 'lucide-react';
+import { Plus, Edit, Trash2, Search } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuth } from '@/lib/auth-context';
+import { Can } from '@/components/auth/can';
+import { P } from '@/lib/permission-codes';
 import * as api from '@/lib/api';
 import type * as Models from '@/lib/models';
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -21,10 +21,9 @@ import { queryKeys } from '@/hooks/queries/query-keys';
 import { usePaginatedList } from '@/hooks/use-paginated-list';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
+import { formatRoleNames, roleName } from '@/lib/user-display';
 
 export default function UsersPage() {
-  const { user: currentUser } = useAuth();
-  const { createUser, updateUser, deleteUser } = useDataStore();
   const pagination = usePaginatedList({
     queryKey: queryKeys.usersPage(),
     fetchPage: fetchUsersPage,
@@ -80,23 +79,14 @@ export default function UsersPage() {
     pagination.setPage(0);
   }, [search]);
 
-  const filtered = users.filter(
-    (u) =>
-      u.full_name.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase()) ||
-      u.username.toLowerCase().includes(search.toLowerCase())
-  );
-
-  // Admin-only access
-  if (currentUser?.roles?.includes('Admin') === false && currentUser?.roles?.length === 0) {
+  const filtered = users.filter((u) => {
+    const q = search.toLowerCase();
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <ShieldAlert className="h-12 w-12 text-muted-foreground mb-4" />
-        <h2 className="text-xl font-semibold text-foreground">Access Denied</h2>
-        <p className="text-sm text-muted-foreground mt-2">Only administrators can manage users</p>
-      </div>
+      (u.full_name ?? '').toLowerCase().includes(q) ||
+      (u.email ?? '').toLowerCase().includes(q) ||
+      (u.username ?? '').toLowerCase().includes(q)
     );
-  }
+  });
 
   async function handleCreate() {
     if (!formData.username.trim() || !formData.password.trim() || !formData.full_name.trim()) {
@@ -111,12 +101,16 @@ export default function UsersPage() {
         full_name: formData.full_name,
         email: formData.email,
       };
-      const res = await api.auth.register(userData);
-      // console.log('User registered:', res.data);
+      await api.auth.register(userData);
       setFormData({ username: '', password: '', full_name: '', email: '', role_id: '' });
       setIsCreateOpen(false);
       toast.success('User created successfully');
-      pagination.invalidate();
+      const lastPage = Math.max(
+        0,
+        Math.ceil((pagination.total + 1) / pagination.pageSize) - 1
+      );
+      pagination.setPage(lastPage);
+      await pagination.invalidate();
     } catch (err) {
       console.error('Failed to create user:', err);
       toast.error('Failed to create user');
@@ -139,20 +133,18 @@ export default function UsersPage() {
         userData.password = editFormData.password;
       }
 
-      await updateUser(editingId, userData);
-      // console.log('User updated:', editingId);
+      await api.users.update(editingId, userData);
 
       if (editFormData.role_id) {
         const roleId = parseInt(editFormData.role_id);
         await api.auth.assignRole(editingId, roleId);
-        // console.log('Role assigned to user:', editingId, 'roleId:', roleId);
       }
 
       setEditFormData({ username: '', password: '', full_name: '', email: '', role_id: '' });
       setEditingId(null);
       setIsEditOpen(false);
       toast.success('User updated successfully');
-      pagination.invalidate();
+      await pagination.invalidate();
     } catch (err) {
       console.error('Failed to update user:', err);
       toast.error('Failed to update user');
@@ -162,19 +154,22 @@ export default function UsersPage() {
   async function confirmDelete() {
     if (deleteConfirm.id === null) return;
     try {
-      await api.auth.deregister(deleteConfirm.id);
+      await api.users.delete(deleteConfirm.id);
       toast.success('User deleted successfully');
-      pagination.invalidate();
+      await pagination.invalidate();
     } catch (err) {
       console.error('Failed to delete user:', err);
-      toast.error('Failed to delete user');
+      const detail = axios.isAxiosError(err)
+        ? (err.response?.data as { detail?: string } | undefined)?.detail
+        : undefined;
+      toast.error(typeof detail === 'string' ? detail : 'Failed to delete user');
     } finally {
       setDeleteConfirm({ open: false, id: null });
     }
   }
 
   function openEdit(user: typeof filtered[0]) {
-    const firstRoleName = user.roles?.[0] || '';
+    const firstRoleName = roleName(user.roles?.[0]);
 
     const foundRole = roles.find(
       (r) => r.name === firstRoleName
@@ -217,12 +212,14 @@ export default function UsersPage() {
           />
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add User
-            </Button>
-          </DialogTrigger>
+          <Can permission={P.create_users}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                Add User
+              </Button>
+            </DialogTrigger>
+          </Can>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create User</DialogTitle>
@@ -306,23 +303,27 @@ export default function UsersPage() {
                       <TableCell className="font-medium">{user.full_name}</TableCell>
                       <TableCell className="font-mono text-sm">{user.username}</TableCell>
                       <TableCell>{user.email}</TableCell>
-                      <TableCell className="capitalize">{user.roles?.join(', ') || 'No role'}</TableCell>
+                      <TableCell className="capitalize">{formatRoleNames(user.roles)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openEdit(user)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => setDeleteConfirm({ open: true, id: user.id })}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <Can permission={P.edit_users}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openEdit(user)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </Can>
+                          <Can permission={P.delete_users}>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => setDeleteConfirm({ open: true, id: user.id })}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </Can>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -382,25 +383,27 @@ export default function UsersPage() {
                 placeholder="Leave blank to keep current password"
               />
             </div>
-            <div>
-              <Label>Role</Label>
-              {loadingRoles ? (
-                <p className="text-sm text-muted-foreground">Loading roles...</p>
-              ) : (
-                <Select value={editFormData.role_id} onValueChange={(value) => setEditFormData({ ...editFormData, role_id: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {roles.map((role) => (
-                      <SelectItem key={role.id} value={role.id.toString()}>
-                        {role.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
+            <Can permission={P.assign_roles}>
+              <div>
+                <Label>Role</Label>
+                {loadingRoles ? (
+                  <p className="text-sm text-muted-foreground">Loading roles...</p>
+                ) : (
+                  <Select value={editFormData.role_id} onValueChange={(value) => setEditFormData({ ...editFormData, role_id: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {roles.map((role) => (
+                        <SelectItem key={role.id} value={role.id.toString()}>
+                          {role.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            </Can>
             <div className="flex gap-2 justify-end pt-4">
               <Button variant="outline" onClick={() => setIsEditOpen(false)}>
                 Cancel

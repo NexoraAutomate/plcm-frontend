@@ -39,14 +39,19 @@ export function inventoryUsesInstances(type: HierarchyEntityType): boolean {
 
 export function getInventorySerialNumbers(item: Inventory): string[] {
   if (inventorySupportsQuantity(item.inventory_type as HierarchyEntityType)) {
-    const serial = item.serial_number?.trim();
+    const serial =
+      item.original_serial_number?.trim() || item.serial_number?.trim();
     return serial ? [serial] : [];
   }
   const serials = (item.instances ?? [])
-    .map((instance) => instance.serial_number?.trim())
+    .map(
+      (instance) =>
+        instance.original_serial_number?.trim() || instance.serial_number?.trim()
+    )
     .filter((serial): serial is string => Boolean(serial));
   if (serials.length > 0) return serials;
-  const fallback = item.serial_number?.trim();
+  const fallback =
+    item.original_serial_number?.trim() || item.serial_number?.trim();
   return fallback ? [fallback] : [];
 }
 
@@ -60,13 +65,18 @@ export function serialNumberFromInventory(
   instance?: InventoryInstance | null,
   fallbackInstance = 1
 ): string {
-  if (instance?.serial_number?.trim()) {
-    return instance.serial_number.trim();
+  const fromInstance =
+    instance?.original_serial_number?.trim() || instance?.serial_number?.trim();
+  if (fromInstance) return fromInstance;
+
+  const fromItem =
+    item.original_serial_number?.trim() || item.serial_number?.trim();
+  if (fromItem) {
+    return fallbackInstance > 1 ? `${fromItem}-${fallbackInstance}` : fromItem;
   }
+
   let base: string;
-  if (item.serial_number?.trim()) {
-    base = item.serial_number;
-  } else if (inventoryPartNumber(item)) {
+  if (inventoryPartNumber(item)) {
     base = `${item.name}-${inventoryPartNumber(item)}`;
   } else {
     base = item.name;
@@ -78,8 +88,10 @@ export function nextSerialNumberFromInventory(
   item: Inventory,
   existingChildren: { name: string }[]
 ): string {
-  if (item.serial_number?.trim()) {
-    return item.serial_number.trim();
+  const existing =
+    item.original_serial_number?.trim() || item.serial_number?.trim();
+  if (existing) {
+    return existing;
   }
   const sameNameCount = existingChildren.filter(
     (child) => child.name.toLowerCase() === item.name.toLowerCase()

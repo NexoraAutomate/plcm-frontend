@@ -38,6 +38,8 @@ import {
   SUBSYSTEMS_DASHBOARD_CONFIG,
   SUBSYSTEM_STATUS_NAMES,
 } from '@/lib/hierarchy-dashboard-configs';
+import { Can } from '@/components/auth/can';
+import { P } from '@/lib/permission-codes';
 
 export default function SubsystemsPage() {
   const router = useRouter();
@@ -302,12 +304,14 @@ export default function SubsystemsPage() {
           </SelectContent>
         </Select>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              New Subsystem
-            </Button>
-          </DialogTrigger>
+          <Can permission={P.create_subsystems}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                New Subsystem
+              </Button>
+            </DialogTrigger>
+          </Can>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create Subsystem</DialogTitle>
@@ -438,13 +442,15 @@ export default function SubsystemsPage() {
                                 View
                               </Button>
                             </Link>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={(e) => { e.stopPropagation(); openEdit(subsystem)}}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
+                            <Can permission={P.edit_subsystems}>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => { e.stopPropagation(); openEdit(subsystem)}}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </Can>
                             {/* <ConfirmDialog
                               title="Delete Subsystem"
                               description="Are you sure you want to delete this subsystem?"

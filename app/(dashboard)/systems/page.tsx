@@ -36,6 +36,8 @@ import { useListPageLoader } from '@/hooks/use-list-page-loader';
 import { SystemsListDashboard } from '@/components/systems/systems-list-dashboard';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { ParentEntityLink } from '@/components/entity-link';
+import { Can } from '@/components/auth/can';
+import { P } from '@/lib/permission-codes';
 
 
 
@@ -326,12 +328,14 @@ export default function SystemsPage() {
           </SelectContent>
         </Select>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              New System
-            </Button>
-          </DialogTrigger>
+          <Can permission={P.create_systems}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                New System
+              </Button>
+            </DialogTrigger>
+          </Can>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create System</DialogTitle>
@@ -518,13 +522,15 @@ export default function SystemsPage() {
                                 View
                               </Button>
                             </Link>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={(e) => { e.stopPropagation(); openEdit(system)}}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
+                            <Can permission={P.edit_systems}>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => { e.stopPropagation(); openEdit(system)}}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </Can>
                             {/* <ConfirmDialog
                               title="Delete System"
                               description="Are you sure you want to delete this system?"

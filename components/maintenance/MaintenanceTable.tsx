@@ -15,6 +15,8 @@ import { MaintenanceCaseStatusBadge } from '@/components/maintenance/badges';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth-context';
+import { P } from '@/lib/permission-codes';
 import type { MaintenanceCase, FaultyEntity, MaintenanceAction, MaintenanceDelivery } from '@/lib/models';
 import { FaultyEntityTable } from './FaultyEntityTable';
 import { MaintenanceActionTable } from './MaintenanceActionTable';
@@ -49,6 +51,9 @@ export function MaintenanceTable({
   getMaintenanceActions,
   getMaintenanceDeliveries,
 }: MaintenanceTableProps) {
+  const { can } = useAuth();
+  const canEditCase = can(P.edit_maintenance_cases);
+  const canDeleteCase = can(P.delete_maintenance_cases);
   const [expandedRows, setExpandedRows] = useState<Map<number, ExpandedRow>>(new Map());
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({
     open: false,
@@ -219,7 +224,7 @@ export function MaintenanceTable({
                             <Eye className="h-4 w-4" />
                           </Button>
                         )}
-                        {onEdit && (
+                        {onEdit && canEditCase && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -229,7 +234,7 @@ export function MaintenanceTable({
                             <Edit className="h-4 w-4" />
                           </Button>
                         )}
-                        {onDelete && caseItem.status === 'open' && (
+                        {onDelete && canDeleteCase && caseItem.status === 'open' && (
                           <Button
                             variant="ghost"
                             size="sm"

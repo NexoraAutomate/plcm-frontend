@@ -36,6 +36,9 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import type { Inventory } from '@/lib/models';
+import { useAuth } from '@/lib/auth-context';
+import { P } from '@/lib/permission-codes';
+import { AccessRestricted } from '@/components/auth/access-restricted';
 import {
   getChildInventoryType,
   getInventoryTypeLabel,
@@ -60,6 +63,7 @@ export default function InventoryAddChildrenPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
+  const { can } = useAuth();
   const inventoryId = Number(params.id);
   const instanceIdFromQuery = searchParams.get('instanceId');
   const serialFromQuery = searchParams.get('serial')?.trim() || null;
@@ -324,6 +328,12 @@ export default function InventoryAddChildrenPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (!can([P.create_inventory, P.edit_inventory])) {
+    return (
+      <AccessRestricted message="You do not have permission to configure inventory child entities." />
+    );
   }
 
   if (loading || !inventoryItem || !parentType || !childType) {

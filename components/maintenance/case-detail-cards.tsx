@@ -22,10 +22,12 @@ import {
   getCaseDisplayStatus,
   getCaseStatusMeta,
   getActionTypeMeta,
-  type MaintenanceCaseWorkflowStatus,
+  MaintenanceCaseWorkflowStatus,
 } from '@/lib/maintenance-workflow';
 import type { FaultyEntity, MaintenanceAction, MaintenanceCase } from '@/lib/models';
 import { formatUserRef } from '@/lib/user-display';
+import { useAuth } from '@/lib/auth-context';
+import { P } from '@/lib/permission-codes';
 
 interface CaseDetailCardsProps {
   maintenanceCase: MaintenanceCase;
@@ -61,6 +63,9 @@ export function CaseDetailCards({
   onCaseStatusChange,
   isUpdatingCase = false,
 }: CaseDetailCardsProps) {
+  const { can } = useAuth();
+  const canEditCase = can(P.edit_maintenance_cases);
+  const canCloseCase = can(P.close_maintenance);
   const contexts = useMemo(
     () => buildEntityDisplayContexts(entities, actions),
     [entities, actions]
@@ -70,8 +75,11 @@ export function CaseDetailCards({
     [maintenanceCase, contexts, actions]
   );
   const allowedTransitions = useMemo(
-    () => getAllowedCaseStatusTransitions(displayStatus),
-    [displayStatus]
+    () =>
+      getAllowedCaseStatusTransitions(displayStatus).filter(
+        (status) => status !== MaintenanceCaseWorkflowStatus.CLOSED || canCloseCase
+      ),
+    [displayStatus, canCloseCase]
   );
   const actionsByEntity = useMemo(
     () => groupActionsByEntity(entities, actions),
@@ -93,7 +101,7 @@ export function CaseDetailCards({
         </CardHeader>
         <CardContent className="space-y-4">
           <CaseProgressStepper displayStatus={displayStatus} />
-          {onCaseStatusChange && allowedTransitions.length > 0 ? (
+          {onCaseStatusChange && canEditCase && allowedTransitions.length > 0 ? (
             <Select
               value={displayStatus}
               onValueChange={(value) =>

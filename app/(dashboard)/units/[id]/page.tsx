@@ -12,6 +12,7 @@ import { ArrowLeft, Calendar, Layers } from 'lucide-react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
+import { P } from '@/lib/permission-codes';
 import { EntityForm } from '@/components/entity-form';
 import { EntityInventorySearch } from '@/components/entity-inventory-search';
 import { useState, useEffect } from 'react';
@@ -412,6 +413,9 @@ export default function UnitDetailPage() {
         addButtonLabel="Add Component"
         emptyMessage="No components yet. Click 'Add Component' to create one."
         childEntityType="component"
+        createPermission={P.create_components}
+        editPermission={P.edit_components}
+        deletePermission={P.delete_components}
       />
 
       {/* Inventory Items */}

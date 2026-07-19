@@ -12,6 +12,7 @@ import { ConfirmDialog } from './confirm-dialog';
 import { EntityStatusHistorySheet } from './entity-status-history-sheet';
 import { EntityPicture } from './entity-picture';
 import type { HardwareEntityType } from '@/lib/entity-resolver';
+import { useAuth } from '@/lib/auth-context';
 
 interface EntityCardsProps {
   title: string;
@@ -30,7 +31,7 @@ interface EntityCardsProps {
     replacement_sequence?: number;
   }>;
   statuses?: Status[];
-  onAdd: () => void;
+  onAdd?: () => void;
   onEdit?: (id: number) => void;
   onReplace?: (entity: {
     id: number;
@@ -39,13 +40,19 @@ interface EntityCardsProps {
     serial_number?: string;
     replacement_sequence?: number;
   }) => void;
-  onDelete: (id: number) => void;
+  onDelete?: (id: number) => void;
   detailPath: (id: number) => string;
   secondaryPath?: (id: number) => string;
   secondaryButtonLabel?: string;
   addButtonLabel?: string;
   emptyMessage?: string;
   childEntityType?: HardwareEntityType;
+  /** Permission code(s) required to add entities. Omit to always allow (backward compat). */
+  createPermission?: string | string[];
+  /** Permission code(s) required to edit entities. Omit to always allow (backward compat). */
+  editPermission?: string | string[];
+  /** Permission code(s) required to delete entities. Omit to always allow (backward compat). */
+  deletePermission?: string | string[];
 }
 
 export function EntityCards({
@@ -63,7 +70,14 @@ export function EntityCards({
   emptyMessage = 'No entities found',
   statuses = [],
   childEntityType,
+  createPermission,
+  editPermission,
+  deletePermission,
 }: EntityCardsProps) {
+  const { can } = useAuth();
+  const canCreate = !createPermission || can(createPermission);
+  const canEdit = !editPermission || can(editPermission);
+  const canDelete = !deletePermission || can(deletePermission);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
 
   return (
@@ -74,10 +88,12 @@ export function EntityCards({
           <CardTitle>{title}</CardTitle>
           <CardDescription>{description}</CardDescription>
         </div>
-        <Button onClick={onAdd} className="gap-2">
-          <Plus className="h-4 w-4" />
-          {addButtonLabel}
-        </Button>
+        {onAdd && canCreate ? (
+          <Button onClick={onAdd} className="gap-2">
+            <Plus className="h-4 w-4" />
+            {addButtonLabel}
+          </Button>
+        ) : null}
       </CardHeader>
       <CardContent>
         {entities.length === 0 ? (
@@ -155,7 +171,7 @@ export function EntityCards({
                             <ArrowRight className="h-3 w-3" />
                           </Button>
                         </Link>
-                        {onEdit ? (
+                        {onEdit && canEdit ? (
                           <Button
                             variant="outline"
                             size="sm"
@@ -177,15 +193,17 @@ export function EntityCards({
                             Replace
                           </Button>
                         ) : null}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 gap-1.5 text-destructive hover:text-destructive"
-                          onClick={() => setDeleteTarget({ id: entity.id, name: entity.name })}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                          Delete
-                        </Button>
+                        {onDelete && canDelete ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 gap-1.5 text-destructive hover:text-destructive"
+                            onClick={() => setDeleteTarget({ id: entity.id, name: entity.name })}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            Delete
+                          </Button>
+                        ) : null}
                       </div>
                       {secondaryPath ? (
                         <Link href={secondaryPath(entity.id)} onClick={(e) => e.stopPropagation()}>
@@ -212,7 +230,7 @@ export function EntityCards({
       title={`Delete ${deleteTarget?.name ?? 'entity'}`}
       description="This action cannot be undone."
       onConfirm={() => {
-        if (deleteTarget) {
+        if (deleteTarget && onDelete) {
           onDelete(deleteTarget.id);
           setDeleteTarget(null);
         }

@@ -37,6 +37,8 @@ import {
   COMPONENTS_DASHBOARD_CONFIG,
   COMPONENT_STATUS_NAMES,
 } from '@/lib/hierarchy-dashboard-configs';
+import { Can } from '@/components/auth/can';
+import { P } from '@/lib/permission-codes';
 
 export default function ComponentsPage() {
   const router = useRouter();
@@ -291,12 +293,14 @@ export default function ComponentsPage() {
           </SelectContent>
         </Select>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              New Component
-            </Button>
-          </DialogTrigger>
+          <Can permission={P.create_components}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                New Component
+              </Button>
+            </DialogTrigger>
+          </Can>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create Component</DialogTitle>
@@ -427,13 +431,15 @@ export default function ComponentsPage() {
                                 View
                               </Button>
                             </Link>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={(e) => { e.stopPropagation(); openEdit(component)}}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
+                            <Can permission={P.edit_components}>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => { e.stopPropagation(); openEdit(component)}}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </Can>
                             {/* <ConfirmDialog
                               title="Delete Component"
                               description="Are you sure you want to delete this component?"

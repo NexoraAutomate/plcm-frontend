@@ -28,6 +28,8 @@ import { cn } from '@/lib/utils';
 import { searchProjectSerialNumbers } from '@/lib/serial-numbers';
 import { EntityLookupTree } from './EntityLookupTree';
 import type { EntityLookupNode, lookUpResponse } from '@/lib/models';
+import { useAuth } from '@/lib/auth-context';
+import { P } from '@/lib/permission-codes';
 
 interface MaintenanceLookupDialogProps {
   isOpen: boolean;
@@ -189,6 +191,10 @@ export function MaintenanceLookupDialog({
   onSuspectChildren,
   onConfirmFault,
 }: MaintenanceLookupDialogProps) {
+  const { can } = useAuth();
+  const canSuspectChildren = can(P.suspect_children);
+  const canCreateCase = can(P.create_maintenance_cases);
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent
@@ -217,13 +223,13 @@ export function MaintenanceLookupDialog({
                 Lookup
               </Button>
 
-              {lookupResponse && !caseId ? (
+              {lookupResponse && !caseId && canCreateCase ? (
                 <Button onClick={onCreateCase} variant="secondary" className="w-full">
                   Create Maintenance Case
                 </Button>
               ) : null}
 
-              {lookupResponse && caseId ? (
+              {lookupResponse && caseId && canSuspectChildren ? (
                 <Button onClick={onSuspectChildren} variant="secondary" className="w-full">
                   Suspect Children
                 </Button>
