@@ -120,6 +120,7 @@ export function useHierarchyEntityActions({
     deleteComponent,
     refreshData,
     ensureHierarchyLoaded,
+    runSilentEntityBatch,
   } = useDataStore();
 
   const effectiveSystems = useMemo(() => {
@@ -133,12 +134,12 @@ export function useHierarchyEntityActions({
   const createEntityByType = useMemo(
     () =>
       buildCreateEntityByType({
-        createSystem: async (data) => ({ id: (await createSystem(data as any)).id }),
-        createSubsystem: async (data) => ({ id: (await createSubsystem(data as any)).id }),
-        createModule: async (data) => ({ id: (await createModule(data as any)).id }),
-        createUnit: async (data) => ({ id: (await createUnit(data as any)).id }),
-        createComponent: async (data) => ({ id: (await createComponent(data as any)).id }),
-      }),
+        createSystem,
+        createSubsystem,
+        createModule,
+        createUnit,
+        createComponent,
+      }, { silent: true }),
     [createSystem, createSubsystem, createModule, createUnit, createComponent]
   );
 
@@ -317,19 +318,21 @@ export function useHierarchyEntityActions({
         ? { ...formData, inventory_instance_id: String(instanceId) }
         : formData;
 
-    const created = await createHierarchyEntityFromForm({
-      entityType,
-      parentId,
-      formData: formWithInstance,
-      inventoryItems,
-      createEntity: (data) => createEntityByType(entityType, data),
-      createEntityByType,
-      extraPayload:
-        entityType === 'system'
-          ? parseHierarchyInstallPayload(formWithInstance)
-          : entityType === 'component'
-            ? { sku: String(formWithInstance.sku || '') }
-            : {},
+    const created = await runSilentEntityBatch(async () => {
+      return createHierarchyEntityFromForm({
+        entityType,
+        parentId,
+        formData: formWithInstance,
+        inventoryItems,
+        createEntity: (data) => createEntityByType(entityType, data),
+        createEntityByType,
+        extraPayload:
+          entityType === 'system'
+            ? parseHierarchyInstallPayload(formWithInstance)
+            : entityType === 'component'
+              ? { sku: String(formWithInstance.sku || '') }
+              : {},
+      });
     });
 
     if (entityType === 'system') {
@@ -338,7 +341,11 @@ export function useHierarchyEntityActions({
 
     if (created.childrenInstalled > 0) {
       toast.success(
-        `Also installed ${created.childrenInstalled} child entit${created.childrenInstalled === 1 ? 'y' : 'ies'} from inventory`
+        `${entityType.charAt(0).toUpperCase() + entityType.slice(1)} added and ${created.childrenInstalled} child entit${created.childrenInstalled === 1 ? 'y' : 'ies'} installed from inventory`
+      );
+    } else {
+      toast.success(
+        `${entityType.charAt(0).toUpperCase() + entityType.slice(1)} added successfully`
       );
     }
 
@@ -455,25 +462,27 @@ export function useHierarchyEntityActions({
     }
 
     setIsSubmitting(true);
+    const currentDialog = dialogState;
     try {
-      if (dialogState.mode === 'edit' && dialogState.entityId) {
+      if (currentDialog.mode === 'edit' && currentDialog.entityId) {
         await handleUpdate(
-          dialogState.entityType,
-          dialogState.entityId,
-          dialogState.parentId,
+          currentDialog.entityType,
+          currentDialog.entityId,
+          currentDialog.parentId,
           formData
         );
+        closeDialog();
       } else {
-        await handleCreate(dialogState.entityType, dialogState.parentId, formData);
+        closeDialog();
+        await handleCreate(currentDialog.entityType, currentDialog.parentId, formData);
       }
-      closeDialog();
     } catch (error) {
       toast.error(
         formatAxiosError(
           error,
-          dialogState.mode === 'edit'
-            ? `Failed to update ${dialogState.entityType}`
-            : `Failed to add ${dialogState.entityType}`
+          currentDialog.mode === 'edit'
+            ? `Failed to update ${currentDialog.entityType}`
+            : `Failed to add ${currentDialog.entityType}`
         )
       );
     } finally {
@@ -484,18 +493,19 @@ export function useHierarchyEntityActions({
   const handleSerialConfirm = async (instanceId: number) => {
     if (!pendingCreate) return;
 
+    const create = pendingCreate;
     setIsSubmitting(true);
+    closeDialog();
     try {
       await handleCreate(
-        pendingCreate.entityType,
-        pendingCreate.parentId,
-        pendingCreate.formData,
+        create.entityType,
+        create.parentId,
+        create.formData,
         instanceId
       );
-      closeDialog();
     } catch (error) {
       toast.error(
-        formatAxiosError(error, `Failed to add ${pendingCreate.entityType}`)
+        formatAxiosError(error, `Failed to add ${create.entityType}`)
       );
     } finally {
       setIsSubmitting(false);

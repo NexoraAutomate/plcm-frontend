@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -46,7 +46,14 @@ export function InventorySerialSelectDialog({
   confirmLabel = 'Use Selected',
   description,
 }: InventorySerialSelectDialogProps) {
-  const instances = item ? getSelectableInstances(item) : [];
+  const instances = useMemo(
+    () => (item ? getSelectableInstances(item) : []),
+    [item]
+  );
+  const instanceSignature = useMemo(
+    () => instances.map((instance) => instance.id).join(','),
+    [instances]
+  );
   const [selectedInstanceId, setSelectedInstanceId] = useState('');
 
   useEffect(() => {
@@ -57,7 +64,9 @@ export function InventorySerialSelectDialog({
     if (instances.length === 1) {
       setSelectedInstanceId(String(instances[0].id));
     }
-  }, [open, instances]);
+    // instanceSignature keeps this stable across parent re-renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, instanceSignature]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

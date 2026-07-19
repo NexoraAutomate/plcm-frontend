@@ -78,35 +78,50 @@ interface DataStoreContextType {
 
   // Systems
   getSystem: (id: number) => Promise<Models.System>;
-  createSystem: (data: Partial<Models.System>) => Promise<Models.System>;
+  createSystem: (
+    data: Partial<Models.System>,
+    options?: { silent?: boolean }
+  ) => Promise<Models.System>;
   updateSystem: (id: number, data: Partial<Models.System>) => Promise<Models.System>;
   deleteSystem: (id: number) => Promise<void>;
   getSystemSubsystems: (systemId: number) => Promise<Models.Subsystem[]>;
 
   // Subsystems
   getSubsystem: (id: number) => Promise<Models.Subsystem>;
-  createSubsystem: (data: Partial<Models.Subsystem>) => Promise<Models.Subsystem>;
+  createSubsystem: (
+    data: Partial<Models.Subsystem>,
+    options?: { silent?: boolean }
+  ) => Promise<Models.Subsystem>;
   updateSubsystem: (id: number, data: Partial<Models.Subsystem>) => Promise<Models.Subsystem>;
   deleteSubsystem: (id: number) => Promise<void>;
   getSubsystemModules: (subsystemId: number) => Promise<Models.Module[]>;
 
   // Modules
   getModule: (id: number) => Promise<Models.Module>;
-  createModule: (data: Partial<Models.Module>) => Promise<Models.Module>;
+  createModule: (
+    data: Partial<Models.Module>,
+    options?: { silent?: boolean }
+  ) => Promise<Models.Module>;
   updateModule: (id: number, data: Partial<Models.Module>) => Promise<Models.Module>;
   deleteModule: (id: number) => Promise<void>;
   getModuleUnits: (moduleId: number) => Promise<Models.Unit[]>;
 
   // Units
   getUnit: (id: number) => Promise<Models.Unit>;
-  createUnit: (data: Partial<Models.Unit>) => Promise<Models.Unit>;
+  createUnit: (
+    data: Partial<Models.Unit>,
+    options?: { silent?: boolean }
+  ) => Promise<Models.Unit>;
   updateUnit: (id: number, data: Partial<Models.Unit>) => Promise<Models.Unit>;
   deleteUnit: (id: number) => Promise<void>;
   getUnitComponents: (unitId: number) => Promise<Models.Component[]>;
 
   // Components
   getComponent: (id: number) => Promise<Models.Component>;
-  createComponent: (data: Partial<Models.Component>) => Promise<Models.Component>;
+  createComponent: (
+    data: Partial<Models.Component>,
+    options?: { silent?: boolean }
+  ) => Promise<Models.Component>;
   updateComponent: (id: number, data: Partial<Models.Component>) => Promise<Models.Component>;
   deleteComponent: (id: number) => Promise<void>;
 
@@ -172,6 +187,8 @@ interface DataStoreContextType {
   refreshData: (options?: { silent?: boolean }) => Promise<void>;
   refreshLightweight: () => Promise<void>;
   ensureHierarchyLoaded: (options?: { force?: boolean }) => Promise<void>;
+  /** Buffer silent entity creates and apply them in one UI update when done. */
+  runSilentEntityBatch: <T,>(fn: () => Promise<T>) => Promise<T>;
 }
 
 const DataStoreContext = createContext<DataStoreContextType | undefined>(undefined);
@@ -206,6 +223,79 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const hierarchyReadyRef = useRef(hierarchyReady);
   statusesRef.current = statuses;
   hierarchyReadyRef.current = hierarchyReady;
+
+  // Batch silent hierarchy creates so the UI does not re-render once per child.
+  const silentEntityBufferRef = useRef<{
+    systems: Models.System[];
+    subsystems: Models.Subsystem[];
+    modules: Models.Module[];
+    units: Models.Unit[];
+    components: Models.Component[];
+  }>({
+    systems: [],
+    subsystems: [],
+    modules: [],
+    units: [],
+    components: [],
+  });
+  const silentBatchDepthRef = useRef(0);
+
+  const flushSilentEntityBuffer = useCallback(() => {
+    const buffer = silentEntityBufferRef.current;
+    const hasPending =
+      buffer.systems.length > 0 ||
+      buffer.subsystems.length > 0 ||
+      buffer.modules.length > 0 ||
+      buffer.units.length > 0 ||
+      buffer.components.length > 0;
+    if (!hasPending) return;
+
+    const snapshot = {
+      systems: buffer.systems,
+      subsystems: buffer.subsystems,
+      modules: buffer.modules,
+      units: buffer.units,
+      components: buffer.components,
+    };
+    silentEntityBufferRef.current = {
+      systems: [],
+      subsystems: [],
+      modules: [],
+      units: [],
+      components: [],
+    };
+
+    if (snapshot.systems.length) {
+      setSystems((prev) => [...prev, ...snapshot.systems]);
+    }
+    if (snapshot.subsystems.length) {
+      setSubsystems((prev) => [...prev, ...snapshot.subsystems]);
+    }
+    if (snapshot.modules.length) {
+      setModules((prev) => [...prev, ...snapshot.modules]);
+    }
+    if (snapshot.units.length) {
+      setUnits((prev) => [...prev, ...snapshot.units]);
+    }
+    if (snapshot.components.length) {
+      setComponents((prev) => [...prev, ...snapshot.components]);
+    }
+  }, []);
+
+  const runSilentEntityBatch = useCallback(
+    async <T,>(fn: () => Promise<T>): Promise<T> => {
+      silentBatchDepthRef.current += 1;
+      try {
+        return await fn();
+      } finally {
+        silentBatchDepthRef.current = Math.max(0, silentBatchDepthRef.current - 1);
+        if (silentBatchDepthRef.current === 0) {
+          flushSilentEntityBuffer();
+        }
+      }
+    },
+    [flushSilentEntityBuffer]
+  );
 
   const applyEntityResults = useCallback(
     (
@@ -659,14 +749,27 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const createSystem = async (data: Partial<Models.System>) => {
+  const createSystem = async (
+    data: Partial<Models.System>,
+    options?: { silent?: boolean }
+  ) => {
     try {
       const res = await api.systems.create(data);
-      setSystems((prev) => [...prev, enrichEntityWithStatus(res.data, statusesRef.current)]);
-      toast.success('System created successfully');
+      const enriched = enrichEntityWithStatus(res.data, statusesRef.current);
+      if (options?.silent) {
+        if (silentBatchDepthRef.current > 0) {
+          silentEntityBufferRef.current.systems.push(enriched);
+        } else {
+          setSystems((prev) => [...prev, enriched]);
+        }
+      } else {
+        flushSilentEntityBuffer();
+        setSystems((prev) => [...prev, enriched]);
+        toast.success('System created successfully');
+      }
       return res.data;
     } catch (err) {
-      toast.error('Failed to create system');
+      if (!options?.silent) toast.error('Failed to create system');
       throw err;
     }
   };
@@ -717,14 +820,27 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const createSubsystem = async (data: Partial<Models.Subsystem>) => {
+  const createSubsystem = async (
+    data: Partial<Models.Subsystem>,
+    options?: { silent?: boolean }
+  ) => {
     try {
       const res = await api.subsystems.create(data);
-      setSubsystems((prev) => [...prev, enrichEntityWithStatus(res.data, statusesRef.current)]);
-      toast.success('Subsystem created successfully');
+      const enriched = enrichEntityWithStatus(res.data, statusesRef.current);
+      if (options?.silent) {
+        if (silentBatchDepthRef.current > 0) {
+          silentEntityBufferRef.current.subsystems.push(enriched);
+        } else {
+          setSubsystems((prev) => [...prev, enriched]);
+        }
+      } else {
+        flushSilentEntityBuffer();
+        setSubsystems((prev) => [...prev, enriched]);
+        toast.success('Subsystem created successfully');
+      }
       return res.data;
     } catch (err) {
-      toast.error('Failed to create subsystem');
+      if (!options?.silent) toast.error('Failed to create subsystem');
       throw err;
     }
   };
@@ -775,14 +891,27 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const createModule = async (data: Partial<Models.Module>) => {
+  const createModule = async (
+    data: Partial<Models.Module>,
+    options?: { silent?: boolean }
+  ) => {
     try {
       const res = await api.modules.create(data);
-      setModules((prev) => [...prev, enrichEntityWithStatus(res.data, statusesRef.current)]);
-      toast.success('Module created successfully');
+      const enriched = enrichEntityWithStatus(res.data, statusesRef.current);
+      if (options?.silent) {
+        if (silentBatchDepthRef.current > 0) {
+          silentEntityBufferRef.current.modules.push(enriched);
+        } else {
+          setModules((prev) => [...prev, enriched]);
+        }
+      } else {
+        flushSilentEntityBuffer();
+        setModules((prev) => [...prev, enriched]);
+        toast.success('Module created successfully');
+      }
       return res.data;
     } catch (err) {
-      toast.error('Failed to create module');
+      if (!options?.silent) toast.error('Failed to create module');
       throw err;
     }
   };
@@ -833,14 +962,27 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const createUnit = async (data: Partial<Models.Unit>) => {
+  const createUnit = async (
+    data: Partial<Models.Unit>,
+    options?: { silent?: boolean }
+  ) => {
     try {
       const res = await api.units.create(data);
-      setUnits((prev) => [...prev, enrichEntityWithStatus(res.data, statusesRef.current)]);
-      toast.success('Unit created successfully');
+      const enriched = enrichEntityWithStatus(res.data, statusesRef.current);
+      if (options?.silent) {
+        if (silentBatchDepthRef.current > 0) {
+          silentEntityBufferRef.current.units.push(enriched);
+        } else {
+          setUnits((prev) => [...prev, enriched]);
+        }
+      } else {
+        flushSilentEntityBuffer();
+        setUnits((prev) => [...prev, enriched]);
+        toast.success('Unit created successfully');
+      }
       return res.data;
     } catch (err) {
-      toast.error('Failed to create unit');
+      if (!options?.silent) toast.error('Failed to create unit');
       throw err;
     }
   };
@@ -891,14 +1033,27 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const createComponent = async (data: Partial<Models.Component>) => {
+  const createComponent = async (
+    data: Partial<Models.Component>,
+    options?: { silent?: boolean }
+  ) => {
     try {
       const res = await api.components.create(data);
-      setComponents((prev) => [...prev, enrichEntityWithStatus(res.data, statusesRef.current)]);
-      toast.success('Component created successfully');
+      const enriched = enrichEntityWithStatus(res.data, statusesRef.current);
+      if (options?.silent) {
+        if (silentBatchDepthRef.current > 0) {
+          silentEntityBufferRef.current.components.push(enriched);
+        } else {
+          setComponents((prev) => [...prev, enriched]);
+        }
+      } else {
+        flushSilentEntityBuffer();
+        setComponents((prev) => [...prev, enriched]);
+        toast.success('Component created successfully');
+      }
       return res.data;
     } catch (err) {
-      toast.error('Failed to create component');
+      if (!options?.silent) toast.error('Failed to create component');
       throw err;
     }
   };
@@ -1482,6 +1637,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     refreshData,
     refreshLightweight,
     ensureHierarchyLoaded,
+    runSilentEntityBatch,
     }),
     [
       users,
@@ -1509,6 +1665,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       refreshData,
       refreshLightweight,
       ensureHierarchyLoaded,
+      runSilentEntityBatch,
     ]
   );
 

@@ -357,25 +357,43 @@ export type CreateEntityByTypeFn = (
   data: Record<string, unknown>
 ) => Promise<{ id: number }>;
 
-export function buildCreateEntityByType(handlers: {
-  createSystem: (data: Record<string, unknown>) => Promise<{ id: number }>;
-  createSubsystem: (data: Record<string, unknown>) => Promise<{ id: number }>;
-  createModule: (data: Record<string, unknown>) => Promise<{ id: number }>;
-  createUnit: (data: Record<string, unknown>) => Promise<{ id: number }>;
-  createComponent: (data: Record<string, unknown>) => Promise<{ id: number }>;
-}): CreateEntityByTypeFn {
+type StoreCreateFn = (
+  data: any,
+  options?: { silent?: boolean }
+) => Promise<{ id: number }>;
+
+export function buildCreateEntityByType(
+  handlers: {
+    createSystem: StoreCreateFn | ((data: Record<string, unknown>) => Promise<{ id: number }>);
+    createSubsystem: StoreCreateFn | ((data: Record<string, unknown>) => Promise<{ id: number }>);
+    createModule: StoreCreateFn | ((data: Record<string, unknown>) => Promise<{ id: number }>);
+    createUnit: StoreCreateFn | ((data: Record<string, unknown>) => Promise<{ id: number }>);
+    createComponent: StoreCreateFn | ((data: Record<string, unknown>) => Promise<{ id: number }>);
+  },
+  options?: { silent?: boolean }
+): CreateEntityByTypeFn {
+  const silent = options?.silent ?? false;
+  const wrap =
+    (fn: StoreCreateFn | ((data: Record<string, unknown>) => Promise<{ id: number }>)) =>
+    async (data: Record<string, unknown>) => {
+      const result = silent
+        ? await (fn as StoreCreateFn)(data, { silent: true })
+        : await fn(data);
+      return { id: result.id };
+    };
+
   return (entityType, data) => {
     switch (entityType) {
       case 'system':
-        return handlers.createSystem(data);
+        return wrap(handlers.createSystem)(data);
       case 'subsystem':
-        return handlers.createSubsystem(data);
+        return wrap(handlers.createSubsystem)(data);
       case 'module':
-        return handlers.createModule(data);
+        return wrap(handlers.createModule)(data);
       case 'unit':
-        return handlers.createUnit(data);
+        return wrap(handlers.createUnit)(data);
       case 'component':
-        return handlers.createComponent(data);
+        return wrap(handlers.createComponent)(data);
       default:
         throw new Error(`Unsupported entity type: ${entityType}`);
     }

@@ -60,6 +60,7 @@ export default function UnitDetailPage() {
     deleteComponent,
     updateComponent,
     updateUnit,
+    runSilentEntityBatch,
   } = useDataStore();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -181,25 +182,27 @@ export default function UnitDetailPage() {
       return;
     }
     setIsSubmitting(true);
+    setIsAddOpen(false);
     try {
-      const createEntityByType = buildCreateEntityByType({
-        createSystem: async (data) => ({ id: (await createSystem(data as any)).id }),
-        createSubsystem: async (data) => ({ id: (await createSubsystem(data as any)).id }),
-        createModule: async (data) => ({ id: (await createModule(data as any)).id }),
-        createUnit: async (data) => ({ id: (await createUnit(data as any)).id }),
-        createComponent: async (data) => ({ id: (await createComponent(data as any)).id }),
-      });
+      const created = await runSilentEntityBatch(async () => {
+        const createEntityByType = buildCreateEntityByType({
+          createSystem,
+          createSubsystem,
+          createModule,
+          createUnit,
+          createComponent,
+        }, { silent: true });
 
-      const created = await createHierarchyEntityFromForm({
-        entityType: 'component',
-        parentId: unit.id,
-        formData,
-        inventoryItems,
-        createEntity: (data) => createEntityByType('component', data),
-        createEntityByType,
-        extraPayload: { sku: String(formData.sku || '') },
+        return createHierarchyEntityFromForm({
+          entityType: 'component',
+          parentId: unit.id,
+          formData,
+          inventoryItems,
+          createEntity: (data) => createEntityByType('component', data),
+          createEntityByType,
+          extraPayload: { sku: String(formData.sku || '') },
+        });
       });
-      setIsAddOpen(false);
       toast.success(
         created.childrenInstalled > 0
           ? `Component added and ${created.childrenInstalled} child entit${created.childrenInstalled === 1 ? 'y' : 'ies'} installed from inventory`
@@ -267,30 +270,32 @@ export default function UnitDetailPage() {
       throw new Error('No component status available');
     }
 
-    const createEntityByType = buildCreateEntityByType({
-      createSystem: async (data) => ({ id: (await createSystem(data as any)).id }),
-      createSubsystem: async (data) => ({ id: (await createSubsystem(data as any)).id }),
-      createModule: async (data) => ({ id: (await createModule(data as any)).id }),
-      createUnit: async (data) => ({ id: (await createUnit(data as any)).id }),
-      createComponent: async (data) => ({ id: (await createComponent(data as any)).id }),
+    const result = await runSilentEntityBatch(async () => {
+      const createEntityByType = buildCreateEntityByType({
+        createSystem,
+        createSubsystem,
+        createModule,
+        createUnit,
+        createComponent,
+      }, { silent: true });
+
+      return installEntityFromInventoryWithChildren({
+        inventoryItem: item,
+        instanceId,
+        parentEntityId: unit.id,
+        entityType: 'component',
+        existingChildren: unitComponents,
+        defaultStatus,
+        createEntity: (data) => createEntityByType('component', data),
+        createEntityByType,
+      });
     });
 
-    const result = await installEntityFromInventoryWithChildren({
-      inventoryItem: item,
-      instanceId,
-      parentEntityId: unit.id,
-      entityType: 'component',
-      existingChildren: unitComponents,
-      defaultStatus,
-      createEntity: (data) => createEntityByType('component', data),
-      createEntityByType,
-    });
-
-    if (result.childrenInstalled > 0) {
-      toast.success(
-        `Installed ${item.name} and ${result.childrenInstalled} child entit${result.childrenInstalled === 1 ? 'y' : 'ies'} from inventory`
-      );
-    }
+    toast.success(
+      result.childrenInstalled > 0
+        ? `Installed ${item.name} and ${result.childrenInstalled} child entit${result.childrenInstalled === 1 ? 'y' : 'ies'} from inventory`
+        : `Installed ${item.name} from inventory`
+    );
 
     return result.updatedInventory;
   }

@@ -59,6 +59,7 @@ export default function ModuleDetailPage() {
     deleteUnit,
     updateUnit,
     updateModule,
+    runSilentEntityBatch,
   } = useDataStore();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -180,24 +181,26 @@ export default function ModuleDetailPage() {
       return;
     }
     setIsSubmitting(true);
+    setIsAddOpen(false);
     try {
-      const createEntityByType = buildCreateEntityByType({
-        createSystem: async (data) => ({ id: (await createSystem(data as any)).id }),
-        createSubsystem: async (data) => ({ id: (await createSubsystem(data as any)).id }),
-        createModule: async (data) => ({ id: (await createModule(data as any)).id }),
-        createUnit: async (data) => ({ id: (await createUnit(data as any)).id }),
-        createComponent: async (data) => ({ id: (await createComponent(data as any)).id }),
-      });
+      const created = await runSilentEntityBatch(async () => {
+        const createEntityByType = buildCreateEntityByType({
+          createSystem,
+          createSubsystem,
+          createModule,
+          createUnit,
+          createComponent,
+        }, { silent: true });
 
-      const created = await createHierarchyEntityFromForm({
-        entityType: 'unit',
-        parentId: module.id,
-        formData,
-        inventoryItems,
-        createEntity: (data) => createEntityByType('unit', data),
-        createEntityByType,
+        return createHierarchyEntityFromForm({
+          entityType: 'unit',
+          parentId: module.id,
+          formData,
+          inventoryItems,
+          createEntity: (data) => createEntityByType('unit', data),
+          createEntityByType,
+        });
       });
-      setIsAddOpen(false);
       toast.success(
         created.childrenInstalled > 0
           ? `Unit added and ${created.childrenInstalled} child entit${created.childrenInstalled === 1 ? 'y' : 'ies'} installed from inventory`
@@ -266,30 +269,32 @@ export default function ModuleDetailPage() {
       throw new Error('No unit status available');
     }
 
-    const createEntityByType = buildCreateEntityByType({
-      createSystem: async (data) => ({ id: (await createSystem(data as any)).id }),
-      createSubsystem: async (data) => ({ id: (await createSubsystem(data as any)).id }),
-      createModule: async (data) => ({ id: (await createModule(data as any)).id }),
-      createUnit: async (data) => ({ id: (await createUnit(data as any)).id }),
-      createComponent: async (data) => ({ id: (await createComponent(data as any)).id }),
+    const result = await runSilentEntityBatch(async () => {
+      const createEntityByType = buildCreateEntityByType({
+        createSystem,
+        createSubsystem,
+        createModule,
+        createUnit,
+        createComponent,
+      }, { silent: true });
+
+      return installEntityFromInventoryWithChildren({
+        inventoryItem: item,
+        instanceId,
+        parentEntityId: module.id,
+        entityType: 'unit',
+        existingChildren: moduleUnits,
+        defaultStatus,
+        createEntity: (data) => createEntityByType('unit', data),
+        createEntityByType,
+      });
     });
 
-    const result = await installEntityFromInventoryWithChildren({
-      inventoryItem: item,
-      instanceId,
-      parentEntityId: module.id,
-      entityType: 'unit',
-      existingChildren: moduleUnits,
-      defaultStatus,
-      createEntity: (data) => createEntityByType('unit', data),
-      createEntityByType,
-    });
-
-    if (result.childrenInstalled > 0) {
-      toast.success(
-        `Installed ${item.name} and ${result.childrenInstalled} child entit${result.childrenInstalled === 1 ? 'y' : 'ies'} from inventory`
-      );
-    }
+    toast.success(
+      result.childrenInstalled > 0
+        ? `Installed ${item.name} and ${result.childrenInstalled} child entit${result.childrenInstalled === 1 ? 'y' : 'ies'} from inventory`
+        : `Installed ${item.name} from inventory`
+    );
 
     return result.updatedInventory;
   }

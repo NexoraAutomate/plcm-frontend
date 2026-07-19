@@ -142,13 +142,15 @@ export function EntityInventorySearch({
       return;
     }
 
+    // Close serial dialog before the recursive install so it does not flicker
+    // while each child entity is created.
+    setSerialDialogItem(null);
     setUsingItemId(item.id);
     try {
       const updatedInventory = await onUseInventory(item, instanceId);
       if (updatedInventory) {
         updateInventoryRow(item.id, updatedInventory);
       }
-      setSerialDialogItem(null);
     } catch (err) {
       console.error('Failed to use inventory item:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to use inventory item');
