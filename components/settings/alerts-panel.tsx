@@ -1,7 +1,6 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { SettingsCard } from '@/components/settings/settings-card';
 import { SettingsSection } from '@/components/settings/settings-section';
 import { SettingsToggleGroup } from '@/components/settings/settings-toggle-group';
@@ -161,44 +160,6 @@ export function AlertsPanel({ embedded = false }: AlertsPanelProps) {
         </SettingsCard>
       </SettingsSection>
 
-      <SettingsSection
-        title="Future Notification Channels"
-        description="Placeholders for channels that will be wired when providers are available."
-      >
-        <SettingsCard>
-          <div className="mb-4 flex flex-wrap gap-2">
-            <Badge variant="secondary">Coming soon</Badge>
-          </div>
-          <SettingsToggleGroup
-            items={[
-              {
-                id: 'channel-whatsapp',
-                label: 'WhatsApp',
-                description: 'Send critical alerts via WhatsApp Business API',
-                checked: settings.channels.whatsapp,
-                disabled: true,
-                onCheckedChange: (checked) =>
-                  setSettings({
-                    ...settings,
-                    channels: { ...settings.channels, whatsapp: checked },
-                  }),
-              },
-              {
-                id: 'channel-push',
-                label: 'Push Notifications',
-                description: 'Mobile and web push delivery',
-                checked: settings.channels.push,
-                disabled: true,
-                onCheckedChange: (checked) =>
-                  setSettings({
-                    ...settings,
-                    channels: { ...settings.channels, push: checked },
-                  }),
-              },
-            ]}
-          />
-        </SettingsCard>
-      </SettingsSection>
     </div>
   );
 }
