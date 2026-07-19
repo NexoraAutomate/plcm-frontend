@@ -10,12 +10,8 @@ export interface ReportTimelineProps {
 
 function formatWhen(iso?: string | null) {
   if (!iso) return '—';
-  try {
-    const d = new Date(iso);
-    return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-  } catch {
-    return iso;
-  }
+  const match = String(iso).trim().match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : iso;
 }
 
 export function ReportTimeline({ events, className }: ReportTimelineProps) {

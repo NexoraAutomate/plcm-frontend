@@ -19,6 +19,7 @@ import { qrDataUrl } from '@/components/reporting/ReportQRCode';
 import {
   displayValue,
   formatReportDate,
+  formatReportNumber,
   formatReportTime,
   newReportUuid,
   registerGeneratedReport,
@@ -127,7 +128,7 @@ export default function ExecutiveReportsPage() {
       exportTabularPdf({
         title: 'Executive Report',
         subtitle: 'Senior management summary',
-        reportNumber: registered.report_uuid,
+        reportNumber: formatReportNumber(registered.report_uuid),
         generatedBy: user?.full_name || user?.username || 'User',
         generatedDate: formatReportDate(now),
         generatedTime: formatReportTime(now),
@@ -220,7 +221,7 @@ export default function ExecutiveReportsPage() {
             header={{ title: 'Executive Report', subtitle: 'Management Summary' }}
             metadata={{
               reportTitle: 'Executive Reports',
-              reportNumber: reportUuid || '—',
+              reportNumber: formatReportNumber(reportUuid),
               generatedBy: user?.full_name || user?.username || 'User',
               generatedDate: formatReportDate(generatedAt),
               generatedTime: formatReportTime(generatedAt),

@@ -22,6 +22,7 @@ import {
   displayValue,
   downloadBlob,
   formatReportDate,
+  formatReportNumber,
   formatReportTime,
   newReportUuid,
   registerGeneratedReport,
@@ -114,7 +115,7 @@ export default function BuildHistoryReportPage() {
           data={data}
           meta={{
             reportTitle: 'Build History Dossier',
-            reportNumber: registered.report_uuid,
+            reportNumber: formatReportNumber(registered.report_uuid),
             generatedBy: user?.full_name || user?.username || 'User',
             generatedDate: formatReportDate(now),
             generatedTime: formatReportTime(now),
@@ -170,7 +171,7 @@ export default function BuildHistoryReportPage() {
           }}
           metadata={{
             reportTitle: 'Build History Dossier',
-            reportNumber: reportUuid || '—',
+            reportNumber: formatReportNumber(reportUuid),
             generatedBy: user?.full_name || user?.username || 'User',
             generatedDate: formatReportDate(generatedAt),
             generatedTime: formatReportTime(generatedAt),

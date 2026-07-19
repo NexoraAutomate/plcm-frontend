@@ -5,17 +5,38 @@ import {
   type ReportType,
 } from '@/lib/api/reports';
 
+const ISO_DATE_PREFIX = /^(\d{4}-\d{2}-\d{2})(?:[T\s].*)?$/;
+
+function toDateOnly(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Format any report field for display; ISO datetimes become YYYY-MM-DD. */
 export function displayValue(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return toDateOnly(value);
+  }
+  if (typeof value === 'string') {
+    const match = value.trim().match(ISO_DATE_PREFIX);
+    if (match) return match[1];
+  }
   return String(value);
 }
 
+/** Short professional report number; full UUID stays for verification QR. */
+export function formatReportNumber(reportUuid?: string | null): string {
+  if (!reportUuid) return '—';
+  const compact = reportUuid.replace(/-/g, '').slice(0, 8).toUpperCase();
+  return compact ? `RPT-${compact}` : '—';
+}
+
 export function formatReportDate(d = new Date()) {
-  return d.toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-  });
+  if (Number.isNaN(d.getTime())) return '—';
+  return toDateOnly(d);
 }
 
 export function formatReportTime(d = new Date()) {

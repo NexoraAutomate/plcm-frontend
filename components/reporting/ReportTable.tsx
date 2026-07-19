@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
+import { displayValue } from './report-utils';
 
 export interface ReportTableColumn<T> {
   key: string;
@@ -70,7 +71,7 @@ export function ReportTable<T extends Record<string, unknown>>({
                   >
                     {col.render
                       ? col.render(row)
-                      : String(row[col.key] ?? '—')}
+                      : displayValue(row[col.key])}
                   </td>
                 ))}
               </tr>

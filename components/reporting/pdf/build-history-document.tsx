@@ -1,5 +1,6 @@
 import { Text, View } from '@react-pdf/renderer';
 import type { BuildHistoryDossier, HierarchyEntityNode } from '@/lib/api/reports';
+import { displayValue as display } from '@/components/reporting/report-utils';
 import {
   DossierDocumentShell,
   DossierKeyValue,
@@ -18,11 +19,6 @@ function flattenHierarchy(
     out.push(...flattenHierarchy(n.children || [], depth + 1));
   }
   return out;
-}
-
-function display(v: unknown) {
-  if (v === null || v === undefined || v === '') return '—';
-  return String(v);
 }
 
 export function BuildHistoryDocument({

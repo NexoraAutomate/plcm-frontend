@@ -1,5 +1,6 @@
 import { Text, View } from '@react-pdf/renderer';
 import type { MaintenanceHistoryDossier } from '@/lib/api/reports';
+import { displayValue as display } from '@/components/reporting/report-utils';
 import {
   DossierDocumentShell,
   DossierKeyValue,
@@ -7,11 +8,6 @@ import {
   dossierTableStyles,
   type DossierMeta,
 } from './dossier-document';
-
-function display(v: unknown) {
-  if (v === null || v === undefined || v === '') return '—';
-  return String(v);
-}
 
 export function MaintenanceHistoryDocument({
   data,

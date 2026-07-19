@@ -19,6 +19,7 @@ import { qrDataUrl } from '@/components/reporting/ReportQRCode';
 import {
   displayValue,
   formatReportDate,
+  formatReportNumber,
   formatReportTime,
   newReportUuid,
   registerGeneratedReport,
@@ -101,7 +102,7 @@ export default function MaintenanceReportsPage() {
       exportTabularPdf({
         title: 'Maintenance Reports',
         subtitle: 'Case summary, aging, workload, and trends',
-        reportNumber: registered.report_uuid,
+        reportNumber: formatReportNumber(registered.report_uuid),
         generatedBy: user?.full_name || user?.username || 'User',
         generatedDate: formatReportDate(now),
         generatedTime: formatReportTime(now),
@@ -118,13 +119,13 @@ export default function MaintenanceReportsPage() {
           'Description',
         ],
         rows: (data.cases || []).map((c) => [
-          String(c.case_number ?? '—'),
-          String(c.status ?? '—'),
-          String(c.project_name ?? '—'),
-          String(c.engineer ?? '—'),
-          String(c.reported_at ?? '—'),
-          String(c.age_days ?? '—'),
-          String(c.description ?? '—'),
+          displayValue(c.case_number),
+          displayValue(c.status),
+          displayValue(c.project_name),
+          displayValue(c.engineer),
+          displayValue(c.reported_at),
+          displayValue(c.age_days),
+          displayValue(c.description),
         ]),
         summaryLines: [
           `Open: ${displayValue(data.summary?.open_cases)}`,
@@ -188,7 +189,7 @@ export default function MaintenanceReportsPage() {
           header={{ title: 'Maintenance Reports' }}
           metadata={{
             reportTitle: 'Maintenance Reports',
-            reportNumber: reportUuid || '—',
+            reportNumber: formatReportNumber(reportUuid),
             generatedBy: user?.full_name || user?.username || 'User',
             generatedDate: formatReportDate(generatedAt),
             generatedTime: formatReportTime(generatedAt),
