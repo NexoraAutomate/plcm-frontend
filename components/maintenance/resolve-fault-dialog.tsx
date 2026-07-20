@@ -151,6 +151,17 @@ export function ResolveFaultDialog({
     [stockRows, selectedStockKey]
   );
 
+  const selectedRowMeta = useMemo(() => {
+    if (!selectedRow) return '';
+    return [
+      selectedRow.partNumber ? `PN: ${selectedRow.partNumber}` : null,
+      selectedRow.oemName,
+      selectedRow.name,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  }, [selectedRow]);
+
   const canSubmit =
     Boolean(resolutionType) &&
     (!requiresReplacement || Boolean(selectedRow)) &&
@@ -192,10 +203,10 @@ export function ResolveFaultDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent className="overflow-hidden sm:max-w-lg">
+        <DialogHeader className="min-w-0">
           <DialogTitle>Resolve Fault</DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="wrap-break-word">
             Review the selected entity and choose how to resolve the fault. When replacing,
             choose an in-stock serial whose part number matches this entity (
             {entity?.part_number || 'N/A'}).
@@ -207,20 +218,28 @@ export function ResolveFaultDialog({
             Select a faulty entity before resolving.
           </div>
         ) : (
-          <div className="space-y-4 py-2">
-            <div className="grid gap-3 sm:grid-cols-2">
+          <div className="min-w-0 space-y-4 py-2">
+            <div className="grid min-w-0 gap-3 sm:grid-cols-2">
               {details.map((detail) => (
-                <div key={detail.label} className="rounded-md border border-border bg-background p-3">
+                <div
+                  key={detail.label}
+                  className="min-w-0 rounded-md border border-border bg-background p-3"
+                >
                   <p className="text-xs uppercase text-muted-foreground">{detail.label}</p>
-                  <p className="mt-1 text-sm font-medium text-foreground">{detail.value}</p>
+                  <p
+                    className="mt-1 truncate text-sm font-medium text-foreground"
+                    title={detail.value}
+                  >
+                    {detail.value}
+                  </p>
                 </div>
               ))}
             </div>
 
-            <div className="grid gap-2">
+            <div className="grid min-w-0 gap-2">
               <Label htmlFor="resolution-type">Resolution Type</Label>
               <Select value={resolutionType} onValueChange={(value) => setResolutionType(value as ResolutionType)}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full min-w-0">
                   <SelectValue placeholder="Select resolution type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -234,24 +253,34 @@ export function ResolveFaultDialog({
             </div>
 
             {requiresReplacement ? (
-              <div className="grid gap-2">
+              <div className="grid min-w-0 gap-2">
                 <Label htmlFor="replacement-serial-number">Replacement Serial Number</Label>
                 {inventoryLoading ? (
                   <p className="text-sm text-muted-foreground">Loading inventory...</p>
                 ) : stockRows.length === 0 ? (
-                  <p className="text-sm text-destructive">
+                  <p className="wrap-break-word text-sm text-destructive">
                     {entity.part_number?.trim()
                       ? `No in-stock inventory serials found for part number ${entity.part_number}.`
                       : 'This entity has no part number, so replacement stock cannot be matched.'}
                   </p>
                 ) : (
                   <Select value={selectedStockKey} onValueChange={setSelectedStockKey}>
-                    <SelectTrigger id="replacement-serial-number" className="w-full">
-                      <SelectValue placeholder="Select replacement by serial number" />
+                    <SelectTrigger
+                      id="replacement-serial-number"
+                      className="w-full min-w-0 max-w-full overflow-hidden [&>span]:min-w-0 [&>span]:flex-1 [&>span]:truncate"
+                    >
+                      <SelectValue placeholder="Select replacement by serial number">
+                        <span className="block truncate" title={selectedRow?.serialNumber}>
+                          {selectedRow?.serialNumber}
+                        </span>
+                      </SelectValue>
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent
+                      position="popper"
+                      className="w-(--radix-select-trigger-width) max-w-(--radix-select-trigger-width)"
+                    >
                       {stockRows.map((row) => {
-                        const description = [
+                        const meta = [
                           row.partNumber ? `PN: ${row.partNumber}` : null,
                           row.oemName,
                           row.name,
@@ -260,27 +289,41 @@ export function ResolveFaultDialog({
                           .join(' · ');
 
                         return (
-                          <SelectItem key={stockRowKey(row)} value={stockRowKey(row)}>
-                            <span className="font-medium">{row.serialNumber}</span>
-                            {description ? (
-                              <span className="ml-2 text-xs text-muted-foreground">{description}</span>
-                            ) : null}
+                          <SelectItem
+                            key={stockRowKey(row)}
+                            value={stockRowKey(row)}
+                            textValue={row.serialNumber}
+                            className="items-start py-2"
+                            title={meta ? `${row.serialNumber} — ${meta}` : row.serialNumber}
+                          >
+                            <div className="flex min-w-0 flex-col gap-0.5 overflow-hidden">
+                              <span className="truncate font-medium">{row.serialNumber}</span>
+                              {meta ? (
+                                <span className="truncate text-xs text-muted-foreground">{meta}</span>
+                              ) : null}
+                            </div>
                           </SelectItem>
                         );
                       })}
                     </SelectContent>
                   </Select>
                 )}
+                {selectedRowMeta ? (
+                  <p className="truncate text-xs text-muted-foreground" title={selectedRowMeta}>
+                    {selectedRowMeta}
+                  </p>
+                ) : null}
               </div>
             ) : null}
 
-            <div className="grid gap-2">
+            <div className="grid min-w-0 gap-2">
               <Label htmlFor="resolution-notes">Resolution Notes</Label>
               <Input
                 id="resolution-notes"
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
                 placeholder="Optional notes for the resolution"
+                className="min-w-0"
               />
             </div>
 

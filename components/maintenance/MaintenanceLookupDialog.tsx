@@ -56,7 +56,18 @@ function SerialNumberField({ value, onChange }: SerialNumberFieldProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [options, setOptions] = useState<string[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState(false);
   const requestIdRef = useRef(0);
+
+  const selectSerial = (serialNumber: string) => {
+    const next = serialNumber.trim();
+    if (!next) return;
+    onChange(next);
+    setOpen(false);
+    setSearchQuery('');
+    setOptions([]);
+    setSearchError(false);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -65,20 +76,24 @@ function SerialNumberField({ value, onChange }: SerialNumberFieldProps) {
     if (q.length < 2) {
       setOptions([]);
       setSearching(false);
+      setSearchError(false);
       return;
     }
 
     const requestId = ++requestIdRef.current;
     setSearching(true);
+    setSearchError(false);
     const timeoutId = window.setTimeout(() => {
       void searchProjectSerialNumbers(q, 25)
         .then((results) => {
           if (requestIdRef.current !== requestId) return;
           setOptions(results);
+          setSearchError(false);
         })
         .catch(() => {
           if (requestIdRef.current !== requestId) return;
           setOptions([]);
+          setSearchError(true);
         })
         .finally(() => {
           if (requestIdRef.current !== requestId) return;
@@ -91,6 +106,12 @@ function SerialNumberField({ value, onChange }: SerialNumberFieldProps) {
     };
   }, [open, searchQuery]);
 
+  const trimmedQuery = searchQuery.trim();
+  const showUseTyped =
+    trimmedQuery.length >= 2 &&
+    !searching &&
+    !options.some((option) => option.toLowerCase() === trimmedQuery.toLowerCase());
+
   return (
     <div className="space-y-2">
       <Label htmlFor="serial-number">Serial Number</Label>
@@ -102,6 +123,9 @@ function SerialNumberField({ value, onChange }: SerialNumberFieldProps) {
             setSearchQuery('');
             setOptions([]);
             setSearching(false);
+            setSearchError(false);
+          } else if (value) {
+            setSearchQuery(value);
           }
         }}
       >
@@ -123,9 +147,17 @@ function SerialNumberField({ value, onChange }: SerialNumberFieldProps) {
           side="bottom"
           className="w-(--radix-popover-trigger-width) p-0"
         >
-          <Command shouldFilter={false}>
+          <Command
+            shouldFilter={false}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && trimmedQuery.length >= 2) {
+                event.preventDefault();
+                selectSerial(trimmedQuery);
+              }
+            }}
+          >
             <CommandInput
-              placeholder="Type at least 2 characters..."
+              placeholder="Paste or type serial number..."
               value={searchQuery}
               onValueChange={setSearchQuery}
             />
@@ -135,24 +167,40 @@ function SerialNumberField({ value, onChange }: SerialNumberFieldProps) {
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Searching…
                 </div>
-              ) : searchQuery.trim().length < 2 ? (
+              ) : trimmedQuery.length < 2 ? (
                 <div className="px-3 py-4 text-sm text-muted-foreground">
-                  Type at least 2 characters to search project-installed serials.
+                  Type or paste at least 2 characters to search project-installed serials.
                 </div>
               ) : (
                 <>
-                  <CommandEmpty>No matching project-installed serial.</CommandEmpty>
+                  {searchError ? (
+                    <div className="px-3 py-2 text-sm text-destructive">
+                      Serial search failed. You can still press Enter to use the typed value.
+                    </div>
+                  ) : null}
+                  {!searchError && options.length === 0 && !showUseTyped ? (
+                    <CommandEmpty>No matching project-installed serial.</CommandEmpty>
+                  ) : null}
                   <CommandGroup className="max-h-72 overflow-auto">
+                    {showUseTyped ? (
+                      <CommandItem
+                        value={`use-typed:${trimmedQuery}`}
+                        onSelect={() => selectSerial(trimmedQuery)}
+                      >
+                        <Check
+                          className={cn(
+                            'mr-2 h-4 w-4',
+                            value === trimmedQuery ? 'opacity-100' : 'opacity-0'
+                          )}
+                        />
+                        Use “{trimmedQuery}”
+                      </CommandItem>
+                    ) : null}
                     {options.map((serialNumber) => (
                       <CommandItem
                         key={serialNumber}
                         value={serialNumber}
-                        onSelect={() => {
-                          onChange(serialNumber);
-                          setOpen(false);
-                          setSearchQuery('');
-                          setOptions([]);
-                        }}
+                        onSelect={() => selectSerial(serialNumber)}
                       >
                         <Check
                           className={cn(
@@ -171,7 +219,7 @@ function SerialNumberField({ value, onChange }: SerialNumberFieldProps) {
         </PopoverContent>
       </Popover>
       <p className="text-xs text-muted-foreground">
-        Searches only serials installed under a project (not inventory stock).
+        Searches only serials installed under a project (not inventory stock). Paste a full SN and press Enter if needed.
       </p>
     </div>
   );
