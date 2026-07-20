@@ -130,7 +130,7 @@ export function SettingsPage() {
         }}
         className="gap-4"
       >
-        <div className="sticky top-0 z-10 -mx-1 border-b border-border bg-background/95 px-1 pb-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="sticky top-0 z-10 -mx-1 border-b border-border bg-background/95 px-1 pb-3 backdrop-blur supports-backdrop-filter:bg-background/80">
           <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 bg-transparent p-0">
             {visibleTabs.map((tab) => (
               <TabsTrigger
