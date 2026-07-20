@@ -120,6 +120,12 @@ const reportingGroup: NavGroup = {
       permission: NAV_PERMISSIONS["/reporting/maintenance-history"] as PermissionCode,
     },
     {
+      label: "Hierarchy Reports",
+      href: "/reporting/hierarchy",
+      icon: GitBranch,
+      permission: NAV_PERMISSIONS["/reporting/hierarchy"] as PermissionCode,
+    },
+    {
       label: "Inventory Reports",
       href: "/reporting/inventory",
       icon: Package,

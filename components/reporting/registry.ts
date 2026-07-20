@@ -13,6 +13,7 @@ export interface ReportDefinition {
   reportType:
     | 'build_history_dossier'
     | 'maintenance_history_dossier'
+    | 'hierarchy'
     | 'inventory'
     | 'maintenance'
     | 'executive';
@@ -36,6 +37,15 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
     permission: P.generate_maintenance_dossier,
     exporter: 'react-pdf',
     reportType: 'maintenance_history_dossier',
+  },
+  {
+    id: 'hierarchy',
+    title: 'Hierarchy Reports',
+    description: 'BHD and MMHD project hierarchy reports with nested entity headings.',
+    href: '/reporting/hierarchy',
+    permission: P.view_reports,
+    exporter: 'jspdf',
+    reportType: 'hierarchy',
   },
   {
     id: 'inventory',

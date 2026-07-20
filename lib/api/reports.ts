@@ -3,9 +3,12 @@ import api, { buildQueryParams } from '@/lib/api';
 export type ReportType =
   | 'build_history_dossier'
   | 'maintenance_history_dossier'
+  | 'hierarchy'
   | 'inventory'
   | 'maintenance'
   | 'executive';
+
+export type HierarchyReportMode = 'bhd' | 'mmhd';
 
 export interface ReportRegisterRequest {
   report_type: ReportType;
@@ -53,7 +56,10 @@ export interface HierarchyEntityNode {
   name: string;
   part_number?: string | null;
   serial_number?: string | null;
+  original_part_number?: string | null;
+  original_serial_number?: string | null;
   installation_date?: string | null;
+  installed_by?: string | null;
   configuration_item?: string | null;
   current_status?: string | null;
   previous_status?: string | null;
@@ -61,7 +67,19 @@ export interface HierarchyEntityNode {
   modified_date?: string | null;
   description?: string | null;
   picture_url?: string | null;
+  sku?: string | null;
+  is_current_install?: boolean | null;
+  replacement_sequence?: number | null;
+  replaced_at?: string | null;
+  was_replaced?: boolean | null;
   children: HierarchyEntityNode[];
+}
+
+export interface HierarchyReportResponse {
+  mode: HierarchyReportMode | string;
+  project: Record<string, unknown>;
+  hierarchy: HierarchyEntityNode[];
+  summary: Record<string, unknown>;
 }
 
 export interface TimelineEvent {
@@ -222,6 +240,11 @@ export const reportsApi = {
 
   buildHistory: (projectId: number) =>
     api.get<BuildHistoryDossier>(`/reports/build-history/${projectId}`),
+
+  hierarchy: (projectId: number, mode: HierarchyReportMode | string = 'bhd') =>
+    api.get<HierarchyReportResponse>(`/reports/hierarchy/${projectId}`, {
+      params: buildQueryParams({ mode }),
+    }),
 
   maintenanceHistory: (caseId: number) =>
     api.get<MaintenanceHistoryDossier>(`/reports/maintenance-history/${caseId}`),

@@ -203,6 +203,7 @@ export const NAV_PERMISSIONS: Record<string, PermissionCode | PermissionCode[]> 
   '/reporting': P.view_reports,
   '/reporting/build-history': P.generate_build_dossier,
   '/reporting/maintenance-history': P.generate_maintenance_dossier,
+  '/reporting/hierarchy': P.view_reports,
   '/reporting/inventory': P.view_reports,
   '/reporting/maintenance': P.view_reports,
   '/reporting/executive': P.view_executive_dashboard,
