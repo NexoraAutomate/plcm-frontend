@@ -130,7 +130,11 @@ export function Navbar() {
           </PopoverContent>
         </Popover>
 
-        <div className="flex items-center gap-3 border-l border-border pl-4">
+        <Link
+          href="/profile"
+          className="flex items-center gap-3 rounded-lg border-l border-border pl-4 outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
+          title="View profile"
+        >
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">
             {user?.full_name?.split(" ").map(n => n[0]).join("") || "U"}
           </div>
@@ -146,7 +150,7 @@ export function Navbar() {
                 : "Viewer"}
             </Badge>
           </div>
-        </div>
+        </Link>
       </div>
     </header>
   );
