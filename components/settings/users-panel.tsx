@@ -94,7 +94,8 @@ function SummaryCard({
 
 export function UsersPanel({ embedded = false }: UsersPanelProps) {
   const { hasAccess } = useAuth();
-  const adminOnly = hasAccess(['Admin']);
+  const isAdmin = hasAccess(['Admin']);
+  const adminOnly = hasAccess(['Admin', 'SubAdmin']);
   const { sort, cycleSort, listFilterPatch } = useTableSorting();
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [search, setSearch] = useState('');
@@ -123,6 +124,20 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [roles, setRoles] = useState<Models.Role[]>([]);
   const [loadingRoles, setLoadingRoles] = useState(true);
+
+  const assignableRoles = useMemo(
+    () =>
+      roles.filter((role) => {
+        const name = role.name.toLowerCase();
+        // Admin is bootstrap-only and never assignable via UI
+        if (name === 'admin') return false;
+        // Only Admin may create or assign SubAdmin
+        if (name === 'subadmin' && !isAdmin) return false;
+        return true;
+      }),
+    [roles, isAdmin]
+  );
+
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -228,9 +243,20 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
         userData.password = editFormData.password;
       }
       await api.users.update(editingId, userData);
+
+      // Only assign when the role actually changed. Re-sending the Admin role
+      // (e.g. password-only edits) is blocked by the API as bootstrap-only.
       if (editFormData.role_id) {
-        await api.auth.assignRole(editingId, parseInt(editFormData.role_id, 10));
+        const newRoleId = parseInt(editFormData.role_id, 10);
+        const selectedRole = roles.find((r) => r.id === newRoleId);
+        const editingUser = users.find((u) => u.id === editingId);
+        const currentRole = roleName(editingUser?.roles?.[0]);
+        const isAdminRole = selectedRole?.name.toLowerCase() === 'admin';
+        if (selectedRole && !isAdminRole && selectedRole.name !== currentRole) {
+          await api.auth.assignRole(editingId, newRoleId);
+        }
       }
+
       setEditFormData({
         username: '',
         password: '',
@@ -562,6 +588,9 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
                 <Label>Role</Label>
                 {loadingRoles ? (
                   <p className="text-sm text-muted-foreground">Loading roles...</p>
+                ) : roleName(users.find((u) => u.id === editingId)?.roles?.[0]).toLowerCase() ===
+                  'admin' ? (
+                  <Input disabled value="Admin" />
                 ) : (
                   <Select
                     value={editFormData.role_id}
@@ -573,7 +602,7 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
                       <SelectValue placeholder="Select a role" />
                     </SelectTrigger>
                     <SelectContent>
-                      {roles.map((role) => (
+                      {assignableRoles.map((role) => (
                         <SelectItem key={role.id} value={role.id.toString()}>
                           {role.name}
                         </SelectItem>

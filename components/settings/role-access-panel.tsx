@@ -104,6 +104,7 @@ export function RoleAccessPanel({ embedded = false }: RoleAccessPanelProps) {
   }, [selectedRole, selectedIds, baselineIds, roleDescription, baselineDescription]);
 
   const isAdminRole = selectedRole?.name.toLowerCase() === 'admin';
+  const isSubAdminRole = selectedRole?.name.toLowerCase() === 'subadmin';
 
   const loadData = useCallback(async (preferRoleId?: number) => {
     setLoading(true);
@@ -414,6 +415,13 @@ export function RoleAccessPanel({ embedded = false }: RoleAccessPanelProps) {
             <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
               You are editing the Admin role. Changes affect every administrator. Keep full access
               unless you intentionally want to restrict Admin capabilities.
+            </div>
+          ) : null}
+          {isSubAdminRole ? (
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
+              You are editing the SubAdmin role. SubAdmins should not receive role-management,
+              security settings, or backup/restore permissions. Startup sync restores the default
+              SubAdmin permission set.
             </div>
           ) : null}
 

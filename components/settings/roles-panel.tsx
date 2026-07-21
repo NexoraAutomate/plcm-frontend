@@ -342,7 +342,7 @@ export function RolesPanel({ embedded = false }: RolesPanelProps) {
                             size="sm"
                             variant="destructive"
                             onClick={() => setDeleteConfirm({ open: true, role })}
-                            disabled={role.name.toLowerCase() === 'admin'}
+                            disabled={['admin', 'subadmin'].includes(role.name.toLowerCase())}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
