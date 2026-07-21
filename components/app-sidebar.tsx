@@ -64,6 +64,12 @@ const navItems: NavItem[] = [
     permission: NAV_PERMISSIONS["/executive-dashboard"] as PermissionCode,
   },
   {
+    label: "Hierarchy Dashboard",
+    href: "/hierarchy-dashboard",
+    icon: GitBranch,
+    permission: NAV_PERMISSIONS["/hierarchy-dashboard"] as PermissionCode,
+  },
+  {
     label: "Customers",
     href: "/customers",
     icon: Users,
@@ -147,12 +153,6 @@ const reportingGroup: NavGroup = {
 };
 
 const hierarchyItems: NavItem[] = [
-  {
-    label: "Hierarchy Dashboard",
-    href: "/hierarchy-dashboard",
-    icon: GitBranch,
-    permission: NAV_PERMISSIONS["/hierarchy-dashboard"] as PermissionCode,
-  },
   {
     label: "Systems",
     href: "/systems",
@@ -355,79 +355,75 @@ export function AppSidebar() {
                 collapsed={collapsed}
               />
             ))}
-          </div>
 
-          {canSeeReporting && (
-            <div className="mt-6">
-              {!collapsed && (
-                <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/40">
-                  Reporting
-                </p>
-              )}
-              {collapsed && (
-                <div className="mx-auto mb-2 h-px w-8 bg-sidebar-border" />
-              )}
-              <div className="space-y-1">
-                {collapsed ? (
-                  <NavLink
-                    item={{
-                      label: reportingGroup.label,
-                      href: reportingGroup.href,
-                      icon: reportingGroup.icon,
-                    }}
-                    pathname={pathname}
-                    collapsed={collapsed}
-                  />
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setReportingOpen((o) => !o)}
-                      className={cn(
-                        "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                        pathname.startsWith("/reporting")
-                          ? "bg-sidebar-accent text-sidebar-primary"
-                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                      )}
+            {canSeeReporting &&
+              (collapsed ? (
+                <NavLink
+                  item={{
+                    label: reportingGroup.label,
+                    href: reportingGroup.href,
+                    icon: reportingGroup.icon,
+                  }}
+                  pathname={pathname}
+                  collapsed={collapsed}
+                />
+              ) : (
+                <>
+                  <div
+                    className={cn(
+                      "flex w-full items-center rounded-lg text-sm font-medium transition-colors",
+                      pathname.startsWith("/reporting")
+                        ? "bg-sidebar-accent text-sidebar-primary"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                    )}
+                  >
+                    <Link
+                      href={reportingGroup.href}
+                      className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5"
                     >
                       <reportingGroup.icon className="h-4.5 w-4.5 shrink-0" />
-                      <span className="flex-1 truncate text-left">
-                        {reportingGroup.label}
-                      </span>
+                      <span className="truncate">{reportingGroup.label}</span>
+                    </Link>
+                    <button
+                      type="button"
+                      aria-label={reportingOpen ? "Collapse reports" : "Expand reports"}
+                      aria-expanded={reportingOpen}
+                      onClick={() => setReportingOpen((o) => !o)}
+                      className="shrink-0 rounded-md p-2 hover:bg-sidebar-accent/80"
+                    >
                       {reportingOpen ? (
-                        <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
+                        <ChevronDown className="h-4 w-4 opacity-70" />
                       ) : (
-                        <ChevronRight className="h-4 w-4 shrink-0 opacity-70" />
+                        <ChevronRight className="h-4 w-4 opacity-70" />
                       )}
                     </button>
-                    {reportingOpen &&
-                      visibleReportingChildren.map((item) => (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          className={cn(
-                            "ml-3 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                            pathname === item.href ||
-                              pathname.startsWith(item.href + "/")
-                              ? "bg-sidebar-accent text-sidebar-primary"
-                              : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                          )}
-                        >
-                          <item.icon className="h-4 w-4 shrink-0" />
-                          <span className="truncate">{item.label}</span>
-                        </Link>
-                      ))}
-                  </>
-                )}
-              </div>
-            </div>
-          )}
+                  </div>
+                  {reportingOpen &&
+                    visibleReportingChildren.map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                          "ml-3 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                          pathname === item.href ||
+                            pathname.startsWith(item.href + "/")
+                            ? "bg-sidebar-accent text-sidebar-primary"
+                            : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                        )}
+                      >
+                        <item.icon className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{item.label}</span>
+                      </Link>
+                    ))}
+                </>
+              ))}
+          </div>
 
           {visibleHierarchy.length > 0 && (
             <div className="mt-6">
               {!collapsed && (
                 <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/40">
-                  Hierarchy
+                  Project Hierarchy
                 </p>
               )}
               {collapsed && (
