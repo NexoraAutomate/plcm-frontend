@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Satellite, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
@@ -115,8 +116,11 @@ export default function LoginPage() {
                 'Sign In'
               )}
             </Button>
-            <p className="text-center text-xs text-muted-foreground pt-2">
-              Enter your credentials to access the system
+            <p className="text-center text-sm text-muted-foreground pt-2">
+              Don&apos;t have an account?{' '}
+              <Link href="/signup" className="font-medium text-primary hover:underline">
+                Request access
+              </Link>
             </p>
           </form>
         </CardContent>

@@ -70,6 +70,13 @@ export const auth = {
     api.get<Models.Role[]>("/auth/roles", { params: buildQueryParams({ sort_by, sort_order }) }),
   getMe: () => api.get("/auth/me"),
   register: (userData: any) => api.post("/auth/register", userData),
+  signup: (userData: {
+    username: string;
+    password: string;
+    full_name: string;
+    email?: string;
+  }) =>
+    api.post<{ message: string; username: string }>("/auth/signup", userData),
   getRole: (id: number) => api.get<Models.Role>(`/auth/roles/${id}`),
   createRole: (data: { name: string; description?: string; permission_ids?: number[] }) =>
     api.post<Models.Role>("/auth/roles", data),
