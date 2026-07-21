@@ -5,10 +5,6 @@ import {
   Plus,
   Trash2,
   Edit,
-  AlertCircle,
-  CheckCircle2,
-  ShieldAlert,
-  Network,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,6 +25,7 @@ import { P } from "@/lib/permission-codes";
 import { toast } from "sonner";
 import * as api from "@/lib/api";
 import type { Hierarchy } from "@/lib/models";
+import { JsonBatchUploadButton } from "@/components/settings/json-batch-upload-button";
 
 const HIERARCHY_LEVELS = [
   { key: "system", label: "System" },
@@ -176,6 +173,59 @@ export function HierarchyPanel({ embedded = false }: HierarchyPanelProps) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleBatchUpload = async (items: unknown[]) => {
+    const validTypes = new Set(HIERARCHY_LEVELS.map((level) => level.key));
+    const payloads: Array<{
+      name: string;
+      hierarchy_type: string;
+      description?: string | null;
+      parent_id?: number | null;
+    }> = [];
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (!item || typeof item !== "object") {
+        throw new Error(`Item at index ${i} must be an object.`);
+      }
+      const record = item as Record<string, unknown>;
+      const name = typeof record.name === "string" ? record.name.trim() : "";
+      const hierarchyType =
+        typeof record.hierarchy_type === "string" ? record.hierarchy_type.trim() : "";
+
+      if (!name) {
+        throw new Error(`Item at index ${i} is missing a valid name.`);
+      }
+      if (!hierarchyType || !validTypes.has(hierarchyType as HierarchyLevel)) {
+        throw new Error(
+          `Item at index ${i} has an invalid hierarchy_type. Expected one of: ${HIERARCHY_LEVELS.map((l) => l.key).join(", ")}.`
+        );
+      }
+
+      let parentId: number | null | undefined = undefined;
+      if ("parent_id" in record) {
+        if (record.parent_id === null || record.parent_id === undefined) {
+          parentId = null;
+        } else if (typeof record.parent_id === "number" && Number.isFinite(record.parent_id)) {
+          parentId = record.parent_id;
+        } else {
+          throw new Error(`Item at index ${i} has an invalid parent_id.`);
+        }
+      }
+
+      payloads.push({
+        name,
+        hierarchy_type: hierarchyType,
+        description: typeof record.description === "string" ? record.description : record.description === null ? null : undefined,
+        parent_id: parentId,
+      });
+    }
+
+    await api.hierarchies.batchCreate(payloads);
+    const res = await api.hierarchies.list();
+    setHierarchies(res.data);
+    toast.success(`Imported ${payloads.length} hierarchy item${payloads.length === 1 ? "" : "s"}`);
   };
 
   const prepareDelete = (item: Hierarchy) => {
@@ -538,12 +588,24 @@ export function HierarchyPanel({ embedded = false }: HierarchyPanelProps) {
   return (
     <div className="space-y-6">
       {!embedded && (
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Systems Hierarchy</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage the complete system → subsystem → module → unit → component hierarchy.
-          </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Systems Hierarchy</h1>
+            <p className="text-sm text-muted-foreground">
+              Manage the complete system → subsystem → module → unit → component hierarchy.
+            </p>
+          </div>
+          <Can permission={P.create_hierarchy}>
+            <JsonBatchUploadButton onUpload={handleBatchUpload} />
+          </Can>
         </div>
+      )}
+      {embedded && (
+        <Can permission={P.create_hierarchy}>
+          <div className="flex justify-end">
+            <JsonBatchUploadButton onUpload={handleBatchUpload} />
+          </div>
+        </Can>
       )}
 
       <Can permission={P.create_hierarchy}>
@@ -553,6 +615,13 @@ export function HierarchyPanel({ embedded = false }: HierarchyPanelProps) {
             <CardTitle className="text-base font-semibold text-card-foreground">
               Add Hierarchy Item
             </CardTitle>
+            <p className="text-sm text-muted-foreground font-normal">
+              Or upload a JSON array with <code className="text-xs">name</code>,{" "}
+              <code className="text-xs">hierarchy_type</code>, optional{" "}
+              <code className="text-xs">description</code>, and <code className="text-xs">parent_id</code>.
+              IDs are assigned sequentially from the next available id — ensure{" "}
+              <code className="text-xs">parent_id</code> values match those assigned IDs (best on an empty table).
+            </p>
           </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2">

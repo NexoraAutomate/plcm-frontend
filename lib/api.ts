@@ -241,6 +241,9 @@ export const hierarchies = {
     }),
   get: (id: number) => api.get<Models.Hierarchy>(`/hierarchies/${id}/`),
   create: (data: Partial<Models.Hierarchy>) => api.post<Models.Hierarchy>("/hierarchies/", data),
+  batchCreate: (
+    items: Array<Partial<Models.Hierarchy> & { description?: string | null }>
+  ) => api.post<Models.Hierarchy[]>("/hierarchies/batch/", items),
   update: (id: number, data: Partial<Models.Hierarchy>) => api.put<Models.Hierarchy>(`/hierarchies/${id}/`, data),
   delete: (id: number) => api.delete(`/hierarchies/${id}/`),
 };
@@ -313,6 +316,8 @@ export const statuses = {
   },
   get: (id: number) => api.get<Models.Status>(`/statuses/${id}/`),
   create: (data: Partial<Models.Status>) => api.post<Models.Status>("/statuses/", data),
+  batchCreate: (items: Array<Partial<Models.Status>>) =>
+    api.post<Models.Status[]>("/statuses/batch/", items),
   update: (id: number, data: Partial<Models.Status>) => api.put<Models.Status>(`/statuses/${id}/`, data),
   delete: (id: number) => api.delete(`/statuses/${id}/`),
 };

@@ -14,6 +14,7 @@ import * as api from "@/lib/api";
 import * as Models from "@/lib/models";
 import { Can } from "@/components/auth/can";
 import { P } from "@/lib/permission-codes";
+import { JsonBatchUploadButton } from "@/components/settings/json-batch-upload-button";
 
 const STATUS_TYPES = [
   { key: "projects", label: "Projects" },
@@ -70,6 +71,31 @@ export function StatusesPanel({ embedded = false }: StatusesPanelProps) {
     } catch (err) {
       console.error("Failed to refresh statuses", err);
     }
+  };
+
+  const handleBatchUpload = async (items: unknown[]) => {
+    const payloads: Array<Partial<Models.Status>> = [];
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (!item || typeof item !== "object") {
+        throw new Error(`Item at index ${i} must be an object.`);
+      }
+      const record = item as Record<string, unknown>;
+      const statusName = typeof record.status_name === "string" ? record.status_name.trim() : "";
+      if (!statusName) {
+        throw new Error(`Item at index ${i} is missing a valid status_name.`);
+      }
+      payloads.push({
+        status_name: statusName,
+        description: typeof record.description === "string" ? record.description : undefined,
+        status_type: typeof record.status_type === "string" ? record.status_type : undefined,
+      });
+    }
+
+    await api.statuses.batchCreate(payloads);
+    await refreshStatuses();
+    toast.success(`Imported ${payloads.length} status${payloads.length === 1 ? "" : "es"}`);
   };
 
   const handleCreateStatus = async () => {
@@ -183,10 +209,13 @@ export function StatusesPanel({ embedded = false }: StatusesPanelProps) {
           <div />
         )}
         <Can permission={P.create_statuses}>
-          <Button variant="secondary" onClick={() => addSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Status
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <JsonBatchUploadButton onUpload={handleBatchUpload} />
+            <Button variant="secondary" onClick={() => addSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Status
+            </Button>
+          </div>
         </Can>
       </div>
 
@@ -195,6 +224,10 @@ export function StatusesPanel({ embedded = false }: StatusesPanelProps) {
           <Card className="shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold text-card-foreground">Add Status</CardTitle>
+              <p className="text-sm text-muted-foreground font-normal">
+                Or upload a JSON array of objects with <code className="text-xs">status_name</code>, optional{" "}
+                <code className="text-xs">description</code>, and <code className="text-xs">status_type</code>.
+              </p>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 md:grid-cols-3">
