@@ -5,6 +5,7 @@ export { SettingsToggleGroup } from './settings-toggle-group';
 export { SettingsPage } from './settings-page';
 export { UsersPanel } from './users-panel';
 export { RolesPanel } from './roles-panel';
+export { RoleAccessPanel } from './role-access-panel';
 export { PermissionsPanel } from './permissions-panel';
 export { StatusesPanel } from './statuses-panel';
 export { HierarchyPanel } from './hierarchy-panel';

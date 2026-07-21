@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/utils';
 import { UsersPanel } from '@/components/settings/users-panel';
 import { RolesPanel } from '@/components/settings/roles-panel';
+import { RoleAccessPanel } from '@/components/settings/role-access-panel';
 import { PermissionsPanel } from '@/components/settings/permissions-panel';
 import { StatusesPanel } from '@/components/settings/statuses-panel';
 import { AlertsPanel } from '@/components/settings/alerts-panel';
@@ -18,6 +19,7 @@ import {
   SETTINGS_ACCESS_PERMISSIONS,
   SETTINGS_TABS,
   isSettingsTabId,
+  type SettingsTabConfig,
   type SettingsTabId,
 } from '@/components/settings/settings-tabs-config';
 
@@ -27,6 +29,8 @@ function SettingsTabContent({ tab }: { tab: SettingsTabId }) {
       return <UsersPanel embedded />;
     case 'roles':
       return <RolesPanel embedded />;
+    case 'role-access':
+      return <RoleAccessPanel embedded />;
     case 'permissions':
       return <PermissionsPanel embedded />;
     case 'status':
@@ -42,15 +46,39 @@ function SettingsTabContent({ tab }: { tab: SettingsTabId }) {
   }
 }
 
+function tabIsVisible(
+  tab: SettingsTabConfig,
+  can: (permission: string | string[]) => boolean,
+  hasAccess: (roles?: string[], permissions?: string[]) => boolean
+): boolean {
+  const roles = tab.role ? (Array.isArray(tab.role) ? tab.role : [tab.role]) : undefined;
+  const perms = tab.permission
+    ? Array.isArray(tab.permission)
+      ? tab.permission
+      : [tab.permission]
+    : undefined;
+
+  if (roles?.length && perms?.length) {
+    return hasAccess(roles, perms);
+  }
+  if (roles?.length) {
+    return hasAccess(roles);
+  }
+  if (perms?.length) {
+    return can(perms);
+  }
+  return true;
+}
+
 export function SettingsPage() {
-  const { can } = useAuth();
+  const { can, hasAccess } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const visibleTabs = useMemo(
-    () => SETTINGS_TABS.filter((tab) => can(tab.permission)),
-    [can]
+    () => SETTINGS_TABS.filter((tab) => tabIsVisible(tab, can, hasAccess)),
+    [can, hasAccess]
   );
 
   const canAccessSettings = can(SETTINGS_ACCESS_PERMISSIONS);

@@ -3,6 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   UserCog,
   Shield,
+  ShieldCheck,
   KeyRound,
   Gauge,
   Bell,
@@ -13,6 +14,7 @@ import {
 export type SettingsTabId =
   | 'users'
   | 'roles'
+  | 'role-access'
   | 'permissions'
   | 'status'
   | 'alerts'
@@ -24,8 +26,10 @@ export type SettingsTabConfig = {
   label: string;
   description: string;
   icon: LucideIcon;
-  /** Permission(s) required to see this tab (OR). */
-  permission: PermissionCode | PermissionCode[];
+  /** Permission(s) required to see this tab (OR). Optional when `role` is set. */
+  permission?: PermissionCode | PermissionCode[];
+  /** Role name(s) required to see this tab (OR). */
+  role?: string | string[];
 };
 
 /**
@@ -45,6 +49,13 @@ export const SETTINGS_TABS: SettingsTabConfig[] = [
     description: 'Create and manage roles',
     icon: Shield,
     permission: P.view_roles,
+  },
+  {
+    id: 'role-access',
+    label: 'Role Access',
+    description: 'Configure what each role can view, create, edit, and delete',
+    icon: ShieldCheck,
+    role: 'Admin',
   },
   {
     id: 'permissions',
