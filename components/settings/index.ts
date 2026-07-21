@@ -11,6 +11,7 @@ export { StatusesPanel } from './statuses-panel';
 export { HierarchyPanel } from './hierarchy-panel';
 export { SecurityPanel } from './security-panel';
 export { AlertsPanel } from './alerts-panel';
+export { BackupPanel } from './backup-panel';
 export { UserStatusBadge } from './user-status-badge';
 export { UserLoginHistoryDialog } from './user-login-history-dialog';
 export { UserDetailsDialog } from './user-details-dialog';

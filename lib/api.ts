@@ -539,4 +539,50 @@ export const pictures = {
   },
 };
 
+const BACKUP_TIMEOUT_MS = 10 * 60 * 1000;
+
+export type RestoreBackupResult = {
+  message: string;
+  alembic_revision?: string;
+  created_at?: string;
+  created_by?: string;
+};
+
+export const backup = {
+  create: async () => {
+    const res = await api.post<Blob>(
+      '/backup/',
+      null,
+      {
+        responseType: 'blob',
+        timeout: BACKUP_TIMEOUT_MS,
+      }
+    );
+
+    const disposition = res.headers['content-disposition'] as string | undefined;
+    let filename = `satlife-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.zip`;
+    if (disposition) {
+      const match = /filename="?([^"]+)"?/i.exec(disposition);
+      if (match?.[1]) filename = match[1];
+    }
+
+    const url = URL.createObjectURL(res.data);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    return { filename };
+  },
+  restore: async (file: File, confirm: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('confirm', confirm);
+    return api.post<RestoreBackupResult>('/backup/restore/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: BACKUP_TIMEOUT_MS,
+    });
+  },
+};
+
 export default api;

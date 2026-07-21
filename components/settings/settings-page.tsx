@@ -15,6 +15,7 @@ import { StatusesPanel } from '@/components/settings/statuses-panel';
 import { AlertsPanel } from '@/components/settings/alerts-panel';
 import { SecurityPanel } from '@/components/settings/security-panel';
 import { HierarchyPanel } from '@/components/settings/hierarchy-panel';
+import { BackupPanel } from '@/components/settings/backup-panel';
 import {
   SETTINGS_ACCESS_PERMISSIONS,
   SETTINGS_TABS,
@@ -41,6 +42,8 @@ function SettingsTabContent({ tab }: { tab: SettingsTabId }) {
       return <SecurityPanel embedded />;
     case 'hierarchy':
       return <HierarchyPanel embedded />;
+    case 'backup':
+      return <BackupPanel embedded />;
     default:
       return null;
   }

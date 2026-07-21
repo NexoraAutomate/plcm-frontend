@@ -9,6 +9,7 @@ import {
   Bell,
   Lock,
   GitBranch,
+  DatabaseBackup,
 } from 'lucide-react';
 
 export type SettingsTabId =
@@ -19,7 +20,8 @@ export type SettingsTabId =
   | 'status'
   | 'alerts'
   | 'security'
-  | 'hierarchy';
+  | 'hierarchy'
+  | 'backup';
 
 export type SettingsTabConfig = {
   id: SettingsTabId;
@@ -91,6 +93,13 @@ export const SETTINGS_TABS: SettingsTabConfig[] = [
     description: 'Configure entity types and parent relationships',
     icon: GitBranch,
     permission: P.view_hierarchy,
+  },
+  {
+    id: 'backup',
+    label: 'Backup & Restore',
+    description: 'Download a full backup or restore from an archive',
+    icon: DatabaseBackup,
+    permission: [P.backup_database, P.restore_database],
   },
 ];
 

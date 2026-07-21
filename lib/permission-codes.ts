@@ -217,6 +217,8 @@ export const SETTINGS_ACCESS_PERMISSIONS: PermissionCode[] = [
   P.view_hierarchy,
   P.manage_settings,
   P.manage_notifications,
+  P.backup_database,
+  P.restore_database,
 ];
 
 /**
