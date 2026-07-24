@@ -9,6 +9,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@ant-design/charts": "^2.6.7",
     "@hookform/resolvers": "^3.9.1",
     "@lottiefiles/dotlottie-react": "^0.19.5",
     "@radix-ui/react-accordion": "1.2.12",
@@ -49,7 +50,10 @@
     "clsx": "^2.1.1",
     "cmdk": "1.1.1",
     "date-fns": "4.1.0",
+    "echarts": "^6.1.0",
+    "echarts-for-react": "^3.0.6",
     "embla-carousel-react": "8.6.0",
+    "framer-motion": "^12.42.2",
     "input-otp": "1.4.2",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
