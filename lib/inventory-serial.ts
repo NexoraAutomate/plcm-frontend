@@ -11,6 +11,7 @@ type PartNumberEntity = {
   original_part_number?: string | null;
   serial_number?: string | null;
   original_serial_number?: string | null;
+  is_current_install?: boolean | null;
 };
 
 function normalizePartNumber(value?: string | null): string {
@@ -65,6 +66,7 @@ export function getUsedEntitySerials(
   const part = normalizePartNumber(inventoryPartNumber(item));
   if (!part) return [];
   return entities
+    .filter((entity) => entity.is_current_install !== false)
     .filter((entity) => entityMatchesPart(entity, part))
     .map(entitySerial)
     .filter(Boolean);

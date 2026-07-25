@@ -69,11 +69,6 @@ function formatWhen(value?: string | null) {
   }
 }
 
-function entityLabel(type?: string | null, id?: number | null) {
-  if (!type && id == null) return '—';
-  return `${type || 'entity'}${id != null ? ` #${id}` : ''}`;
-}
-
 export default function InventoryIssuancesPage() {
   const { users } = useDataStore();
   const { isInventoryManager } = useAuth();
@@ -178,8 +173,13 @@ export default function InventoryIssuancesPage() {
               : 'Your issuance history — return unused items to Admin when no longer needed.'}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => void load()}>
-          <RefreshCw className="mr-1.5 size-3.5" />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void load()}
+          disabled={loading}
+        >
+          <RefreshCw className={`mr-1.5 size-3.5 ${loading ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
       </div>
@@ -254,7 +254,6 @@ export default function InventoryIssuancesPage() {
                     <TableHead>Issued by</TableHead>
                     <TableHead>Issued</TableHead>
                     <TableHead>Return / Closed</TableHead>
-                    <TableHead>Entity</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="w-[1%] whitespace-nowrap text-right">Actions</TableHead>
                   </TableRow>
@@ -295,18 +294,12 @@ export default function InventoryIssuancesPage() {
                           '—'
                         )}
                       </TableCell>
-                      <TableCell className="text-sm">
-                        {entityLabel(
-                          row.installed_entity_type || row.target_entity_type,
-                          row.installed_entity_id ?? row.target_entity_id
-                        )}
-                      </TableCell>
                       <TableCell>
                         <Badge variant={statusBadgeVariant(row.status)}>
                           {row.status === 'return_pending' ? 'return pending' : row.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right align-top">
                         {row.status === 'issued' ? (
                           <Button
                             variant="outline"
@@ -320,7 +313,7 @@ export default function InventoryIssuancesPage() {
                           </Button>
                         ) : null}
                         {row.status === 'return_pending' && inventoryManager ? (
-                          <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                          <div className="inline-flex flex-col items-stretch gap-1.5">
                             <Button
                               variant="default"
                               size="sm"

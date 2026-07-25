@@ -32,15 +32,31 @@ export function needsSerialSelection(item: Inventory): boolean {
   // Prefer live instance rows over catalog quantity (multi-unit groups must open serial pickers).
   const selectableCount = getSelectableInstances(item).length;
   if (selectableCount > 0) return selectableCount > 1;
-  return Number(item.quantity) > 1;
+  return Number(item.available_quantity ?? item.quantity) > 1;
 }
 
+/** True when this serial cannot be installed (awaiting admin return acceptance). */
+export function isInstanceReturnPending(instance: InventoryInstance): boolean {
+  return instance.open_issuance_status === 'return_pending';
+}
+
+/** Serials that may be installed / composed (excludes return_pending). */
 export function getSelectableInstances(item: Inventory): InventoryInstance[] {
-  return (item.instances ?? []).filter((instance) => instance.id);
+  return (item.instances ?? []).filter(
+    (instance) => Boolean(instance.id) && !isInstanceReturnPending(instance)
+  );
+}
+
+export function getReturnPendingInstances(item: Inventory): InventoryInstance[] {
+  return (item.instances ?? []).filter(
+    (instance) => Boolean(instance.id) && isInstanceReturnPending(instance)
+  );
 }
 
 export function getAvailableInstances(item: Inventory): InventoryInstance[] {
-  return (item.instances ?? []).filter((instance) => instance.id && !instance.is_reserved);
+  return (item.instances ?? []).filter(
+    (instance) => instance.id && !instance.is_reserved && !isInstanceReturnPending(instance)
+  );
 }
 
 export function getSelectableInstancesIncludingReserved(
@@ -50,6 +66,7 @@ export function getSelectableInstancesIncludingReserved(
   const allow = new Set(options?.allowIssuanceIds ?? []);
   return (item.instances ?? []).filter((instance) => {
     if (!instance.id) return false;
+    if (isInstanceReturnPending(instance)) return false;
     if (!instance.is_reserved) return true;
     return instance.open_issuance_id != null && allow.has(instance.open_issuance_id);
   });

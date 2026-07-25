@@ -7,6 +7,7 @@ import * as api from '@/lib/api';
 import { Can } from '@/components/auth/can';
 import { useAuth } from '@/lib/auth-context';
 import { P } from '@/lib/permission-codes';
+import { canManageInstall } from '@/lib/install-ownership';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -25,6 +26,7 @@ type Props = {
   entityId: number;
   partNumber?: string | null;
   serialNumber?: string | null;
+  installedById?: number | null;
   isCurrentInstall?: boolean;
   onReverted?: () => void;
   className?: string;
@@ -37,17 +39,24 @@ export function RevertToInventoryButton({
   entityId,
   partNumber,
   serialNumber,
+  installedById,
   isCurrentInstall = true,
   onReverted,
   className,
   variant = 'outline',
   size = 'sm',
 }: Props) {
-  const { isInventoryManager } = useAuth();
+  const { user, isInventoryManager } = useAuth();
   const [busy, setBusy] = useState(false);
 
-  // Admin/SubAdmin manage issue/returns — only installers revert
-  if (isInventoryManager() || !isCurrentInstall) return null;
+  const ownsInstall = canManageInstall({
+    isInventoryManager: isInventoryManager(),
+    currentUserId: user?.id,
+    installedById,
+  });
+
+  // Admin/SubAdmin manage issue/returns — only owning installers revert
+  if (isInventoryManager() || !isCurrentInstall || !ownsInstall) return null;
 
   const handleRevert = async () => {
     setBusy(true);

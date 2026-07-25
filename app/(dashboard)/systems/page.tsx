@@ -40,6 +40,9 @@ import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { ParentEntityLink } from '@/components/entity-link';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
+import { useAuth } from '@/lib/auth-context';
+import { canManageInstall, isOwnInstall } from '@/lib/install-ownership';
+import { cn } from '@/lib/utils';
 
 
 
@@ -49,6 +52,8 @@ export default function SystemsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { pageLoading } = useEntityHierarchyGate();
+  const { user, isInventoryManager } = useAuth();
+  const inventoryManager = isInventoryManager();
   const { projects, subsystems, createSystem, updateSystem, deleteSystem, statuses: storeStatuses, users } = useDataStore();
   const faultMap = useEntityFaultMap();
   const [search, setSearch] = useState('');
@@ -484,10 +489,25 @@ export default function SystemsPage() {
                 ) : (
                   systems.map((system) => {
                     const project = projects.find((p) => p.id === system.project_id);
+                    const ownsInstall = canManageInstall({
+                      isInventoryManager: inventoryManager,
+                      currentUserId: user?.id,
+                      installedById: system.installed_by_id,
+                    });
+                    const mine = isOwnInstall({
+                      currentUserId: user?.id,
+                      installedById: system.installed_by_id,
+                    });
                     return (
                       <TableRow
                         key={system.id}
-                        className="cursor-pointer"
+                        className={cn(
+                          'cursor-pointer',
+                          !inventoryManager &&
+                            mine &&
+                            system.is_current_install !== false &&
+                            'bg-emerald-50/70 dark:bg-emerald-950/25'
+                        )}
                         onClick={() => router.push(`/systems/${system.id}`)}
                       >
                         <TableCell className="font-medium">
@@ -497,6 +517,11 @@ export default function SystemsPage() {
                             entityId={system.id}
                             faultMap={faultMap}
                           />
+                          {!inventoryManager && mine && system.is_current_install !== false ? (
+                            <p className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                              Installed by you
+                            </p>
+                          ) : null}
                         </TableCell>
                         <TableCell>
                           {project ? (
@@ -530,27 +555,20 @@ export default function SystemsPage() {
                                 View
                               </Button>
                             </Link>
-                            <Can permission={P.edit_systems}>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={(e) => { e.stopPropagation(); openEdit(system)}}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </Can>
-                            {/* <ConfirmDialog
-                              title="Delete System"
-                              description="Are you sure you want to delete this system?"
-                              onConfirm={() => handleDelete(system.id)}
-                            >
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </ConfirmDialog> */}
+                            {ownsInstall ? (
+                              <Can permission={P.edit_systems}>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openEdit(system);
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              </Can>
+                            ) : null}
                           </div>
                         </TableCell>
                       </TableRow>

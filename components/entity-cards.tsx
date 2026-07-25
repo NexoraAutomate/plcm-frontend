@@ -15,6 +15,8 @@ import type { HardwareEntityType } from '@/lib/entity-resolver';
 import { useAuth } from '@/lib/auth-context';
 import { RevertToInventoryButton } from '@/components/revert-to-inventory-button';
 import { useDataStore } from '@/lib/data-store';
+import { canManageInstall, isOwnInstall } from '@/lib/install-ownership';
+import { cn } from '@/lib/utils';
 
 interface EntityCardsProps {
   title: string;
@@ -78,11 +80,12 @@ export function EntityCards({
   editPermission,
   deletePermission,
 }: EntityCardsProps) {
-  const { can } = useAuth();
+  const { can, user, isInventoryManager } = useAuth();
   const { ensureHierarchyLoaded, markLocalInstallReverted } = useDataStore();
+  const inventoryManager = isInventoryManager();
   const canCreate = !createPermission || can(createPermission);
-  const canEdit = !editPermission || can(editPermission);
-  const canDelete = !deletePermission || can(deletePermission);
+  const canEditPerm = !editPermission || can(editPermission);
+  const canDeletePerm = !deletePermission || can(deletePermission);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
 
   return (
@@ -109,8 +112,20 @@ export function EntityCards({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {entities.map((entity) => {
               const statusLabel = resolveStatusName(entity, statuses);
+              const ownsInstall = canManageInstall({
+                isInventoryManager: inventoryManager,
+                currentUserId: user?.id,
+                installedById: entity.installed_by_id,
+              });
+              const mine = isOwnInstall({
+                currentUserId: user?.id,
+                installedById: entity.installed_by_id,
+              });
+              const canEdit = canEditPerm && ownsInstall;
+              const canDelete = canDeletePerm && ownsInstall;
               const canRevert =
                 Boolean(childEntityType) &&
+                ownsInstall &&
                 entity.is_current_install !== false &&
                 Boolean(
                   entity.installation_date ||
@@ -119,7 +134,16 @@ export function EntityCards({
                     entity.serial_number
                 );
               return (
-              <Card key={entity.id} className="hover:shadow-md transition-shadow">
+              <Card
+                key={entity.id}
+                className={cn(
+                  'hover:shadow-md transition-shadow',
+                  !inventoryManager &&
+                    mine &&
+                    entity.is_current_install !== false &&
+                    'border-emerald-500/70 bg-emerald-50/60 ring-1 ring-emerald-500/30 dark:bg-emerald-950/30 dark:border-emerald-500/50'
+                )}
+              >
                 <CardContent className="pt-6">
                   <div className="space-y-3">
                     <Link href={detailPath(entity.id)} className="block rounded-md transition-colors hover:bg-muted/30">
@@ -127,6 +151,11 @@ export function EntityCards({
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-sm truncate">{entity.name}</h3>
+                            {!inventoryManager && mine && entity.is_current_install !== false ? (
+                              <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400 mt-0.5">
+                                Installed by you
+                              </p>
+                            ) : null}
                             {(entity.replacement_sequence ?? 0) > 0 ? (
                               <p className="text-xs font-medium text-primary mt-0.5">
                                 Current install · replacement #{entity.replacement_sequence}
@@ -196,7 +225,7 @@ export function EntityCards({
                             Edit
                           </Button>
                         ) : null}
-                        {onReplace ? (
+                        {onReplace && ownsInstall ? (
                           <Button
                             variant="outline"
                             size="sm"
@@ -225,6 +254,7 @@ export function EntityCards({
                           entityId={entity.id}
                           partNumber={entity.part_number}
                           serialNumber={entity.serial_number}
+                          installedById={entity.installed_by_id}
                           isCurrentInstall={entity.is_current_install !== false}
                           className="w-full"
                           onReverted={() => {

@@ -33,6 +33,8 @@ import { HARDWARE_ENTITY_DETAIL_PATH } from '@/lib/entity-replacement';
 import { useAuth } from '@/lib/auth-context';
 import { P } from '@/lib/permission-codes';
 import { RevertToInventoryButton } from '@/components/revert-to-inventory-button';
+import { canManageInstall, isOwnInstall } from '@/lib/install-ownership';
+import { cn } from '@/lib/utils';
 
 type HardwareOwnerType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
 
@@ -87,8 +89,19 @@ export function EntityInstallMetadataCard({
   onReverted,
 }: EntityInstallMetadataCardProps) {
   const { users } = useDataStore();
-  const { can } = useAuth();
-  const canEdit = can(EDIT_PERMISSION_BY_OWNER_TYPE[ownerType]);
+  const { can, user, isInventoryManager } = useAuth();
+  const inventoryManager = isInventoryManager();
+  const ownsInstall = canManageInstall({
+    isInventoryManager: inventoryManager,
+    currentUserId: user?.id,
+    installedById: entity.installed_by_id,
+  });
+  const mine = isOwnInstall({
+    currentUserId: user?.id,
+    installedById: entity.installed_by_id,
+  });
+  const canEdit =
+    can(EDIT_PERMISSION_BY_OWNER_TYPE[ownerType]) && ownsInstall;
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
   const [replaceOpen, setReplaceOpen] = useState(false);
@@ -239,12 +252,23 @@ export function EntityInstallMetadataCard({
 
   return (
     <>
-      <Card className="shadow-sm">
+      <Card
+        className={cn(
+          'shadow-sm',
+          !inventoryManager &&
+            mine &&
+            entity.is_current_install !== false &&
+            'border-emerald-500/70 bg-emerald-50/40 ring-1 ring-emerald-500/25 dark:bg-emerald-950/25 dark:border-emerald-500/50'
+        )}
+      >
         <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
           <div>
             <CardTitle className="text-base">Installation & Media</CardTitle>
             <CardDescription>
               Install date, custodian, original identifiers, and attachments for {entity.name}
+              {!inventoryManager && mine && entity.is_current_install !== false
+                ? ' — installed by you'
+                : ''}
             </CardDescription>
           </div>
           <div className="flex gap-2">
@@ -268,6 +292,7 @@ export function EntityInstallMetadataCard({
                 entityId={entity.id}
                 partNumber={entity.part_number}
                 serialNumber={entity.serial_number}
+                installedById={entity.installed_by_id}
                 isCurrentInstall={entity.is_current_install !== false}
                 onReverted={() => {
                   onReverted?.();

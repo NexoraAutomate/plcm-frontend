@@ -34,6 +34,9 @@ interface InventorySerialSelectDialogProps {
 function formatInstanceLabel(instance: InventoryInstance, index: number): string {
   const serial = instance.serial_number?.trim();
   const base = serial || `Unit ${index + 1}`;
+  if (instance.open_issuance_status === 'return_pending') {
+    return `${base} (return pending)`;
+  }
   return instance.is_reserved ? `${base} (issued)` : base;
 }
 

@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Edit, Trash2, Search, Layers, Network, Copy, ChevronDown, PackageMinus, ListOrdered, Undo2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Layers, Network, Copy, ChevronDown, PackageMinus, ListOrdered, Undo2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import { EntityAttachmentsSection, type PendingAttachmentUpload } from '@/components/entity-attachments-section';
@@ -1281,14 +1281,25 @@ export default function InventoryPage() {
               : 'Items currently issued to you — return unused stock to Admin when finished'}
           </p>
         </div>
-        <Can permission={P.view_inventory_issuances}>
-          <Button variant="outline" asChild>
-            <Link href="/inventory/issuances">
-              <ListOrdered className="mr-2 h-4 w-4" />
-              Issuances
-            </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void pagination.invalidate()}
+            disabled={pagination.fetching}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${pagination.fetching ? 'animate-spin' : ''}`} />
+            Refresh
           </Button>
-        </Can>
+          <Can permission={P.view_inventory_issuances}>
+            <Button variant="outline" asChild>
+              <Link href="/inventory/issuances">
+                <ListOrdered className="mr-2 h-4 w-4" />
+                Issuances
+              </Link>
+            </Button>
+          </Can>
+        </div>
       </div>
 
       <div className="space-y-3">
