@@ -32,6 +32,7 @@ import type { HierarchyEntityType } from '@/lib/entity-hierarchy';
 import { HARDWARE_ENTITY_DETAIL_PATH } from '@/lib/entity-replacement';
 import { useAuth } from '@/lib/auth-context';
 import { P } from '@/lib/permission-codes';
+import { RevertToInventoryButton } from '@/components/revert-to-inventory-button';
 
 type HardwareOwnerType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
 
@@ -63,11 +64,13 @@ interface EntityInstallMetadataCardProps {
     oem_name?: string;
     sku?: string;
     replacement_sequence?: number;
+    is_current_install?: boolean;
   };
   onUpdate: (data: Partial<HierarchyInstallFields>) => Promise<void>;
   projectId?: number;
   allowReplace?: boolean;
   hierarchyHref?: string;
+  onReverted?: () => void;
 }
 
 function normalizeInstallPayload(data: Record<string, unknown>) {
@@ -81,6 +84,7 @@ export function EntityInstallMetadataCard({
   projectId,
   allowReplace = false,
   hierarchyHref,
+  onReverted,
 }: EntityInstallMetadataCardProps) {
   const { users } = useDataStore();
   const { can } = useAuth();
@@ -257,6 +261,19 @@ export function EntityInstallMetadataCard({
                 <Replace className="mr-2 h-4 w-4" />
                 Replace
               </Button>
+            ) : null}
+            {entity.part_number ? (
+              <RevertToInventoryButton
+                entityType={ownerType}
+                entityId={entity.id}
+                partNumber={entity.part_number}
+                serialNumber={entity.serial_number}
+                isCurrentInstall={entity.is_current_install !== false}
+                onReverted={() => {
+                  onReverted?.();
+                  router.refresh();
+                }}
+              />
             ) : null}
             {canEdit ? (
               <Button type="button" variant="outline" size="sm" onClick={() => setEditOpen(true)}>

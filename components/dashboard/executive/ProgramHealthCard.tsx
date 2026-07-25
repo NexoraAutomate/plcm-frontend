@@ -21,8 +21,8 @@ export function ProgramHealthCard({ metric, className }: ProgramHealthCardProps)
       series: [
         {
           type: 'gauge',
-          startAngle: 210,
-          endAngle: -30,
+          startAngle: 0,
+          endAngle: 360,
           min: 0,
           max: 100,
           radius: '100%',
@@ -39,10 +39,10 @@ export function ProgramHealthCard({ metric, className }: ProgramHealthCardProps)
               color: [[1, '#1F1F1F']],
             },
           },
-          axisTick: { show: false },
-          splitLine: { show: false },
-          axisLabel: { show: false },
-          pointer: { show: false },
+          axisTick: { show: true },
+          splitLine: { show: true },
+          axisLabel: { show: true },
+          pointer: { show: true },
           detail: {
             valueAnimation: true,
             offsetCenter: [0, '0%'],
@@ -50,7 +50,7 @@ export function ProgramHealthCard({ metric, className }: ProgramHealthCardProps)
             color: EXEC.text,
             fontSize: 22,
             fontWeight: 700,
-          },
+          },  
           data: [{ value: Math.round(metric.value) }],
         },
       ],
@@ -65,10 +65,10 @@ export function ProgramHealthCard({ metric, className }: ProgramHealthCardProps)
       headerRight={metric.trend ? <TrendBadge trend={metric.trend} /> : undefined}
       noPadding
     >
-      <div className="h-[120px] px-1">
+      <div className="h-30 px-1">
         <ReactECharts
           option={option}
-          style={{ height: 120, width: '100%' }}
+          style={{ height: 150, width: '100%' }}
           opts={{ renderer: 'canvas' }}
           notMerge
           lazyUpdate

@@ -38,6 +38,22 @@ export function getSelectableInstances(item: Inventory): InventoryInstance[] {
   return (item.instances ?? []).filter((instance) => instance.id);
 }
 
+export function getAvailableInstances(item: Inventory): InventoryInstance[] {
+  return (item.instances ?? []).filter((instance) => instance.id && !instance.is_reserved);
+}
+
+export function getSelectableInstancesIncludingReserved(
+  item: Inventory,
+  options?: { allowIssuanceIds?: number[] }
+): InventoryInstance[] {
+  const allow = new Set(options?.allowIssuanceIds ?? []);
+  return (item.instances ?? []).filter((instance) => {
+    if (!instance.id) return false;
+    if (!instance.is_reserved) return true;
+    return instance.open_issuance_id != null && allow.has(instance.open_issuance_id);
+  });
+}
+
 export function buildInventoryAssetSources(
   inventoryItem: Inventory,
   consumedInstance?: InventoryInstance | null
@@ -80,6 +96,7 @@ export async function copyInventoryAssetsToEntity(
 export async function installEntityFromInventory({
   inventoryItem,
   instanceId,
+  issuanceId,
   entityType,
   parentEntityId,
   parentField,
@@ -92,6 +109,7 @@ export async function installEntityFromInventory({
 }: {
   inventoryItem: Inventory;
   instanceId?: number;
+  issuanceId?: number | null;
   entityType: HierarchyEntityType;
   parentEntityId: number;
   parentField: string;
@@ -107,11 +125,22 @@ export async function installEntityFromInventory({
 
   let consumedInstance: InventoryInstance | null = null;
   let updatedInventory = inventoryItem;
+  let linkedIssuanceId: number | null = issuanceId ?? null;
 
   if (!skipConsume) {
-    const consumeRes = await api.inventory.consume(inventoryItem.id, instanceId);
+    // Prefer open issuance on the selected instance when not explicitly provided
+    if (linkedIssuanceId == null && instanceId != null) {
+      const inst = (inventoryItem.instances ?? []).find((i) => i.id === instanceId);
+      if (inst?.open_issuance_id) linkedIssuanceId = inst.open_issuance_id;
+    }
+    const consumeRes = await api.inventory.consume(inventoryItem.id, instanceId, {
+      issuanceId: linkedIssuanceId,
+    });
     consumedInstance = consumeRes.data?.consumed_instance ?? null;
     updatedInventory = consumeRes.data?.inventory ?? inventoryItem;
+    if (consumeRes.data?.issuance?.id) {
+      linkedIssuanceId = consumeRes.data.issuance.id;
+    }
   }
 
   const merged = mergeInventoryWithInstance(
@@ -138,6 +167,14 @@ export async function installEntityFromInventory({
     ...inventoryToHierarchyCreatePayload(merged, serialNumber || nextSerialNumberFromInventory(merged, existingChildren)),
     [parentField]: parentEntityId,
   });
+
+  if (linkedIssuanceId) {
+    try {
+      await api.inventory.linkIssuanceInstall(linkedIssuanceId, entityType, created.id);
+    } catch {
+      // Install already succeeded; linking is best-effort for the ledger.
+    }
+  }
 
   await copyInventoryAssetsToEntity(
     entityType,

@@ -270,9 +270,53 @@ export const inventory = {
   create: (data: Partial<Models.Inventory>) => api.post<Models.Inventory>("/inventory/", data),
   update: (id: number, data: Partial<Models.Inventory>) => api.put<Models.Inventory>(`/inventory/${id}/`, data),
   delete: (id: number) => api.delete(`/inventory/${id}/`),
-  consume: (id: number, instanceId?: number) =>
+  consume: (
+    id: number,
+    instanceId?: number,
+    options?: {
+      issuanceId?: number | null
+      installedEntityType?: string | null
+      installedEntityId?: number | null
+    }
+  ) =>
     api.post<Models.InventoryConsumeResult>(`/inventory/${id}/consume/`, {
       instance_id: instanceId ?? null,
+      issuance_id: options?.issuanceId ?? null,
+      installed_entity_type: options?.installedEntityType ?? null,
+      installed_entity_id: options?.installedEntityId ?? null,
+    }),
+  issue: (id: number, data: Models.InventoryIssuePayload) =>
+    api.post<Models.InventoryIssuance>(`/inventory/${id}/issue/`, data),
+  listIssuances: (params?: {
+    status?: string
+    issued_to_user_id?: number
+    issued_by_user_id?: number
+    inventory_id?: number
+    part_number?: string
+    serial_number?: string
+    search?: string
+  }) =>
+    api.get<Models.InventoryIssuance[]>('/inventory/issuances/', { params }),
+  getIssuance: (issuanceId: number) =>
+    api.get<Models.InventoryIssuance>(`/inventory/issuances/${issuanceId}/`),
+  returnIssuance: (issuanceId: number, notes?: string) =>
+    api.post<Models.InventoryIssuance>(`/inventory/issuances/${issuanceId}/return/`, {
+      notes: notes ?? null,
+    }),
+  linkIssuanceInstall: (
+    issuanceId: number,
+    installedEntityType: string,
+    installedEntityId: number
+  ) =>
+    api.post<Models.InventoryIssuance>(`/inventory/issuances/${issuanceId}/link-install/`, {
+      installed_entity_type: installedEntityType,
+      installed_entity_id: installedEntityId,
+    }),
+  revertToStock: (entityType: string, entityId: number, notes?: string) =>
+    api.post<Models.InventoryRevertResult>('/inventory/revert-to-stock/', {
+      entity_type: entityType,
+      entity_id: entityId,
+      notes: notes ?? null,
     }),
   listInstances: (inventoryId: number) =>
     api.get<Models.InventoryInstance[]>(`/inventory/${inventoryId}/instances/`),

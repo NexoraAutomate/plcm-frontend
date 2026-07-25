@@ -9,8 +9,7 @@ import {
 export function isInventoryInStock(item: Inventory): boolean {
   const type = item.inventory_type as HierarchyEntityType;
   if (inventoryUsesInstances(type)) {
-    // Instance-based stock is defined by remaining instance rows.
-    // Ignore a stale positive quantity when no instances remain.
+    // Instance-based stock is defined by remaining instance rows (incl. reserved/issued).
     return (item.instances ?? []).some((instance) => Boolean(instance?.id));
   }
   return Number(item.quantity) > 0;

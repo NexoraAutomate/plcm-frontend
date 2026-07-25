@@ -217,6 +217,7 @@ export async function createHierarchyEntityFromForm(options: {
   let parentInventoryAfterConsume: Inventory | null = null;
   let parentInstanceIdForChildren: number | null = null;
   let parentInstanceSerialForChildren: string | null = null;
+  let linkedIssuanceId: number | null = null;
   let prefetchedChildren:
     | Awaited<ReturnType<typeof api.inventory.getChildren>>['data']
     | undefined;
@@ -253,12 +254,20 @@ export async function createHierarchyEntityFromForm(options: {
       console.warn('Failed to prefetch inventory children before install:', err);
     }
 
+    const issuanceId =
+      selected.instanceId != null
+        ? (inventoryMatch.instances ?? []).find((i) => i.id === selected.instanceId)
+            ?.open_issuance_id ?? null
+        : null;
+
     const consumeRes = await api.inventory.consume(
       inventoryMatch.id,
-      selected.instanceId
+      selected.instanceId,
+      { issuanceId }
     );
     consumedInstance = consumeRes.data?.consumed_instance ?? null;
     parentInventoryAfterConsume = consumeRes.data?.inventory ?? inventoryMatch;
+    linkedIssuanceId = consumeRes.data?.issuance?.id ?? issuanceId;
 
     if (!parentInstanceSerialForChildren) {
       parentInstanceSerialForChildren =
@@ -306,6 +315,14 @@ export async function createHierarchyEntityFromForm(options: {
   });
 
   if (inventoryMatch && parentInventoryAfterConsume) {
+    if (linkedIssuanceId) {
+      try {
+        await api.inventory.linkIssuanceInstall(linkedIssuanceId, entityType, created.id);
+      } catch {
+        // Install already succeeded; linking is best-effort for the ledger.
+      }
+    }
+
     await copyInventoryAssetsToEntity(
       entityType,
       created.id,

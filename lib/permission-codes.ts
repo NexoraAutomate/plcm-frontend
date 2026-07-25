@@ -58,6 +58,8 @@ export const P = {
   create_inventory: 'create_inventory',
   edit_inventory: 'edit_inventory',
   delete_inventory: 'delete_inventory',
+  issue_inventory: 'issue_inventory',
+  revert_inventory_install: 'revert_inventory_install',
 
   // Maintenance
   view_maintenance: 'view_maintenance',

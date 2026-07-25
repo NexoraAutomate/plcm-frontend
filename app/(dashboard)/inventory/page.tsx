@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Edit, Trash2, Search, Layers, Network, Copy, ChevronDown } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Layers, Network, Copy, ChevronDown, PackageMinus, ListOrdered } from 'lucide-react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import { EntityAttachmentsSection, type PendingAttachmentUpload } from '@/components/entity-attachments-section';
@@ -55,8 +55,10 @@ import { duplicateInventoryEntity } from '@/lib/inventory-duplicate';
 import { InventorySerialSelectDialog } from '@/components/inventory-serial-select-dialog';
 import { InventoryDeleteDialog } from '@/components/inventory-delete-dialog';
 import { InventoryHierarchyDialog } from '@/components/inventory-hierarchy-dialog';
+import { InventoryIssueDialog } from '@/components/inventory-issue-dialog';
 import { isInventoryInStock } from '@/lib/inventory-filter';
 import { StatusBadge } from '@/components/status-badge';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Can } from '@/components/auth/can';
 import { useAuth } from '@/lib/auth-context';
@@ -70,6 +72,7 @@ const ACTION_ICON = {
   children: 'size-3.5 text-muted-foreground transition-colors group-hover/children:text-violet-600',
   hierarchy: 'size-3.5 text-muted-foreground transition-colors group-hover/hierarchy:text-cyan-600',
   duplicate: 'size-3.5 text-muted-foreground transition-colors group-hover/duplicate:text-amber-600',
+  issue: 'size-3.5 text-muted-foreground transition-colors group-hover/issue:text-orange-600',
   edit: 'size-3.5 text-muted-foreground transition-colors group-hover/edit:text-blue-600',
   delete: 'size-3.5 text-muted-foreground transition-colors group-hover/delete:text-red-600',
 } as const;
@@ -176,8 +179,8 @@ function instanceSerialNumber(instance: InventoryInstance): string {
 /** Serial numbers for expandable rows: one per in-stock instance when present. */
 function getExpandableSerialInstances(item: Inventory): InventoryInstance[] {
   if (!inventoryUsesInstances(item.inventory_type as EntityType)) return [];
-  const selectable = getSelectableInstances(item);
-  return selectable.filter((instance) => Boolean(instanceSerialNumber(instance)));
+  const all = (item.instances ?? []).filter((instance) => Boolean(instance?.id));
+  return all.filter((instance) => Boolean(instanceSerialNumber(instance)));
 }
 
 function enrichInventoryItems(
@@ -278,6 +281,10 @@ export default function InventoryPage() {
     holder_user_id: '',
     location: '',
   });
+  const [issueTarget, setIssueTarget] = useState<{
+    item: InventoryItem;
+    instanceId?: number;
+  } | null>(null);
 
   const [selectedEntityType, setSelectedEntityType] = useState<EntityType>('component');
   const { data: hierarchyCategories = [] } = useHierarchiesQuery(selectedEntityType);
@@ -1263,9 +1270,17 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Inventory</h1>
-        <p className="text-muted-foreground mt-2">Manage inventory for all entity types</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Inventory</h1>
+          <p className="text-muted-foreground mt-2">Manage inventory for all entity types</p>
+        </div>
+        <Button variant="outline" asChild>
+          <Link href="/inventory/issuances">
+            <ListOrdered className="mr-2 h-4 w-4" />
+            Issuances
+          </Link>
+        </Button>
       </div>
 
       <div className="space-y-3">
@@ -1434,7 +1449,17 @@ export default function InventoryPage() {
                           </TableCell>
                           <TableCell>{item.partNumber || '—'}</TableCell>
                           <TableCell>{item.totalUsed ?? 0}</TableCell>
-                          <TableCell>{item.quantity}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-0.5">
+                              <span>{item.quantity}</span>
+                              {(item.reserved_quantity ?? 0) > 0 ? (
+                                <Badge variant="secondary" className="w-fit text-[10px]">
+                                  {item.available_quantity ?? Math.max(0, item.quantity - (item.reserved_quantity ?? 0))} avail ·{' '}
+                                  {item.reserved_quantity} issued
+                                </Badge>
+                              ) : null}
+                            </div>
+                          </TableCell>
                           <TableCell>{item.holderName || '—'}</TableCell>
                           <TableCell>{item.displayLocation || '—'}</TableCell>
                           <TableCell className="text-right">
@@ -1486,6 +1511,22 @@ export default function InventoryPage() {
                                   <Copy className={ACTION_ICON.duplicate} />
                                 </Button>
                               ) : null}
+                              <Can permission={P.issue_inventory}>
+                                <Button
+                                  size="icon-sm"
+                                  variant="ghost"
+                                  className={cn(ACTION_BTN, 'group/issue')}
+                                  onClick={() => setIssueTarget({ item })}
+                                  title="Issue to developer"
+                                  aria-label="Issue to developer"
+                                  disabled={
+                                    (item.available_quantity ?? item.quantity) <= 0 &&
+                                    !(item.instances ?? []).some((i) => i.id && !i.is_reserved)
+                                  }
+                                >
+                                  <PackageMinus className={ACTION_ICON.issue} />
+                                </Button>
+                              </Can>
                               <Can permission={P.edit_inventory}>
                                 <Button
                                   size="icon-sm"
@@ -1515,7 +1556,7 @@ export default function InventoryPage() {
                         </TableRow>
                         {isExpanded && isExpandable ? (
                           <TableRow className="bg-muted/20 hover:bg-muted/20">
-                            <TableCell colSpan={9} className="p-0">
+                            <TableCell colSpan={10} className="p-0">
                               <div className="px-6 py-3">
                                 <p className="mb-2 text-xs font-medium text-muted-foreground">
                                   All serial numbers for part {item.partNumber || item.entityName || '—'}
@@ -1527,6 +1568,8 @@ export default function InventoryPage() {
                                         <TableHead>Serial Number</TableHead>
                                         <TableHead>Inventory Holder</TableHead>
                                         <TableHead>Location</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="w-[60px]" />
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -1543,6 +1586,31 @@ export default function InventoryPage() {
                                               {holder ? formatUserRef(holder) : '—'}
                                             </TableCell>
                                             <TableCell>{instance.location?.trim() || '—'}</TableCell>
+                                            <TableCell>
+                                              {instance.is_reserved ? (
+                                                <Badge variant="secondary">Issued</Badge>
+                                              ) : (
+                                                <span className="text-muted-foreground text-xs">Available</span>
+                                              )}
+                                            </TableCell>
+                                            <TableCell>
+                                              {!instance.is_reserved ? (
+                                                <Can permission={P.issue_inventory}>
+                                                  <Button
+                                                    size="icon-sm"
+                                                    variant="ghost"
+                                                    className={cn(ACTION_BTN, 'group/issue')}
+                                                    title="Issue this serial"
+                                                    aria-label="Issue this serial"
+                                                    onClick={() =>
+                                                      setIssueTarget({ item, instanceId: instance.id })
+                                                    }
+                                                  >
+                                                    <PackageMinus className={ACTION_ICON.issue} />
+                                                  </Button>
+                                                </Can>
+                                              ) : null}
+                                            </TableCell>
                                           </TableRow>
                                         );
                                       })}
@@ -1832,6 +1900,19 @@ export default function InventoryPage() {
         }}
         onDeleteAll={handleDeleteAll}
         onDeleteOne={handleDeleteOneSerial}
+      />
+
+      <InventoryIssueDialog
+        open={issueTarget != null}
+        onOpenChange={(open) => {
+          if (!open) setIssueTarget(null);
+        }}
+        item={issueTarget?.item ?? null}
+        users={users}
+        presetInstanceId={issueTarget?.instanceId}
+        onIssued={() => {
+          void pagination.invalidate();
+        }}
       />
     </div>
   );

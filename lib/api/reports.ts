@@ -187,6 +187,17 @@ export interface InventoryReportItem {
   entity_id?: number | null;
   configuration_item?: string | null;
   added_date?: string | null;
+  issuance_id?: number | null;
+  issued_to_name?: string | null;
+  issued_by_name?: string | null;
+  issued_at?: string | null;
+  issuance_status?: string | null;
+  target_entity_type?: string | null;
+  target_entity_id?: number | null;
+  installed_entity_type?: string | null;
+  installed_entity_id?: number | null;
+  reserved_quantity?: number | null;
+  available_quantity?: number | null;
 }
 
 export interface InventoryReportResponse {

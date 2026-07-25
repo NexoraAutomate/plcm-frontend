@@ -331,6 +331,8 @@ export interface InventoryInstance extends HierarchyInstallFields {
   added_date?: string
   shelf_life_expires_at?: string
   updated_at?: string
+  is_reserved?: boolean
+  open_issuance_id?: number | null
 }
 
 export interface Inventory extends HierarchyInstallFields {
@@ -343,6 +345,8 @@ export interface Inventory extends HierarchyInstallFields {
   status_id?: number
   sku?: string
   quantity: number
+  reserved_quantity?: number
+  available_quantity?: number
   location?: string
   description?: string
   oem_name?: string
@@ -356,9 +360,55 @@ export interface Inventory extends HierarchyInstallFields {
   component?: Component
 }
 
+export type InventoryIssuanceStatus = 'issued' | 'installed' | 'returned' | 'reverted'
+
+export interface InventoryIssuance {
+  id: number
+  inventory_id: number
+  inventory_instance_id?: number | null
+  quantity: number
+  issued_to_user_id: number
+  issued_by_user_id: number
+  issued_at: string
+  status: InventoryIssuanceStatus | string
+  target_entity_type?: string | null
+  target_entity_id?: number | null
+  part_number?: string | null
+  serial_number?: string | null
+  inventory_name?: string | null
+  inventory_type?: string | null
+  notes?: string | null
+  installed_at?: string | null
+  installed_entity_type?: string | null
+  installed_entity_id?: number | null
+  installed_by_id?: number | null
+  closed_at?: string | null
+  closed_by_id?: number | null
+  issued_to_name?: string | null
+  issued_by_name?: string | null
+  installed_by_name?: string | null
+  closed_by_name?: string | null
+}
+
+export interface InventoryIssuePayload {
+  issued_to_user_id: number
+  quantity?: number
+  instance_id?: number | null
+  target_entity_type?: string | null
+  target_entity_id?: number | null
+  notes?: string | null
+}
+
 export interface InventoryConsumeResult {
   inventory: Inventory
   consumed_instance?: InventoryInstance | null
+  issuance?: InventoryIssuance | null
+}
+
+export interface InventoryRevertResult {
+  inventory: Inventory
+  restored_instance?: InventoryInstance | null
+  issuance?: InventoryIssuance | null
 }
 
 export interface InventoryChildLink {

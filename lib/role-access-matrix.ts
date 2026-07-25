@@ -49,7 +49,10 @@ export const CRUD_MODULES: CrudModuleDef[] = [
   { key: 'modules', label: 'Modules', resource: 'modules' },
   { key: 'units', label: 'Units', resource: 'units' },
   { key: 'components', label: 'Components', resource: 'components' },
-  { key: 'inventory', label: 'Inventory', resource: 'inventory' },
+  { key: 'inventory', label: 'Inventory', resource: 'inventory', extras: [
+    { code: 'issue_inventory', label: 'Issue to developer' },
+    { code: 'revert_inventory_install', label: 'Revert install to stock' },
+  ]},
   { key: 'entities', label: 'Entities', resource: 'entities' },
   { key: 'statuses', label: 'Statuses', resource: 'statuses' },
   { key: 'hierarchy', label: 'System Hierarchy', resource: 'hierarchy' },

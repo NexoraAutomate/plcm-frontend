@@ -31,16 +31,35 @@ const INVENTORY_MODES = [
   { value: 'current', label: 'Current Stock' },
   { value: 'low', label: 'Low Stock' },
   { value: 'out', label: 'Out of Stock' },
-  { value: 'reserved', label: 'Reserved Items' },
-  { value: 'issued', label: 'Issued Items' },
+  { value: 'reserved', label: 'Reserved / Issued (open)' },
+  { value: 'issued', label: 'Issued Items (open)' },
   { value: 'available', label: 'Available Items' },
   { value: 'by_project', label: 'Inventory by Project' },
   { value: 'by_system', label: 'Inventory by System' },
   { value: 'by_location', label: 'Inventory by Location' },
-  { value: 'movements', label: 'Inventory Movements' },
+  { value: 'movements', label: 'Issuance Movements' },
   { value: 'valuation', label: 'Stock Valuation' },
   { value: 'lookup', label: 'Part / Serial Lookup' },
 ];
+
+const ISSUANCE_MODES = new Set(['issued', 'reserved', 'movements']);
+
+function entityDetail(item: {
+  configuration_item?: string | null;
+  installed_entity_type?: string | null;
+  installed_entity_id?: number | null;
+  target_entity_type?: string | null;
+  target_entity_id?: number | null;
+}) {
+  if (item.configuration_item) return item.configuration_item;
+  if (item.installed_entity_type && item.installed_entity_id != null) {
+    return `${item.installed_entity_type} #${item.installed_entity_id}`;
+  }
+  if (item.target_entity_type && item.target_entity_id != null) {
+    return `${item.target_entity_type} #${item.target_entity_id}`;
+  }
+  return '—';
+}
 
 export default function InventoryReportsPage() {
   const { user } = useAuth();
@@ -109,6 +128,7 @@ export default function InventoryReportsPage() {
         payloadForChecksum: data,
         reportUuid,
       });
+      const isIssuanceMode = ISSUANCE_MODES.has(mode);
       const qr = await qrDataUrl(registered.report_uuid);
       exportTabularPdf({
         title: 'Inventory Report',
@@ -120,26 +140,54 @@ export default function InventoryReportsPage() {
         softwareVersion: APP_VERSION,
         qrDataUrl: qr,
         orientation: 'landscape',
-        columns: [
-          'Name',
-          'Type',
-          'Part No.',
-          'Serial',
-          'Qty',
-          'Location',
-          'Status',
-          'SKU',
-        ],
-        rows: (data.items || []).map((i) => [
-          i.name,
-          i.inventory_type || '—',
-          i.part_number || '—',
-          i.serial_number || '—',
-          i.quantity ?? '—',
-          i.location || '—',
-          i.status_name || '—',
-          i.sku || '—',
-        ]),
+        columns: isIssuanceMode
+          ? [
+              'Name',
+              'Part No.',
+              'Serial',
+              'Qty',
+              'Whom',
+              'Issued By',
+              'When',
+              'Entity',
+              'Status',
+            ]
+          : [
+              'Name',
+              'Type',
+              'Part No.',
+              'Serial',
+              'Qty',
+              'Available',
+              'Location',
+              'Status',
+              'SKU',
+            ],
+        rows: (data.items || []).map((i) =>
+          isIssuanceMode
+            ? [
+                i.name,
+                i.part_number || '—',
+                i.serial_number || '—',
+                i.quantity ?? '—',
+                i.issued_to_name || '—',
+                i.issued_by_name || '—',
+                i.issued_at ? formatReportDate(new Date(i.issued_at)) : '—',
+                entityDetail(i),
+                i.issuance_status || i.status_name || '—',
+              ]
+            : [
+                i.name,
+                i.inventory_type || '—',
+                i.part_number || '—',
+                i.serial_number || '—',
+                i.quantity ?? '—',
+                i.available_quantity ?? '—',
+                i.location || '—',
+                i.status_name || '—',
+                i.sku || '—',
+              ]
+        ),
         summaryLines: [
           `Total items: ${displayValue(data.summary?.total_items)}`,
           `Total quantity: ${displayValue(data.summary?.total_quantity)}`,
@@ -258,19 +306,45 @@ export default function InventoryReportsPage() {
             )}
           </ReportSection>
 
-          <ReportSection title="Inventory Items">
+          <ReportSection title={ISSUANCE_MODES.has(mode) ? 'Issuance Ledger' : 'Inventory Items'}>
             <ReportTable
-              columns={[
-                { key: 'name', header: 'Name' },
-                { key: 'inventory_type', header: 'Type' },
-                { key: 'part_number', header: 'Part No.' },
-                { key: 'serial_number', header: 'Serial' },
-                { key: 'quantity', header: 'Qty' },
-                { key: 'location', header: 'Location' },
-                { key: 'status_name', header: 'Status' },
-                { key: 'sku', header: 'SKU' },
-              ]}
-              rows={(data.items || []) as unknown as Record<string, unknown>[]}
+              columns={
+                ISSUANCE_MODES.has(mode)
+                  ? [
+                      { key: 'name', header: 'Name' },
+                      { key: 'part_number', header: 'Part No.' },
+                      { key: 'serial_number', header: 'Serial' },
+                      { key: 'quantity', header: 'Qty' },
+                      { key: 'issued_to_name', header: 'Whom' },
+                      { key: 'issued_by_name', header: 'Issued By' },
+                      { key: 'issued_at', header: 'When' },
+                      { key: 'entity_detail', header: 'Entity' },
+                      { key: 'issuance_status', header: 'Status' },
+                    ]
+                  : [
+                      { key: 'name', header: 'Name' },
+                      { key: 'inventory_type', header: 'Type' },
+                      { key: 'part_number', header: 'Part No.' },
+                      { key: 'serial_number', header: 'Serial' },
+                      { key: 'quantity', header: 'Qty' },
+                      { key: 'available_quantity', header: 'Available' },
+                      { key: 'location', header: 'Location' },
+                      { key: 'status_name', header: 'Status' },
+                      { key: 'sku', header: 'SKU' },
+                    ]
+              }
+              rows={
+                (ISSUANCE_MODES.has(mode)
+                  ? (data.items || []).map((i) => ({
+                      ...i,
+                      entity_detail: entityDetail(i),
+                      issued_at: i.issued_at
+                        ? formatReportDate(new Date(i.issued_at))
+                        : '—',
+                      issuance_status: i.issuance_status || i.status_name || '—',
+                    }))
+                  : data.items || []) as unknown as Record<string, unknown>[]
+              }
             />
           </ReportSection>
         </ReportLayout>

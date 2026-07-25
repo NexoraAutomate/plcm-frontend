@@ -33,8 +33,8 @@ interface InventorySerialSelectDialogProps {
 
 function formatInstanceLabel(instance: InventoryInstance, index: number): string {
   const serial = instance.serial_number?.trim();
-  if (serial) return serial;
-  return `Unit ${index + 1}`;
+  const base = serial || `Unit ${index + 1}`;
+  return instance.is_reserved ? `${base} (issued)` : base;
 }
 
 export function InventorySerialSelectDialog({
