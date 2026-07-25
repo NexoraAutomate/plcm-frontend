@@ -192,6 +192,13 @@ export function EntityInventorySearch({
     );
   }
 
+  const emptyMessage =
+    allowedInventoryNames.length === 0
+      ? `No hierarchy template for ${parentEntityName}. Ask an admin to define allowed ${inventoryType} names.`
+      : inventoryItems.length === 0
+        ? `No issued ${inventoryType} inventory matching ${parentEntityName}'s hierarchy`
+        : 'No matching inventory items';
+
   return (
     <>
       <Card>
@@ -223,11 +230,7 @@ export function EntityInventorySearch({
             </div>
 
             {filteredItems.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                {inventoryItems.length === 0
-                  ? `No available ${inventoryType} inventory for ${parentEntityName}`
-                  : 'No matching inventory items'}
-              </div>
+              <div className="text-center py-8 text-muted-foreground">{emptyMessage}</div>
             ) : (
               <div className="overflow-x-auto">
                 <Table>

@@ -183,6 +183,9 @@ interface DataStoreContextType {
   updateConfigurationHistory: (id: number, data: MaintenanceTypes.UpdateConfigurationHistoryPayload) => Promise<MaintenanceTypes.ConfigurationHistory>;
   deleteConfigurationHistory: (id: number) => Promise<void>;
 
+  /** Soft-clear a reverted install from local hierarchy state immediately. */
+  markLocalInstallReverted: (entityType: string, entityId: number) => void;
+
   // Refresh
   refreshData: (options?: { silent?: boolean }) => Promise<void>;
   refreshLightweight: () => Promise<void>;
@@ -371,6 +374,20 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     },
     [loadHierarchyData, queryClient]
   );
+
+  const markLocalInstallReverted = useCallback((entityType: string, entityId: number) => {
+    const type = entityType.trim().toLowerCase();
+    const mark = <T extends { id: number; is_current_install?: boolean }>(rows: T[]) =>
+      rows.map((row) =>
+        row.id === entityId ? { ...row, is_current_install: false } : row
+      );
+
+    if (type === 'system') setSystems(mark);
+    else if (type === 'subsystem') setSubsystems(mark);
+    else if (type === 'module') setModules(mark);
+    else if (type === 'unit') setUnits(mark);
+    else if (type === 'component') setComponents(mark);
+  }, []);
 
   const ensureHierarchyLoadedRef = useRef(ensureHierarchyLoaded);
   ensureHierarchyLoadedRef.current = ensureHierarchyLoaded;
@@ -1637,6 +1654,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     refreshData,
     refreshLightweight,
     ensureHierarchyLoaded,
+    markLocalInstallReverted,
     runSilentEntityBatch,
     }),
     [
@@ -1665,6 +1683,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       refreshData,
       refreshLightweight,
       ensureHierarchyLoaded,
+      markLocalInstallReverted,
       runSilentEntityBatch,
     ]
   );

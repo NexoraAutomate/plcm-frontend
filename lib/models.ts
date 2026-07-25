@@ -411,6 +411,19 @@ export interface InventoryRevertResult {
   issuance?: InventoryIssuance | null
 }
 
+export interface InventoryReturnNotice {
+  id: number
+  issuance_id: number
+  inventory_id?: number | null
+  inventory_name?: string | null
+  part_number?: string | null
+  serial_number?: string | null
+  returned_by_user_id: number
+  returned_by_name?: string | null
+  created_at: string
+  read_at?: string | null
+}
+
 export interface InventoryChildLink {
   id: number
   parent_inventory_id: number

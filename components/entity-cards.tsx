@@ -13,6 +13,8 @@ import { EntityStatusHistorySheet } from './entity-status-history-sheet';
 import { EntityPicture } from './entity-picture';
 import type { HardwareEntityType } from '@/lib/entity-resolver';
 import { useAuth } from '@/lib/auth-context';
+import { RevertToInventoryButton } from '@/components/revert-to-inventory-button';
+import { useDataStore } from '@/lib/data-store';
 
 interface EntityCardsProps {
   title: string;
@@ -29,6 +31,8 @@ interface EntityCardsProps {
     part_number?: string;
     serial_number?: string;
     replacement_sequence?: number;
+    is_current_install?: boolean;
+    installed_by_id?: number | null;
   }>;
   statuses?: Status[];
   onAdd?: () => void;
@@ -75,6 +79,7 @@ export function EntityCards({
   deletePermission,
 }: EntityCardsProps) {
   const { can } = useAuth();
+  const { ensureHierarchyLoaded, markLocalInstallReverted } = useDataStore();
   const canCreate = !createPermission || can(createPermission);
   const canEdit = !editPermission || can(editPermission);
   const canDelete = !deletePermission || can(deletePermission);
@@ -104,6 +109,15 @@ export function EntityCards({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {entities.map((entity) => {
               const statusLabel = resolveStatusName(entity, statuses);
+              const canRevert =
+                Boolean(childEntityType) &&
+                entity.is_current_install !== false &&
+                Boolean(
+                  entity.installation_date ||
+                    entity.installed_by_id ||
+                    entity.part_number ||
+                    entity.serial_number
+                );
               return (
               <Card key={entity.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="pt-6">
@@ -164,8 +178,8 @@ export function EntityCards({
                     </Link>
 
                     <div className="space-y-2 pt-2">
-                      <div className="flex gap-2">
-                        <Link href={detailPath(entity.id)} className="flex-1" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex gap-2 flex-wrap">
+                        <Link href={detailPath(entity.id)} className="flex-1 min-w-[5.5rem]" onClick={(e) => e.stopPropagation()}>
                           <Button variant="outline" size="sm" className="w-full gap-1.5">
                             View
                             <ArrowRight className="h-3 w-3" />
@@ -175,7 +189,7 @@ export function EntityCards({
                           <Button
                             variant="outline"
                             size="sm"
-                            className="flex-1 gap-1.5"
+                            className="flex-1 min-w-[5.5rem] gap-1.5"
                             onClick={() => onEdit(entity.id)}
                           >
                             <Pencil className="h-3 w-3" />
@@ -186,7 +200,7 @@ export function EntityCards({
                           <Button
                             variant="outline"
                             size="sm"
-                            className="flex-1 gap-1.5"
+                            className="flex-1 min-w-[5.5rem] gap-1.5"
                             onClick={() => onReplace(entity)}
                           >
                             <Replace className="h-3 w-3" />
@@ -197,7 +211,7 @@ export function EntityCards({
                           <Button
                             variant="outline"
                             size="sm"
-                            className="flex-1 gap-1.5 text-destructive hover:text-destructive"
+                            className="flex-1 min-w-[5.5rem] gap-1.5 text-destructive hover:text-destructive"
                             onClick={() => setDeleteTarget({ id: entity.id, name: entity.name })}
                           >
                             <Trash2 className="h-3 w-3" />
@@ -205,6 +219,20 @@ export function EntityCards({
                           </Button>
                         ) : null}
                       </div>
+                      {canRevert && childEntityType ? (
+                        <RevertToInventoryButton
+                          entityType={childEntityType}
+                          entityId={entity.id}
+                          partNumber={entity.part_number}
+                          serialNumber={entity.serial_number}
+                          isCurrentInstall={entity.is_current_install !== false}
+                          className="w-full"
+                          onReverted={() => {
+                            markLocalInstallReverted(childEntityType, entity.id);
+                            void ensureHierarchyLoaded({ force: true });
+                          }}
+                        />
+                      ) : null}
                       {secondaryPath ? (
                         <Link href={secondaryPath(entity.id)} onClick={(e) => e.stopPropagation()}>
                           <Button variant="outline" size="sm" className="w-full gap-2">

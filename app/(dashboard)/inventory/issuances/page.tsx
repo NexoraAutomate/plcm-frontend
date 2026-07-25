@@ -8,8 +8,6 @@ import * as api from '@/lib/api';
 import type { InventoryIssuance, User } from '@/lib/models';
 import { useDataStore } from '@/lib/data-store';
 import { formatUserRef } from '@/lib/user-display';
-import { Can } from '@/components/auth/can';
-import { P } from '@/lib/permission-codes';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -31,6 +29,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { PageLoader } from '@/components/page-loader';
+import { useAuth } from '@/lib/auth-context';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All statuses' },
@@ -71,6 +70,8 @@ function entityLabel(type?: string | null, id?: number | null) {
 
 export default function InventoryIssuancesPage() {
   const { users } = useDataStore();
+  const { isInventoryManager } = useAuth();
+  const inventoryManager = isInventoryManager();
   const [rows, setRows] = useState<InventoryIssuance[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState('issued');
@@ -83,7 +84,8 @@ export default function InventoryIssuancesPage() {
     try {
       const res = await api.inventory.listIssuances({
         status: status !== 'all' ? status : undefined,
-        issued_to_user_id: issuedTo !== 'all' ? Number(issuedTo) : undefined,
+        issued_to_user_id:
+          inventoryManager && issuedTo !== 'all' ? Number(issuedTo) : undefined,
         search: search.trim() || undefined,
       });
       setRows(res.data ?? []);
@@ -93,7 +95,7 @@ export default function InventoryIssuancesPage() {
     } finally {
       setLoading(false);
     }
-  }, [status, issuedTo, search]);
+  }, [status, issuedTo, search, inventoryManager]);
 
   useEffect(() => {
     void load();
@@ -129,8 +131,9 @@ export default function InventoryIssuancesPage() {
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">Inventory issuances</h1>
           <p className="text-sm text-muted-foreground">
-            Track who received stock, when, quantity, and install status. Quantity decreases only
-            on install.
+            {inventoryManager
+              ? 'Track who received stock, when, quantity, and install status. Accept returns from installers.'
+              : 'Your issued stock — return unused items to Admin when no longer needed.'}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => void load()}>
@@ -162,7 +165,11 @@ export default function InventoryIssuancesPage() {
           </div>
           <div className="space-y-2">
             <Label>Developer</Label>
-            <Select value={issuedTo} onValueChange={setIssuedTo}>
+            <Select
+              value={issuedTo}
+              onValueChange={setIssuedTo}
+              disabled={!inventoryManager}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="All developers" />
               </SelectTrigger>
@@ -206,7 +213,7 @@ export default function InventoryIssuancesPage() {
                     <TableHead>When</TableHead>
                     <TableHead>Entity</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="w-[100px]">Actions</TableHead>
+                    <TableHead className="w-25">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -237,17 +244,15 @@ export default function InventoryIssuancesPage() {
                       </TableCell>
                       <TableCell>
                         {row.status === 'issued' && (
-                          <Can permission={P.issue_inventory}>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={returningId === row.id}
-                              onClick={() => void handleReturn(row)}
-                            >
-                              <Undo2 className="mr-1 size-3.5" />
-                              Return
-                            </Button>
-                          </Can>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={returningId === row.id}
+                            onClick={() => void handleReturn(row)}
+                          >
+                            <Undo2 className="mr-1 size-3.5" />
+                            {inventoryManager ? 'Accept return' : 'Return to admin'}
+                          </Button>
                         )}
                       </TableCell>
                     </TableRow>

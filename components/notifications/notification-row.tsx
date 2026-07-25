@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Bell, Wrench, AlertTriangle, CheckCircle2, Users, Rocket } from 'lucide-react';
+import { Bell, Wrench, AlertTriangle, CheckCircle2, Users, Rocket, Package } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { AppNotification } from '@/lib/app-notifications';
 import { cn } from '@/lib/utils';
@@ -17,6 +17,7 @@ const TYPE_ICON: Record<AppNotification['type'], typeof Bell> = {
   project_updated: Rocket,
   order_updated: Rocket,
   customer_status_change: Users,
+  inventory_returned: Package,
 };
 
 interface NotificationRowProps {

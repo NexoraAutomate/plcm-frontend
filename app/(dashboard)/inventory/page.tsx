@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Edit, Trash2, Search, Layers, Network, Copy, ChevronDown, PackageMinus, ListOrdered } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Layers, Network, Copy, ChevronDown, PackageMinus, ListOrdered, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import { EntityAttachmentsSection, type PendingAttachmentUpload } from '@/components/entity-attachments-section';
@@ -214,10 +214,12 @@ function enrichInventoryItems(
 
 export default function InventoryPage() {
   const router = useRouter();
-  const { can } = useAuth();
-  const canCreateInventory = can(P.create_inventory);
-  const canEditInventory = can(P.edit_inventory);
+  const { can, isInventoryManager } = useAuth();
+  const inventoryManager = isInventoryManager();
+  const canCreateInventory = inventoryManager && can(P.create_inventory);
+  const canEditInventory = inventoryManager && can(P.edit_inventory);
   const canAddStock = canCreateInventory || canEditInventory;
+  const canIssue = inventoryManager && can(P.issue_inventory);
   const { users, statuses, systems, subsystems, modules, units, components, ensureHierarchyLoaded } =
     useDataStore();
   const [search, setSearch] = useState('');
@@ -1273,7 +1275,11 @@ export default function InventoryPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Inventory</h1>
-          <p className="text-muted-foreground mt-2">Manage inventory for all entity types</p>
+          <p className="text-muted-foreground mt-2">
+            {inventoryManager
+              ? 'Manage warehouse inventory for all entity types'
+              : 'Items currently issued to you — return unused stock to Admin when finished'}
+          </p>
         </div>
         <Button variant="outline" asChild>
           <Link href="/inventory/issuances">
@@ -1285,7 +1291,7 @@ export default function InventoryPage() {
 
       <div className="space-y-3">
         <div className="flex flex-wrap gap-4 items-center">
-          <div className="flex-1 min-w-[200px] relative">
+          <div className="flex-1 min-w-50 relative">
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search by name, serial number, or part number..."
@@ -1320,14 +1326,16 @@ export default function InventoryPage() {
               if (open) setFormTab('general');
             }}
           >
-            <Can permission={P.create_inventory}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Item
-                </Button>
-              </DialogTrigger>
-            </Can>
+            {canCreateInventory ? (
+              <Can permission={P.create_inventory}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Item
+                  </Button>
+                </DialogTrigger>
+              </Can>
+            ) : null}
             <DialogContent className={inventoryDialogClassName}>
               <DialogHeader className="space-y-1.5 border-b px-6 py-5 text-left">
                 <DialogTitle>Add Inventory Item</DialogTitle>
@@ -1512,6 +1520,7 @@ export default function InventoryPage() {
                                 </Button>
                               ) : null}
                               <Can permission={P.issue_inventory}>
+                                {canIssue ? (
                                 <Button
                                   size="icon-sm"
                                   variant="ghost"
@@ -1526,8 +1535,51 @@ export default function InventoryPage() {
                                 >
                                   <PackageMinus className={ACTION_ICON.issue} />
                                 </Button>
+                                ) : null}
                               </Can>
+                              {!inventoryManager &&
+                              ((item.reserved_quantity ?? 0) > 0 ||
+                                (item.instances ?? []).some((i) => i.open_issuance_id)) ? (
+                                <Button
+                                  size="icon-sm"
+                                  variant="ghost"
+                                  className={cn(ACTION_BTN, 'group/issue')}
+                                  title="Return to admin"
+                                  aria-label="Return to admin"
+                                  onClick={async () => {
+                                    try {
+                                      let id =
+                                        (item.instances ?? []).find((i) => i.open_issuance_id)
+                                          ?.open_issuance_id ?? null;
+                                      if (!id) {
+                                        const res = await api.inventory.listIssuances({
+                                          inventory_id: item.id,
+                                          status: 'issued',
+                                        });
+                                        id = res.data?.[0]?.id ?? null;
+                                      }
+                                      if (!id) {
+                                        toast.error('No open issuance found to return');
+                                        return;
+                                      }
+                                      await api.inventory.returnIssuance(id);
+                                      toast.success('Returned to admin warehouse');
+                                      void pagination.invalidate();
+                                    } catch (err: unknown) {
+                                      const detail =
+                                        (err as { response?: { data?: { detail?: string } } })
+                                          ?.response?.data?.detail || 'Failed to return';
+                                      toast.error(
+                                        typeof detail === 'string' ? detail : 'Failed to return'
+                                      );
+                                    }
+                                  }}
+                                >
+                                  <Undo2 className={ACTION_ICON.issue} />
+                                </Button>
+                              ) : null}
                               <Can permission={P.edit_inventory}>
+                                {canEditInventory ? (
                                 <Button
                                   size="icon-sm"
                                   variant="ghost"
@@ -1538,8 +1590,10 @@ export default function InventoryPage() {
                                 >
                                   <Edit className={ACTION_ICON.edit} />
                                 </Button>
+                                ) : null}
                               </Can>
                               <Can permission={P.delete_inventory}>
+                                {inventoryManager ? (
                                 <Button
                                   size="icon-sm"
                                   variant="ghost"
@@ -1550,6 +1604,7 @@ export default function InventoryPage() {
                                 >
                                   <Trash2 className={ACTION_ICON.delete} />
                                 </Button>
+                                ) : null}
                               </Can>
                             </div>
                           </TableCell>
@@ -1569,7 +1624,7 @@ export default function InventoryPage() {
                                         <TableHead>Inventory Holder</TableHead>
                                         <TableHead>Location</TableHead>
                                         <TableHead>Status</TableHead>
-                                        <TableHead className="w-[60px]" />
+                                        <TableHead className="w-15" />
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -1594,7 +1649,7 @@ export default function InventoryPage() {
                                               )}
                                             </TableCell>
                                             <TableCell>
-                                              {!instance.is_reserved ? (
+                                              {!instance.is_reserved && canIssue ? (
                                                 <Can permission={P.issue_inventory}>
                                                   <Button
                                                     size="icon-sm"
@@ -1609,6 +1664,39 @@ export default function InventoryPage() {
                                                     <PackageMinus className={ACTION_ICON.issue} />
                                                   </Button>
                                                 </Can>
+                                              ) : null}
+                                              {instance.is_reserved &&
+                                              instance.open_issuance_id &&
+                                              !inventoryManager ? (
+                                                <Button
+                                                  size="icon-sm"
+                                                  variant="ghost"
+                                                  className={cn(ACTION_BTN, 'group/issue')}
+                                                  title="Return to admin"
+                                                  aria-label="Return to admin"
+                                                  onClick={async () => {
+                                                    try {
+                                                      await api.inventory.returnIssuance(
+                                                        instance.open_issuance_id!
+                                                      );
+                                                      toast.success('Returned to admin warehouse');
+                                                      void pagination.invalidate();
+                                                    } catch (err: unknown) {
+                                                      const detail =
+                                                        (err as {
+                                                          response?: { data?: { detail?: string } };
+                                                        })?.response?.data?.detail ||
+                                                        'Failed to return';
+                                                      toast.error(
+                                                        typeof detail === 'string'
+                                                          ? detail
+                                                          : 'Failed to return'
+                                                      );
+                                                    }
+                                                  }}
+                                                >
+                                                  <Undo2 className={ACTION_ICON.issue} />
+                                                </Button>
                                               ) : null}
                                             </TableCell>
                                           </TableRow>

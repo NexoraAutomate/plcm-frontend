@@ -1,6 +1,6 @@
 import { CaseStatus, FaultyEntityStatus } from '@/lib/models';
 import { getCaseStatusMeta, mapCaseStatusFromApi } from '@/lib/maintenance-workflow';
-import type { Customer, FaultyEntity, MaintenanceCase, Project } from '@/lib/models';
+import type { Customer, FaultyEntity, InventoryReturnNotice, MaintenanceCase, Project } from '@/lib/models';
 
 export type AppNotificationType =
   | 'open_maintenance_case'
@@ -12,7 +12,8 @@ export type AppNotificationType =
   | 'project_completed'
   | 'customer_status_change'
   | 'order_updated'
-  | 'project_updated';
+  | 'project_updated'
+  | 'inventory_returned';
 
 export interface AppNotification {
   id: string;
@@ -22,6 +23,8 @@ export interface AppNotification {
   href: string;
   timestamp: string;
   priority: 'high' | 'medium' | 'low';
+  /** Backend notice id for inventory returns (optional). */
+  metaId?: number;
 }
 
 const OPEN_CASE_STATUSES: string[] = [
@@ -43,8 +46,15 @@ export function buildAppNotifications(input: {
   faultyEntities: FaultyEntity[];
   projects: Project[];
   customers: Customer[];
+  inventoryReturnNotices?: InventoryReturnNotice[];
 }): AppNotification[] {
-  const { maintenanceCases, faultyEntities, projects, customers } = input;
+  const {
+    maintenanceCases,
+    faultyEntities,
+    projects,
+    customers,
+    inventoryReturnNotices = [],
+  } = input;
   const notifications: AppNotification[] = [];
 
   for (const mc of maintenanceCases) {
@@ -176,6 +186,27 @@ export function buildAppNotifications(input: {
         priority: 'medium',
       });
     }
+  }
+
+  for (const notice of inventoryReturnNotices) {
+    if (notice.read_at) continue;
+    const itemLabel =
+      notice.inventory_name ||
+      notice.part_number ||
+      (notice.inventory_id != null ? `Inventory #${notice.inventory_id}` : 'inventory item');
+    const who = notice.returned_by_name || `User #${notice.returned_by_user_id}`;
+    notifications.push({
+      id: `inventory-returned-${notice.id}`,
+      type: 'inventory_returned',
+      title: 'Inventory returned',
+      message: `Installer ${who} has returned ${itemLabel}${
+        notice.serial_number ? ` (${notice.serial_number})` : ''
+      }`,
+      href: '/inventory/issuances',
+      timestamp: notice.created_at,
+      priority: 'high',
+      metaId: notice.id,
+    });
   }
 
   return notifications.sort(

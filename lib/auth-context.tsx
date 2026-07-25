@@ -28,6 +28,8 @@ interface AuthContextType {
   /** True if the user has every listed permission (AND). */
   hasAllPermissions: (permissions: string[]) => boolean;
   can: (permission: string | string[]) => boolean;
+  /** Admin or SubAdmin — full warehouse + issue/accept returns. */
+  isInventoryManager: () => boolean;
   refreshUser: () => Promise<void>;
 }
 
@@ -225,6 +227,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return (user?.roles ?? []).some((role) => role.toLowerCase() === 'admin');
   }, [user?.roles]);
 
+  const isInventoryManager = useCallback(() => {
+    return (user?.roles ?? []).some((role) => {
+      const name = role.toLowerCase();
+      return name === 'admin' || name === 'subadmin';
+    });
+  }, [user?.roles]);
+
   const can = useCallback(
     (permission: string | string[]) => {
       if (!user) return false;
@@ -284,6 +293,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         hasAccess,
         hasAllPermissions,
         can,
+        isInventoryManager,
         refreshUser,
       }}
     >

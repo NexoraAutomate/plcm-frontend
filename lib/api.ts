@@ -303,6 +303,14 @@ export const inventory = {
     api.post<Models.InventoryIssuance>(`/inventory/issuances/${issuanceId}/return/`, {
       notes: notes ?? null,
     }),
+  listReturnNotices: (unreadOnly = false) =>
+    api.get<Models.InventoryReturnNotice[]>('/inventory/return-notices/', {
+      params: { unread_only: unreadOnly },
+    }),
+  markReturnNoticeRead: (noticeId: number) =>
+    api.post<Models.InventoryReturnNotice>(`/inventory/return-notices/${noticeId}/read/`),
+  markAllReturnNoticesRead: () =>
+    api.post<{ ok: boolean; marked: number }>('/inventory/return-notices/read-all/'),
   linkIssuanceInstall: (
     issuanceId: number,
     installedEntityType: string,

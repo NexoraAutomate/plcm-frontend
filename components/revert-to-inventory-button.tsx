@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Undo2 } from 'lucide-react';
 import * as api from '@/lib/api';
 import { Can } from '@/components/auth/can';
+import { useAuth } from '@/lib/auth-context';
 import { P } from '@/lib/permission-codes';
 import { Button } from '@/components/ui/button';
 import {
@@ -42,18 +43,20 @@ export function RevertToInventoryButton({
   variant = 'outline',
   size = 'sm',
 }: Props) {
+  const { isInventoryManager } = useAuth();
   const [busy, setBusy] = useState(false);
 
-  if (!isCurrentInstall) return null;
+  // Admin/SubAdmin manage issue/returns — only installers revert
+  if (isInventoryManager() || !isCurrentInstall) return null;
 
   const handleRevert = async () => {
     setBusy(true);
     try {
       await api.inventory.revertToStock(entityType, entityId);
       toast.success(
-        `Restored to inventory${partNumber ? ` (${partNumber}` : ''}${
+        `Restored to your inventory${partNumber ? ` (${partNumber}` : ''}${
           serialNumber ? ` / ${serialNumber}` : ''
-        }${partNumber || serialNumber ? ')' : ''}`
+        }${partNumber || serialNumber ? ')' : ''} with children removed from hierarchy`
       );
       onReverted?.();
     } catch (err: unknown) {
@@ -79,9 +82,11 @@ export function RevertToInventoryButton({
           <AlertDialogHeader>
             <AlertDialogTitle>Revert accidental install?</AlertDialogTitle>
             <AlertDialogDescription>
-              This marks the install as not current and restores the item to inventory with the same
-              part number{partNumber ? ` (${partNumber})` : ''}
-              {serialNumber ? ` and serial (${serialNumber})` : ''}.
+              This removes the item and all its children from the hierarchy UI and restores the
+              assembly to your issued inventory list
+              {partNumber ? ` (${partNumber}` : ''}
+              {serialNumber ? ` / ${serialNumber}` : ''}
+              {partNumber || serialNumber ? ')' : ''}. Installation metadata will be cleared.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -8,6 +8,7 @@ import {
 import { inventoryPartNumber, mergeInventoryWithInstance } from '@/lib/inventory-entity-fields';
 import { inventoryToHierarchyCreatePayload } from '@/lib/hierarchy-install-fields';
 import { getSelectableInstances } from '@/lib/inventory-install';
+import { isInventoryInStock } from '@/lib/inventory-filter';
 import * as api from '@/lib/api';
 import {
   buildInventoryAssetSources,
@@ -32,7 +33,7 @@ export function filterInventoryForHierarchy(
   return items.filter(
     (item) =>
       item.inventory_type === entityType &&
-      item.quantity > 0 &&
+      isInventoryInStock(item) &&
       allowed.has(item.name?.trim().toLowerCase() ?? '')
   );
 }

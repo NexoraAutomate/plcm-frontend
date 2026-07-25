@@ -35,6 +35,7 @@ import {
 import { syncEntityPicture } from '@/lib/entity-picture-upload';
 import { useHierarchyCreateFormOptions } from '@/hooks/use-hierarchy-create-form-options';
 import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
+import { isCurrentInstallEntity } from '@/lib/entity-replacement';
 
 export default function ProjectDetailPage() {
   const params = useParams();
@@ -64,7 +65,9 @@ export default function ProjectDetailPage() {
   const [systemHierarchyNames, setSystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
 
   const project = projects.find((p) => String(p.id) === projectId);
-  const projectSystems = project ? systems.filter((s) => s.project_id === project.id) : [];
+  const projectSystems = project
+    ? systems.filter((s) => s.project_id === project.id && isCurrentInstallEntity(s))
+    : [];
   const order = project ? orders.find((o) => o.id === project.order_id) : null;
 
 
