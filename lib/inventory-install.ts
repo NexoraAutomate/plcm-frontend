@@ -29,9 +29,10 @@ export interface InventoryAssetSource {
 export function needsSerialSelection(item: Inventory): boolean {
   const usesInstances = inventoryUsesInstances(item.inventory_type as HierarchyEntityType);
   if (!usesInstances) return false;
-  if (item.quantity <= 1) return false;
-  const selectableCount = (item.instances ?? []).filter((instance) => Boolean(instance?.id)).length;
-  return selectableCount > 1;
+  // Prefer live instance rows over catalog quantity (multi-unit groups must open serial pickers).
+  const selectableCount = getSelectableInstances(item).length;
+  if (selectableCount > 0) return selectableCount > 1;
+  return Number(item.quantity) > 1;
 }
 
 export function getSelectableInstances(item: Inventory): InventoryInstance[] {

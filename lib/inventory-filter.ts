@@ -9,10 +9,12 @@ import {
 export function isInventoryInStock(item: Inventory): boolean {
   const type = item.inventory_type as HierarchyEntityType;
   if (inventoryUsesInstances(type)) {
-    // Instance-based stock is defined by remaining instance rows (incl. reserved/issued).
-    return (item.instances ?? []).some((instance) => Boolean(instance?.id));
+    const instances = item.instances ?? [];
+    if (instances.some((instance) => Boolean(instance?.id))) return true;
+    // Fallback when instance rows were not hydrated on the list payload.
+    return Number(item.available_quantity ?? item.quantity) > 0;
   }
-  return Number(item.quantity) > 0;
+  return Number(item.available_quantity ?? item.quantity) > 0;
 }
 
 function normalizePartNumber(value?: string | null): string {

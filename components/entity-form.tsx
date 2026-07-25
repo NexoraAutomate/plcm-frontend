@@ -150,7 +150,13 @@ export function EntityForm({
 
           {field.type === 'select' && (
             <Select
-              value={formData[field.name]?.toString() || ''}
+              value={
+                formData[field.name] !== undefined &&
+                formData[field.name] !== null &&
+                String(formData[field.name]) !== ''
+                  ? String(formData[field.name])
+                  : undefined
+              }
               disabled={field.disabled}
               onValueChange={(value) => applyFieldChange(field.name, value)}
             >

@@ -43,8 +43,10 @@ export function buildPartNumberOptions(inventoryItems: Inventory[]): FormOption[
   for (const item of inventoryItems) {
     const partNumber = inventoryPartNumber(item);
     if (!partNumber) continue;
-    const label = item.name ? `${partNumber} — ${item.name}` : partNumber;
-    options.set(partNumber, label);
+    const qty = Number(item.available_quantity ?? item.quantity) || 0;
+    const qtyLabel = qty > 1 ? ` (${qty} available)` : qty === 1 ? ' (1 available)' : '';
+    const base = item.name ? `${partNumber} — ${item.name}` : partNumber;
+    options.set(partNumber, `${base}${qtyLabel}`);
   }
   return Array.from(options.entries()).map(([value, label]) => ({ value, label }));
 }
@@ -75,12 +77,18 @@ export function buildSerialOptionsForPartNumber(
   if (!item) return [];
 
   if (inventoryUsesInstances(item.inventory_type as HierarchyEntityType)) {
-    return getSelectableInstances(item).map((instance, index) => {
+    const instances = getSelectableInstances(item);
+    if (instances.length === 0) return [];
+    return instances.map((instance, index) => {
       const serial =
         instance.original_serial_number?.trim() ||
         instance.serial_number?.trim() ||
         `Unit ${index + 1}`;
-      return { label: serial, value: String(instance.id) };
+      const reserved =
+        instance.is_reserved || instance.open_issuance_id
+          ? ' (issued)'
+          : '';
+      return { label: `${serial}${reserved}`, value: String(instance.id) };
     });
   }
 

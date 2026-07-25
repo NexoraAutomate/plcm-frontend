@@ -97,7 +97,8 @@ export const TOGGLE_SECTIONS: ToggleSectionDef[] = [
     label: 'Pages & Dashboards',
     description: 'Controls which areas of the app this role can open',
     permissions: [
-      { code: 'view_executive_dashboard', label: 'Executive Dashboard' },
+      { code: 'view_executive_dashboard', label: 'Executive Dashboard view' },
+      { code: 'view_hierarchy_dashboard', label: 'Hierarchy Dashboard view' },
       { code: 'view_reports', label: 'Reporting' },
       { code: 'view_notifications', label: 'Notifications' },
     ],
