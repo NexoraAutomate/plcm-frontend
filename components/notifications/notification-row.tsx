@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Bell, Wrench, AlertTriangle, CheckCircle2, Users, Rocket, Package } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { AppNotification } from '@/lib/app-notifications';
+import { parseApiDate } from '@/lib/parse-api-date';
 import { cn } from '@/lib/utils';
 
 const TYPE_ICON: Record<AppNotification['type'], typeof Bell> = {
@@ -24,20 +25,21 @@ interface NotificationRowProps {
   item: AppNotification;
   isRead?: boolean;
   onMarkRead?: (id: string) => void;
+  /** When set, inventory return clicks open a decision flow instead of navigating. */
+  onActivate?: (item: AppNotification) => void;
 }
 
-export function NotificationRow({ item, isRead = false, onMarkRead }: NotificationRowProps) {
+export function NotificationRow({
+  item,
+  isRead = false,
+  onMarkRead,
+  onActivate,
+}: NotificationRowProps) {
   const Icon = TYPE_ICON[item.type];
+  const isReturnDecision = item.type === 'inventory_returned' && onActivate != null;
 
-  return (
-    <Link
-      href={item.href}
-      onClick={() => onMarkRead?.(item.id)}
-      className={cn(
-        'flex gap-3 rounded-lg p-3 transition-colors hover:bg-muted/60',
-        isRead && 'opacity-70'
-      )}
-    >
+  const content = (
+    <>
       <div
         className={cn(
           'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
@@ -59,9 +61,32 @@ export function NotificationRow({ item, isRead = false, onMarkRead }: Notificati
         </div>
         <p className="truncate text-xs text-muted-foreground">{item.message}</p>
         <p className="mt-1 text-[10px] text-muted-foreground">
-          {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
+          {formatDistanceToNow(parseApiDate(item.timestamp), { addSuffix: true })}
         </p>
       </div>
+    </>
+  );
+
+  const className = cn(
+    'flex gap-3 rounded-lg p-3 transition-colors hover:bg-muted/60',
+    isRead && 'opacity-70'
+  );
+
+  if (isReturnDecision) {
+    return (
+      <button
+        type="button"
+        className={cn(className, 'w-full cursor-pointer text-left')}
+        onClick={() => onActivate(item)}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <Link href={item.href} onClick={() => onMarkRead?.(item.id)} className={className}>
+      {content}
     </Link>
   );
 }

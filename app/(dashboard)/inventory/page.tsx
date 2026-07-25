@@ -1540,19 +1540,27 @@ export default function InventoryPage() {
                                 ) : null}
                               </Can>
                               {!inventoryManager &&
-                              ((item.reserved_quantity ?? 0) > 0 ||
-                                (item.instances ?? []).some((i) => i.open_issuance_id)) ? (
+                              ((item.instances ?? []).some(
+                                (i) =>
+                                  i.open_issuance_id &&
+                                  i.open_issuance_status !== 'return_pending'
+                              ) ||
+                                (!(item.instances ?? []).length &&
+                                  (item.available_quantity ?? item.quantity) > 0)) ? (
                                 <Button
                                   size="icon-sm"
                                   variant="ghost"
                                   className={cn(ACTION_BTN, 'group/issue')}
-                                  title="Return to admin"
-                                  aria-label="Return to admin"
+                                  title="Request return to admin"
+                                  aria-label="Request return to admin"
                                   onClick={async () => {
                                     try {
                                       let id =
-                                        (item.instances ?? []).find((i) => i.open_issuance_id)
-                                          ?.open_issuance_id ?? null;
+                                        (item.instances ?? []).find(
+                                          (i) =>
+                                            i.open_issuance_id &&
+                                            i.open_issuance_status !== 'return_pending'
+                                        )?.open_issuance_id ?? null;
                                       if (!id) {
                                         const res = await api.inventory.listIssuances({
                                           inventory_id: item.id,
@@ -1565,7 +1573,9 @@ export default function InventoryPage() {
                                         return;
                                       }
                                       await api.inventory.returnIssuance(id);
-                                      toast.success('Returned to admin warehouse');
+                                      toast.success(
+                                        'Return requested — waiting for admin acceptance'
+                                      );
                                       void pagination.invalidate();
                                     } catch (err: unknown) {
                                       const detail =
@@ -1579,6 +1589,22 @@ export default function InventoryPage() {
                                 >
                                   <Undo2 className={ACTION_ICON.issue} />
                                 </Button>
+                              ) : null}
+                              {!inventoryManager &&
+                              (item.instances ?? []).some(
+                                (i) => i.open_issuance_status === 'return_pending'
+                              ) &&
+                              !(item.instances ?? []).some(
+                                (i) =>
+                                  i.open_issuance_id &&
+                                  i.open_issuance_status !== 'return_pending'
+                              ) ? (
+                                <span
+                                  className="px-1 text-[10px] text-muted-foreground"
+                                  title="Awaiting admin acceptance"
+                                >
+                                  Pending
+                                </span>
                               ) : null}
                               <Can permission={P.edit_inventory}>
                                 {canEditInventory ? (
@@ -1669,19 +1695,22 @@ export default function InventoryPage() {
                                               ) : null}
                                               {instance.is_reserved &&
                                               instance.open_issuance_id &&
+                                              instance.open_issuance_status !== 'return_pending' &&
                                               !inventoryManager ? (
                                                 <Button
                                                   size="icon-sm"
                                                   variant="ghost"
                                                   className={cn(ACTION_BTN, 'group/issue')}
-                                                  title="Return to admin"
-                                                  aria-label="Return to admin"
+                                                  title="Request return to admin"
+                                                  aria-label="Request return to admin"
                                                   onClick={async () => {
                                                     try {
                                                       await api.inventory.returnIssuance(
                                                         instance.open_issuance_id!
                                                       );
-                                                      toast.success('Returned to admin warehouse');
+                                                      toast.success(
+                                                        'Return requested — waiting for admin acceptance'
+                                                      );
                                                       void pagination.invalidate();
                                                     } catch (err: unknown) {
                                                       const detail =
@@ -1699,6 +1728,15 @@ export default function InventoryPage() {
                                                 >
                                                   <Undo2 className={ACTION_ICON.issue} />
                                                 </Button>
+                                              ) : null}
+                                              {instance.open_issuance_status === 'return_pending' &&
+                                              !inventoryManager ? (
+                                                <span
+                                                  className="text-[10px] text-muted-foreground"
+                                                  title="Awaiting admin acceptance"
+                                                >
+                                                  Pending
+                                                </span>
                                               ) : null}
                                             </TableCell>
                                           </TableRow>

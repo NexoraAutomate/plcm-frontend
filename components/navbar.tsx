@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { NotificationRow } from "@/components/notifications/notification-row";
+import { InventoryReturnDecisionDialog } from "@/components/notifications/inventory-return-decision-dialog";
 import { useAppNotifications } from "@/hooks/use-app-notifications";
 import { useNotificationSync } from "@/hooks/use-notification-sync";
 
@@ -30,6 +31,10 @@ export function Navbar() {
     markAsRead,
     markAllAsRead,
     clearAll,
+    returnDialogNotice,
+    setReturnDialogOpen,
+    handleNotificationActivate,
+    refreshReturnNotices,
   } = useAppNotifications();
 
   return (
@@ -94,6 +99,7 @@ export function Navbar() {
                       item={item}
                       isRead={isRead(item.id)}
                       onMarkRead={markAsRead}
+                      onActivate={handleNotificationActivate}
                     />
                   ))}
                 </div>
@@ -129,6 +135,13 @@ export function Navbar() {
             </div>
           </PopoverContent>
         </Popover>
+
+        <InventoryReturnDecisionDialog
+          notice={returnDialogNotice}
+          open={returnDialogNotice != null}
+          onOpenChange={setReturnDialogOpen}
+          onDecided={() => void refreshReturnNotices()}
+        />
 
         <Link
           href="/profile"

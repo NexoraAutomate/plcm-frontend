@@ -1,6 +1,7 @@
 import { CaseStatus, FaultyEntityStatus } from '@/lib/models';
 import { getCaseStatusMeta, mapCaseStatusFromApi } from '@/lib/maintenance-workflow';
 import type { Customer, FaultyEntity, InventoryReturnNotice, MaintenanceCase, Project } from '@/lib/models';
+import { parseApiDate } from '@/lib/parse-api-date';
 
 export type AppNotificationType =
   | 'open_maintenance_case'
@@ -25,6 +26,8 @@ export interface AppNotification {
   priority: 'high' | 'medium' | 'low';
   /** Backend notice id for inventory returns (optional). */
   metaId?: number;
+  /** Issuance id for inventory return accept/reject. */
+  metaIssuanceId?: number;
 }
 
 const OPEN_CASE_STATUSES: string[] = [
@@ -37,7 +40,8 @@ const RECENT_MS = 7 * 24 * 60 * 60 * 1000;
 
 function isRecent(isoDate?: string | null): boolean {
   if (!isoDate) return false;
-  const ts = new Date(isoDate).getTime();
+  const ts = parseApiDate(isoDate).getTime();
+  if (Number.isNaN(ts)) return false;
   return Date.now() - ts <= RECENT_MS;
 }
 
@@ -189,7 +193,7 @@ export function buildAppNotifications(input: {
   }
 
   for (const notice of inventoryReturnNotices) {
-    if (notice.read_at) continue;
+    if (notice.decision && notice.decision !== 'pending') continue;
     const itemLabel =
       notice.inventory_name ||
       notice.part_number ||
@@ -198,14 +202,15 @@ export function buildAppNotifications(input: {
     notifications.push({
       id: `inventory-returned-${notice.id}`,
       type: 'inventory_returned',
-      title: 'Inventory returned',
-      message: `Installer ${who} has returned ${itemLabel}${
+      title: 'Inventory return requested',
+      message: `Installer ${who} requested return of ${itemLabel}${
         notice.serial_number ? ` (${notice.serial_number})` : ''
       }`,
       href: '/inventory/issuances',
       timestamp: notice.created_at,
       priority: 'high',
       metaId: notice.id,
+      metaIssuanceId: notice.issuance_id,
     });
   }
 

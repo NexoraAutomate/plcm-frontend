@@ -4,7 +4,9 @@ import { useMemo } from 'react';
 import { Bell } from 'lucide-react';
 import { format, isToday, isYesterday, startOfDay } from 'date-fns';
 import { NotificationRow } from '@/components/notifications/notification-row';
+import { InventoryReturnDecisionDialog } from '@/components/notifications/inventory-return-decision-dialog';
 import { useAppNotifications } from '@/hooks/use-app-notifications';
+import { parseApiDate } from '@/lib/parse-api-date';
 
 function groupLabel(date: Date): string {
   if (isToday(date)) return 'Today';
@@ -13,13 +15,22 @@ function groupLabel(date: Date): string {
 }
 
 export default function NotificationsPage() {
-  const { notifications, loading, isRead, markAsRead } = useAppNotifications();
+  const {
+    notifications,
+    loading,
+    isRead,
+    markAsRead,
+    returnDialogNotice,
+    setReturnDialogOpen,
+    handleNotificationActivate,
+    refreshReturnNotices,
+  } = useAppNotifications();
 
   const grouped = useMemo(() => {
     const groups = new Map<string, typeof notifications>();
 
     for (const item of notifications) {
-      const day = startOfDay(new Date(item.timestamp));
+      const day = startOfDay(parseApiDate(item.timestamp));
       const key = day.toISOString();
       const existing = groups.get(key) ?? [];
       existing.push(item);
@@ -39,7 +50,7 @@ export default function NotificationsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Notifications</h1>
         <p className="text-sm text-muted-foreground">
-          Maintenance, faults, projects, and customer updates
+          Maintenance, faults, projects, customer updates, and inventory returns
         </p>
       </div>
 
@@ -65,6 +76,7 @@ export default function NotificationsPage() {
                     item={item}
                     isRead={isRead(item.id)}
                     onMarkRead={markAsRead}
+                    onActivate={handleNotificationActivate}
                   />
                 ))}
               </div>
@@ -72,6 +84,13 @@ export default function NotificationsPage() {
           ))}
         </div>
       )}
+
+      <InventoryReturnDecisionDialog
+        notice={returnDialogNotice}
+        open={returnDialogNotice != null}
+        onOpenChange={setReturnDialogOpen}
+        onDecided={() => void refreshReturnNotices()}
+      />
     </div>
   );
 }

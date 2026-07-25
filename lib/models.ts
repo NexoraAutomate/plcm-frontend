@@ -333,6 +333,7 @@ export interface InventoryInstance extends HierarchyInstallFields {
   updated_at?: string
   is_reserved?: boolean
   open_issuance_id?: number | null
+  open_issuance_status?: string | null
 }
 
 export interface Inventory extends HierarchyInstallFields {
@@ -360,7 +361,12 @@ export interface Inventory extends HierarchyInstallFields {
   component?: Component
 }
 
-export type InventoryIssuanceStatus = 'issued' | 'installed' | 'returned' | 'reverted'
+export type InventoryIssuanceStatus =
+  | 'issued'
+  | 'return_pending'
+  | 'installed'
+  | 'returned'
+  | 'reverted'
 
 export interface InventoryIssuance {
   id: number
@@ -384,6 +390,7 @@ export interface InventoryIssuance {
   installed_by_id?: number | null
   closed_at?: string | null
   closed_by_id?: number | null
+  return_requested_at?: string | null
   issued_to_name?: string | null
   issued_by_name?: string | null
   installed_by_name?: string | null
@@ -411,6 +418,8 @@ export interface InventoryRevertResult {
   issuance?: InventoryIssuance | null
 }
 
+export type InventoryReturnDecision = 'pending' | 'accepted' | 'rejected'
+
 export interface InventoryReturnNotice {
   id: number
   issuance_id: number
@@ -422,6 +431,10 @@ export interface InventoryReturnNotice {
   returned_by_name?: string | null
   created_at: string
   read_at?: string | null
+  decision?: InventoryReturnDecision | string | null
+  decided_at?: string | null
+  decided_by_id?: number | null
+  decision_notes?: string | null
 }
 
 export interface InventoryChildLink {

@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { ArrowLeft, RefreshCw, Undo2 } from 'lucide-react';
+import { ArrowLeft, Check, RefreshCw, Undo2, X } from 'lucide-react';
 import * as api from '@/lib/api';
 import type { InventoryIssuance, User } from '@/lib/models';
 import { useDataStore } from '@/lib/data-store';
 import { formatUserRef } from '@/lib/user-display';
+import { parseApiDate } from '@/lib/parse-api-date';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -32,8 +33,9 @@ import { PageLoader } from '@/components/page-loader';
 import { useAuth } from '@/lib/auth-context';
 
 const STATUS_OPTIONS = [
-  { value: 'all', label: 'All statuses' },
+  { value: 'all', label: 'All (history)' },
   { value: 'issued', label: 'Issued (open)' },
+  { value: 'return_pending', label: 'Return pending' },
   { value: 'installed', label: 'Installed' },
   { value: 'returned', label: 'Returned' },
   { value: 'reverted', label: 'Reverted' },
@@ -43,6 +45,8 @@ function statusBadgeVariant(status: string) {
   switch (status) {
     case 'issued':
       return 'default' as const;
+    case 'return_pending':
+      return 'secondary' as const;
     case 'installed':
       return 'secondary' as const;
     case 'returned':
@@ -57,7 +61,9 @@ function statusBadgeVariant(status: string) {
 function formatWhen(value?: string | null) {
   if (!value) return '—';
   try {
-    return new Date(value).toLocaleString();
+    const d = parseApiDate(value);
+    if (Number.isNaN(d.getTime())) return value;
+    return d.toLocaleString();
   } catch {
     return value;
   }
@@ -74,10 +80,10 @@ export default function InventoryIssuancesPage() {
   const inventoryManager = isInventoryManager();
   const [rows, setRows] = useState<InventoryIssuance[]>([]);
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState('issued');
+  const [status, setStatus] = useState('all');
   const [issuedTo, setIssuedTo] = useState('all');
   const [search, setSearch] = useState('');
-  const [returningId, setReturningId] = useState<number | null>(null);
+  const [actionId, setActionId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -102,10 +108,14 @@ export default function InventoryIssuancesPage() {
   }, [load]);
 
   const handleReturn = async (row: InventoryIssuance) => {
-    setReturningId(row.id);
+    setActionId(row.id);
     try {
       await api.inventory.returnIssuance(row.id);
-      toast.success('Issuance returned — stock is available again');
+      toast.success(
+        inventoryManager
+          ? 'Return accepted — stock is available again'
+          : 'Return requested — waiting for admin acceptance'
+      );
       await load();
     } catch (err: unknown) {
       const detail =
@@ -113,7 +123,39 @@ export default function InventoryIssuancesPage() {
         'Failed to return issuance';
       toast.error(typeof detail === 'string' ? detail : 'Failed to return issuance');
     } finally {
-      setReturningId(null);
+      setActionId(null);
+    }
+  };
+
+  const handleAccept = async (row: InventoryIssuance) => {
+    setActionId(row.id);
+    try {
+      await api.inventory.acceptReturn(row.id);
+      toast.success('Return accepted — stock restored to warehouse');
+      await load();
+    } catch (err: unknown) {
+      const detail =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        'Failed to accept return';
+      toast.error(typeof detail === 'string' ? detail : 'Failed to accept return');
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleReject = async (row: InventoryIssuance) => {
+    setActionId(row.id);
+    try {
+      await api.inventory.rejectReturn(row.id);
+      toast.success('Return rejected — reissued to installer');
+      await load();
+    } catch (err: unknown) {
+      const detail =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        'Failed to reject return';
+      toast.error(typeof detail === 'string' ? detail : 'Failed to reject return');
+    } finally {
+      setActionId(null);
     }
   };
 
@@ -132,8 +174,8 @@ export default function InventoryIssuancesPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Inventory issuances</h1>
           <p className="text-sm text-muted-foreground">
             {inventoryManager
-              ? 'Track who received stock, when, quantity, and install status. Accept returns from installers.'
-              : 'Your issued stock — return unused items to Admin when no longer needed.'}
+              ? 'Full issuance and return history. Accept or reject pending returns from installers.'
+              : 'Your issuance history — return unused items to Admin when no longer needed.'}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => void load()}>
@@ -210,28 +252,48 @@ export default function InventoryIssuancesPage() {
                     <TableHead>Qty</TableHead>
                     <TableHead>Whom</TableHead>
                     <TableHead>Issued by</TableHead>
-                    <TableHead>When</TableHead>
+                    <TableHead>Issued</TableHead>
+                    <TableHead>Return / Closed</TableHead>
                     <TableHead>Entity</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="w-25">Actions</TableHead>
+                    <TableHead className="w-40">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rows.map((row) => (
                     <TableRow key={row.id}>
                       <TableCell>
-                        <div className="font-medium">{row.inventory_name || `Inventory #${row.inventory_id}`}</div>
+                        <div className="font-medium">
+                          {row.inventory_name || `Inventory #${row.inventory_id}`}
+                        </div>
                         <div className="text-xs text-muted-foreground">{row.inventory_type}</div>
                       </TableCell>
                       <TableCell>
                         <div>{row.part_number || '—'}</div>
-                        <div className="text-xs text-muted-foreground">{row.serial_number || '—'}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {row.serial_number || '—'}
+                        </div>
                       </TableCell>
                       <TableCell>{row.quantity}</TableCell>
-                      <TableCell>{row.issued_to_name || `User #${row.issued_to_user_id}`}</TableCell>
-                      <TableCell>{row.issued_by_name || `User #${row.issued_by_user_id}`}</TableCell>
+                      <TableCell>
+                        {row.issued_to_name || `User #${row.issued_to_user_id}`}
+                      </TableCell>
+                      <TableCell>
+                        {row.issued_by_name || `User #${row.issued_by_user_id}`}
+                      </TableCell>
                       <TableCell className="whitespace-nowrap text-sm">
                         {formatWhen(row.issued_at)}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-sm">
+                        {row.status === 'return_pending' ? (
+                          <span title="Return requested">
+                            Req {formatWhen(row.return_requested_at)}
+                          </span>
+                        ) : row.closed_at ? (
+                          <span title={row.status}>{formatWhen(row.closed_at)}</span>
+                        ) : (
+                          '—'
+                        )}
                       </TableCell>
                       <TableCell className="text-sm">
                         {entityLabel(
@@ -240,20 +302,51 @@ export default function InventoryIssuancesPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={statusBadgeVariant(row.status)}>{row.status}</Badge>
+                        <Badge variant={statusBadgeVariant(row.status)}>
+                          {row.status === 'return_pending' ? 'return pending' : row.status}
+                        </Badge>
                       </TableCell>
                       <TableCell>
-                        {row.status === 'issued' && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={returningId === row.id}
-                            onClick={() => void handleReturn(row)}
-                          >
-                            <Undo2 className="mr-1 size-3.5" />
-                            {inventoryManager ? 'Accept return' : 'Return to admin'}
-                          </Button>
-                        )}
+                        <div className="flex flex-wrap gap-1">
+                          {row.status === 'issued' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={actionId === row.id}
+                              onClick={() => void handleReturn(row)}
+                            >
+                              <Undo2 className="mr-1 size-3.5" />
+                              {inventoryManager ? 'Force return' : 'Return'}
+                            </Button>
+                          )}
+                          {row.status === 'return_pending' && inventoryManager && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={actionId === row.id}
+                                onClick={() => void handleAccept(row)}
+                              >
+                                <Check className="mr-1 size-3.5" />
+                                Accept
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={actionId === row.id}
+                                onClick={() => void handleReject(row)}
+                              >
+                                <X className="mr-1 size-3.5" />
+                                Reject
+                              </Button>
+                            </>
+                          )}
+                          {row.status === 'return_pending' && !inventoryManager && (
+                            <span className="px-2 text-xs text-muted-foreground">
+                              Awaiting admin
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

@@ -11,6 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { ActivityItem } from '@/lib/types/dashboard';
+import { parseApiDate } from '@/lib/parse-api-date';
 import { DashboardEmptyState } from './DashboardEmptyState';
 
 interface RecentActivityTableProps {
@@ -54,7 +55,7 @@ export function RecentActivityTable({ title, items, onRowClick }: RecentActivity
                     {item.status?.replace(/_/g, ' ') ?? '—'}
                   </TableCell>
                   <TableCell className="text-right text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
+                    {formatDistanceToNow(parseApiDate(item.timestamp), { addSuffix: true })}
                   </TableCell>
                 </TableRow>
               ))}
