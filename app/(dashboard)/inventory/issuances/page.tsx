@@ -256,7 +256,7 @@ export default function InventoryIssuancesPage() {
                     <TableHead>Return / Closed</TableHead>
                     <TableHead>Entity</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="w-40">Actions</TableHead>
+                    <TableHead className="w-[1%] whitespace-nowrap text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -306,47 +306,48 @@ export default function InventoryIssuancesPage() {
                           {row.status === 'return_pending' ? 'return pending' : row.status}
                         </Badge>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {row.status === 'issued' && (
+                      <TableCell className="text-right">
+                        {row.status === 'issued' ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="whitespace-nowrap"
+                            disabled={actionId === row.id}
+                            onClick={() => void handleReturn(row)}
+                          >
+                            <Undo2 className="size-3.5" />
+                            {inventoryManager ? 'Force return' : 'Return'}
+                          </Button>
+                        ) : null}
+                        {row.status === 'return_pending' && inventoryManager ? (
+                          <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
                             <Button
-                              variant="ghost"
+                              variant="default"
                               size="sm"
+                              className="whitespace-nowrap"
                               disabled={actionId === row.id}
-                              onClick={() => void handleReturn(row)}
+                              onClick={() => void handleAccept(row)}
                             >
-                              <Undo2 className="mr-1 size-3.5" />
-                              {inventoryManager ? 'Force return' : 'Return'}
+                              <Check className="size-3.5" />
+                              Accept
                             </Button>
-                          )}
-                          {row.status === 'return_pending' && inventoryManager && (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={actionId === row.id}
-                                onClick={() => void handleAccept(row)}
-                              >
-                                <Check className="mr-1 size-3.5" />
-                                Accept
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={actionId === row.id}
-                                onClick={() => void handleReject(row)}
-                              >
-                                <X className="mr-1 size-3.5" />
-                                Reject
-                              </Button>
-                            </>
-                          )}
-                          {row.status === 'return_pending' && !inventoryManager && (
-                            <span className="px-2 text-xs text-muted-foreground">
-                              Awaiting admin
-                            </span>
-                          )}
-                        </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="whitespace-nowrap"
+                              disabled={actionId === row.id}
+                              onClick={() => void handleReject(row)}
+                            >
+                              <X className="size-3.5" />
+                              Reject
+                            </Button>
+                          </div>
+                        ) : null}
+                        {row.status === 'return_pending' && !inventoryManager ? (
+                          <span className="whitespace-nowrap text-xs text-muted-foreground">
+                            Awaiting admin
+                          </span>
+                        ) : null}
                       </TableCell>
                     </TableRow>
                   ))}
