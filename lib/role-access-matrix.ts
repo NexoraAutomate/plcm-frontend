@@ -52,6 +52,7 @@ export const CRUD_MODULES: CrudModuleDef[] = [
   { key: 'inventory', label: 'Inventory', resource: 'inventory', extras: [
     { code: 'issue_inventory', label: 'Issue to developer' },
     { code: 'revert_inventory_install', label: 'Revert install to stock' },
+    { code: 'view_inventory_issuances', label: 'Inventory issuances' },
   ]},
   { key: 'entities', label: 'Entities', resource: 'entities' },
   { key: 'statuses', label: 'Statuses', resource: 'statuses' },

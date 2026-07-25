@@ -1281,12 +1281,14 @@ export default function InventoryPage() {
               : 'Items currently issued to you — return unused stock to Admin when finished'}
           </p>
         </div>
-        <Button variant="outline" asChild>
-          <Link href="/inventory/issuances">
-            <ListOrdered className="mr-2 h-4 w-4" />
-            Issuances
-          </Link>
-        </Button>
+        <Can permission={P.view_inventory_issuances}>
+          <Button variant="outline" asChild>
+            <Link href="/inventory/issuances">
+              <ListOrdered className="mr-2 h-4 w-4" />
+              Issuances
+            </Link>
+          </Button>
+        </Can>
       </div>
 
       <div className="space-y-3">

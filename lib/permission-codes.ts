@@ -60,6 +60,7 @@ export const P = {
   delete_inventory: 'delete_inventory',
   issue_inventory: 'issue_inventory',
   revert_inventory_install: 'revert_inventory_install',
+  view_inventory_issuances: 'view_inventory_issuances',
 
   // Maintenance
   view_maintenance: 'view_maintenance',
@@ -163,6 +164,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [P.generate_maintenance_dossier]: 'Generate Maintenance Dossier',
   [P.view_executive_dashboard]: 'Executive Dashboard View',
   [P.view_hierarchy_dashboard]: 'Hierarchy Dashboard View',
+  [P.view_inventory_issuances]: 'Inventory Issuances',
   [P.confirm_faults]: 'Confirm Faults',
   [P.cascade_faults]: 'Cascade Faults',
   [P.suspect_children]: 'Suspect Children',
@@ -183,6 +185,7 @@ export const NAV_PERMISSIONS: Record<string, PermissionCode | PermissionCode[]> 
   '/orders': P.view_orders,
   '/projects': P.view_projects,
   '/inventory': P.view_inventory,
+  '/inventory/issuances': P.view_inventory_issuances,
   '/maintenance': P.view_maintenance_cases,
   '/notifications': P.view_notifications,
   '/hierarchy-dashboard': P.view_hierarchy_dashboard,
@@ -261,6 +264,9 @@ export function routePermissionForPath(pathname: string): PermissionCode | Permi
   }
   // Nested maintenance case detail
   if (normalized.startsWith('/maintenance/')) return P.view_maintenance_cases;
+  if (normalized === '/inventory/issuances' || normalized.startsWith('/inventory/issuances/')) {
+    return P.view_inventory_issuances;
+  }
   if (normalized.startsWith('/inventory/')) return P.view_inventory;
   if (normalized.startsWith('/projects/')) return P.view_projects;
   if (normalized.startsWith('/customers/')) return P.view_customers;
