@@ -1,0 +1,181 @@
+'use client';
+
+import { ProgramHealthCard } from './ProgramHealthCard';
+import { LogoCard } from './LogoCard';
+import { KPICard } from './KPICard';
+import { AreaChartCard } from './AreaChartCard';
+import { GaugeCard } from './GaugeCard';
+import { StatusMetricCard } from './StatusMetricCard';
+import { FiltersPanel } from './FiltersPanel';
+import { DonutChartCard } from './DonutChartCard';
+import { ScatterChartCard } from './ScatterChartCard';
+import { HorizontalBarCard } from './HorizontalBarCard';
+import { RadarChartCard } from './RadarChartCard';
+import { TreemapCard } from './TreemapCard';
+import { ConfigSplitCard } from './ConfigSplitCard';
+import { AlertPanel } from './AlertPanel';
+import { LineChartCard, DualLineChartCard } from './LineChartCard';
+import type { CommandCenterViewModel, ExecFilterOption, ExecFiltersState } from './types';
+import { EXEC_MAINT_COLORS, EXEC_FAULT_COLORS, EXEC } from './theme';
+
+interface ExecutiveCommandGridProps {
+  model: CommandCenterViewModel;
+  filters: ExecFiltersState;
+  customers: ExecFilterOption[];
+  programs: ExecFilterOption[];
+  projects: ExecFilterOption[];
+  onFiltersChange: (patch: Partial<ExecFiltersState>) => void;
+  onNavigate?: (path: string) => void;
+  fetching?: boolean;
+  onRefresh?: () => void;
+}
+
+export function ExecutiveCommandGrid({
+  model,
+  filters,
+  customers,
+  programs,
+  projects,
+  onFiltersChange,
+  onNavigate,
+  fetching,
+  onRefresh,
+}: ExecutiveCommandGridProps) {
+  return (
+    <div
+      className="executive-command-center grid h-full min-h-0 w-full gap-3 overflow-hidden p-3"
+      style={{
+        background: EXEC.bg,
+        gridTemplateRows: 'minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.95fr)',
+        gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
+        fontFamily: 'var(--font-exec-inter), Inter, system-ui, sans-serif',
+      }}
+    >
+      {/* ── Row 1 ── */}
+      <div className="col-span-2 grid min-h-0 grid-rows-[auto_1fr] gap-3">
+        <LogoCard />
+        <ProgramHealthCard metric={model.programHealth} />
+      </div>
+
+      <KPICard
+        className="col-span-1 min-h-0"
+        label="Active Programs"
+        value={model.activePrograms.value}
+        trend={model.activePrograms.trend}
+        sparkline={model.activePrograms.sparkline}
+        onClick={() => onNavigate?.('/projects')}
+      />
+
+      <AreaChartCard
+        className="col-span-4 min-h-0"
+        data={model.portfolioTrend}
+        totals={model.portfolioTotals}
+        onClick={() => onNavigate?.('/projects')}
+      />
+
+      <div className="col-span-3 grid min-h-0 grid-rows-[1fr_auto] gap-3">
+        <div className="grid min-h-0 grid-cols-3 gap-3">
+          <GaugeCard metric={model.mttr} compact onClick={() => onNavigate?.('/maintenance')} />
+          <GaugeCard metric={model.mtbf} compact onClick={() => onNavigate?.('/maintenance')} />
+          <GaugeCard metric={model.spi} compact onClick={() => onNavigate?.('/projects')} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <StatusMetricCard
+            label="Open Maintenance Cases"
+            value={model.openMaintenanceCases.value}
+            trend={model.openMaintenanceCases.trend}
+            onClick={() => onNavigate?.('/maintenance')}
+          />
+          <StatusMetricCard
+            label="Delayed Projects"
+            value={model.delayedProjects.value}
+            trend={model.delayedProjects.trend}
+            onClick={() => onNavigate?.('/projects')}
+          />
+        </div>
+      </div>
+
+      <div className="col-span-2 min-h-0">
+        <FiltersPanel
+          filters={filters}
+          customers={customers}
+          programs={programs}
+          projects={projects}
+          onChange={onFiltersChange}
+          lastUpdated={model.generatedAt}
+          fetching={fetching}
+          onRefresh={onRefresh}
+        />
+      </div>
+
+      {/* ── Row 2 ── */}
+      <DonutChartCard
+        className="col-span-3 min-h-0"
+        title="Projects by Status"
+        data={model.projectsByStatus}
+        onSliceClick={() => onNavigate?.('/projects')}
+      />
+      <ScatterChartCard className="col-span-4 min-h-0" data={model.milestones} />
+      <HorizontalBarCard
+        className="col-span-3 min-h-0"
+        title="Top Delayed Projects"
+        data={model.topDelayed}
+        valueLabel="Days Overdue"
+        onBarClick={(item) => item.id && onNavigate?.(`/projects/${item.id}`)}
+      />
+      <RadarChartCard className="col-span-2 min-h-0" data={model.systemAvailability} />
+
+      {/* ── Row 3 ── */}
+      <TreemapCard
+        className="col-span-3 min-h-0"
+        tree={model.hierarchy}
+        onNodeClick={(node) => {
+          if (node.entityType === 'project' && node.id) onNavigate?.(`/projects/${node.id}`);
+          if (node.entityType === 'customer' && node.id) onNavigate?.(`/customers/${node.id}`);
+          if (node.entityType === 'order' && node.id) onNavigate?.(`/orders/${node.id}`);
+        }}
+      />
+      <ConfigSplitCard
+        className="col-span-4 min-h-0"
+        components={model.topModifiedComponents}
+        rows={model.recentChanges}
+      />
+      <HorizontalBarCard
+        className="col-span-3 min-h-0"
+        title="Projects by Customer"
+        data={model.projectsByCustomer}
+        valueLabel="Projects"
+        color={EXEC.purple}
+        onBarClick={(item) => item.id && onNavigate?.(`/customers/${item.id}`)}
+      />
+      <AlertPanel className="col-span-2 min-h-0" alerts={model.alerts} />
+
+      {/* ── Row 4 ── */}
+      <DonutChartCard
+        className="col-span-3 min-h-0"
+        title="Maintenance Cases by Status"
+        data={model.maintenanceByStatus}
+        colors={[...EXEC_MAINT_COLORS]}
+        onSliceClick={() => onNavigate?.('/maintenance')}
+      />
+      <LineChartCard
+        className="col-span-3 min-h-0"
+        title="Maintenance Trend"
+        data={model.maintenanceTrend}
+        onClick={() => onNavigate?.('/maintenance')}
+      />
+      <DonutChartCard
+        className="col-span-3 min-h-0"
+        title="Faults by Type"
+        data={model.faultsByType}
+        colors={[...EXEC_FAULT_COLORS]}
+        onSliceClick={() => onNavigate?.('/maintenance')}
+      />
+      <DualLineChartCard
+        className="col-span-3 min-h-0"
+        title="Fault Trend vs MTTR"
+        data={model.faultVsMttr}
+      />
+    </div>
+  );
+}
