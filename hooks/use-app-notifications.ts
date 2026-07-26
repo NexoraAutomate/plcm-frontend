@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDataStore } from '@/lib/data-store';
-import { buildAppNotifications, type AppNotification } from '@/lib/app-notifications';
+import {
+  buildAppNotifications,
+  filterAppNotifications,
+  type AppNotification,
+} from '@/lib/app-notifications';
 import { useNotificationState } from '@/hooks/use-notification-state';
 import { useAuth } from '@/lib/auth-context';
 import * as api from '@/lib/api';
@@ -15,9 +19,11 @@ const INSTALLER_NOTICE_TYPES = new Set([
   'inventory_return_rejected',
 ]);
 
-export function useAppNotifications() {
+export function useAppNotifications(options?: { search?: string }) {
+  const search = options?.search ?? '';
   const { maintenanceCases, faultyEntities, projects, customers, loading } = useDataStore();
   const { isInventoryManager } = useAuth();
+  const inventoryManager = isInventoryManager();
   const {
     hydrated,
     isRead,
@@ -35,25 +41,46 @@ export function useAppNotifications() {
   const installerToastReady = useRef(false);
 
   const loadReturnNotices = useCallback(async () => {
-    if (!isInventoryManager()) {
+    if (!inventoryManager) {
       setReturnNotices([]);
       return;
     }
     try {
-      const res = await api.inventory.listReturnNotices({ pendingOnly: true });
+      // Full history for admin (pending + decided)
+      const res = await api.inventory.listReturnNotices();
       setReturnNotices(res.data ?? []);
     } catch {
       setReturnNotices([]);
     }
-  }, [isInventoryManager]);
+  }, [inventoryManager]);
 
   const loadInstallerNotices = useCallback(async () => {
     try {
-      const res = await api.inventory.listInstallerNotices({ unreadOnly: true });
+      const res = await api.inventory.listInstallerNotices({
+        allUsers: inventoryManager,
+      });
       const rows = res.data ?? [];
+      const unread = rows.filter((r) => !r.read_at);
       if (installerToastReady.current) {
-        for (const row of rows) {
+        for (const row of unread) {
           if (seenInstallerIds.current.has(row.id)) continue;
+          // Managers browsing all-user notices shouldn't get toasts for other users' mail.
+          if (inventoryManager && row.user_id != null) {
+            // Still toast only for events that appear as new for this session when scoped to self;
+            // for all_users feed, toast only when the notice is for the signed-in admin themselves.
+            const sat =
+              typeof window !== 'undefined' ? localStorage.getItem('sat-user') : null;
+            let selfId: number | null = null;
+            try {
+              selfId = sat ? Number(JSON.parse(sat)?.id) : null;
+            } catch {
+              selfId = null;
+            }
+            if (selfId != null && row.user_id !== selfId) {
+              seenInstallerIds.current.add(row.id);
+              continue;
+            }
+          }
           seenInstallerIds.current.add(row.id);
           toast.info(row.message || 'Inventory update', {
             description: row.notes || undefined,
@@ -68,7 +95,7 @@ export function useAppNotifications() {
     } catch {
       setInstallerNotices([]);
     }
-  }, []);
+  }, [inventoryManager]);
 
   useEffect(() => {
     void loadReturnNotices();
@@ -90,66 +117,93 @@ export function useAppNotifications() {
         inventoryReturnNotices: returnNotices,
         inventoryInstallerNotices: installerNotices,
       }),
-    [maintenanceCases, faultyEntities, projects, customers, returnNotices, installerNotices]
+    [
+      maintenanceCases,
+      faultyEntities,
+      projects,
+      customers,
+      returnNotices,
+      installerNotices,
+    ]
   );
 
-  const notifications = useMemo(
-    () =>
-      hydrated
-        ? allNotifications.filter((n) => {
-            // Pending inventory returns stay until admin decides — not clearable.
-            if (n.type === 'inventory_returned') return true;
-            // Unread installer notices stay until marked read on the server.
-            if (INSTALLER_NOTICE_TYPES.has(n.type)) return true;
-            return !isCleared(n.id);
-          })
-        : allNotifications,
-    [allNotifications, hydrated, isCleared]
-  );
+  const notifications = useMemo(() => {
+    const base = hydrated
+      ? allNotifications.filter((n) => {
+          if (n.persistent) return true;
+          return !isCleared(n.id);
+        })
+      : allNotifications;
+    return filterAppNotifications(base, search);
+  }, [allNotifications, hydrated, isCleared, search]);
 
   const isNotificationRead = useCallback(
     (id: string) => {
-      const n = notifications.find((x) => x.id === id);
-      if (n?.type === 'inventory_returned') return false;
-      if (n && INSTALLER_NOTICE_TYPES.has(n.type)) return false;
+      const n = notifications.find((x) => x.id === id) ?? allNotifications.find((x) => x.id === id);
+      if (!n) return isRead(id);
+      if (n.type === 'inventory_returned') return false;
+      if (n.persistent && n.serverRead != null) return Boolean(n.serverRead);
       return isRead(id);
     },
-    [notifications, isRead]
+    [notifications, allNotifications, isRead]
   );
 
   const unreadCount = useMemo(
     () =>
       hydrated
-        ? notifications.filter((n) => !isNotificationRead(n.id)).length
-        : notifications.length,
-    [notifications, hydrated, isNotificationRead]
+        ? allNotifications.filter((n) => {
+            if (n.persistent) {
+              if (n.type === 'inventory_returned') return true;
+              return !n.serverRead;
+            }
+            return !isCleared(n.id) && !isRead(n.id);
+          }).length
+        : allNotifications.length,
+    [allNotifications, hydrated, isCleared, isRead]
   );
 
   const highPriorityCount = useMemo(
-    () => notifications.filter((n) => n.priority === 'high' && !isNotificationRead(n.id)).length,
-    [notifications, isNotificationRead]
+    () =>
+      allNotifications.filter((n) => {
+        if (n.priority !== 'high') return false;
+        if (n.persistent) {
+          if (n.type === 'inventory_returned') return true;
+          return !n.serverRead;
+        }
+        return !isCleared(n.id) && !isRead(n.id);
+      }).length,
+    [allNotifications, isCleared, isRead]
   );
 
   const openReturnDecision = useCallback(
     (noticeId: number) => {
       const notice = returnNotices.find((n) => n.id === noticeId) ?? null;
-      if (notice) setReturnDialogNotice(notice);
+      if (notice && (!notice.decision || notice.decision === 'pending')) {
+        setReturnDialogNotice(notice);
+      }
     },
     [returnNotices]
   );
 
-  const markInstallerNotice = useCallback(
-    async (noticeId?: number) => {
-      if (noticeId == null) return;
-      try {
-        await api.inventory.markInstallerNoticeRead(noticeId);
-        setInstallerNotices((prev) => prev.filter((n) => n.id !== noticeId));
-      } catch {
-        // Keep in list if mark-read fails.
-      }
-    },
-    []
-  );
+  const markInstallerNotice = useCallback(async (noticeId?: number) => {
+    if (noticeId == null) return;
+    try {
+      const res = await api.inventory.markInstallerNoticeRead(noticeId);
+      const updated = res.data;
+      setInstallerNotices((prev) =>
+        prev.map((n) =>
+          n.id === noticeId
+            ? {
+                ...n,
+                read_at: updated?.read_at ?? new Date().toISOString(),
+              }
+            : n
+        )
+      );
+    } catch {
+      // Keep unread state if mark-read fails.
+    }
+  }, []);
 
   const handleNotificationActivate = useCallback(
     (item: AppNotification) => {
@@ -157,50 +211,62 @@ export function useAppNotifications() {
         openReturnDecision(item.metaId);
         return;
       }
-      if (INSTALLER_NOTICE_TYPES.has(item.type)) {
+      if (INSTALLER_NOTICE_TYPES.has(item.type) && !item.serverRead) {
         void markInstallerNotice(item.metaId);
-        markLocalRead(item.id);
-        return;
       }
-      markLocalRead(item.id);
+      if (!item.persistent) {
+        markLocalRead(item.id);
+      }
     },
     [openReturnDecision, markInstallerNotice, markLocalRead]
   );
 
   const markAsRead = useCallback(
     (id: string) => {
-      const n = notifications.find((x) => x.id === id);
+      const n =
+        notifications.find((x) => x.id === id) ?? allNotifications.find((x) => x.id === id);
       if (n?.type === 'inventory_returned') {
         if (n.metaId != null) openReturnDecision(n.metaId);
         return;
       }
-      if (n && INSTALLER_NOTICE_TYPES.has(n.type)) {
+      if (n && INSTALLER_NOTICE_TYPES.has(n.type) && !n.serverRead) {
         void markInstallerNotice(n.metaId);
+        return;
       }
-      markLocalRead(id);
+      if (!n?.persistent) {
+        markLocalRead(id);
+      }
     },
-    [markLocalRead, notifications, openReturnDecision, markInstallerNotice]
+    [
+      markLocalRead,
+      notifications,
+      allNotifications,
+      openReturnDecision,
+      markInstallerNotice,
+    ]
   );
 
   const markAllAsRead = useCallback(() => {
-    const localIds = notifications
-      .filter((n) => n.type !== 'inventory_returned' && !INSTALLER_NOTICE_TYPES.has(n.type))
+    const localIds = allNotifications
+      .filter((n) => !n.persistent && !isCleared(n.id))
       .map((n) => n.id);
     markLocalAllRead(localIds);
-    if (installerNotices.length > 0) {
-      void api.inventory.markAllInstallerNoticesRead().then(() => {
-        setInstallerNotices([]);
+    void api.inventory
+      .markAllInstallerNoticesRead({ allUsers: inventoryManager })
+      .then(() => {
+        setInstallerNotices((prev) =>
+          prev.map((n) => ({
+            ...n,
+            read_at: n.read_at ?? new Date().toISOString(),
+          }))
+        );
       });
-    }
-  }, [markLocalAllRead, notifications, installerNotices.length]);
+  }, [markLocalAllRead, allNotifications, isCleared, inventoryManager]);
 
   const clearAll = useCallback(() => {
-    clearLocal(
-      notifications
-        .filter((n) => n.type !== 'inventory_returned' && !INSTALLER_NOTICE_TYPES.has(n.type))
-        .map((n) => n.id)
-    );
-  }, [clearLocal, notifications]);
+    // Only clear ephemeral (non-persistent) notifications from the local UI.
+    clearLocal(allNotifications.filter((n) => !n.persistent).map((n) => n.id));
+  }, [clearLocal, allNotifications]);
 
   const closeReturnDialog = useCallback((open: boolean) => {
     if (!open) setReturnDialogNotice(null);

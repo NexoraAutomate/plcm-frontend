@@ -40,6 +40,11 @@ export function NotificationRow({
 }: NotificationRowProps) {
   const Icon = TYPE_ICON[item.type];
   const isReturnDecision = item.type === 'inventory_returned' && onActivate != null;
+  const isPersistentActivate =
+    onActivate != null &&
+    (item.type === 'inventory_issued' ||
+      item.type === 'inventory_return_accepted' ||
+      item.type === 'inventory_return_rejected');
 
   const content = (
     <>
@@ -91,7 +96,7 @@ export function NotificationRow({
       <button
         type="button"
         className={cn(className, 'w-full cursor-pointer text-left')}
-        onClick={() => onActivate(item)}
+        onClick={() => onActivate?.(item)}
       >
         {content}
       </button>
@@ -99,7 +104,14 @@ export function NotificationRow({
   }
 
   return (
-    <Link href={item.href} onClick={() => onMarkRead?.(item.id)} className={className}>
+    <Link
+      href={item.href}
+      onClick={() => {
+        if (isPersistentActivate) onActivate?.(item);
+        else onMarkRead?.(item.id);
+      }}
+      className={className}
+    >
       {content}
     </Link>
   );

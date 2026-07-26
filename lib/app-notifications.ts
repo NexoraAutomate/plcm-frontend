@@ -27,10 +27,16 @@ export interface AppNotification {
   href: string;
   timestamp: string;
   priority: 'high' | 'medium' | 'low';
-  /** Backend notice id for inventory returns (optional). */
+  /** Backend notice id for inventory returns / installer notices. */
   metaId?: number;
   /** Issuance id for inventory return accept/reject. */
   metaIssuanceId?: number;
+  /** Server-backed inventory notice already marked read (stays in history). */
+  serverRead?: boolean;
+  /** Persist in history — not removable by Clear all. */
+  persistent?: boolean;
+  /** Extra text for client-side search (recipient name, notes, etc.). */
+  searchText?: string;
 }
 
 const OPEN_CASE_STATUSES: string[] = [
@@ -198,57 +204,126 @@ export function buildAppNotifications(input: {
   }
 
   for (const notice of inventoryReturnNotices) {
-    if (notice.decision && notice.decision !== 'pending') continue;
     const itemLabel =
       notice.inventory_name ||
       notice.part_number ||
       (notice.inventory_id != null ? `Inventory #${notice.inventory_id}` : 'inventory item');
     const who = notice.returned_by_name || `User #${notice.returned_by_user_id}`;
-    notifications.push({
-      id: `inventory-returned-${notice.id}`,
-      type: 'inventory_returned',
-      title: 'Inventory return requested',
-      message: `Installer ${who} requested return of ${itemLabel}${
-        notice.serial_number ? ` (${notice.serial_number})` : ''
-      }`,
-      href: '/inventory/issuances',
-      timestamp: notice.created_at,
-      priority: 'high',
-      metaId: notice.id,
-      metaIssuanceId: notice.issuance_id,
-    });
+    const serial = notice.serial_number ? ` (${notice.serial_number})` : '';
+    const decision = (notice.decision || 'pending').toLowerCase();
+    const searchText = [
+      itemLabel,
+      who,
+      notice.serial_number,
+      notice.part_number,
+      notice.request_notes,
+      notice.decision_notes,
+      decision,
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    if (decision === 'pending' || !notice.decision) {
+      notifications.push({
+        id: `inventory-returned-${notice.id}`,
+        type: 'inventory_returned',
+        title: 'Inventory return requested',
+        message: `Installer ${who} requested return of ${itemLabel}${serial}`,
+        href: '/inventory/issuances',
+        timestamp: notice.created_at,
+        priority: 'high',
+        metaId: notice.id,
+        metaIssuanceId: notice.issuance_id,
+        serverRead: false,
+        persistent: true,
+        searchText,
+      });
+    } else if (decision === 'accepted') {
+      notifications.push({
+        id: `inventory-returned-${notice.id}`,
+        type: 'inventory_return_accepted',
+        title: 'Return accepted (admin)',
+        message: `Accepted return of ${itemLabel}${serial} from ${who}`,
+        href: '/inventory/issuances',
+        timestamp: notice.decided_at || notice.created_at,
+        priority: 'low',
+        metaId: notice.id,
+        metaIssuanceId: notice.issuance_id,
+        serverRead: true,
+        persistent: true,
+        searchText,
+      });
+    } else if (decision === 'rejected') {
+      notifications.push({
+        id: `inventory-returned-${notice.id}`,
+        type: 'inventory_return_rejected',
+        title: 'Return rejected (admin)',
+        message: `Rejected return of ${itemLabel}${serial} from ${who}`,
+        href: '/inventory/issuances',
+        timestamp: notice.decided_at || notice.created_at,
+        priority: 'low',
+        metaId: notice.id,
+        metaIssuanceId: notice.issuance_id,
+        serverRead: true,
+        persistent: true,
+        searchText,
+      });
+    }
   }
 
   for (const notice of inventoryInstallerNotices) {
-    if (notice.read_at) continue;
     const itemLabel =
       notice.inventory_name ||
       notice.part_number ||
       (notice.inventory_id != null ? `Inventory #${notice.inventory_id}` : 'inventory item');
     const serial = notice.serial_number ? ` (${notice.serial_number})` : '';
+    const recipient = notice.user_name || `User #${notice.user_id}`;
+    const isRead = Boolean(notice.read_at);
+    const searchText = [
+      itemLabel,
+      recipient,
+      notice.message,
+      notice.notes,
+      notice.serial_number,
+      notice.part_number,
+      notice.notice_type,
+    ]
+      .filter(Boolean)
+      .join(' ');
+
     if (notice.notice_type === 'issued') {
       notifications.push({
         id: `inventory-issued-${notice.id}`,
         type: 'inventory_issued',
-        title: 'Inventory issued to you',
-        message: notice.message || `${itemLabel}${serial} was issued to you`,
+        title: 'Inventory issued',
+        message:
+          notice.message ||
+          `${itemLabel}${serial} issued to ${recipient}`,
         href: '/inventory/issuances',
         timestamp: notice.created_at,
-        priority: 'high',
+        priority: isRead ? 'low' : 'high',
         metaId: notice.id,
         metaIssuanceId: notice.issuance_id ?? undefined,
+        serverRead: isRead,
+        persistent: true,
+        searchText,
       });
     } else if (notice.notice_type === 'return_accepted') {
       notifications.push({
         id: `inventory-return-accepted-${notice.id}`,
         type: 'inventory_return_accepted',
         title: 'Return accepted',
-        message: notice.message || `Your return of ${itemLabel}${serial} was accepted`,
+        message:
+          notice.message ||
+          `Return of ${itemLabel}${serial} accepted for ${recipient}`,
         href: '/inventory/issuances',
         timestamp: notice.created_at,
-        priority: 'medium',
+        priority: isRead ? 'low' : 'medium',
         metaId: notice.id,
         metaIssuanceId: notice.issuance_id ?? undefined,
+        serverRead: isRead,
+        persistent: true,
+        searchText,
       });
     } else if (notice.notice_type === 'return_rejected') {
       notifications.push({
@@ -257,12 +332,15 @@ export function buildAppNotifications(input: {
         title: 'Return rejected',
         message:
           notice.message ||
-          `Your return of ${itemLabel}${serial} was rejected — item remains with you`,
+          `Return of ${itemLabel}${serial} rejected for ${recipient}`,
         href: '/inventory/issuances',
         timestamp: notice.created_at,
-        priority: 'high',
+        priority: isRead ? 'low' : 'high',
         metaId: notice.id,
         metaIssuanceId: notice.issuance_id ?? undefined,
+        serverRead: isRead,
+        persistent: true,
+        searchText,
       });
     }
   }
@@ -270,4 +348,25 @@ export function buildAppNotifications(input: {
   return notifications.sort(
     (a, b) => parseApiDate(b.timestamp).getTime() - parseApiDate(a.timestamp).getTime()
   );
+}
+
+/** Client-side filter for notification history search. */
+export function filterAppNotifications(
+  items: AppNotification[],
+  query: string
+): AppNotification[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return items;
+  return items.filter((item) => {
+    const haystack = [
+      item.title,
+      item.message,
+      item.type,
+      item.searchText,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    return haystack.includes(q);
+  });
 }

@@ -313,29 +313,42 @@ export const inventory = {
     api.post<Models.InventoryIssuance>(`/inventory/issuances/${issuanceId}/reject-return/`, {
       notes,
     }),
-  listReturnNotices: (options?: { unreadOnly?: boolean; pendingOnly?: boolean }) =>
+  listReturnNotices: (options?: {
+    unreadOnly?: boolean
+    pendingOnly?: boolean
+    search?: string
+  }) =>
     api.get<Models.InventoryReturnNotice[]>('/inventory/return-notices/', {
       params: {
         unread_only: options?.unreadOnly ?? false,
         pending_only: options?.pendingOnly ?? false,
+        search: options?.search || undefined,
       },
     }),
   markReturnNoticeRead: (noticeId: number) =>
     api.post<Models.InventoryReturnNotice>(`/inventory/return-notices/${noticeId}/read/`),
   markAllReturnNoticesRead: () =>
     api.post<{ ok: boolean; marked: number }>('/inventory/return-notices/read-all/'),
-  listInstallerNotices: (options?: { unreadOnly?: boolean }) =>
+  listInstallerNotices: (options?: {
+    unreadOnly?: boolean
+    search?: string
+    allUsers?: boolean
+  }) =>
     api.get<Models.InventoryInstallerNotice[]>('/inventory/installer-notices/', {
       params: {
         unread_only: options?.unreadOnly ?? false,
+        search: options?.search || undefined,
+        all_users: options?.allUsers ?? false,
       },
     }),
   markInstallerNoticeRead: (noticeId: number) =>
     api.post<Models.InventoryInstallerNotice>(
       `/inventory/installer-notices/${noticeId}/read/`
     ),
-  markAllInstallerNoticesRead: () =>
-    api.post<{ ok: boolean; marked: number }>('/inventory/installer-notices/read-all/'),
+  markAllInstallerNoticesRead: (options?: { allUsers?: boolean }) =>
+    api.post<{ ok: boolean; marked: number }>('/inventory/installer-notices/read-all/', {
+      params: { all_users: options?.allUsers ?? false },
+    }),
   linkIssuanceInstall: (
     issuanceId: number,
     installedEntityType: string,

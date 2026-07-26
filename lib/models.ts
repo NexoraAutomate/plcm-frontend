@@ -456,6 +456,7 @@ export interface InventoryInstallerNotice {
   notes?: string | null
   created_at: string
   read_at?: string | null
+  user_name?: string | null
 }
 
 export interface InventoryIssuanceEvent {
