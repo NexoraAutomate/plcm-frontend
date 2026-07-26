@@ -14,17 +14,28 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+function isImmersiveDashboardRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return (
+    pathname.startsWith("/executive-dashboard") ||
+    pathname.startsWith("/hierarchy-dashboard")
+  );
+}
+
 function AppShellFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const isExecutiveCommand = pathname?.startsWith("/executive-dashboard");
+  const immersiveFullscreen = isImmersiveDashboardRoute(pathname);
   const { active: fullscreenActive, exit } = useAppFullscreen();
-  const hideChrome = fullscreenActive;
+  // Only executive + hierarchy dashboards hide the sidebar in fullscreen.
+  const hideSidebar = fullscreenActive && immersiveFullscreen;
+  const hideNavbar = fullscreenActive;
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {!hideChrome ? <AppSidebar /> : null}
+      {!hideSidebar ? <AppSidebar /> : null}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {!hideChrome ? <Navbar /> : null}
+        {!hideNavbar ? <Navbar /> : null}
         <main
           className={cn(
             "relative min-h-0 flex-1 bg-background",
@@ -33,7 +44,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
               : "overflow-y-auto p-6"
           )}
         >
-          {hideChrome ? (
+          {hideNavbar ? (
             <div className="pointer-events-none absolute right-3 top-3 z-50 flex items-center gap-2">
               <div className="pointer-events-auto flex items-center gap-2 rounded-md border border-border bg-card/95 px-2 py-1 text-[11px] text-muted-foreground shadow-sm backdrop-blur">
                 <span>Fullscreen · Esc for normal view</span>

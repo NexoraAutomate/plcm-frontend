@@ -11,7 +11,10 @@ import {
 } from 'react';
 
 type AppFullscreenContextValue = {
-  /** True when sidebar/navbar are hidden and browser fullscreen is requested. */
+  /**
+   * True when browser fullscreen is requested and the top navbar is hidden.
+   * Sidebar is also hidden only on executive / hierarchy dashboard routes.
+   */
   active: boolean;
   enter: () => void;
   exit: () => void;
