@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Moon, Sun, Bell, Expand, Minimize2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Moon, Sun, Bell, Expand, Minimize2, UserRound, KeyRound, LogOut } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/lib/auth-context";
 import { Badge } from "@/components/ui/badge";
@@ -12,15 +13,25 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { NotificationRow } from "@/components/notifications/notification-row";
 import { InventoryReturnDecisionDialog } from "@/components/notifications/inventory-return-decision-dialog";
 import { useAppNotifications } from "@/hooks/use-app-notifications";
 import { useNotificationSync } from "@/hooks/use-notification-sync";
 import { useAppFullscreen } from "@/components/app-fullscreen";
+import { UserAvatar } from "@/components/user-avatar";
 
 export function Navbar() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const router = useRouter();
   const { theme, setTheme } = useTheme();
   const { active: fullscreenActive, toggle: toggleFullscreen } = useAppFullscreen();
   useNotificationSync();
@@ -163,27 +174,70 @@ export function Navbar() {
           onDecided={() => void refreshReturnNotices()}
         />
 
-        <Link
-          href="/profile"
-          className="flex items-center gap-3 rounded-lg border-l border-border pl-4 outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
-          title="View profile"
-        >
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">
-            {user?.full_name?.split(" ").map(n => n[0]).join("") || "U"}
-          </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="flex items-center gap-3 rounded-lg border-l border-border pl-4 outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
+              title="Account menu"
+            >
+              {user ? (
+                <UserAvatar
+                  userId={user.id}
+                  fullName={user.full_name}
+                  username={user.username}
+                  avatarUrl={user.avatar_url}
+                  size={32}
+                />
+              ) : (
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                  U
+                </div>
+              )}
 
-          <div className="hidden md:block">
-            <p className="text-sm font-medium leading-none text-foreground">
-              {user?.full_name || "User"}
-            </p>
+              <div className="hidden text-left md:block">
+                <p className="text-sm font-medium leading-none text-foreground">
+                  {user?.full_name || "User"}
+                </p>
 
-            <Badge variant="outline" className="mt-1 text-[10px] px-1.5 py-0">
-              {user?.roles?.length
-                ? user.roles.join(", ")
-                : "Viewer"}
-            </Badge>
-          </div>
-        </Link>
+                <Badge variant="outline" className="mt-1 text-[10px] px-1.5 py-0">
+                  {user?.roles?.length ? user.roles.join(", ") : "Viewer"}
+                </Badge>
+              </div>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium leading-none">
+                  {user?.full_name || user?.username || "User"}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {user?.email || user?.username}
+                </p>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => router.push("/profile")}>
+              <UserRound className="h-4 w-4" />
+              View profile
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push("/profile?changePassword=1")}>
+              <KeyRound className="h-4 w-4" />
+              Change password
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => {
+                void logout();
+              }}
+            >
+              <LogOut className="h-4 w-4" />
+              Logout
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );

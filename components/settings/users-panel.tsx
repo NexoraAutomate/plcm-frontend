@@ -60,6 +60,7 @@ import { SettingsCard } from '@/components/settings/settings-card';
 import { UserStatusBadge } from '@/components/settings/user-status-badge';
 import { UserLoginHistoryDialog } from '@/components/settings/user-login-history-dialog';
 import { UserDetailsDialog } from '@/components/settings/user-details-dialog';
+import { UserAvatar } from '@/components/user-avatar';
 import { useAuth } from '@/lib/auth-context';
 
 export type UsersPanelProps = {
@@ -96,6 +97,7 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
   const { hasAccess } = useAuth();
   const isAdmin = hasAccess(['Admin']);
   const adminOnly = hasAccess(['Admin', 'SubAdmin']);
+  const canEditAvatars = isAdmin;
   const { sort, cycleSort, listFilterPatch } = useTableSorting();
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [search, setSearch] = useState('');
@@ -441,6 +443,7 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-14">Photo</TableHead>
                 <SortableTableHead column="full_name" sort={sort} onSort={cycleSort}>
                   Name
                 </SortableTableHead>
@@ -454,25 +457,50 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
                 <SortableTableHead column="is_active" sort={sort} onSort={cycleSort}>
                   Status
                 </SortableTableHead>
+                <SortableTableHead column="created_at" sort={sort} onSort={cycleSort}>
+                  Created
+                </SortableTableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {users.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
                     No users found
                   </TableCell>
                 </TableRow>
               ) : (
                 users.map((user) => (
                   <TableRow key={user.id}>
+                    <TableCell>
+                      <UserAvatar
+                        userId={user.id}
+                        fullName={user.full_name}
+                        username={user.username}
+                        avatarUrl={user.avatar_url}
+                        size={36}
+                        editable={canEditAvatars}
+                        uploadMode="admin"
+                        onUploaded={(avatarUrl) => {
+                          void pagination.refetch();
+                          if (detailsUser?.id === user.id) {
+                            setDetailsUser({ ...detailsUser, avatar_url: avatarUrl });
+                          }
+                        }}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{user.full_name}</TableCell>
                     <TableCell className="font-mono text-sm">{user.username}</TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell className="capitalize">{formatRoleNames(user.roles)}</TableCell>
                     <TableCell>
                       <UserStatusBadge isActive={user.is_active !== false} />
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                      {user.created_at
+                        ? new Date(user.created_at).toLocaleDateString()
+                        : '—'}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
@@ -536,6 +564,24 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
             <DialogDescription>Update user details, status, and roles</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {editingId != null && canEditAvatars ? (
+              <div className="flex items-center gap-3 rounded-lg border px-3 py-3">
+                <UserAvatar
+                  userId={editingId}
+                  fullName={editFormData.full_name}
+                  username={editFormData.username}
+                  avatarUrl={users.find((u) => u.id === editingId)?.avatar_url}
+                  size={56}
+                  editable
+                  uploadMode="admin"
+                  onUploaded={() => void pagination.refetch()}
+                />
+                <div>
+                  <p className="text-sm font-medium">Profile picture</p>
+                  <p className="text-xs text-muted-foreground">Click the photo to upload</p>
+                </div>
+              </div>
+            ) : null}
             <div>
               <Label>Username (read-only)</Label>
               <Input disabled value={editFormData.username} />

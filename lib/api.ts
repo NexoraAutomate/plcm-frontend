@@ -69,6 +69,16 @@ export const auth = {
   listRoles: (sort_by?: string, sort_order?: 'asc' | 'desc') =>
     api.get<Models.Role[]>("/auth/roles", { params: buildQueryParams({ sort_by, sort_order }) }),
   getMe: () => api.get("/auth/me"),
+  changePassword: (old_password: string, new_password: string) =>
+    api.post<{ message: string }>("/auth/change-password", { old_password, new_password }),
+  uploadAvatar: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post<{ avatar_url: string }>("/auth/avatar/", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+  deleteAvatar: () => api.delete<{ avatar_url: string | null }>("/auth/avatar/"),
   register: (userData: any) => api.post("/auth/register", userData),
   signup: (userData: {
     username: string;
@@ -153,6 +163,17 @@ export const users = {
     api.get<Models.UserLoginHistory[]>(`/users/${id}/login-history/`, {
       params: buildQueryParams({ skip, limit, ...params }),
     }),
+  fetchAvatarBlob: (id: number) =>
+    api.get<Blob>(`/users/${id}/avatar/`, { responseType: "blob" }),
+  uploadAvatar: (id: number, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post<{ avatar_url: string }>(`/users/${id}/avatar/`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+  deleteAvatar: (id: number) =>
+    api.delete<{ avatar_url: string | null }>(`/users/${id}/avatar/`),
 };
 
 // Customers
