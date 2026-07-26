@@ -61,7 +61,18 @@ export function NotificationRow({
         </div>
         <p className="truncate text-xs text-muted-foreground">{item.message}</p>
         <p className="mt-1 text-[10px] text-muted-foreground">
-          {formatDistanceToNow(parseApiDate(item.timestamp), { addSuffix: true })}
+          {(() => {
+            const date = parseApiDate(item.timestamp);
+            if (Number.isNaN(date.getTime())) return '—';
+            const relative = formatDistanceToNow(date, { addSuffix: true });
+            const absolute = date.toLocaleString();
+            return (
+              <span title={absolute}>
+                {relative}
+                <span className="text-muted-foreground/80"> · {absolute}</span>
+              </span>
+            );
+          })()}
         </p>
       </div>
     </>
