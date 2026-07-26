@@ -24,12 +24,13 @@ function isImmersiveDashboardRoute(pathname: string | null): boolean {
 
 function AppShellFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const isExecutiveCommand = pathname?.startsWith("/executive-dashboard");
+  const isExecutiveCommand = pathname?.startsWith("/executive-dashboard") ?? false;
   const immersiveFullscreen = isImmersiveDashboardRoute(pathname);
   const { active: fullscreenActive, exit } = useAppFullscreen();
-  // Only executive + hierarchy dashboards hide the sidebar in fullscreen.
+  // Executive + hierarchy dashboards hide the sidebar in fullscreen.
   const hideSidebar = fullscreenActive && immersiveFullscreen;
-  const hideNavbar = fullscreenActive;
+  // Navbar stays on all routes except executive dashboard.
+  const hideNavbar = fullscreenActive && isExecutiveCommand;
 
   return (
     <div className="flex h-screen overflow-hidden">

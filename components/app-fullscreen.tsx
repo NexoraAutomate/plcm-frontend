@@ -12,8 +12,9 @@ import {
 
 type AppFullscreenContextValue = {
   /**
-   * True when browser fullscreen is requested and the top navbar is hidden.
-   * Sidebar is also hidden only on executive / hierarchy dashboard routes.
+   * True when browser fullscreen is requested.
+   * Navbar is hidden only on the executive dashboard; sidebar is also hidden
+   * on executive / hierarchy dashboard routes.
    */
   active: boolean;
   enter: () => void;
