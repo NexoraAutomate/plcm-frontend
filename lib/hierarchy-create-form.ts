@@ -206,6 +206,8 @@ export async function createHierarchyEntityFromForm(options: {
   createEntity: (data: Record<string, unknown>) => Promise<{ id: number }>;
   createEntityByType?: CreateEntityByTypeFn;
   extraPayload?: Record<string, unknown>;
+  /** Defaults to signed-in user when installing from inventory. */
+  installedById?: number | null;
 }): Promise<{ id: number; inventoryConsumed: boolean; childrenInstalled: number }> {
   const {
     entityType,
@@ -303,7 +305,9 @@ export async function createHierarchyEntityFromForm(options: {
           ''
       );
 
-    installPayload = inventoryToHierarchyCreatePayload(merged, serialForEntity);
+    installPayload = inventoryToHierarchyCreatePayload(merged, serialForEntity, {
+      installedById: options.installedById,
+    });
   }
 
   const parentFieldByType: Record<HierarchyEntityType, string> = {
@@ -314,11 +318,16 @@ export async function createHierarchyEntityFromForm(options: {
     component: 'unit_id',
   };
 
+  const statusId = Number(formData.status_id ?? formData.id);
   const created = await createEntity({
     name,
     description: String(formData.description || ''),
-    status_id: Number(formData.id),
     ...installPayload,
+    // Keep form / first hierarchy status — never leave inventory status on the entity.
+    status_id: Number.isFinite(statusId) && statusId > 0 ? statusId : undefined,
+    installed_by_id:
+      options.installedById ??
+      (installPayload as { installed_by_id?: number }).installed_by_id,
     [parentFieldByType[entityType]]: parentId,
     ...extraPayload,
   });

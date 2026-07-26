@@ -1,9 +1,24 @@
 import type { User, HierarchyInstallFields, Inventory } from '@/lib/models';
 import { inventoryPartNumber } from '@/lib/inventory-entity-fields';
+import { getStoredUserId } from '@/lib/current-user';
+
+export interface HierarchyCreateFromInventoryOptions {
+  /** Defaults to the signed-in user when omitted. */
+  installedById?: number | null;
+}
 
 /** Part/serial + install metadata when creating hierarchy rows from inventory. */
-export function inventoryToHierarchyCreatePayload(item: Inventory, serialNumber: string) {
+export function inventoryToHierarchyCreatePayload(
+  item: Inventory,
+  serialNumber: string,
+  options?: HierarchyCreateFromInventoryOptions
+) {
   const partNumber = inventoryPartNumber(item);
+  const installerId =
+    options?.installedById != null && Number(options.installedById) > 0
+      ? Number(options.installedById)
+      : getStoredUserId() ?? item.installed_by_id ?? undefined;
+
   return {
     part_number: partNumber,
     serial_number: serialNumber,
@@ -11,8 +26,8 @@ export function inventoryToHierarchyCreatePayload(item: Inventory, serialNumber:
     original_part_number: item.original_part_number || partNumber,
     original_serial_number: item.original_serial_number || serialNumber,
     installation_date: item.installation_date || new Date().toISOString(),
-    installed_by_id: item.installed_by_id,
-    ...(item.status_id != null ? { status_id: item.status_id } : {}),
+    installed_by_id: installerId,
+    // Never copy inventory.status_id — hierarchy statuses are a different namespace.
     picture_url: item.picture_url,
     ...(item.inventory_type === 'component' && item.sku ? { sku: item.sku } : {}),
   };

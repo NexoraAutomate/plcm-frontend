@@ -19,6 +19,9 @@ const TYPE_ICON: Record<AppNotification['type'], typeof Bell> = {
   order_updated: Rocket,
   customer_status_change: Users,
   inventory_returned: Package,
+  inventory_issued: Package,
+  inventory_return_accepted: CheckCircle2,
+  inventory_return_rejected: AlertTriangle,
 };
 
 interface NotificationRowProps {

@@ -438,6 +438,26 @@ export interface InventoryReturnNotice {
   request_notes?: string | null
 }
 
+export type InventoryInstallerNoticeType =
+  | 'issued'
+  | 'return_accepted'
+  | 'return_rejected'
+
+export interface InventoryInstallerNotice {
+  id: number
+  user_id: number
+  notice_type: InventoryInstallerNoticeType | string
+  issuance_id?: number | null
+  inventory_id?: number | null
+  inventory_name?: string | null
+  part_number?: string | null
+  serial_number?: string | null
+  message?: string | null
+  notes?: string | null
+  created_at: string
+  read_at?: string | null
+}
+
 export interface InventoryIssuanceEvent {
   id?: number | null
   issuance_id: number

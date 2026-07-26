@@ -165,9 +165,12 @@ export function useHierarchyCreateFormOptions({
   );
 
   const createInitialValues = useMemo(() => {
-    if (!parent) return {};
-    return { [parent.fieldName]: parent.id };
-  }, [parent]);
+    const firstStatusId = statusOptions[0]?.value;
+    return {
+      ...(parent ? { [parent.fieldName]: parent.id } : {}),
+      ...(firstStatusId != null ? { id: firstStatusId } : {}),
+    };
+  }, [parent, statusOptions]);
 
   return {
     inventoryItems,

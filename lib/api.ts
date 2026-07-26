@@ -324,6 +324,18 @@ export const inventory = {
     api.post<Models.InventoryReturnNotice>(`/inventory/return-notices/${noticeId}/read/`),
   markAllReturnNoticesRead: () =>
     api.post<{ ok: boolean; marked: number }>('/inventory/return-notices/read-all/'),
+  listInstallerNotices: (options?: { unreadOnly?: boolean }) =>
+    api.get<Models.InventoryInstallerNotice[]>('/inventory/installer-notices/', {
+      params: {
+        unread_only: options?.unreadOnly ?? false,
+      },
+    }),
+  markInstallerNoticeRead: (noticeId: number) =>
+    api.post<Models.InventoryInstallerNotice>(
+      `/inventory/installer-notices/${noticeId}/read/`
+    ),
+  markAllInstallerNoticesRead: () =>
+    api.post<{ ok: boolean; marked: number }>('/inventory/installer-notices/read-all/'),
   linkIssuanceInstall: (
     issuanceId: number,
     installedEntityType: string,

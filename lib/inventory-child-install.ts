@@ -580,6 +580,7 @@ export async function installEntityFromInventory({
   createEntity,
   skipConsume = false,
   composedSerialNumber,
+  installedById,
 }: {
   inventoryItem: Inventory;
   instanceId?: number;
@@ -590,6 +591,7 @@ export async function installEntityFromInventory({
   createEntity: CreateEntityFn;
   skipConsume?: boolean;
   composedSerialNumber?: string | null;
+  installedById?: number | null;
 }): Promise<{ id: number; updatedInventory: Inventory }> {
   const parentField = PARENT_FK_FIELD[entityType];
   if (!parentField) {
@@ -607,6 +609,7 @@ export async function installEntityFromInventory({
     createEntity,
     skipConsume,
     composedSerialNumber,
+    installedById,
   });
 
   return { id: result.entityId, updatedInventory: result.updatedInventory };
@@ -621,6 +624,7 @@ export async function installEntityFromInventoryWithChildren({
   defaultStatus,
   createEntity,
   createEntityByType,
+  installedById,
 }: {
   inventoryItem: Inventory;
   instanceId?: number;
@@ -630,6 +634,7 @@ export async function installEntityFromInventoryWithChildren({
   defaultStatus: Status;
   createEntity: CreateEntityFn;
   createEntityByType: CreateEntityByTypeFn;
+  installedById?: number | null;
 }): Promise<{
   id: number;
   updatedInventory: Inventory;
@@ -661,6 +666,7 @@ export async function installEntityFromInventoryWithChildren({
     existingChildren,
     defaultStatus,
     createEntity,
+    installedById,
   });
 
   const inventoryUpdates = new Map<number, Inventory>();

@@ -99,10 +99,16 @@ export default function ProjectsPage(){
       end_date: '',
       owner_id: 0,
       order_id: 0,
-      status_id: 0,
+      status_id: statuses[0]?.id ?? 0,
     });
     setCreateCompleteHierarchyEnabled(true);
   }
+
+  useEffect(() => {
+    if (isCreateOpen && formData.status_id === 0 && statuses[0]?.id) {
+      setFormData((prev) => ({ ...prev, status_id: statuses[0].id }));
+    }
+  }, [isCreateOpen, statuses, formData.status_id]);
 
   useEffect(() => {
     if (searchParams.get('action') === 'create') {

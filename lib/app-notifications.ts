@@ -1,6 +1,6 @@
 import { CaseStatus, FaultyEntityStatus } from '@/lib/models';
 import { getCaseStatusMeta, mapCaseStatusFromApi } from '@/lib/maintenance-workflow';
-import type { Customer, FaultyEntity, InventoryReturnNotice, MaintenanceCase, Project } from '@/lib/models';
+import type { Customer, FaultyEntity, InventoryInstallerNotice, InventoryReturnNotice, MaintenanceCase, Project } from '@/lib/models';
 import { parseApiDate } from '@/lib/parse-api-date';
 
 export type AppNotificationType =
@@ -14,7 +14,10 @@ export type AppNotificationType =
   | 'customer_status_change'
   | 'order_updated'
   | 'project_updated'
-  | 'inventory_returned';
+  | 'inventory_returned'
+  | 'inventory_issued'
+  | 'inventory_return_accepted'
+  | 'inventory_return_rejected';
 
 export interface AppNotification {
   id: string;
@@ -51,6 +54,7 @@ export function buildAppNotifications(input: {
   projects: Project[];
   customers: Customer[];
   inventoryReturnNotices?: InventoryReturnNotice[];
+  inventoryInstallerNotices?: InventoryInstallerNotice[];
 }): AppNotification[] {
   const {
     maintenanceCases,
@@ -58,6 +62,7 @@ export function buildAppNotifications(input: {
     projects,
     customers,
     inventoryReturnNotices = [],
+    inventoryInstallerNotices = [],
   } = input;
   const notifications: AppNotification[] = [];
 
@@ -212,6 +217,54 @@ export function buildAppNotifications(input: {
       metaId: notice.id,
       metaIssuanceId: notice.issuance_id,
     });
+  }
+
+  for (const notice of inventoryInstallerNotices) {
+    if (notice.read_at) continue;
+    const itemLabel =
+      notice.inventory_name ||
+      notice.part_number ||
+      (notice.inventory_id != null ? `Inventory #${notice.inventory_id}` : 'inventory item');
+    const serial = notice.serial_number ? ` (${notice.serial_number})` : '';
+    if (notice.notice_type === 'issued') {
+      notifications.push({
+        id: `inventory-issued-${notice.id}`,
+        type: 'inventory_issued',
+        title: 'Inventory issued to you',
+        message: notice.message || `${itemLabel}${serial} was issued to you`,
+        href: '/inventory/issuances',
+        timestamp: notice.created_at,
+        priority: 'high',
+        metaId: notice.id,
+        metaIssuanceId: notice.issuance_id ?? undefined,
+      });
+    } else if (notice.notice_type === 'return_accepted') {
+      notifications.push({
+        id: `inventory-return-accepted-${notice.id}`,
+        type: 'inventory_return_accepted',
+        title: 'Return accepted',
+        message: notice.message || `Your return of ${itemLabel}${serial} was accepted`,
+        href: '/inventory/issuances',
+        timestamp: notice.created_at,
+        priority: 'medium',
+        metaId: notice.id,
+        metaIssuanceId: notice.issuance_id ?? undefined,
+      });
+    } else if (notice.notice_type === 'return_rejected') {
+      notifications.push({
+        id: `inventory-return-rejected-${notice.id}`,
+        type: 'inventory_return_rejected',
+        title: 'Return rejected',
+        message:
+          notice.message ||
+          `Your return of ${itemLabel}${serial} was rejected — item remains with you`,
+        href: '/inventory/issuances',
+        timestamp: notice.created_at,
+        priority: 'high',
+        metaId: notice.id,
+        metaIssuanceId: notice.issuance_id ?? undefined,
+      });
+    }
   }
 
   return notifications.sort(

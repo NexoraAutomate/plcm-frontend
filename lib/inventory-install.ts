@@ -124,6 +124,7 @@ export async function installEntityFromInventory({
   /** When true, child stock was already removed at compose time — create entity only. */
   skipConsume = false,
   composedSerialNumber,
+  installedById,
 }: {
   inventoryItem: Inventory;
   instanceId?: number;
@@ -136,6 +137,7 @@ export async function installEntityFromInventory({
   createEntity: (data: Record<string, unknown>) => Promise<{ id: number }>;
   skipConsume?: boolean;
   composedSerialNumber?: string | null;
+  installedById?: number | null;
 }): Promise<{ entityId: number; updatedInventory: Inventory }> {
   if (!isValidEntityId(parentEntityId)) {
     throw new Error(`Invalid parent entity for ${entityType} install`);
@@ -181,8 +183,13 @@ export async function installEntityFromInventory({
   const created = await createEntity({
     name: merged.name,
     description: merged.description || '',
+    ...inventoryToHierarchyCreatePayload(
+      merged,
+      serialNumber || nextSerialNumberFromInventory(merged, existingChildren),
+      { installedById }
+    ),
+    // Hierarchy first-status must win over any inventory metadata.
     status_id: defaultStatus.id,
-    ...inventoryToHierarchyCreatePayload(merged, serialNumber || nextSerialNumberFromInventory(merged, existingChildren)),
     [parentField]: parentEntityId,
   });
 
