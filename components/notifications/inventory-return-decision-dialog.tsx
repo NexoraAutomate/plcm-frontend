@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import type { InventoryReturnNotice } from '@/lib/models';
@@ -32,11 +32,16 @@ export function InventoryReturnDecisionDialog({
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState<'accept' | 'reject' | null>(null);
 
+  useEffect(() => {
+    if (open) setNotes('');
+  }, [open, notice?.id]);
+
   const itemLabel =
     notice?.inventory_name ||
     notice?.part_number ||
     (notice?.inventory_id != null ? `Inventory #${notice.inventory_id}` : 'inventory item');
   const who = notice?.returned_by_name || (notice ? `User #${notice.returned_by_user_id}` : '');
+  const requestNotes = notice?.request_notes?.trim();
 
   const resetAndClose = () => {
     setNotes('');
@@ -46,13 +51,18 @@ export function InventoryReturnDecisionDialog({
 
   const handleDecide = async (action: 'accept' | 'reject') => {
     if (!notice) return;
+    const cleaned = notes.trim();
+    if (!cleaned) {
+      toast.error('Admin remarks are required');
+      return;
+    }
     setBusy(action);
     try {
       if (action === 'accept') {
-        await api.inventory.acceptReturn(notice.issuance_id, notes.trim() || undefined);
+        await api.inventory.acceptReturn(notice.issuance_id, cleaned);
         toast.success('Return accepted — stock restored to warehouse');
       } else {
-        await api.inventory.rejectReturn(notice.issuance_id, notes.trim() || undefined);
+        await api.inventory.rejectReturn(notice.issuance_id, cleaned);
         toast.success('Return rejected — item reissued to installer');
       }
       onDecided?.();
@@ -87,26 +97,36 @@ export function InventoryReturnDecisionDialog({
             warehouse stock, or reject to keep it issued to the installer.
           </DialogDescription>
         </DialogHeader>
+        {requestNotes ? (
+          <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
+            <p className="text-xs font-medium text-muted-foreground mb-1">Installer reason</p>
+            <p className="whitespace-pre-wrap">{requestNotes}</p>
+          </div>
+        ) : null}
         <div className="space-y-2">
-          <Label htmlFor="return-decision-notes">Notes (optional)</Label>
+          <Label htmlFor="return-decision-notes">Admin remarks *</Label>
           <Textarea
             id="return-decision-notes"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Reason or remarks…"
+            placeholder="Reason for accept or reject…"
             rows={3}
             disabled={busy != null}
+            required
           />
         </div>
         <DialogFooter className="gap-2 sm:gap-0">
           <Button
             variant="outline"
-            disabled={busy != null}
+            disabled={busy != null || !notes.trim()}
             onClick={() => void handleDecide('reject')}
           >
             {busy === 'reject' ? 'Rejecting…' : 'Reject (reissue)'}
           </Button>
-          <Button disabled={busy != null} onClick={() => void handleDecide('accept')}>
+          <Button
+            disabled={busy != null || !notes.trim()}
+            onClick={() => void handleDecide('accept')}
+          >
             {busy === 'accept' ? 'Accepting…' : 'Accept return'}
           </Button>
         </DialogFooter>

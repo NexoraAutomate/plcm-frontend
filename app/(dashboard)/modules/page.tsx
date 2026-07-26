@@ -39,12 +39,21 @@ import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { MODULES_DASHBOARD_CONFIG, MODULE_STATUS_NAMES } from '@/lib/hierarchy-dashboard-configs';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
+import { useAuth } from '@/lib/auth-context';
+import { canManageInstall, ownInstallRowClass, showOwnInstallBadge } from '@/lib/install-ownership';
+import { cn } from '@/lib/utils';
+import {
+  InstallerFilterSelect,
+  resolveInstallerFilterId,
+} from '@/components/installer-filter-select';
 
 export default function ModulesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { pageLoading } = useEntityHierarchyGate();
-  const { subsystems, units, createModule, updateModule, deleteModule } = useDataStore();
+  const { user, isInventoryManager } = useAuth();
+  const inventoryManager = isInventoryManager();
+  const { subsystems, units, createModule, updateModule, deleteModule, users } = useDataStore();
   const faultMap = useEntityFaultMap();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
@@ -57,6 +66,7 @@ export default function ModulesPage() {
   const parentFilterParam = searchParams.get('subsystem_id');
   const [statusFilter, setStatusFilter] = useState<string>(statusFilterParam || 'all');
   const [parentFilter, setParentFilter] = useState<string>(parentFilterParam || 'all');
+  const [installerFilter, setInstallerFilter] = useState('all');
   const { data: subsystemHierarchyNames = [] } = useHierarchiesQuery('subsystem');
   const { data: moduleHierarchyNamesAll = [] } = useHierarchiesQuery('module');
   const { data: statuses = [] } = useStatusesByTypeQuery('modules');
@@ -68,9 +78,13 @@ export default function ModulesPage() {
         statusName: statusFilter,
         statuses,
         subsystemId: parentFilter !== 'all' ? Number(parentFilter) : null,
+        installedById: resolveInstallerFilterId(installerFilter, {
+          currentUserId: user?.id,
+          isInventoryManager: inventoryManager,
+        }),
         ...listFilterPatch,
       }),
-    [debouncedSearch, statusFilter, statuses, parentFilter, listFilterPatch]
+    [debouncedSearch, statusFilter, statuses, parentFilter, installerFilter, user?.id, inventoryManager, listFilterPatch]
   );
 
   const pagination = usePaginatedList({
@@ -301,6 +315,14 @@ export default function ModulesPage() {
             ))}
           </SelectContent>
         </Select>
+        <InstallerFilterSelect
+          value={installerFilter}
+          onValueChange={setInstallerFilter}
+          users={users}
+          currentUserId={user?.id}
+          isInventoryManager={inventoryManager}
+          showLabel={false}
+        />
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <Can permission={P.create_modules}>
             <DialogTrigger asChild>
@@ -400,10 +422,23 @@ export default function ModulesPage() {
                 ) : (
                   modules.map((module) => {
                     const subsystem = subsystems.find((s) => s.id === module.subsystem_id);
+                    const ownsInstall = canManageInstall({
+                      isInventoryManager: inventoryManager,
+                      currentUserId: user?.id,
+                      installedById: module.installed_by_id,
+                    });
                     return (
                       <TableRow
                         key={module.id}
-                        className="cursor-pointer"
+                        className={cn(
+                          'cursor-pointer',
+                          ownInstallRowClass({
+                            isInventoryManager: inventoryManager,
+                            currentUserId: user?.id,
+                            installedById: module.installed_by_id,
+                            isCurrentInstall: module.is_current_install,
+                          })
+                        )}
                         onClick={() => router.push(`/modules/${module.id}`)}
                       >
                         <TableCell className="font-medium">
@@ -413,6 +448,16 @@ export default function ModulesPage() {
                             entityId={module.id}
                             faultMap={faultMap}
                           />
+                          {showOwnInstallBadge({
+                            isInventoryManager: inventoryManager,
+                            currentUserId: user?.id,
+                            installedById: module.installed_by_id,
+                            isCurrentInstall: module.is_current_install,
+                          }) ? (
+                            <p className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                              Installed by you
+                            </p>
+                          ) : null}
                         </TableCell>
                         <TableCell>
                           {subsystem ? (
@@ -440,15 +485,17 @@ export default function ModulesPage() {
                                 View
                               </Button>
                             </Link>
-                            <Can permission={P.edit_modules}>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={(e) => { e.stopPropagation(); openEdit(module)}}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </Can>
+                            {ownsInstall ? (
+                              <Can permission={P.edit_modules}>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(e) => { e.stopPropagation(); openEdit(module)}}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              </Can>
+                            ) : null}
                             {/* <ConfirmDialog
                               title="Delete Module"
                               description="Are you sure you want to delete this module?"

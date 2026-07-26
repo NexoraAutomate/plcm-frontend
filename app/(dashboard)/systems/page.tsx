@@ -43,6 +43,10 @@ import { P } from '@/lib/permission-codes';
 import { useAuth } from '@/lib/auth-context';
 import { canManageInstall, isOwnInstall } from '@/lib/install-ownership';
 import { cn } from '@/lib/utils';
+import {
+  InstallerFilterSelect,
+  resolveInstallerFilterId,
+} from '@/components/installer-filter-select';
 
 
 
@@ -67,6 +71,7 @@ export default function SystemsPage() {
   const projectFilterParam = searchParams.get('project_id');
   const [statusFilter, setStatusFilter] = useState<string>(statusFilterParam || 'all');
   const [projectFilter, setProjectFilter] = useState<string>(projectFilterParam || 'all');
+  const [installerFilter, setInstallerFilter] = useState('all');
   const { data: statuses = [] } = useStatusesByTypeQuery('systems');
   const { data: systemHierarchyNames = [] } = useHierarchiesQuery('system');
 
@@ -77,9 +82,13 @@ export default function SystemsPage() {
         statusName: statusFilter,
         statuses,
         projectId: projectFilter !== 'all' ? Number(projectFilter) : null,
+        installedById: resolveInstallerFilterId(installerFilter, {
+          currentUserId: user?.id,
+          isInventoryManager: inventoryManager,
+        }),
         ...listFilterPatch,
       }),
-    [debouncedSearch, statusFilter, statuses, projectFilter, listFilterPatch]
+    [debouncedSearch, statusFilter, statuses, projectFilter, installerFilter, user?.id, inventoryManager, listFilterPatch]
   );
 
   const pagination = usePaginatedList({
@@ -340,6 +349,14 @@ export default function SystemsPage() {
             ))}
           </SelectContent>
         </Select>
+        <InstallerFilterSelect
+          value={installerFilter}
+          onValueChange={setInstallerFilter}
+          users={users as Models.User[]}
+          currentUserId={user?.id}
+          isInventoryManager={inventoryManager}
+          showLabel={false}
+        />
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <Can permission={P.create_systems}>
             <DialogTrigger asChild>

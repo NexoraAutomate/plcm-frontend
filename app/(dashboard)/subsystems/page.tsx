@@ -42,12 +42,21 @@ import {
 } from '@/lib/hierarchy-dashboard-configs';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
+import { useAuth } from '@/lib/auth-context';
+import { canManageInstall, ownInstallRowClass, showOwnInstallBadge } from '@/lib/install-ownership';
+import { cn } from '@/lib/utils';
+import {
+  InstallerFilterSelect,
+  resolveInstallerFilterId,
+} from '@/components/installer-filter-select';
 
 export default function SubsystemsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { pageLoading } = useEntityHierarchyGate();
-  const { systems, modules, createSubsystem, updateSubsystem, deleteSubsystem } = useDataStore();
+  const { user, isInventoryManager } = useAuth();
+  const inventoryManager = isInventoryManager();
+  const { systems, modules, createSubsystem, updateSubsystem, deleteSubsystem, users } = useDataStore();
   const faultMap = useEntityFaultMap();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
@@ -60,6 +69,7 @@ export default function SubsystemsPage() {
   const parentFilterParam = searchParams.get('system_id');
   const [statusFilter, setStatusFilter] = useState<string>(statusFilterParam || 'all');
   const [parentFilter, setParentFilter] = useState<string>(parentFilterParam || 'all');
+  const [installerFilter, setInstallerFilter] = useState('all');
   const { data: systemHierarchyNames = [] } = useHierarchiesQuery('system');
   const { data: subsystemHierarchyNamesAll = [] } = useHierarchiesQuery('subsystem');
   const { data: statuses = [] } = useStatusesByTypeQuery('subsystems');
@@ -71,9 +81,13 @@ export default function SubsystemsPage() {
         statusName: statusFilter,
         statuses,
         systemId: parentFilter !== 'all' ? Number(parentFilter) : null,
+        installedById: resolveInstallerFilterId(installerFilter, {
+          currentUserId: user?.id,
+          isInventoryManager: inventoryManager,
+        }),
         ...listFilterPatch,
       }),
-    [debouncedSearch, statusFilter, statuses, parentFilter, listFilterPatch]
+    [debouncedSearch, statusFilter, statuses, parentFilter, installerFilter, user?.id, inventoryManager, listFilterPatch]
   );
 
   const pagination = usePaginatedList({
@@ -307,6 +321,14 @@ export default function SubsystemsPage() {
             ))}
           </SelectContent>
         </Select>
+        <InstallerFilterSelect
+          value={installerFilter}
+          onValueChange={setInstallerFilter}
+          users={users}
+          currentUserId={user?.id}
+          isInventoryManager={inventoryManager}
+          showLabel={false}
+        />
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <Can permission={P.create_subsystems}>
             <DialogTrigger asChild>
@@ -406,10 +428,23 @@ export default function SubsystemsPage() {
                 ) : (
                   subsystems.map((subsystem) => {
                     const system = systems.find((s) => s.id === subsystem.system_id);
+                    const ownsInstall = canManageInstall({
+                      isInventoryManager: inventoryManager,
+                      currentUserId: user?.id,
+                      installedById: subsystem.installed_by_id,
+                    });
                     return (
                       <TableRow
                         key={subsystem.id}
-                        className="cursor-pointer"
+                        className={cn(
+                          'cursor-pointer',
+                          ownInstallRowClass({
+                            isInventoryManager: inventoryManager,
+                            currentUserId: user?.id,
+                            installedById: subsystem.installed_by_id,
+                            isCurrentInstall: subsystem.is_current_install,
+                          })
+                        )}
                         onClick={() => router.push(`/subsystems/${subsystem.id}`)}
                       >
                         <TableCell className="font-medium">
@@ -419,6 +454,16 @@ export default function SubsystemsPage() {
                             entityId={subsystem.id}
                             faultMap={faultMap}
                           />
+                          {showOwnInstallBadge({
+                            isInventoryManager: inventoryManager,
+                            currentUserId: user?.id,
+                            installedById: subsystem.installed_by_id,
+                            isCurrentInstall: subsystem.is_current_install,
+                          }) ? (
+                            <p className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                              Installed by you
+                            </p>
+                          ) : null}
                         </TableCell>
                         <TableCell>
                           {system ? (
@@ -446,15 +491,17 @@ export default function SubsystemsPage() {
                                 View
                               </Button>
                             </Link>
-                            <Can permission={P.edit_subsystems}>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={(e) => { e.stopPropagation(); openEdit(subsystem)}}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </Can>
+                            {ownsInstall ? (
+                              <Can permission={P.edit_subsystems}>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(e) => { e.stopPropagation(); openEdit(subsystem)}}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              </Can>
+                            ) : null}
                             {/* <ConfirmDialog
                               title="Delete Subsystem"
                               description="Are you sure you want to delete this subsystem?"

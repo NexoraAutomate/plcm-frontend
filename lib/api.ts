@@ -299,17 +299,19 @@ export const inventory = {
     api.get<Models.InventoryIssuance[]>('/inventory/issuances/', { params }),
   getIssuance: (issuanceId: number) =>
     api.get<Models.InventoryIssuance>(`/inventory/issuances/${issuanceId}/`),
-  returnIssuance: (issuanceId: number, notes?: string) =>
+  getIssuanceHistory: (issuanceId: number) =>
+    api.get<Models.InventoryIssuanceEvent[]>(`/inventory/issuances/${issuanceId}/history/`),
+  returnIssuance: (issuanceId: number, notes: string) =>
     api.post<Models.InventoryIssuance>(`/inventory/issuances/${issuanceId}/return/`, {
-      notes: notes ?? null,
+      notes,
     }),
-  acceptReturn: (issuanceId: number, notes?: string) =>
+  acceptReturn: (issuanceId: number, notes: string) =>
     api.post<Models.InventoryIssuance>(`/inventory/issuances/${issuanceId}/accept-return/`, {
-      notes: notes ?? null,
+      notes,
     }),
-  rejectReturn: (issuanceId: number, notes?: string) =>
+  rejectReturn: (issuanceId: number, notes: string) =>
     api.post<Models.InventoryIssuance>(`/inventory/issuances/${issuanceId}/reject-return/`, {
-      notes: notes ?? null,
+      notes,
     }),
   listReturnNotices: (options?: { unreadOnly?: boolean; pendingOnly?: boolean }) =>
     api.get<Models.InventoryReturnNotice[]>('/inventory/return-notices/', {

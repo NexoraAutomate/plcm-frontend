@@ -435,6 +435,26 @@ export interface InventoryReturnNotice {
   decided_at?: string | null
   decided_by_id?: number | null
   decision_notes?: string | null
+  request_notes?: string | null
+}
+
+export interface InventoryIssuanceEvent {
+  id?: number | null
+  issuance_id: number
+  inventory_id?: number | null
+  inventory_instance_id?: number | null
+  event_type: string
+  quantity: number
+  actor_user_id?: number | null
+  actor_name?: string | null
+  installer_user_id?: number | null
+  installer_name?: string | null
+  notes?: string | null
+  part_number?: string | null
+  serial_number?: string | null
+  inventory_name?: string | null
+  inventory_type?: string | null
+  created_at: string
 }
 
 export interface InventoryChildLink {

@@ -31,6 +31,11 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { PageLoader } from '@/components/page-loader';
 import { useAuth } from '@/lib/auth-context';
+import {
+  IssuanceRemarksDialog,
+  type IssuanceRemarksAction,
+} from '@/components/inventory/issuance-remarks-dialog';
+import { IssuanceHistorySheet } from '@/components/inventory/issuance-history-sheet';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All (history)' },
@@ -79,6 +84,11 @@ export default function InventoryIssuancesPage() {
   const [issuedTo, setIssuedTo] = useState('all');
   const [search, setSearch] = useState('');
   const [actionId, setActionId] = useState<number | null>(null);
+  const [remarksOpen, setRemarksOpen] = useState(false);
+  const [remarksAction, setRemarksAction] = useState<IssuanceRemarksAction | null>(null);
+  const [remarksRow, setRemarksRow] = useState<InventoryIssuance | null>(null);
+  const [historyRow, setHistoryRow] = useState<InventoryIssuance | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -102,56 +112,52 @@ export default function InventoryIssuancesPage() {
     void load();
   }, [load]);
 
-  const handleReturn = async (row: InventoryIssuance) => {
-    setActionId(row.id);
+  const openRemarks = (row: InventoryIssuance, action: IssuanceRemarksAction) => {
+    setRemarksRow(row);
+    setRemarksAction(action);
+    setRemarksOpen(true);
+  };
+
+  const handleRemarksConfirm = async (notes: string) => {
+    if (!remarksRow || !remarksAction) return;
+    setActionId(remarksRow.id);
     try {
-      await api.inventory.returnIssuance(row.id);
-      toast.success(
-        inventoryManager
-          ? 'Return accepted — stock is available again'
-          : 'Return requested — waiting for admin acceptance'
-      );
+      if (remarksAction === 'return') {
+        await api.inventory.returnIssuance(remarksRow.id, notes);
+        toast.success(
+          inventoryManager
+            ? 'Return accepted — stock is available again'
+            : 'Return requested — waiting for admin acceptance'
+        );
+      } else if (remarksAction === 'accept') {
+        await api.inventory.acceptReturn(remarksRow.id, notes);
+        toast.success('Return accepted — stock restored to warehouse');
+      } else {
+        await api.inventory.rejectReturn(remarksRow.id, notes);
+        toast.success('Return rejected — reissued to installer');
+      }
+      setRemarksOpen(false);
+      setRemarksRow(null);
+      setRemarksAction(null);
       await load();
     } catch (err: unknown) {
       const detail =
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-        'Failed to return issuance';
-      toast.error(typeof detail === 'string' ? detail : 'Failed to return issuance');
+        'Action failed';
+      toast.error(typeof detail === 'string' ? detail : 'Action failed');
     } finally {
       setActionId(null);
     }
   };
 
-  const handleAccept = async (row: InventoryIssuance) => {
-    setActionId(row.id);
-    try {
-      await api.inventory.acceptReturn(row.id);
-      toast.success('Return accepted — stock restored to warehouse');
-      await load();
-    } catch (err: unknown) {
-      const detail =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-        'Failed to accept return';
-      toast.error(typeof detail === 'string' ? detail : 'Failed to accept return');
-    } finally {
-      setActionId(null);
-    }
-  };
-
-  const handleReject = async (row: InventoryIssuance) => {
-    setActionId(row.id);
-    try {
-      await api.inventory.rejectReturn(row.id);
-      toast.success('Return rejected — reissued to installer');
-      await load();
-    } catch (err: unknown) {
-      const detail =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-        'Failed to reject return';
-      toast.error(typeof detail === 'string' ? detail : 'Failed to reject return');
-    } finally {
-      setActionId(null);
-    }
+  const itemLabel = (row: InventoryIssuance | null) => {
+    if (!row) return undefined;
+    return (
+      row.inventory_name ||
+      row.part_number ||
+      row.serial_number ||
+      `Issuance #${row.id}`
+    );
   };
 
   return (
@@ -169,8 +175,8 @@ export default function InventoryIssuancesPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Inventory issuances</h1>
           <p className="text-sm text-muted-foreground">
             {inventoryManager
-              ? 'Full issuance and return history. Accept or reject pending returns from installers.'
-              : 'Your issuance history — return unused items to Admin when no longer needed.'}
+              ? 'Full issuance and return history. Click a row for unit ping-pong timeline. Accept or reject pending returns with remarks.'
+              : 'Your issuance history — click a row for timeline. Return unused items with a reason.'}
           </p>
         </div>
         <Button
@@ -260,7 +266,14 @@ export default function InventoryIssuancesPage() {
                 </TableHeader>
                 <TableBody>
                   {rows.map((row) => (
-                    <TableRow key={row.id}>
+                    <TableRow
+                      key={row.id}
+                      className="cursor-pointer"
+                      onClick={() => {
+                        setHistoryRow(row);
+                        setHistoryOpen(true);
+                      }}
+                    >
                       <TableCell>
                         <div className="font-medium">
                           {row.inventory_name || `Inventory #${row.inventory_id}`}
@@ -299,14 +312,17 @@ export default function InventoryIssuancesPage() {
                           {row.status === 'return_pending' ? 'return pending' : row.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right align-top">
+                      <TableCell
+                        className="text-right align-top"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         {row.status === 'issued' ? (
                           <Button
                             variant="outline"
                             size="sm"
                             className="whitespace-nowrap"
                             disabled={actionId === row.id}
-                            onClick={() => void handleReturn(row)}
+                            onClick={() => openRemarks(row, 'return')}
                           >
                             <Undo2 className="size-3.5" />
                             {inventoryManager ? 'Force return' : 'Return'}
@@ -319,7 +335,7 @@ export default function InventoryIssuancesPage() {
                               size="sm"
                               className="whitespace-nowrap"
                               disabled={actionId === row.id}
-                              onClick={() => void handleAccept(row)}
+                              onClick={() => openRemarks(row, 'accept')}
                             >
                               <Check className="size-3.5" />
                               Accept
@@ -329,7 +345,7 @@ export default function InventoryIssuancesPage() {
                               size="sm"
                               className="whitespace-nowrap"
                               disabled={actionId === row.id}
-                              onClick={() => void handleReject(row)}
+                              onClick={() => openRemarks(row, 'reject')}
                             >
                               <X className="size-3.5" />
                               Reject
@@ -350,6 +366,21 @@ export default function InventoryIssuancesPage() {
           )}
         </CardContent>
       </Card>
+
+      <IssuanceRemarksDialog
+        open={remarksOpen}
+        onOpenChange={setRemarksOpen}
+        action={remarksAction}
+        itemLabel={itemLabel(remarksRow)}
+        busy={actionId != null}
+        onConfirm={handleRemarksConfirm}
+      />
+
+      <IssuanceHistorySheet
+        issuance={historyRow}
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+      />
     </div>
   );
 }

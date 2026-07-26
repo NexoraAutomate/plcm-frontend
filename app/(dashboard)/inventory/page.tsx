@@ -56,6 +56,7 @@ import { InventorySerialSelectDialog } from '@/components/inventory-serial-selec
 import { InventoryDeleteDialog } from '@/components/inventory-delete-dialog';
 import { InventoryHierarchyDialog } from '@/components/inventory-hierarchy-dialog';
 import { InventoryIssueDialog } from '@/components/inventory-issue-dialog';
+import { IssuanceRemarksDialog } from '@/components/inventory/issuance-remarks-dialog';
 import { isInventoryInStock } from '@/lib/inventory-filter';
 import { StatusBadge } from '@/components/status-badge';
 import { Badge } from '@/components/ui/badge';
@@ -287,6 +288,8 @@ export default function InventoryPage() {
     item: InventoryItem;
     instanceId?: number;
   } | null>(null);
+  const [returnIssuanceId, setReturnIssuanceId] = useState<number | null>(null);
+  const [returnRemarksBusy, setReturnRemarksBusy] = useState(false);
 
   const [selectedEntityType, setSelectedEntityType] = useState<EntityType>('component');
   const { data: hierarchyCategories = [] } = useHierarchiesQuery(selectedEntityType);
@@ -1583,17 +1586,13 @@ export default function InventoryPage() {
                                         toast.error('No open issuance found to return');
                                         return;
                                       }
-                                      await api.inventory.returnIssuance(id);
-                                      toast.success(
-                                        'Return requested — waiting for admin acceptance'
-                                      );
-                                      void pagination.invalidate();
+                                      setReturnIssuanceId(id);
                                     } catch (err: unknown) {
                                       const detail =
                                         (err as { response?: { data?: { detail?: string } } })
-                                          ?.response?.data?.detail || 'Failed to return';
+                                          ?.response?.data?.detail || 'Failed to prepare return';
                                       toast.error(
-                                        typeof detail === 'string' ? detail : 'Failed to return'
+                                        typeof detail === 'string' ? detail : 'Failed to prepare return'
                                       );
                                     }
                                   }}
@@ -1714,26 +1713,9 @@ export default function InventoryPage() {
                                                   className={cn(ACTION_BTN, 'group/issue')}
                                                   title="Request return to admin"
                                                   aria-label="Request return to admin"
-                                                  onClick={async () => {
-                                                    try {
-                                                      await api.inventory.returnIssuance(
-                                                        instance.open_issuance_id!
-                                                      );
-                                                      toast.success(
-                                                        'Return requested — waiting for admin acceptance'
-                                                      );
-                                                      void pagination.invalidate();
-                                                    } catch (err: unknown) {
-                                                      const detail =
-                                                        (err as {
-                                                          response?: { data?: { detail?: string } };
-                                                        })?.response?.data?.detail ||
-                                                        'Failed to return';
-                                                      toast.error(
-                                                        typeof detail === 'string'
-                                                          ? detail
-                                                          : 'Failed to return'
-                                                      );
+                                                  onClick={() => {
+                                                    if (instance.open_issuance_id) {
+                                                      setReturnIssuanceId(instance.open_issuance_id);
                                                     }
                                                   }}
                                                 >
@@ -2051,6 +2033,32 @@ export default function InventoryPage() {
         presetInstanceId={issueTarget?.instanceId}
         onIssued={() => {
           void pagination.invalidate();
+        }}
+      />
+
+      <IssuanceRemarksDialog
+        open={returnIssuanceId != null}
+        onOpenChange={(open) => {
+          if (!open && !returnRemarksBusy) setReturnIssuanceId(null);
+        }}
+        action="return"
+        busy={returnRemarksBusy}
+        onConfirm={async (notes) => {
+          if (returnIssuanceId == null) return;
+          setReturnRemarksBusy(true);
+          try {
+            await api.inventory.returnIssuance(returnIssuanceId, notes);
+            toast.success('Return requested — waiting for admin acceptance');
+            setReturnIssuanceId(null);
+            void pagination.invalidate();
+          } catch (err: unknown) {
+            const detail =
+              (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+              'Failed to return';
+            toast.error(typeof detail === 'string' ? detail : 'Failed to return');
+          } finally {
+            setReturnRemarksBusy(false);
+          }
         }}
       />
     </div>
