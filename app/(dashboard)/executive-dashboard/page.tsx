@@ -1,9 +1,9 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Inter } from 'next/font/google';
-import { Loader2 } from 'lucide-react';
+import { Expand, Loader2, Minimize2 } from 'lucide-react';
 import {
   useCustomersQuery,
   useOrdersQuery,
@@ -14,6 +14,7 @@ import { useExecutiveDashboard } from '@/hooks/use-executive-dashboard';
 import { buildCommandCenterViewModel } from '@/lib/executive-command-center';
 import { ExecutiveCommandGrid } from '@/components/dashboard/executive';
 import type { ExecFiltersState } from '@/components/dashboard/executive';
+import { useExecutivePresentation } from '@/components/dashboard/executive/executive-presentation';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -51,12 +52,18 @@ function inferRange(dateFrom: string): string | undefined {
 
 export default function ExecutiveDashboardPage() {
   const router = useRouter();
+  const { active: presentationActive, enter, exit } = useExecutivePresentation();
   const { data: customers = [] } = useCustomersQuery(0, LIST_BOOTSTRAP_SIZE);
   const { data: orders = [] } = useOrdersQuery(0, LIST_BOOTSTRAP_SIZE);
   const { data: projects = [] } = useProjectsQuery(0, LIST_BOOTSTRAP_SIZE);
 
   const { data, loading, fetching, error, filters, updateFilters, refetch } =
     useExecutiveDashboard();
+
+  // Enter presentation when landing here (login redirect / deep link). Sidebar click also calls enter.
+  useEffect(() => {
+    enter();
+  }, [enter]);
 
   const model = useMemo(() => buildCommandCenterViewModel(data), [data]);
 
@@ -142,6 +149,36 @@ export default function ExecutiveDashboardPage() {
           </Button>
         </div>
       ) : null}
+
+      <div className="pointer-events-none absolute right-3 top-3 z-30 flex items-center gap-2">
+        {presentationActive ? (
+          <div className="pointer-events-auto flex items-center gap-2 rounded-md border border-[#242424] bg-[#141414]/90 px-2 py-1 text-[11px] text-[#9CA3AF] backdrop-blur">
+            <span>Fullscreen · Esc for normal view</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-[#F5F5F5] hover:bg-[#242424]"
+              title="Exit fullscreen (Esc)"
+              aria-label="Exit fullscreen"
+              onClick={exit}
+            >
+              <Minimize2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="pointer-events-auto gap-1.5 border-[#242424] bg-[#141414]/90 text-[#F5F5F5] hover:bg-[#1a1a1a]"
+            onClick={enter}
+          >
+            <Expand className="h-3.5 w-3.5" />
+            Fullscreen
+          </Button>
+        )}
+      </div>
 
       <div className={cn('min-h-0 flex-1 transition-opacity duration-300', fetching && 'opacity-70')}>
         <ExecutiveCommandGrid

@@ -6,28 +6,23 @@ import { useAuth } from "@/lib/auth-context";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Navbar } from "@/components/navbar";
 import { RoutePermissionGuard } from "@/components/auth/require-permission";
+import {
+  ExecutivePresentationProvider,
+  useExecutivePresentation,
+} from "@/components/dashboard/executive/executive-presentation";
 import { cn } from "@/lib/utils";
 
-export function AppShell({ children }: { children: ReactNode }) {
-  const { isAuthenticated, authReady } = useAuth();
-  const router = useRouter();
+function AppShellFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const isExecutiveCommand = pathname?.startsWith("/executive-dashboard");
-
-  useEffect(() => {
-    if (!authReady) return;
-    if (!isAuthenticated) {
-      router.replace("/login");
-    }
-  }, [isAuthenticated, authReady, router]);
-
-  if (!authReady || !isAuthenticated) return null;
+  const { active: presentationActive } = useExecutivePresentation();
+  const hideChrome = presentationActive;
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <AppSidebar />
+      {!hideChrome ? <AppSidebar /> : null}
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Navbar />
+        {!hideChrome ? <Navbar /> : null}
         <main
           className={cn(
             "min-h-0 flex-1 bg-background",
@@ -40,5 +35,25 @@ export function AppShell({ children }: { children: ReactNode }) {
         </main>
       </div>
     </div>
+  );
+}
+
+export function AppShell({ children }: { children: ReactNode }) {
+  const { isAuthenticated, authReady } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!authReady) return;
+    if (!isAuthenticated) {
+      router.replace("/login");
+    }
+  }, [isAuthenticated, authReady, router]);
+
+  if (!authReady || !isAuthenticated) return null;
+
+  return (
+    <ExecutivePresentationProvider>
+      <AppShellFrame>{children}</AppShellFrame>
+    </ExecutivePresentationProvider>
   );
 }
