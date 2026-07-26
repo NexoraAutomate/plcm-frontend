@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Moon, Sun, Bell } from "lucide-react";
+import { Moon, Sun, Bell, Expand, Minimize2 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/lib/auth-context";
 import { Badge } from "@/components/ui/badge";
@@ -17,10 +17,12 @@ import { NotificationRow } from "@/components/notifications/notification-row";
 import { InventoryReturnDecisionDialog } from "@/components/notifications/inventory-return-decision-dialog";
 import { useAppNotifications } from "@/hooks/use-app-notifications";
 import { useNotificationSync } from "@/hooks/use-notification-sync";
+import { useAppFullscreen } from "@/components/app-fullscreen";
 
 export function Navbar() {
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { active: fullscreenActive, toggle: toggleFullscreen } = useAppFullscreen();
   useNotificationSync();
   const {
     notifications,
@@ -52,6 +54,24 @@ export function Navbar() {
       </div>
 
       <div className="flex items-center gap-4">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative h-9 w-9 text-muted-foreground"
+          onClick={toggleFullscreen}
+          title={fullscreenActive ? "Exit fullscreen (Esc)" : "Enter fullscreen"}
+          aria-label={fullscreenActive ? "Exit fullscreen" : "Enter fullscreen"}
+        >
+          {fullscreenActive ? (
+            <Minimize2 className="h-4 w-4" />
+          ) : (
+            <Expand className="h-4 w-4" />
+          )}
+          <span className="sr-only">
+            {fullscreenActive ? "Exit fullscreen" : "Enter fullscreen"}
+          </span>
+        </Button>
+
         <Button
           variant="ghost"
           size="icon"

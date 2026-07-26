@@ -32,7 +32,7 @@ import { useAuth } from "@/lib/auth-context";
 import { NAV_PERMISSIONS, SETTINGS_ACCESS_PERMISSIONS, type PermissionCode } from "@/lib/permission-codes";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { useExecutivePresentation } from "@/components/dashboard/executive/executive-presentation";
+import { useAppFullscreen } from "@/components/app-fullscreen";
 import {
   Tooltip,
   TooltipContent,
@@ -239,7 +239,7 @@ function NavLink({
 export function AppSidebar() {
   const pathname = usePathname();
   const { logout, can } = useAuth();
-  const { enter: enterExecutivePresentation } = useExecutivePresentation();
+  const { enter: enterFullscreen } = useAppFullscreen();
   const [pinned, setPinned] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [reportingOpen, setReportingOpen] = useState(false);
@@ -260,7 +260,7 @@ export function AppSidebar() {
 
   const handleNavigate = (href: string) => {
     if (href === "/executive-dashboard" || href.startsWith("/executive-dashboard/")) {
-      enterExecutivePresentation();
+      enterFullscreen();
     }
   };
 
