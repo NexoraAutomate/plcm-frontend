@@ -11,38 +11,32 @@ import {
 
 /**
  * True when the catalog has units available to install/replace
- * (excludes return_pending serials).
+ * (excludes return_pending-only stock).
  */
 export function isInventoryInStock(item: Inventory): boolean {
+  // Prefer API installable quantity (installer-scoped available_quantity).
+  if (Number(item.available_quantity ?? 0) > 0) return true;
+
   const type = item.inventory_type as HierarchyEntityType;
   if (inventoryUsesInstances(type)) {
     const installable = getSelectableInstances(item);
     if (installable.length > 0) return true;
-    // Instances hydrated but none installable
+    // Instances hydrated but none installable (e.g. all return_pending)
     if ((item.instances ?? []).some((instance) => Boolean(instance?.id))) return false;
     // Fallback when instance rows were not hydrated on the list payload.
-    return Number(item.available_quantity ?? item.quantity) > 0;
+    return Number(item.quantity ?? 0) > 0;
   }
-  return Number(item.available_quantity ?? item.quantity) > 0;
+  return Number(item.quantity ?? 0) > 0;
 }
 
 /** Held stock is only awaiting admin return acceptance (nothing installable). */
 export function isInventoryReturnPendingOnly(item: Inventory): boolean {
+  if (isInventoryInStock(item)) return false;
+
   const type = item.inventory_type as HierarchyEntityType;
   if (inventoryUsesInstances(type)) {
-    const installable = getSelectableInstances(item).length;
     const pending = getReturnPendingInstances(item).length;
-    if (installable === 0 && pending > 0) return true;
-    // Hydrated empty installable with pending reserved qty from API
-    if (
-      installable === 0 &&
-      Number(item.available_quantity ?? 0) <= 0 &&
-      Number(item.reserved_quantity ?? 0) > 0 &&
-      Number(item.quantity ?? 0) > 0
-    ) {
-      return true;
-    }
-    return false;
+    if (pending > 0) return true;
   }
   return (
     Number(item.available_quantity ?? 0) <= 0 &&

@@ -99,14 +99,34 @@ export function EntityInventorySearch({
         else setLoading(true);
         const res = await api.inventory.list(0, 1000, inventoryType);
         const allowedNames = new Set(allowedInventoryNames.map((name) => name.toLowerCase()));
-        const items = (res.data || []).filter(
+        const rawItems = Array.isArray(res.data)
+          ? res.data
+          : Array.isArray((res.data as { items?: Inventory[] } | undefined)?.items)
+            ? ((res.data as { items: Inventory[] }).items ?? [])
+            : [];
+        const items = rawItems.filter(
           (item) =>
             item.inventory_type === inventoryType &&
             allowedNames.has(item.name?.toLowerCase() ?? '') &&
             isInventoryVisibleForInstall(item)
         );
-        setInventoryItems(items);
-        setFilteredItems(items);
+
+        // Ensure serial rows are present for installable groups (list payloads can omit them).
+        const hydrated = await Promise.all(
+          items.map(async (item) => {
+            if ((item.instances ?? []).length > 0) return item;
+            if (Number(item.available_quantity ?? item.quantity ?? 0) <= 0) return item;
+            try {
+              const instRes = await api.inventory.listInstances(item.id);
+              return { ...item, instances: instRes.data ?? [] };
+            } catch {
+              return item;
+            }
+          })
+        );
+
+        setInventoryItems(hydrated);
+        setFilteredItems(hydrated);
       } catch (err) {
         console.error('Failed to fetch inventory:', err);
         toast.error('Failed to load inventory items');
