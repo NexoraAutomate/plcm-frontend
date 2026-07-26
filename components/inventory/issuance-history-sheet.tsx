@@ -110,7 +110,7 @@ export function IssuanceHistorySheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto px-6 bg-white backdrop-blur-md border border-white/20 rounded-xl p-6 ">
         <SheetHeader>
           <SheetTitle>Issuance history</SheetTitle>
           <SheetDescription>
