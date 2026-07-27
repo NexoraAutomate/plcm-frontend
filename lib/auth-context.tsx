@@ -140,6 +140,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(null);
             localStorage.removeItem('sat-user');
             localStorage.removeItem('token');
+            localStorage.removeItem('session_id');
+            document.cookie = 'token=; path=/; max-age=0';
           }
         } catch {
           // Keep cached user if offline; permissions refresh on next successful fetch
@@ -156,6 +158,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, [persistUser]);
+
+  // Detect admin session termination while the tab is open
+  useEffect(() => {
+    if (!user) return;
+
+    let cancelled = false;
+
+    async function verifySession() {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      try {
+        const res = await fetch(`${apiBase()}/auth/me/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (cancelled) return;
+        if (res.status === 401) {
+          setUser(null);
+          localStorage.removeItem('sat-user');
+          localStorage.removeItem('token');
+          localStorage.removeItem('session_id');
+          document.cookie = 'token=; path=/; max-age=0';
+          if (!window.location.pathname.startsWith('/login')) {
+            window.location.href = '/login';
+          }
+        }
+      } catch {
+        // ignore transient network errors
+      }
+    }
+
+    const id = window.setInterval(() => {
+      void verifySession();
+    }, 15_000);
+    const onFocus = () => {
+      void verifySession();
+    };
+    window.addEventListener('focus', onFocus);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [user]);
 
   const login = useCallback(
     async (username: string, password: string) => {
@@ -184,6 +229,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const data = await response.json();
       localStorage.setItem('token', data.access_token);
+      if (data.session_id) {
+        localStorage.setItem('session_id', data.session_id);
+      }
       document.cookie = `token=${data.access_token}; path=/;`;
 
       const userResponse = await fetch(`${apiBase()}/auth/me/`, {
@@ -209,8 +257,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     const token = localStorage.getItem('token');
+    const sessionId = localStorage.getItem('session_id');
     if (token) {
-      void fetch(`${apiBase()}/auth/logout`, {
+      const qs = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : '';
+      void fetch(`${apiBase()}/auth/logout${qs}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       }).catch(() => {
@@ -220,6 +270,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     localStorage.removeItem('sat-user');
     localStorage.removeItem('token');
+    localStorage.removeItem('session_id');
     document.cookie = 'token=; path=/; max-age=0';
   }, []);
 

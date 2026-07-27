@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
-import type { SecuritySettings as ApiSecuritySettings } from '@/lib/models';
+import type { SecuritySettings as ApiSecuritySettings, ActiveSession as ApiSession } from '@/lib/models';
 
 export type PasswordPolicySettings = {
   minLength: number;
@@ -39,6 +39,7 @@ export type ActiveSession = {
   loginTime: string;
   lastActivity: string;
   status: 'Active' | 'Idle' | 'Expired';
+  isCurrent?: boolean;
 };
 
 export const DEFAULT_SECURITY_SETTINGS: SecuritySettingsState = {
@@ -101,6 +102,21 @@ function toApi(settings: SecuritySettingsState): Partial<ApiSecuritySettings> {
   };
 }
 
+function mapSession(row: ApiSession): ActiveSession {
+  return {
+    id: row.session_id,
+    user: row.username,
+    device: row.device_name || '—',
+    browser: row.browser || '—',
+    operatingSystem: row.operating_system || '—',
+    ipAddress: row.ip_address || '—',
+    loginTime: row.login_time,
+    lastActivity: row.last_activity || row.login_time,
+    status: 'Active',
+    isCurrent: row.is_current,
+  };
+}
+
 export function useSecuritySettings() {
   const [settings, setSettings] = useState<SecuritySettingsState>(DEFAULT_SECURITY_SETTINGS);
   const [loading, setLoading] = useState(true);
@@ -113,7 +129,6 @@ export function useSecuritySettings() {
         const res = await api.auth.getSecuritySettings();
         if (!cancelled) setSettings(fromApi(res.data));
       } catch {
-        // Fall back to defaults when the caller lacks manage_settings or API is unavailable
         if (!cancelled) setSettings(DEFAULT_SECURITY_SETTINGS);
       } finally {
         if (!cancelled) setLoading(false);
@@ -172,7 +187,6 @@ export function useSecuritySettings() {
   };
 }
 
-/** Active sessions derived from open login-history rows when available. */
 export function useActiveSessions() {
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
   const [loading, setLoading] = useState(true);
@@ -180,25 +194,8 @@ export function useActiveSessions() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.auth.listLoginHistory(0, 50, {
-        login_status: 'Success',
-        sort_by: 'login_time',
-        sort_order: 'desc',
-      });
-      const open = (res.data ?? []).filter((row) => !row.logout_time);
-      setSessions(
-        open.map((row) => ({
-          id: row.session_id || String(row.id),
-          user: row.username,
-          device: row.device_name || '—',
-          browser: row.browser || '—',
-          operatingSystem: row.operating_system || '—',
-          ipAddress: row.ip_address || '—',
-          loginTime: row.login_time,
-          lastActivity: row.last_activity || row.login_time,
-          status: 'Active',
-        }))
-      );
+      const res = await api.auth.listSessions(0, 100);
+      setSessions((res.data ?? []).map(mapSession));
     } catch {
       setSessions([]);
     } finally {
@@ -211,16 +208,26 @@ export function useActiveSessions() {
   }, [refresh]);
 
   const terminateSession = useCallback(
-    async (_sessionId: string) => {
-      toast.message('Session termination requires a dedicated sessions API.');
-      await refresh();
+    async (sessionId: string) => {
+      try {
+        await api.auth.terminateSession(sessionId);
+        toast.success('Session terminated');
+        await refresh();
+      } catch {
+        toast.error('Failed to terminate session');
+      }
     },
     [refresh]
   );
 
   const terminateAllSessions = useCallback(async () => {
-    toast.message('Terminate-all requires a dedicated sessions API.');
-    await refresh();
+    try {
+      const res = await api.auth.terminateAllSessions(true);
+      toast.success(res.data?.message || 'Sessions terminated');
+      await refresh();
+    } catch {
+      toast.error('Failed to terminate sessions');
+    }
   }, [refresh]);
 
   return {

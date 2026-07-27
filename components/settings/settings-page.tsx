@@ -10,7 +10,6 @@ import { cn } from '@/lib/utils';
 import { UsersPanel } from '@/components/settings/users-panel';
 import { RolesPanel } from '@/components/settings/roles-panel';
 import { RoleAccessPanel } from '@/components/settings/role-access-panel';
-import { PermissionsPanel } from '@/components/settings/permissions-panel';
 import { StatusesPanel } from '@/components/settings/statuses-panel';
 import { AlertsPanel } from '@/components/settings/alerts-panel';
 import { SecurityPanel } from '@/components/settings/security-panel';
@@ -32,8 +31,6 @@ function SettingsTabContent({ tab }: { tab: SettingsTabId }) {
       return <RolesPanel embedded />;
     case 'role-access':
       return <RoleAccessPanel embedded />;
-    case 'permissions':
-      return <PermissionsPanel embedded />;
     case 'status':
       return <StatusesPanel embedded />;
     case 'alerts':

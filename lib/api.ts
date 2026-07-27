@@ -49,6 +49,43 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+function clearClientAuth() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem("token");
+  localStorage.removeItem("sat-user");
+  localStorage.removeItem("session_id");
+  document.cookie = "token=; path=/; max-age=0";
+}
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (typeof window !== "undefined" && error?.response?.status === 401) {
+      const detail = error.response?.data?.detail;
+      const url = String(error.config?.url || "");
+      const isAuthAttempt =
+        url.includes("/auth/login") ||
+        url.includes("/auth/token") ||
+        url.includes("/auth/change-password");
+      const sessionEnded =
+        typeof detail === "string" &&
+        (detail === "Session has been terminated" ||
+          detail === "Could not validate credentials" ||
+          detail === "User is inactive" ||
+          detail.includes("inactive or pending") ||
+          detail.includes("User is inactive"));
+
+      if (!isAuthAttempt && sessionEnded) {
+        clearClientAuth();
+        if (!window.location.pathname.startsWith("/login")) {
+          window.location.href = "/login";
+        }
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export async function fetchStatusesByType(statusType: string): Promise<Models.Status[]> {
   try {
     const res = await api.get<Models.Status[]>('/statuses/', {
@@ -114,6 +151,17 @@ export const auth = {
   getSecuritySettings: () => api.get<Models.SecuritySettings>("/auth/security-settings"),
   updateSecuritySettings: (data: Partial<Models.SecuritySettings>) =>
     api.put<Models.SecuritySettings>("/auth/security-settings", data),
+  getPasswordPolicy: () => api.get<Models.PasswordPolicyPublic>("/auth/password-policy"),
+  listSessions: (skip = 0, limit = 100) =>
+    api.get<Models.ActiveSession[]>("/auth/sessions", {
+      params: buildQueryParams({ skip, limit }),
+    }),
+  terminateSession: (sessionId: string) =>
+    api.delete<{ message: string; session_id: string }>(`/auth/sessions/${sessionId}`),
+  terminateAllSessions: (exceptCurrent = true) =>
+    api.delete<{ message: string; terminated: number }>("/auth/sessions", {
+      params: { except_current: exceptCurrent },
+    }),
   listLoginHistory: (
     skip = 0,
     limit = 50,

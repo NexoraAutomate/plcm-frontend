@@ -22,6 +22,11 @@ import { UserStatusBadge } from '@/components/settings/user-status-badge';
 import { UserAvatar } from '@/components/user-avatar';
 import { formatRoleNames } from '@/lib/user-display';
 import type { ReactNode } from 'react';
+import type { PasswordPolicyPublic } from '@/lib/models';
+import {
+  passwordPolicyHint,
+  validatePasswordAgainstPolicy,
+} from '@/lib/password-policy';
 
 function formatDateTime(value?: string | null) {
   if (!value) return '—';
@@ -49,6 +54,7 @@ export function ProfilePage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
+  const [passwordPolicy, setPasswordPolicy] = useState<PasswordPolicyPublic | null>(null);
 
   useEffect(() => {
     if (searchParams.get('changePassword') === '1') {
@@ -56,13 +62,21 @@ export function ProfilePage() {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    void api.auth
+      .getPasswordPolicy()
+      .then((res) => setPasswordPolicy(res.data))
+      .catch(() => setPasswordPolicy(null));
+  }, []);
+
   async function handleChangePassword() {
     if (!oldPassword || !newPassword) {
       toast.error('Enter your current and new password');
       return;
     }
-    if (newPassword.length < 6) {
-      toast.error('New password must be at least 6 characters');
+    const policyError = validatePasswordAgainstPolicy(newPassword, passwordPolicy);
+    if (policyError) {
+      toast.error(policyError);
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -176,6 +190,9 @@ export function ProfilePage() {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
               />
+              <p className="mt-1 text-xs text-muted-foreground">
+                {passwordPolicyHint(passwordPolicy)}
+              </p>
             </div>
             <div>
               <Label htmlFor="confirm-password">Confirm new password</Label>

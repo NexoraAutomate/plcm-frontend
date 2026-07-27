@@ -117,7 +117,7 @@ export function AlertsPanel({ embedded = false }: AlertsPanelProps) {
 
       <SettingsSection
         title="In-App Notifications"
-        description="Control how alerts appear inside the application."
+        description="Control how alerts appear inside the application. Changes apply immediately to the bell menu and notification page."
       >
         <SettingsCard>
           <SettingsToggleGroup

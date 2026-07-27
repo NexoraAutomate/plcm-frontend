@@ -12,12 +12,48 @@ import { useNotificationState } from '@/hooks/use-notification-state';
 import { useAuth } from '@/lib/auth-context';
 import * as api from '@/lib/api';
 import type { InventoryInstallerNotice, InventoryReturnNotice } from '@/lib/models';
+import {
+  readAlertSettings,
+  type AlertSettingsState,
+} from '@/components/settings/hooks/use-alert-settings';
 
 const INSTALLER_NOTICE_TYPES = new Set([
   'inventory_issued',
   'inventory_return_accepted',
   'inventory_return_rejected',
 ]);
+
+function playNotificationSound() {
+  try {
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 880;
+    gain.gain.value = 0.04;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.12);
+    void ctx.close();
+  } catch {
+    // ignore audio failures
+  }
+}
+
+function showDesktopNotification(title: string, body?: string) {
+  if (typeof window === 'undefined' || !('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
+  try {
+    new Notification(title, { body, silent: true });
+  } catch {
+    // ignore
+  }
+}
 
 export function useAppNotifications(options?: { search?: string }) {
   const search = options?.search ?? '';
@@ -37,24 +73,52 @@ export function useAppNotifications(options?: { search?: string }) {
   const [returnDialogNotice, setReturnDialogNotice] = useState<InventoryReturnNotice | null>(
     null
   );
+  const [alertSettings, setAlertSettings] = useState<AlertSettingsState>(() =>
+    readAlertSettings()
+  );
   const seenInstallerIds = useRef<Set<number>>(new Set());
   const installerToastReady = useRef(false);
 
+  useEffect(() => {
+    const onChange = () => setAlertSettings(readAlertSettings());
+    window.addEventListener('plcm-alert-settings-changed', onChange);
+    window.addEventListener('storage', onChange);
+    return () => {
+      window.removeEventListener('plcm-alert-settings-changed', onChange);
+      window.removeEventListener('storage', onChange);
+    };
+  }, []);
+
+  const inAppEnabled = alertSettings.inApp.enabled;
+
+  const announceNewNotice = useCallback(
+    (title: string, body?: string) => {
+      if (!inAppEnabled) return;
+      toast.info(title, { description: body, duration: 8_000 });
+      if (alertSettings.inApp.sound) playNotificationSound();
+      if (alertSettings.inApp.desktop) showDesktopNotification(title, body);
+    },
+    [inAppEnabled, alertSettings.inApp.sound, alertSettings.inApp.desktop]
+  );
+
   const loadReturnNotices = useCallback(async () => {
-    if (!inventoryManager) {
+    if (!inAppEnabled || !inventoryManager) {
       setReturnNotices([]);
       return;
     }
     try {
-      // Full history for admin (pending + decided)
       const res = await api.inventory.listReturnNotices();
       setReturnNotices(res.data ?? []);
     } catch {
       setReturnNotices([]);
     }
-  }, [inventoryManager]);
+  }, [inventoryManager, inAppEnabled]);
 
   const loadInstallerNotices = useCallback(async () => {
+    if (!inAppEnabled) {
+      setInstallerNotices([]);
+      return;
+    }
     try {
       const res = await api.inventory.listInstallerNotices({
         allUsers: inventoryManager,
@@ -64,10 +128,7 @@ export function useAppNotifications(options?: { search?: string }) {
       if (installerToastReady.current) {
         for (const row of unread) {
           if (seenInstallerIds.current.has(row.id)) continue;
-          // Managers browsing all-user notices shouldn't get toasts for other users' mail.
           if (inventoryManager && row.user_id != null) {
-            // Still toast only for events that appear as new for this session when scoped to self;
-            // for all_users feed, toast only when the notice is for the signed-in admin themselves.
             const sat =
               typeof window !== 'undefined' ? localStorage.getItem('sat-user') : null;
             let selfId: number | null = null;
@@ -82,10 +143,7 @@ export function useAppNotifications(options?: { search?: string }) {
             }
           }
           seenInstallerIds.current.add(row.id);
-          toast.info(row.message || 'Inventory update', {
-            description: row.notes || undefined,
-            duration: 8_000,
-          });
+          announceNewNotice(row.message || 'Inventory update', row.notes || undefined);
         }
       } else {
         for (const row of rows) seenInstallerIds.current.add(row.id);
@@ -95,37 +153,38 @@ export function useAppNotifications(options?: { search?: string }) {
     } catch {
       setInstallerNotices([]);
     }
-  }, [inventoryManager]);
+  }, [inventoryManager, inAppEnabled, announceNewNotice]);
 
   useEffect(() => {
     void loadReturnNotices();
     void loadInstallerNotices();
+    if (!inAppEnabled) return;
     const id = window.setInterval(() => {
       void loadReturnNotices();
       void loadInstallerNotices();
     }, 60_000);
     return () => window.clearInterval(id);
-  }, [loadReturnNotices, loadInstallerNotices]);
+  }, [loadReturnNotices, loadInstallerNotices, inAppEnabled]);
 
-  const allNotifications = useMemo(
-    () =>
-      buildAppNotifications({
-        maintenanceCases,
-        faultyEntities,
-        projects,
-        customers,
-        inventoryReturnNotices: returnNotices,
-        inventoryInstallerNotices: installerNotices,
-      }),
-    [
+  const allNotifications = useMemo(() => {
+    if (!inAppEnabled) return [];
+    return buildAppNotifications({
       maintenanceCases,
       faultyEntities,
       projects,
       customers,
-      returnNotices,
-      installerNotices,
-    ]
-  );
+      inventoryReturnNotices: returnNotices,
+      inventoryInstallerNotices: installerNotices,
+    });
+  }, [
+    inAppEnabled,
+    maintenanceCases,
+    faultyEntities,
+    projects,
+    customers,
+    returnNotices,
+    installerNotices,
+  ]);
 
   const notifications = useMemo(() => {
     const base = hydrated
@@ -150,29 +209,33 @@ export function useAppNotifications(options?: { search?: string }) {
 
   const unreadCount = useMemo(
     () =>
-      hydrated
-        ? allNotifications.filter((n) => {
+      !inAppEnabled
+        ? 0
+        : hydrated
+          ? allNotifications.filter((n) => {
+              if (n.persistent) {
+                if (n.type === 'inventory_returned') return true;
+                return !n.serverRead;
+              }
+              return !isCleared(n.id) && !isRead(n.id);
+            }).length
+          : allNotifications.length,
+    [allNotifications, hydrated, isCleared, isRead, inAppEnabled]
+  );
+
+  const highPriorityCount = useMemo(
+    () =>
+      !inAppEnabled
+        ? 0
+        : allNotifications.filter((n) => {
+            if (n.priority !== 'high') return false;
             if (n.persistent) {
               if (n.type === 'inventory_returned') return true;
               return !n.serverRead;
             }
             return !isCleared(n.id) && !isRead(n.id);
-          }).length
-        : allNotifications.length,
-    [allNotifications, hydrated, isCleared, isRead]
-  );
-
-  const highPriorityCount = useMemo(
-    () =>
-      allNotifications.filter((n) => {
-        if (n.priority !== 'high') return false;
-        if (n.persistent) {
-          if (n.type === 'inventory_returned') return true;
-          return !n.serverRead;
-        }
-        return !isCleared(n.id) && !isRead(n.id);
-      }).length,
-    [allNotifications, isCleared, isRead]
+          }).length,
+    [allNotifications, isCleared, isRead, inAppEnabled]
   );
 
   const openReturnDecision = useCallback(
@@ -277,6 +340,7 @@ export function useAppNotifications(options?: { search?: string }) {
     unreadCount,
     highPriorityCount,
     loading: loading || !hydrated,
+    inAppEnabled,
     isRead: isNotificationRead,
     markAsRead,
     markAllAsRead,

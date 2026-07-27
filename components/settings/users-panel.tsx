@@ -47,6 +47,10 @@ import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
 import * as api from '@/lib/api';
 import type * as Models from '@/lib/models';
+import {
+  passwordPolicyHint,
+  validatePasswordAgainstPolicy,
+} from '@/lib/password-policy';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { fetchUsersPage } from '@/hooks/queries/fetchers';
@@ -126,6 +130,7 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [roles, setRoles] = useState<Models.Role[]>([]);
   const [loadingRoles, setLoadingRoles] = useState(true);
+  const [passwordPolicy, setPasswordPolicy] = useState<Models.PasswordPolicyPublic | null>(null);
 
   const assignableRoles = useMemo(
     () =>
@@ -178,6 +183,12 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
         setLoadingRoles(true);
         const rolesRes = await api.auth.listRoles();
         setRoles(rolesRes.data);
+        try {
+          const policyRes = await api.auth.getPasswordPolicy();
+          setPasswordPolicy(policyRes.data);
+        } catch {
+          setPasswordPolicy(null);
+        }
       } catch (err) {
         console.error('API ERROR:', err);
         toast.error('Failed to load data');
@@ -196,6 +207,11 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
   async function handleCreate() {
     if (!formData.username.trim() || !formData.password.trim() || !formData.full_name.trim()) {
       toast.error('Please fill in all required fields');
+      return;
+    }
+    const policyError = validatePasswordAgainstPolicy(formData.password, passwordPolicy);
+    if (policyError) {
+      toast.error(policyError);
       return;
     }
     try {
@@ -242,6 +258,14 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
         is_active: editFormData.is_active,
       };
       if (editFormData.password) {
+        const policyError = validatePasswordAgainstPolicy(
+          editFormData.password,
+          passwordPolicy
+        );
+        if (policyError) {
+          toast.error(policyError);
+          return;
+        }
         userData.password = editFormData.password;
       }
       await api.users.update(editingId, userData);
@@ -412,6 +436,9 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   placeholder="Set initial password"
                 />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {passwordPolicyHint(passwordPolicy)}
+                </p>
               </div>
               <div className="flex items-center justify-between rounded-lg border px-3 py-3">
                 <div>

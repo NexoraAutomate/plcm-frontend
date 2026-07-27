@@ -13,6 +13,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import type { PasswordPolicyPublic } from '@/lib/models';
+import {
+  passwordPolicyHint,
+  validatePasswordAgainstPolicy,
+} from '@/lib/password-policy';
 
 function signupErrorMessage(err: unknown): string {
   if (axios.isAxiosError(err)) {
@@ -31,8 +36,16 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [passwordPolicy, setPasswordPolicy] = useState<PasswordPolicyPublic | null>(null);
   const { isAuthenticated, authReady, can } = useAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    void auth
+      .getPasswordPolicy()
+      .then((res) => setPasswordPolicy(res.data))
+      .catch(() => setPasswordPolicy(null));
+  }, []);
 
   useEffect(() => {
     if (!authReady) return;
@@ -56,8 +69,9 @@ export default function SignupPage() {
       toast.error('Passwords do not match');
       return;
     }
-    if (password.length < 8) {
-      toast.error('Password must be at least 8 characters');
+    const policyError = validatePasswordAgainstPolicy(password, passwordPolicy);
+    if (policyError) {
+      toast.error(policyError);
       return;
     }
 
@@ -151,11 +165,12 @@ export default function SignupPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 8 characters"
+                placeholder={passwordPolicyHint(passwordPolicy)}
                 disabled={isLoading}
                 required
                 autoComplete="new-password"
               />
+              <p className="text-xs text-muted-foreground">{passwordPolicyHint(passwordPolicy)}</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm_password" className="text-foreground">

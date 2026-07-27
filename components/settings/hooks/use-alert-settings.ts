@@ -30,7 +30,7 @@ export type AlertSettingsState = {
   channels: FutureChannelSettings;
 };
 
-const STORAGE_KEY = 'plcm-alert-settings';
+export const ALERT_SETTINGS_STORAGE_KEY = 'plcm-alert-settings';
 
 export const DEFAULT_ALERT_SETTINGS: AlertSettingsState = {
   email: {
@@ -53,9 +53,24 @@ export const DEFAULT_ALERT_SETTINGS: AlertSettingsState = {
   },
 };
 
+export function readAlertSettings(): AlertSettingsState {
+  if (typeof window === 'undefined') return DEFAULT_ALERT_SETTINGS;
+  try {
+    const raw = localStorage.getItem(ALERT_SETTINGS_STORAGE_KEY);
+    if (!raw) return DEFAULT_ALERT_SETTINGS;
+    const parsed = JSON.parse(raw) as Partial<AlertSettingsState>;
+    return {
+      email: { ...DEFAULT_ALERT_SETTINGS.email, ...parsed.email },
+      inApp: { ...DEFAULT_ALERT_SETTINGS.inApp, ...parsed.inApp },
+      channels: { ...DEFAULT_ALERT_SETTINGS.channels, ...parsed.channels },
+    };
+  } catch {
+    return DEFAULT_ALERT_SETTINGS;
+  }
+}
+
 /**
- * Local persistence for notification preferences.
- * Swap to API integration when notification-settings endpoints are available.
+ * Notification preferences persisted locally and applied by the in-app feed.
  */
 export function useAlertSettings() {
   const [settings, setSettings] = useState<AlertSettingsState>(DEFAULT_ALERT_SETTINGS);
@@ -63,24 +78,35 @@ export function useAlertSettings() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        setSettings({ ...DEFAULT_ALERT_SETTINGS, ...JSON.parse(raw) });
-      }
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
+    setSettings(readAlertSettings());
+    setLoading(false);
   }, []);
 
   const saveSettings = useCallback(async (next: AlertSettingsState) => {
     setSaving(true);
     try {
-      // TODO: PUT /api/notifications/settings
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      if (next.inApp.desktop && typeof window !== 'undefined' && 'Notification' in window) {
+        if (Notification.permission === 'default') {
+          const permission = await Notification.requestPermission();
+          if (permission !== 'granted') {
+            next = {
+              ...next,
+              inApp: { ...next.inApp, desktop: false },
+            };
+            toast.message('Desktop notification permission was not granted');
+          }
+        } else if (Notification.permission === 'denied') {
+          next = {
+            ...next,
+            inApp: { ...next.inApp, desktop: false },
+          };
+          toast.message('Desktop notifications are blocked in the browser');
+        }
+      }
+
+      localStorage.setItem(ALERT_SETTINGS_STORAGE_KEY, JSON.stringify(next));
       setSettings(next);
+      window.dispatchEvent(new CustomEvent('plcm-alert-settings-changed', { detail: next }));
       toast.success('Notification settings saved');
     } catch {
       toast.error('Failed to save notification settings');

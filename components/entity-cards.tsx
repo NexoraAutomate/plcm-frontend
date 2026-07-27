@@ -229,7 +229,7 @@ export function EntityCards({
                           <Button
                             variant="outline"
                             size="sm"
-                            className="flex-1 min-w-[5.5rem] gap-1.5"
+                            className="flex-1 min-w-22 gap-1.5"
                             onClick={() => onReplace(entity)}
                           >
                             <Replace className="h-3 w-3" />

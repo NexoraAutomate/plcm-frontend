@@ -23,6 +23,7 @@ import * as MaintenanceTypes from '@/lib/models';
 import { enrichEntitiesWithStatus, enrichEntityWithStatus } from './entity-status';
 import { LIST_BOOTSTRAP_SIZE, LIST_PAGE_SIZE } from './data-loading';
 import { toast } from 'sonner';
+import { StatusColorProvider } from '@/lib/status-color-context';
 
 interface DataStoreContextType {
   // Data
@@ -1688,7 +1689,11 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     ]
   );
 
-  return <DataStoreContext.Provider value={value}>{children}</DataStoreContext.Provider>;
+  return (
+    <DataStoreContext.Provider value={value}>
+      <StatusColorProvider statuses={statuses}>{children}</StatusColorProvider>
+    </DataStoreContext.Provider>
+  );
 }
 
 export function useDataStore() {

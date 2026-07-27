@@ -40,6 +40,7 @@ export function Navbar() {
     unreadCount,
     highPriorityCount,
     loading,
+    inAppEnabled,
     isRead,
     markAsRead,
     markAllAsRead,
@@ -118,7 +119,11 @@ export function Navbar() {
               </p>
             </div>
             <ScrollArea className="h-80">
-              {loading ? (
+              {!inAppEnabled ? (
+                <p className="p-4 text-sm text-muted-foreground">
+                  In-app notifications are disabled. Enable them in Settings → Alerts.
+                </p>
+              ) : loading ? (
                 <p className="p-4 text-sm text-muted-foreground">Loading…</p>
               ) : notifications.length === 0 ? (
                 <p className="p-4 text-sm text-muted-foreground">No active alerts</p>

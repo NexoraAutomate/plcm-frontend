@@ -4,7 +4,6 @@ import {
   UserCog,
   Shield,
   ShieldCheck,
-  KeyRound,
   Gauge,
   Bell,
   Lock,
@@ -16,7 +15,6 @@ export type SettingsTabId =
   | 'users'
   | 'roles'
   | 'role-access'
-  | 'permissions'
   | 'status'
   | 'alerts'
   | 'security'
@@ -60,16 +58,9 @@ export const SETTINGS_TABS: SettingsTabConfig[] = [
     role: 'Admin',
   },
   {
-    id: 'permissions',
-    label: 'Permissions',
-    description: 'Manage permission codes by module',
-    icon: KeyRound,
-    permission: P.view_roles,
-  },
-  {
     id: 'status',
     label: 'Status',
-    description: 'Manage status values used across entities',
+    description: 'Manage status values by category with badge colors',
     icon: Gauge,
     permission: P.view_statuses,
   },

@@ -338,14 +338,20 @@ export function SecurityPanel({ embedded = false }: SecurityPanelProps) {
                       <TableCell>{formatDateTime(session.loginTime)}</TableCell>
                       <TableCell>{formatDateTime(session.lastActivity)}</TableCell>
                       <TableCell>
-                        <Badge variant={session.status === 'Active' ? 'default' : 'secondary'}>
-                          {session.status}
-                        </Badge>
+                        <div className="flex flex-wrap items-center gap-1">
+                          <Badge variant={session.status === 'Active' ? 'default' : 'secondary'}>
+                            {session.status}
+                          </Badge>
+                          {session.isCurrent ? (
+                            <Badge variant="outline">This device</Badge>
+                          ) : null}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <Button
                           size="sm"
                           variant="outline"
+                          disabled={session.isCurrent}
                           onClick={() => terminateSession(session.id)}
                         >
                           Terminate
@@ -358,7 +364,8 @@ export function SecurityPanel({ embedded = false }: SecurityPanelProps) {
             </Table>
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            Session management uses placeholder data until the sessions API is available.
+            Terminating a session immediately invalidates that device&apos;s access token. Your
+            current session is kept when using Terminate All.
           </p>
         </SettingsCard>
       </SettingsSection>

@@ -124,6 +124,32 @@ export interface Status {
   status_name: string
   description: string
   status_type: string
+  color?: string | null
+}
+
+export interface PasswordPolicyPublic {
+  min_password_length: number
+  require_uppercase: boolean
+  require_lowercase: boolean
+  require_numbers: boolean
+  require_special: boolean
+  password_history_length: number
+  password_expiry_days: number
+}
+
+export interface ActiveSession {
+  id: number
+  session_id: string
+  user_id?: number | null
+  username: string
+  device_name?: string | null
+  browser?: string | null
+  operating_system?: string | null
+  ip_address?: string | null
+  login_time: string
+  last_activity?: string | null
+  status: string
+  is_current?: boolean
 }
 
 // Order
