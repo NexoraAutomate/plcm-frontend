@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Plus, Edit, Trash2, Palette } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Edit, Trash2, ChevronDown, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -19,6 +20,8 @@ import { JsonBatchUploadButton } from "@/components/settings/json-batch-upload-b
 import { StatusBadge } from "@/components/status-badge";
 import {
   STATUS_COLOR_PALETTE,
+  THEME_COLOR_COLUMNS,
+  STANDARD_COLORS,
   normalizeStatusColor,
   statusBadgeStyleFromColor,
   suggestColorForStatusName,
@@ -44,41 +47,112 @@ function ColorPalettePicker({
   value: string;
   onChange: (hex: string) => void;
 }) {
+  const [open, setOpen] = useState(false);
   const selected = normalizeStatusColor(value) ?? "";
+  const customRef = useRef<HTMLInputElement>(null);
+
+  function pick(hex: string) {
+    const normalized = normalizeStatusColor(hex);
+    if (!normalized) return;
+    onChange(normalized);
+    setOpen(false);
+  }
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap gap-2">
-        {STATUS_COLOR_PALETTE.map((swatch) => {
-          const active = selected === swatch.hex.toUpperCase();
-          return (
-            <button
-              key={swatch.hex}
-              type="button"
-              title={swatch.name}
-              aria-label={swatch.name}
-              onClick={() => onChange(swatch.hex)}
-              className={cn(
-                "h-7 w-7 rounded-full border-2 transition-transform",
-                active ? "scale-110 border-foreground" : "border-transparent hover:scale-105"
-              )}
-              style={{ backgroundColor: swatch.hex }}
+    <div className="flex flex-wrap items-center gap-3">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button type="button" variant="outline" size="sm" className="h-8 gap-2 px-2.5">
+            <span
+              className="h-3.5 w-3.5 rounded-[2px] border border-black/20"
+              style={{ backgroundColor: selected || "#2F5496" }}
             />
-          );
-        })}
-      </div>
-      <div className="flex items-center gap-2">
-        <Input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="#059669"
-          className="font-mono text-sm md:w-36"
-          maxLength={7}
-        />
-        <Badge variant="outline" style={statusBadgeStyleFromColor(value)} className="text-xs">
-          Preview
-        </Badge>
-      </div>
+            <span className="text-xs">Color</span>
+            <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-[220px] p-2" sideOffset={6}>
+          <div className="space-y-2">
+            <p className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Theme Colors
+            </p>
+            <div className="flex gap-0.5">
+              {THEME_COLOR_COLUMNS.map((column) => (
+                <div key={column.name} className="flex flex-col gap-0.5" title={column.name}>
+                  {column.shades.map((hex) => {
+                    const active = selected === hex.toUpperCase();
+                    return (
+                      <button
+                        key={hex}
+                        type="button"
+                        title={`${column.name} (${hex})`}
+                        aria-label={`${column.name} ${hex}`}
+                        onClick={() => pick(hex)}
+                        className={cn(
+                          "h-3.5 w-3.5 rounded-[1px] border border-black/10 hover:relative hover:z-10 hover:outline-1 hover:outline-offset-0 hover:outline-foreground",
+                          active && "outline-1 outline-offset-0 outline-foreground"
+                        )}
+                        style={{ backgroundColor: hex }}
+                      />
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+
+            <p className="px-0.5 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Standard Colors
+            </p>
+            <div className="flex gap-0.5">
+              {STANDARD_COLORS.map((swatch) => {
+                const active = selected === swatch.hex.toUpperCase();
+                return (
+                  <button
+                    key={swatch.hex}
+                    type="button"
+                    title={swatch.name}
+                    aria-label={swatch.name}
+                    onClick={() => pick(swatch.hex)}
+                    className={cn(
+                      "h-3.5 w-3.5 rounded-[1px] border border-black/10 hover:relative hover:z-10 hover:outline-1 hover:outline-offset-0 hover:outline-foreground",
+                      active && "outline-1 outline-offset-0 outline-foreground"
+                    )}
+                    style={{ backgroundColor: swatch.hex }}
+                  />
+                );
+              })}
+            </div>
+
+            <div className="border-t border-border pt-1.5">
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-sm px-1.5 py-1 text-xs hover:bg-accent"
+                onClick={() => customRef.current?.click()}
+              >
+                <span
+                  className="relative h-3.5 w-3.5 overflow-hidden rounded-[1px] border border-black/20"
+                  style={{
+                    background:
+                      "conic-gradient(red, yellow, lime, aqua, blue, magenta, red)",
+                  }}
+                />
+                More Colors…
+              </button>
+              <input
+                ref={customRef}
+                type="color"
+                className="sr-only"
+                value={selected || "#2F5496"}
+                onChange={(e) => pick(e.target.value)}
+              />
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <Badge variant="outline" style={statusBadgeStyleFromColor(value)} className="text-xs">
+        Preview
+      </Badge>
     </div>
   );
 }
