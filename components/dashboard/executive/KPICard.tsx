@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DashboardCard } from './DashboardCard';
 import { AnimatedNumber } from './AnimatedNumber';
-import type { ExecTrend } from './types';
+import type { ExecInsight, ExecTrend } from './types';
 import { EXEC } from './theme';
 
 interface KPICardProps {
@@ -16,6 +16,7 @@ interface KPICardProps {
   sparkline?: number[];
   className?: string;
   onClick?: () => void;
+  insight?: ExecInsight;
 }
 
 function TrendBadge({ trend }: { trend: ExecTrend }) {
@@ -34,24 +35,48 @@ function TrendBadge({ trend }: { trend: ExecTrend }) {
   );
 }
 
+function formatTrendValue(value: string) {
+  return value.replace(/^[▲▼+\-\s]+/, '').replace(/\s*vs last month\s*/i, '').trim();
+}
+
 function MiniSparkline({ values, color }: { values: number[]; color: string }) {
   if (!values.length) return null;
   const max = Math.max(...values, 1);
   const min = Math.min(...values, 0);
   const range = max - min || 1;
   const w = 100;
-  const h = 28;
-  const points = values
-    .map((v, i) => {
-      const x = (i / Math.max(values.length - 1, 1)) * w;
-      const y = h - ((v - min) / range) * (h - 4) - 2;
-      return `${x},${y}`;
-    })
-    .join(' ');
+  const h = 36;
+  const coords = values.map((v, i) => {
+    const x = (i / Math.max(values.length - 1, 1)) * w;
+    const y = h - ((v - min) / range) * (h - 6) - 3;
+    return { x, y };
+  });
+  const linePoints = coords.map((p) => `${p.x},${p.y}`).join(' ');
+  const areaPoints = [`0,${h}`, ...coords.map((p) => `${p.x},${p.y}`), `${w},${h}`].join(' ');
+  const gradientId = `spark-fill-${color.replace('#', '')}`;
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="mt-auto h-7 w-full" preserveAspectRatio="none">
-      <polyline fill="none" stroke={color} strokeWidth="2" points={points} strokeLinecap="round" />
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      className="mt-auto h-10 w-full"
+      preserveAspectRatio="none"
+      style={{ filter: `drop-shadow(0 0 4px ${color}88)` }}
+    >
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon fill={`url(#${gradientId})`} points={areaPoints} />
+      <polyline
+        fill="none"
+        stroke={color}
+        strokeWidth="2.25"
+        points={linePoints}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -65,19 +90,40 @@ export function KPICard({
   sparkline,
   className,
   onClick,
+  insight,
 }: KPICardProps) {
+  const positive = trend ? (trend.positive ?? trend.direction === 'up') : true;
+  const trendGlyph =
+    trend?.direction === 'down' ? '▼' : trend?.direction === 'flat' ? '–' : '▲';
+
   return (
-    <DashboardCard className={className} onClick={onClick} noPadding>
-      <div className="flex h-full flex-col px-3 py-2.5">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-[#9CA3AF]">{label}</p>
-        <AnimatedNumber
-          value={value}
-          decimals={decimals}
-          className="mt-1 text-[30px] font-bold leading-none text-[#F5F5F5]"
-        />
+    <DashboardCard
+      className={className}
+      onClick={onClick}
+      title={label}
+      noPadding
+      insight={insight}
+    >
+      <div className="flex h-full flex-col px-3 pb-2.5 pt-1">
+        <div style={{ color: accent }}>
+          <AnimatedNumber
+            value={value}
+            decimals={decimals}
+            className="text-[34px] font-bold leading-none"
+          />
+        </div>
         {trend ? (
-          <div className="mt-1.5">
-            <TrendBadge trend={trend} />
+          <div className="mt-2">
+            <div
+              className="inline-flex items-center gap-1 text-[13px] font-semibold leading-none"
+              style={{ color: positive ? EXEC.success : EXEC.danger }}
+            >
+              <span className="text-[10px] leading-none" aria-hidden>
+                {trendGlyph}
+              </span>
+              {formatTrendValue(trend.value)}
+            </div>
+            <p className="mt-1 text-[11px] leading-tight text-[#9CA3AF]">vs last month</p>
           </div>
         ) : null}
         {sparkline?.length ? <MiniSparkline values={sparkline} color={accent} /> : null}

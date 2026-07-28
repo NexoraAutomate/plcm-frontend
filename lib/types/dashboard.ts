@@ -27,6 +27,8 @@ export interface ProjectProgressItem {
   name: string;
   progress: number;
   status_name?: string | null;
+  end_date?: string | null;
+  days_overdue?: number | null;
 }
 
 export interface TreemapNode {
@@ -62,6 +64,7 @@ export interface ExecutiveKpisSection {
 export interface ProjectAnalyticsSection {
   status_distribution: ChartDataPoint[];
   timeline: ChartDataPoint[];
+  completed_timeline?: ChartDataPoint[];
   progress: ProjectProgressItem[];
 }
 

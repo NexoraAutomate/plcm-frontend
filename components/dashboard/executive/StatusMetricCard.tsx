@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DashboardCard } from './DashboardCard';
 import { AnimatedNumber } from './AnimatedNumber';
-import type { ExecTrend } from './types';
+import type { ExecInsight, ExecTrend } from './types';
 
 interface StatusMetricCardProps {
   label: string;
@@ -12,6 +12,7 @@ interface StatusMetricCardProps {
   trend?: ExecTrend;
   className?: string;
   onClick?: () => void;
+  insight?: ExecInsight;
 }
 
 export function StatusMetricCard({
@@ -20,12 +21,13 @@ export function StatusMetricCard({
   trend,
   className,
   onClick,
+  insight,
 }: StatusMetricCardProps) {
   const positive = trend?.positive ?? false;
   const Icon = trend?.direction === 'down' ? ArrowDown : ArrowUp;
 
   return (
-    <DashboardCard className={className} onClick={onClick} noPadding>
+    <DashboardCard className={className} onClick={onClick} noPadding insight={insight}>
       <div className="flex h-full items-center justify-between gap-2 px-3 py-2">
         <div className="min-w-0">
           <p className="truncate text-[10px] font-medium uppercase tracking-wide text-[#9CA3AF]">

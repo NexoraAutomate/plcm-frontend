@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { Bar } from '@ant-design/charts';
 import { DashboardCard } from './DashboardCard';
-import type { ExecNamedValue } from './types';
+import type { ExecInsight, ExecNamedValue } from './types';
 import { EXEC } from './theme';
 
 interface HorizontalBarCardProps {
@@ -13,6 +13,7 @@ interface HorizontalBarCardProps {
   color?: string;
   className?: string;
   onBarClick?: (item: ExecNamedValue) => void;
+  insight?: ExecInsight;
 }
 
 export function HorizontalBarCard({
@@ -22,6 +23,7 @@ export function HorizontalBarCard({
   color = EXEC.purple,
   className,
   onBarClick,
+  insight,
 }: HorizontalBarCardProps) {
   const sorted = useMemo(() => [...data].sort((a, b) => a.value - b.value), [data]);
 
@@ -65,7 +67,7 @@ export function HorizontalBarCard({
   );
 
   return (
-    <DashboardCard className={className} title={title}>
+    <DashboardCard className={className} title={title} insight={insight}>
       <div className="h-[155px]">{sorted.length ? <Bar {...config} /> : null}</div>
     </DashboardCard>
   );

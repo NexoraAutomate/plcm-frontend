@@ -2,9 +2,11 @@ import type { ExecutiveDashboardResponse, ChartDataPoint, TreemapNode } from '@/
 import type {
   CommandCenterViewModel,
   ExecAlert,
+  ExecInsight,
   ExecMilestonePoint,
   ExecNamedValue,
   ExecSeriesPoint,
+  ExecTrend,
   ExecTreemapNode,
 } from '@/components/dashboard/executive/types';
 import { EXEC } from '@/components/dashboard/executive/theme';
@@ -13,6 +15,11 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 function kpiValue(data: ExecutiveDashboardResponse | null, key: string): number {
   return data?.kpis.metrics.find((m) => m.key === key)?.value ?? 0;
+}
+
+function kpiChange(data: ExecutiveDashboardResponse | null, key: string): number | null {
+  const raw = data?.kpis.metrics.find((m) => m.key === key)?.change_percent;
+  return typeof raw === 'number' && Number.isFinite(raw) ? raw : null;
 }
 
 function monthLabel(raw: string): string {
@@ -25,12 +32,33 @@ function monthLabel(raw: string): string {
   return raw.slice(0, 3);
 }
 
-function padMonths(
-  points: ChartDataPoint[],
-  valueKey = 'value'
-): { name: string; value: number }[] {
-  const map = new Map(points.map((p) => [monthLabel(p.name), p.value]));
-  return MONTHS.map((name) => ({ name, value: Number(map.get(name) ?? 0) }));
+function monthKeySort(a: string, b: string): number {
+  return a.localeCompare(b);
+}
+
+function padMonthsFromMaps(
+  maps: Record<string, number>[]
+): { name: string; values: number[] }[] {
+  const keys = new Set<string>();
+  for (const map of maps) {
+    for (const k of Object.keys(map)) keys.add(k);
+  }
+  const sortedKeys = [...keys].sort(monthKeySort);
+  // Prefer calendar order within current year span when keys are YYYY-MM
+  const labeled = sortedKeys.map((key) => ({
+    name: monthLabel(key),
+    values: maps.map((map) => Number(map[key] ?? 0)),
+  }));
+  if (labeled.length) return labeled;
+  return MONTHS.map((name) => ({ name, values: maps.map(() => 0) }));
+}
+
+function toMonthMap(points: ChartDataPoint[]): Record<string, number> {
+  const map: Record<string, number> = {};
+  for (const p of points) {
+    map[p.name] = Number(p.value) || 0;
+  }
+  return map;
 }
 
 function mapTree(nodes: TreemapNode[]): ExecTreemapNode[] {
@@ -43,42 +71,152 @@ function mapTree(nodes: TreemapNode[]): ExecTreemapNode[] {
   }));
 }
 
-function buildPortfolioTrend(data: ExecutiveDashboardResponse | null): ExecSeriesPoint[] {
-  const created = padMonths(data?.projects.timeline ?? []);
+function trendFromChange(
+  changePercent: number | null,
+  opts?: { invertPositive?: boolean; unit?: string }
+): ExecTrend | undefined {
+  if (changePercent === null) return undefined;
+  const direction: ExecTrend['direction'] =
+    changePercent > 0 ? 'up' : changePercent < 0 ? 'down' : 'flat';
+  const risingIsGood = !opts?.invertPositive;
+  const positive =
+    direction === 'flat' ? true : direction === 'up' ? risingIsGood : !risingIsGood;
+  const abs = Math.abs(changePercent);
+  const unit = opts?.unit ?? '%';
+  return {
+    direction,
+    value: `${abs}${unit}`,
+    positive,
+  };
+}
+
+function momChange(values: number[]): number | null {
+  if (values.length < 2) return null;
+  const prev = values[values.length - 2];
+  const curr = values[values.length - 1];
+  if (prev === 0) return curr === 0 ? 0 : null;
+  return Number((((curr - prev) / prev) * 100).toFixed(1));
+}
+
+function healthColor(pct: number): string {
+  if (pct >= 75) return EXEC.success;
+  if (pct >= 55) return EXEC.warning;
+  return EXEC.danger;
+}
+
+function normalizeStatusName(name: string): string {
+  const n = name.toLowerCase();
+  if (n.includes('complete')) return 'Completed';
+  if (n.includes('hold')) return 'On Hold';
+  if (n.includes('delay') || n.includes('risk')) return 'Delayed';
+  if (
+    n.includes('on track') ||
+    n.includes('execution') ||
+    n.includes('monitor') ||
+    n.includes('plan') ||
+    n.includes('init')
+  ) {
+    return 'On Track';
+  }
+  return name || 'On Track';
+}
+
+const PROJECT_STATUS_ORDER = ['On Track', 'Delayed', 'On Hold', 'Completed'] as const;
+
+function aggregateStatus(points: ChartDataPoint[]): ExecNamedValue[] {
+  const buckets: Record<string, number> = {
+    'On Track': 0,
+    Delayed: 0,
+    'On Hold': 0,
+    Completed: 0,
+  };
+  for (const p of points) {
+    const key = normalizeStatusName(p.name);
+    if (key in buckets) {
+      buckets[key] += p.value;
+    }
+  }
+  return PROJECT_STATUS_ORDER.map((name) => ({
+    name,
+    value: buckets[name],
+    color:
+      name === 'On Track'
+        ? EXEC.success
+        : name === 'Delayed'
+          ? EXEC.orange
+          : name === 'On Hold'
+            ? EXEC.yellow
+            : EXEC.cyan,
+  })).filter((d) => d.value > 0);
+}
+
+function faultTypeBuckets(points: ChartDataPoint[]): ExecNamedValue[] {
+  return points
+    .map((p) => ({ name: p.name, value: p.value }))
+    .filter((d) => d.value > 0)
+    .sort((a, b) => b.value - a.value);
+}
+
+function buildPortfolioTrend(data: ExecutiveDashboardResponse | null): {
+  series: ExecSeriesPoint[];
+  totals: { started: number; completed: number; delayed: number };
+} {
+  const startedMap = toMonthMap(data?.projects.timeline ?? []);
+  const completedMap = toMonthMap(data?.projects.completed_timeline ?? []);
   const delayedTotal = kpiValue(data, 'delayed_projects');
-  const completedTotal = kpiValue(data, 'completed_projects');
-  return created.map((row, i) => {
-    const factor = (i + 1) / 12;
-    return {
-      month: row.name,
-      started: row.value,
-      completed: Math.max(0, Math.round((completedTotal / 12) * (0.6 + factor * 0.8) + row.value * 0.3)),
-      delayed: Math.max(0, Math.round((delayedTotal / 12) * (0.5 + (i % 4) * 0.2))),
-    };
-  });
+
+  const rows = padMonthsFromMaps([startedMap, completedMap]);
+  // Only keep months that have real activity (or keep full year labels if both empty)
+  const hasAny = rows.some((r) => r.values.some((v) => v > 0));
+  const filtered = hasAny ? rows.filter((r) => r.values.some((v) => v > 0)) : [];
+
+  const series: ExecSeriesPoint[] = filtered.map((row) => ({
+    month: row.name,
+    started: row.values[0] ?? 0,
+    completed: row.values[1] ?? 0,
+    // Delayed is a point-in-time KPI (projects past end date, not completed).
+    // Attribute the current delayed count only to the latest month with activity.
+    delayed: 0,
+  }));
+
+  if (series.length && delayedTotal > 0) {
+    series[series.length - 1].delayed = delayedTotal;
+  }
+
+  const startedSum = series.reduce((s, r) => s + Number(r.started || 0), 0);
+  const completedSum = series.reduce((s, r) => s + Number(r.completed || 0), 0);
+
+  return {
+    series,
+    totals: {
+      started: startedSum,
+      completed: completedSum || kpiValue(data, 'completed_projects'),
+      delayed: delayedTotal,
+    },
+  };
+}
+
+function priorityFromDaysOverdue(days: number): ExecMilestonePoint['priority'] {
+  if (days >= 30) return 'Critical';
+  if (days >= 14) return 'High';
+  if (days >= 1) return 'Medium';
+  return 'Low';
 }
 
 function buildMilestones(data: ExecutiveDashboardResponse | null): ExecMilestonePoint[] {
-  const priorities = ['Critical', 'High', 'Medium', 'Low'] as const;
-  const months = ['May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'];
   const progress = data?.projects.progress ?? [];
-  if (!progress.length) {
-    return months.flatMap((month, mi) =>
-      priorities.map((priority, pi) => ({
-        month,
-        priority,
-        y: 4 - pi,
-        name: `${priority} milestone`,
-        count: ((mi + pi) % 3) + 1,
-      }))
-    );
-  }
-  return progress.slice(0, 18).map((p, i) => {
-    const priority = priorities[i % 4];
+  const overdue = progress.filter((p) => (p.days_overdue ?? 0) > 0);
+  if (!overdue.length) return [];
+
+  return overdue.slice(0, 24).map((p) => {
+    const days = p.days_overdue ?? 0;
+    const priority = priorityFromDaysOverdue(days);
+    const yMap = { Critical: 4, High: 3, Medium: 2, Low: 1 } as const;
+    const month = p.end_date ? monthLabel(p.end_date.slice(0, 7)) : '—';
     return {
-      month: months[i % months.length],
+      month,
       priority,
-      y: 4 - (i % 4),
+      y: yMap[priority],
       name: p.name,
       count: 1,
     };
@@ -86,38 +224,84 @@ function buildMilestones(data: ExecutiveDashboardResponse | null): ExecMilestone
 }
 
 function buildTopDelayed(data: ExecutiveDashboardResponse | null): ExecNamedValue[] {
-  const delayed = kpiValue(data, 'delayed_projects');
-  const progress = data?.projects.progress ?? [];
-  const candidates = progress
-    .filter((p) => (p.status_name ?? '').toLowerCase() !== 'completed')
-    .slice(0, 5);
-  if (candidates.length) {
-    return candidates.map((p, i) => ({
+  return (data?.projects.progress ?? [])
+    .filter((p) => (p.days_overdue ?? 0) > 0)
+    .sort((a, b) => (b.days_overdue ?? 0) - (a.days_overdue ?? 0))
+    .slice(0, 5)
+    .map((p) => ({
       name: p.name.length > 22 ? `${p.name.slice(0, 20)}…` : p.name,
-      value: Math.max(3, Math.round(42 - p.progress * 0.3 - i * 4)),
+      value: p.days_overdue ?? 0,
       id: p.id,
     }));
-  }
-  if (!delayed) return [];
-  return Array.from({ length: Math.min(5, delayed) }, (_, i) => ({
-    name: `Delayed Project ${i + 1}`,
-    value: 42 - i * 6,
-  }));
 }
 
+/** Per-project system availability from hierarchy system counts and open fault counts. */
 function buildSystemAvailability(data: ExecutiveDashboardResponse | null): ExecNamedValue[] {
-  const faultTotal =
-    data?.reliability.fault_type_distribution.reduce((s, d) => s + d.value, 0) ?? 0;
-  const base = faultTotal > 0 ? Math.max(78, 96 - Math.min(15, faultTotal / 20)) : 90;
-  const dims = ['AOCS', 'Power', 'Thermal', 'Comms', 'Payload', 'Structure'];
-  return dims.map((name, i) => ({
-    name,
-    value: Math.min(99, Math.round(base + ((i % 3) - 1) * 2.5 + (i === 3 ? 3 : 0))),
-  }));
+  const faultSeries =
+    data?.maintenance.fault_by_project?.[0]?.series?.find((s) => s.name.toLowerCase().includes('fault'))
+      ?.data ??
+    data?.maintenance.fault_by_project?.[0]?.series?.[0]?.data ??
+    [];
+  const faultMap = new Map(faultSeries.map((d) => [d.name, Number(d.value) || 0]));
+
+  const projectNodes: { name: string; systems: number }[] = [];
+  const walk = (nodes: TreemapNode[]) => {
+    for (const n of nodes) {
+      if (n.entity_type === 'project') {
+        projectNodes.push({ name: n.name, systems: Math.max(0, Number(n.value) || 0) });
+      }
+      if (n.children?.length) walk(n.children);
+    }
+  };
+  walk(data?.product_structure.tree ?? []);
+
+  const scored = projectNodes
+    .map((p) => {
+      const faults = faultMap.get(p.name) ?? 0;
+      const systems = p.systems;
+      // Availability = share of systems not implicated by open faults (capped).
+      // When system count is unknown, penalize by fault count alone (each fault −10 pts).
+      let value: number;
+      if (systems > 0) {
+        value = Math.max(0, Math.min(100, Math.round((1 - Math.min(faults, systems) / systems) * 100)));
+      } else if (faults === 0) {
+        value = 100;
+      } else {
+        value = Math.max(0, 100 - faults * 10);
+      }
+      return { name: p.name.length > 14 ? `${p.name.slice(0, 12)}…` : p.name, value, faults };
+    })
+    .sort((a, b) => a.value - b.value || b.faults - a.faults)
+    .slice(0, 6)
+    .map(({ name, value }) => ({ name, value }));
+
+  if (scored.length) return scored;
+
+  // Fallback: project names from fault list only
+  return faultSeries.slice(0, 6).map((d) => {
+    const faults = Number(d.value) || 0;
+    return {
+      name: d.name.length > 14 ? `${d.name.slice(0, 12)}…` : d.name,
+      value: Math.max(0, 100 - faults * 10),
+    };
+  });
+}
+
+function relativeLabel(iso: string | null | undefined): string {
+  if (!iso) return 'Current';
+  const ts = new Date(iso).getTime();
+  if (Number.isNaN(ts)) return 'Current';
+  const mins = Math.max(0, Math.round((Date.now() - ts) / 60000));
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 48) return `${hrs}h ago`;
+  return `${Math.round(hrs / 24)}d ago`;
 }
 
 function buildAlerts(data: ExecutiveDashboardResponse | null): ExecAlert[] {
   const alerts: ExecAlert[] = [];
+  const asOf = relativeLabel(data?.generated_at);
   const delayed = kpiValue(data, 'delayed_projects');
   const openCases = kpiValue(data, 'open_maintenance_cases');
   const openFaulty = kpiValue(data, 'open_faulty_entities');
@@ -129,102 +313,54 @@ function buildAlerts(data: ExecutiveDashboardResponse | null): ExecAlert[] {
       id: 'delayed',
       severity: 'critical',
       title: `${delayed} project${delayed === 1 ? '' : 's'} delayed past end date`,
-      timeAgo: '15m ago',
+      timeAgo: asOf,
     });
   }
   if (openFaulty > 0) {
     alerts.push({
       id: 'fault',
       severity: 'critical',
-      title: `Critical fault awaiting approval (${openFaulty} open)`,
-      timeAgo: '32m ago',
+      title: `Open faulty entities awaiting action (${openFaulty})`,
+      timeAgo: asOf,
     });
   }
   if (openCases > 0) {
     alerts.push({
       id: 'maint',
       severity: 'warning',
-      title: `Maintenance overdue — ${openCases} open cases`,
-      timeAgo: '1h ago',
+      title: `${openCases} open maintenance case${openCases === 1 ? '' : 's'}`,
+      timeAgo: asOf,
     });
   }
   if (configMonth > 0) {
     alerts.push({
       id: 'config',
       severity: 'info',
-      title: `Configuration approval pending (${configMonth} this month)`,
-      timeAgo: '2h ago',
+      title: `${configMonth} configuration change${configMonth === 1 ? '' : 's'} this month`,
+      timeAgo: asOf,
     });
   }
-  if (completed > 0) {
+  if (completed > 0 && !delayed && !openFaulty && !openCases) {
     alerts.push({
       id: 'done',
       severity: 'success',
-      title: `Program milestone — ${completed} projects completed`,
-      timeAgo: '4h ago',
+      title: `Portfolio stable — ${completed} completed project${completed === 1 ? '' : 's'}`,
+      timeAgo: asOf,
     });
   }
   if (!alerts.length) {
     alerts.push({
       id: 'ok',
       severity: 'success',
-      title: 'All programs nominal — no executive actions required',
-      timeAgo: 'now',
+      title: 'No critical portfolio exceptions in current filter scope',
+      timeAgo: asOf,
     });
   }
   return alerts.slice(0, 6);
 }
 
-function normalizeStatusName(name: string): string {
-  const n = name.toLowerCase();
-  if (n.includes('complete')) return 'Completed';
-  if (n.includes('hold')) return 'On Hold';
-  if (n.includes('cancel')) return 'Cancelled';
-  if (n.includes('delay') || n.includes('risk')) return 'Delayed';
-  if (n.includes('execution') || n.includes('monitor') || n.includes('plan') || n.includes('init')) {
-    return 'On Track';
-  }
-  return name || 'On Track';
-}
-
-function aggregateStatus(points: ChartDataPoint[]): ExecNamedValue[] {
-  const buckets: Record<string, number> = {
-    'On Track': 0,
-    Delayed: 0,
-    'On Hold': 0,
-    Completed: 0,
-    Cancelled: 0,
-  };
-  for (const p of points) {
-    const key = normalizeStatusName(p.name);
-    buckets[key] = (buckets[key] ?? 0) + p.value;
-  }
-  const delayedKpiBump = 0;
-  return Object.entries(buckets)
-    .map(([name, value]) => ({ name, value: value + (name === 'Delayed' ? delayedKpiBump : 0) }))
-    .filter((d) => d.value > 0);
-}
-
-function faultTypeBuckets(points: ChartDataPoint[]): ExecNamedValue[] {
-  const wanted = ['Hardware', 'Software', 'Electrical', 'Mechanical', 'Configuration'];
-  const map = new Map(points.map((p) => [p.name.toLowerCase(), p.value]));
-  const mapped = wanted.map((name) => {
-    const hit = [...map.entries()].find(([k]) => k.includes(name.toLowerCase().slice(0, 5)));
-    return { name, value: hit ? Number(hit[1]) : 0 };
-  });
-  if (mapped.every((m) => m.value === 0) && points.length) {
-    return points.map((p) => ({ name: p.name, value: p.value }));
-  }
-  if (mapped.every((m) => m.value === 0)) {
-    return [
-      { name: 'Hardware', value: 46 },
-      { name: 'Software', value: 27 },
-      { name: 'Electrical', value: 12 },
-      { name: 'Mechanical', value: 10 },
-      { name: 'Configuration', value: 5 },
-    ];
-  }
-  return mapped.filter((m) => m.value > 0);
+function insight(calculation: string, benefit: string): ExecInsight {
+  return { calculation, benefit };
 }
 
 export function buildCommandCenterViewModel(
@@ -235,212 +371,254 @@ export function buildCommandCenterViewModel(
   const delayedProjects = kpiValue(data, 'delayed_projects');
   const completedProjects = kpiValue(data, 'completed_projects');
   const openCases = kpiValue(data, 'open_maintenance_cases');
-  const activePrograms = Math.max(activeProjects, kpiValue(data, 'total_orders') || activeProjects);
+  const activePrograms = activeProjects;
+  const totalOrders = kpiValue(data, 'total_orders');
 
-  const healthPct =
-    totalProjects > 0
-      ? Math.round(((totalProjects - delayedProjects) / totalProjects) * 100)
-      : 78;
-  const spi =
-    totalProjects > 0
-      ? Number((Math.max(0.5, (totalProjects - delayedProjects * 1.2) / totalProjects)).toFixed(2))
-      : 0.92;
+  const healthAvailable = totalProjects > 0;
+  const healthPct = healthAvailable
+    ? Math.round(((totalProjects - delayedProjects) / totalProjects) * 100)
+    : 0;
+  const healthMomPts = kpiChange(data, 'program_health');
+  const healthTrend = trendFromChange(healthMomPts);
 
-  const mttrVal = data?.reliability.mttr.value ?? 18.6;
-  const mtbfVal = data?.reliability.mtbf.value ?? 312;
+  // Schedule Performance Index proxy: on-schedule share of portfolio.
+  // SPI = (total − delayed) / total. Undefined when there are no projects.
+  const spiAvailable = totalProjects > 0;
+  const spi = spiAvailable
+    ? Number(Math.max(0, (totalProjects - delayedProjects) / totalProjects).toFixed(2))
+    : 0;
 
-  const portfolioTrend = buildPortfolioTrend(data);
-  const last = portfolioTrend[portfolioTrend.length - 1];
+  const mttrVal = data?.reliability.mttr.value ?? 0;
+  const mtbfVal = data?.reliability.mtbf.value ?? 0;
+  const mttrMax = data?.reliability.mttr.max_value || Math.max(mttrVal, 1);
+  const mtbfMax = data?.reliability.mtbf.max_value || Math.max(mtbfVal, 1);
+
+  const { series: portfolioTrend, totals: portfolioTotals } = buildPortfolioTrend(data);
+  const sparkline = portfolioTrend.map((p) => Number(p.started) || 0);
+  const startedMom = momChange(sparkline);
 
   const projectsByStatus = aggregateStatus(data?.projects.status_distribution ?? []);
-  if (!projectsByStatus.length && totalProjects) {
-    projectsByStatus.push(
-      { name: 'On Track', value: Math.max(0, activeProjects - delayedProjects) },
-      { name: 'Delayed', value: delayedProjects },
-      { name: 'Completed', value: completedProjects },
-      { name: 'On Hold', value: Math.max(0, totalProjects - activeProjects - completedProjects) }
-    );
+  if (!projectsByStatus.length && totalProjects > 0) {
+    const onTrack = Math.max(0, activeProjects - delayedProjects);
+    const onHold = Math.max(0, totalProjects - activeProjects - completedProjects);
+    if (onTrack) projectsByStatus.push({ name: 'On Track', value: onTrack, color: EXEC.success });
+    if (delayedProjects)
+      projectsByStatus.push({ name: 'Delayed', value: delayedProjects, color: EXEC.orange });
+    if (onHold) projectsByStatus.push({ name: 'On Hold', value: onHold, color: EXEC.yellow });
+    if (completedProjects)
+      projectsByStatus.push({ name: 'Completed', value: completedProjects, color: EXEC.cyan });
   }
 
   const maintenanceByStatus = (data?.maintenance.cases_by_status ?? []).map((d) => ({
     name: d.name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
     value: d.value,
   }));
-  if (!maintenanceByStatus.length) {
-    maintenanceByStatus.push(
-      { name: 'Open', value: Math.max(1, Math.round(openCases * 0.4)) },
-      { name: 'Under Inspection', value: Math.max(1, Math.round(openCases * 0.25)) },
-      { name: 'Under Repair', value: Math.max(1, Math.round(openCases * 0.2)) },
-      { name: 'Resolved', value: Math.max(1, Math.round(openCases * 0.15) || 12) }
-    );
-  }
 
-  const maintenanceTrend = padMonths(data?.maintenance.monthly_trend ?? []).map((d) => ({
-    name: d.name,
+  const maintenanceTrendRaw = [...(data?.maintenance.monthly_trend ?? [])].sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
+  const maintenanceTrend = maintenanceTrendRaw.map((d) => ({
+    name: monthLabel(d.name),
     value: d.value,
   }));
-  if (maintenanceTrend.every((d) => d.value === 0)) {
-    maintenanceTrend.forEach((d, i) => {
-      d.value = 8 + ((i * 3) % 11) + (i % 4);
-    });
-  }
+  const maintMom = momChange(maintenanceTrend.map((d) => d.value));
 
-  const faultTrend = padMonths(data?.maintenance.monthly_trend ?? []);
-  const faultVsMttr: ExecSeriesPoint[] = faultTrend.map((d, i) => ({
-    month: d.name,
+  const faultVsMttr: ExecSeriesPoint[] = maintenanceTrendRaw.map((d) => ({
+    month: monthLabel(d.name),
     faults: d.value,
-    mttr: Number((mttrVal * (0.85 + (i % 5) * 0.05)).toFixed(1)),
+    // Current measured MTTR as a reference baseline (not a fabricated monthly series).
+    mttr: mttrVal,
   }));
+
+  const topModifiedComponents = (data?.configuration.top_modified_components ?? [])
+    .slice(0, 5)
+    .map((d) => ({ name: d.name, value: d.value }));
+
+  const recentChanges = (data?.configuration.recent_timeline ?? []).map((item) => ({
+    id: item.id,
+    partNumber: item.title,
+    reason: item.subtitle || '—',
+    status: item.status || 'Pending',
+    date: new Date(item.timestamp).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+    }),
+  }));
+
+  const projectsByCustomer = (data?.resources.projects_by_customer ?? [])
+    .slice(0, 5)
+    .map((d) => ({ name: d.name, value: d.value, id: d.id }));
+
+  const hierarchy = mapTree(data?.product_structure.tree ?? []);
+  const topDelayed = buildTopDelayed(data);
+  const systemAvailability = buildSystemAvailability(data);
+  const milestones = buildMilestones(data);
 
   return {
     generatedAt: data?.generated_at ?? null,
     programHealth: {
       label: 'Overall Program Health',
       value: healthPct,
-      displayValue: `${healthPct}%`,
+      displayValue: healthAvailable ? `${healthPct}%` : 'N/A',
       max: 100,
-      color: healthPct >= 75 ? EXEC.success : healthPct >= 55 ? EXEC.warning : EXEC.danger,
-      trend: { direction: 'up', value: '+6%', positive: true },
+      available: healthAvailable,
+      color: healthAvailable ? healthColor(healthPct) : EXEC.muted,
+      trend: healthAvailable ? healthTrend : undefined,
+      insight: healthAvailable
+        ? insight(
+            `(Total projects − Delayed projects) ÷ Total projects × 100 = (${totalProjects} − ${delayedProjects}) ÷ ${totalProjects} × 100 = ${healthPct}%. Delayed = end date in the past and status ≠ Completed.${
+              healthMomPts !== null
+                ? ` MoM change = current health − prior-month health (portfolio as of last month-end) = ${healthMomPts > 0 ? '+' : ''}${healthMomPts} percentage points.`
+                : ' MoM change requires a prior-month portfolio (projects created before this month); none available yet.'
+            }`,
+            'Use this as the first glance at portfolio schedule risk. A falling score means more programs are past due — prioritize recovery plans before capacity or new commitments.'
+          )
+        : insight(
+            'Health is undefined when Total projects = 0 (division by zero). No synthetic default is applied.',
+            'Empty scope usually means filters exclude all work or onboarding has not started. Clear filters or create projects before using health for go/no-go decisions.'
+          ),
     },
     activePrograms: {
       value: activePrograms,
-      trend: { direction: 'up', value: '▲ 2 vs last month', positive: true },
-      sparkline: portfolioTrend.map((p) => Number(p.started) || 0),
+      trend: trendFromChange(kpiChange(data, 'active_projects') ?? startedMom),
+      sparkline,
+      insight: insight(
+        `Active programs = active_projects KPI (projects whose status is not Completed or On Hold) = ${activePrograms}. Related portfolio size: ${totalOrders} order(s), ${totalProjects} total project(s). Sparkline = projects created per month from the portfolio timeline.`,
+        'Shows concurrent delivery load. Rising active programs without matching completions or staffing signals capacity risk.'
+      ),
     },
     portfolioTrend,
-    portfolioTotals: {
-      started: Number(last?.started ?? 0),
-      completed: Number(last?.completed ?? 0),
-      delayed: Number(last?.delayed ?? delayedProjects),
-    },
+    portfolioTotals,
+    portfolioInsight: insight(
+      'Started = projects created that month (created_at). Completed = projects with status Completed grouped by end_date month. Delayed = current count of projects past end date (point-in-time), shown on the latest month — not a historical delayed series.',
+      'Compare intake vs completions to spot backlog growth. A spike in delayed on the latest month means schedule recovery should be the executive focus.'
+    ),
     mttr: {
       label: 'MTTR',
       value: mttrVal,
-      displayValue: mttrVal.toFixed(1),
+      displayValue: mttrVal ? mttrVal.toFixed(1) : '—',
       unit: 'hrs',
-      max: Math.max(mttrVal * 1.4, 24),
+      max: mttrMax,
       color: EXEC.success,
-      trend: { direction: 'down', value: '▼ 2.4 hrs', positive: true },
+      available: mttrVal > 0,
+      insight: insight(
+        'Mean Time To Repair = average of (resolved_at − identified_at) in hours across resolved faulty entities in scope.',
+        'Lower MTTR means faster restoration. Rising MTTR with stable fault volume points to repair-process or spare-parts bottlenecks.'
+      ),
     },
     mtbf: {
       label: 'MTBF',
       value: mtbfVal,
-      displayValue: String(Math.round(mtbfVal)),
+      displayValue: mtbfVal ? String(Math.round(mtbfVal)) : '—',
       unit: 'days',
-      max: Math.max(mtbfVal * 1.2, 365),
+      max: mtbfMax,
       color: EXEC.cyan,
-      trend: { direction: 'up', value: '▲ 18 days', positive: true },
+      available: mtbfVal > 0,
+      insight: insight(
+        'Mean Time Between Failures from reliability analytics (average interval between fault events in scope), expressed in days.',
+        'Higher MTBF indicates more stable hardware/software. Declining MTBF warrants design or supplier quality review before the next build wave.'
+      ),
     },
     spi: {
       label: 'SPI',
       value: spi,
-      displayValue: spi.toFixed(2),
+      displayValue: spiAvailable ? spi.toFixed(2) : 'N/A',
       unit: 'Index',
       max: 1.2,
-      color: spi >= 1 ? EXEC.success : EXEC.danger,
-      trend: {
-        direction: spi >= 1 ? 'up' : 'down',
-        value: spi >= 1 ? '▲ 0.03' : '▼ 0.05',
-        positive: spi >= 1,
-      },
+      color: !spiAvailable ? EXEC.muted : spi >= 1 ? EXEC.success : EXEC.danger,
+      available: spiAvailable,
+      insight: spiAvailable
+        ? insight(
+            `Schedule Performance Index (proxy) = (Total projects − Delayed) ÷ Total = (${totalProjects} − ${delayedProjects}) ÷ ${totalProjects} = ${spi.toFixed(2)}. 1.00 means no delayed projects; below 1.00 means schedule erosion.`,
+            'Treat SPI < 1 as a portfolio red flag. Use it with Top Delayed Projects to decide which programs need executive intervention.'
+          )
+        : insight(
+            'SPI requires Total projects > 0. No projects in scope → index is undefined.',
+            'Do not compare SPI across empty filter scopes. Widen filters or wait for project data before schedule decisions.'
+          ),
     },
     openMaintenanceCases: {
       value: openCases,
-      trend: { direction: 'up', value: '+12', positive: false },
+      trend: trendFromChange(kpiChange(data, 'open_maintenance_cases') ?? maintMom, {
+        invertPositive: true,
+      }),
+      insight: insight(
+        `Count of maintenance cases in open statuses (Open, Under Inspection, Under Repair) in the current filter scope = ${openCases}.`,
+        'Open cases consume engineering capacity. Growth here often precedes MTTR increases and delivery slips.'
+      ),
     },
     delayedProjects: {
       value: delayedProjects,
-      trend: { direction: 'up', value: '+3', positive: false },
+      trend: trendFromChange(kpiChange(data, 'delayed_projects'), { invertPositive: true }),
+      insight: insight(
+        `Count of projects where end_date < now and status ≠ Completed = ${delayedProjects} of ${totalProjects} total.`,
+        'Each delayed project is a contractual and resource risk. Drill into Top Delayed for days overdue and owners.'
+      ),
     },
     projectsByStatus,
-    milestones: buildMilestones(data),
-    topDelayed: buildTopDelayed(data),
-    systemAvailability: buildSystemAvailability(data),
-    hierarchy: (() => {
-      const tree = mapTree(data?.product_structure.tree ?? []);
-      if (tree.length) return tree;
-      return [
-        {
-          name: 'Customer A',
-          value: 12,
-          entityType: 'customer',
-          children: [
-            {
-              name: 'ORD-1001',
-              value: 7,
-              entityType: 'order',
-              children: [
-                { name: 'SAT-Alpha', value: 4, entityType: 'project' },
-                { name: 'SAT-Beta', value: 3, entityType: 'project' },
-              ],
-            },
-          ],
-        },
-        {
-          name: 'Customer B',
-          value: 8,
-          entityType: 'customer',
-          children: [
-            {
-              name: 'ORD-2002',
-              value: 8,
-              entityType: 'order',
-              children: [{ name: 'CommSat-01', value: 8, entityType: 'project' }],
-            },
-          ],
-        },
-      ];
-    })(),
-    topModifiedComponents: (() => {
-      const items = (data?.configuration.top_modified_components ?? [])
-        .slice(0, 5)
-        .map((d) => ({ name: d.name, value: d.value }));
-      if (items.length) return items;
-      return [
-        { name: 'PCU-1001', value: 18 },
-        { name: 'PWR-2203', value: 14 },
-        { name: 'RF-4410', value: 11 },
-        { name: 'ADC-0902', value: 9 },
-        { name: 'THR-3311', value: 7 },
-      ];
-    })(),
-    recentChanges: (() => {
-      const rows = (data?.configuration.recent_timeline ?? []).map((item) => ({
-        id: item.id,
-        partNumber: item.title,
-        reason: item.subtitle || '—',
-        status: item.status || 'Pending',
-        date: new Date(item.timestamp).toLocaleDateString(undefined, {
-          month: 'short',
-          day: 'numeric',
-        }),
-      }));
-      if (rows.length) return rows;
-      return [
-        { id: 1, partNumber: 'PCU-1001', reason: 'Firmware rev', status: 'Approved', date: 'Jul 21' },
-        { id: 2, partNumber: 'PWR-2203', reason: 'Thermal fix', status: 'Pending', date: 'Jul 20' },
-        { id: 3, partNumber: 'RF-4410', reason: 'Connector swap', status: 'Approved', date: 'Jul 19' },
-        { id: 4, partNumber: 'ADC-0902', reason: 'Calibration', status: 'Pending', date: 'Jul 18' },
-        { id: 5, partNumber: 'THR-3311', reason: 'Seal replace', status: 'Approved', date: 'Jul 17' },
-      ];
-    })(),
-    projectsByCustomer: (() => {
-      const items = (data?.resources.projects_by_customer ?? [])
-        .slice(0, 5)
-        .map((d) => ({ name: d.name, value: d.value, id: d.id }));
-      if (items.length) return items;
-      return [
-        { name: 'Customer A', value: 12 },
-        { name: 'Customer B', value: 9 },
-        { name: 'Customer C', value: 7 },
-        { name: 'Customer D', value: 5 },
-        { name: 'Customer E', value: 3 },
-      ];
-    })(),
+    projectsByStatusInsight: insight(
+      'Buckets: Completed and On Hold come from project status. Lifecycle statuses (Initiation, Planning, Execution, Monitoring) become Delayed when end_date is past, otherwise On Track.',
+      'A healthy mix skews to On Track and Completed. Growth in Delayed should trigger schedule recovery; On Hold growth signals stalled commitments.'
+    ),
+    milestones,
+    milestonesInsight: insight(
+      'Each point is a project past its end date. X = end-date month; Y/priority = Critical (≥30d), High (≥14d), Medium (≥1d) based on days overdue.',
+      'Clusters of Critical/High points show where schedule risk concentrates by time window — useful for recovery sprint planning.'
+    ),
+    topDelayed,
+    topDelayedInsight: insight(
+      'Top 5 non-completed projects ranked by days overdue = max(0, floor((now − end_date) / 1 day)).',
+      'Start recovery with the longest-overdue programs; they usually carry the highest customer and cost exposure.'
+    ),
+    systemAvailability,
+    systemAvailabilityInsight: insight(
+      'Per project: if systems > 0, availability = (1 − min(open faults, systems) ÷ systems) × 100. If systems unknown, availability = max(0, 100 − faults × 10). Fault counts come from maintenance analytics.',
+      'Low availability projects need reliability focus (spares, design, ops). Compare with MTTR/MTBF before approving further deployments.'
+    ),
+    hierarchy,
+    hierarchyInsight: insight(
+      'Treemap of Customer → Order → Project. Node value at project level = system count; parent values roll up child counts.',
+      'Use hierarchy to see concentration risk — large nodes dominate portfolio exposure and should get proportional oversight.'
+    ),
+    topModifiedComponents,
+    recentChanges,
+    configInsight: insight(
+      'Left: components ranked by configuration change count. Right: most recent configuration history rows (part, reason, status, date).',
+      'High churn on the same part numbers signals instability. Pending approvals in the recent list are decision queues for configuration control.'
+    ),
+    projectsByCustomer,
+    projectsByCustomerInsight: insight(
+      'Project counts grouped by customer from resources analytics, top 5 by volume.',
+      'Shows commercial concentration. Over-reliance on one customer increases revenue and delivery risk if that account slips.'
+    ),
     alerts: buildAlerts(data),
+    alertsInsight: insight(
+      'Rule-based alerts from live KPIs: delayed projects, open faulty entities, open maintenance cases, and configuration changes this month. Timestamps reflect dashboard generation time.',
+      'Treat Critical items as the executive action list for the current filter scope before reviewing secondary charts.'
+    ),
     maintenanceByStatus,
+    maintenanceByStatusInsight: insight(
+      'Maintenance case counts grouped by case status in the current filter scope.',
+      'Watch Under Repair / Under Inspection share — bottlenecks there drive MTTR and open-case growth.'
+    ),
     maintenanceTrend,
+    maintenanceTrendInsight: insight(
+      'Count of maintenance cases reported per calendar month (reported_at), scoped by filters.',
+      'An upward trend means rising operational friction. Pair with fault-type mix to target preventive actions.'
+    ),
     faultsByType: faultTypeBuckets(data?.reliability.fault_type_distribution ?? []),
+    faultsByTypeInsight: insight(
+      'Open/historical faulty entities grouped by fault_type from reliability analytics.',
+      'Dominant fault types guide whether to invest in hardware quality, software hardening, or process controls.'
+    ),
     faultVsMttr,
+    faultVsMttrInsight: insight(
+      'Faults = monthly maintenance case counts. MTTR line = current measured mean repair time (hours) drawn as a constant baseline for comparison — not a fabricated per-month MTTR.',
+      'If fault volume rises while MTTR stays high, recovery capacity is insufficient. If faults fall but MTTR rises, investigate repair-path efficiency.'
+    ),
+    filtersInsight: insight(
+      'Customer / Program / Project filters narrow every KPI and chart to the selected scope. Last updated is the API generated_at timestamp.',
+      'Always confirm filter scope before acting — metrics for one customer must not drive enterprise-wide decisions.'
+    ),
   };
 }

@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { Area } from '@ant-design/charts';
 import { DashboardCard } from './DashboardCard';
-import type { ExecSeriesPoint } from './types';
+import type { ExecInsight, ExecSeriesPoint } from './types';
 import { EXEC } from './theme';
 
 interface AreaChartCardProps {
@@ -12,6 +12,7 @@ interface AreaChartCardProps {
   totals?: { started: number; completed: number; delayed: number };
   className?: string;
   onClick?: () => void;
+  insight?: ExecInsight;
 }
 
 export function AreaChartCard({
@@ -20,6 +21,7 @@ export function AreaChartCard({
   totals,
   className,
   onClick,
+  insight,
 }: AreaChartCardProps) {
   const chartData = useMemo(() => {
     const rows: { month: string; value: number; type: string }[] = [];
@@ -65,6 +67,7 @@ export function AreaChartCard({
       className={className}
       title={title}
       onClick={onClick}
+      insight={insight}
       headerRight={
         totals ? (
           <div className="flex items-center gap-3 text-[11px]">

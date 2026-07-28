@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { DashboardCard } from './DashboardCard';
-import type { ExecNamedValue } from './types';
+import type { ExecInsight, ExecNamedValue } from './types';
 import { EXEC } from './theme';
 
 const ReactECharts = dynamic(() => import('echarts-for-react'), { ssr: false });
@@ -12,12 +12,14 @@ interface RadarChartCardProps {
   title?: string;
   data: ExecNamedValue[];
   className?: string;
+  insight?: ExecInsight;
 }
 
 export function RadarChartCard({
   title = 'System Availability',
   data,
   className,
+  insight,
 }: RadarChartCardProps) {
   const option = useMemo(
     () => ({
@@ -48,7 +50,7 @@ export function RadarChartCard({
   );
 
   return (
-    <DashboardCard className={className} title={title}>
+    <DashboardCard className={className} title={title} insight={insight}>
       <div className="h-[160px]">
         {data.length ? (
           <ReactECharts

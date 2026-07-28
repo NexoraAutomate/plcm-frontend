@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/select';
 import { RefreshCw } from 'lucide-react';
 import { DashboardCard } from './DashboardCard';
-import type { ExecFilterOption, ExecFiltersState } from './types';
+import type { ExecFilterOption, ExecFiltersState, ExecInsight } from './types';
 
 interface FiltersPanelProps {
   filters: ExecFiltersState;
@@ -21,6 +21,7 @@ interface FiltersPanelProps {
   fetching?: boolean;
   onRefresh?: () => void;
   className?: string;
+  insight?: ExecInsight;
 }
 
 function FilterSelect({
@@ -67,10 +68,17 @@ export function FiltersPanel({
   fetching,
   onRefresh,
   className,
+  insight,
 }: FiltersPanelProps) {
   return (
     <div className={`flex h-full min-h-0 flex-col gap-2 ${className ?? ''}`}>
-      <DashboardCard gradient className="min-h-0 flex-1" title="Global Filters" noPadding>
+      <DashboardCard
+        gradient
+        className="min-h-0 flex-1"
+        title="Global Filters"
+        noPadding
+        insight={insight}
+      >
         <div className="space-y-2 px-3 pb-3">
           <FilterSelect
             label="Customer"

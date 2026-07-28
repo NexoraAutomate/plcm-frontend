@@ -30,7 +30,7 @@ export function GaugeCard({ metric, className, compact = false, onClick }: Gauge
           radius: compact ? '90%' : '95%',
           center: ['50%', compact ? '58%' : '55%'],
           progress: {
-            show: true,
+            show: metric.available !== false,
             width: compact ? 8 : 10,
             roundCap: true,
             itemStyle: { color: metric.color },
@@ -50,21 +50,21 @@ export function GaugeCard({ metric, className, compact = false, onClick }: Gauge
             valueAnimation: true,
             offsetCenter: [0, compact ? '8%' : '4%'],
             formatter: () => metric.displayValue,
-            color: EXEC.text,
+            color: metric.available === false ? EXEC.muted : EXEC.text,
             fontSize: compact ? 13 : 16,
             fontWeight: 700,
           },
           title: {
-            show: !!metric.unit,
+            show: !!metric.unit && metric.available !== false,
             offsetCenter: [0, compact ? '42%' : '38%'],
             color: EXEC.muted,
             fontSize: 10,
           },
-          data: [{ value: metric.value, name: metric.unit ?? '' }],
+          data: [{ value: metric.available === false ? 0 : metric.value, name: metric.unit ?? '' }],
         },
       ],
     }),
-    [metric]
+    [compact, metric]
   );
 
   return (
@@ -74,6 +74,7 @@ export function GaugeCard({ metric, className, compact = false, onClick }: Gauge
       onClick={onClick}
       headerRight={metric.trend ? <TrendBadge trend={metric.trend} /> : undefined}
       noPadding
+      insight={metric.insight}
     >
       <div className={compact ? 'h-[88px]' : 'h-[110px]'}>
         <ReactECharts

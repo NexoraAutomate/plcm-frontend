@@ -4,6 +4,12 @@ export interface ExecTrend {
   positive?: boolean;
 }
 
+/** Explains how a metric is derived and why it matters for decisions. */
+export interface ExecInsight {
+  calculation: string;
+  benefit: string;
+}
+
 export interface ExecNamedValue {
   name: string;
   value: number;
@@ -24,6 +30,9 @@ export interface ExecGaugeMetric {
   max: number;
   trend?: ExecTrend;
   color: string;
+  /** False when denominator is missing / metric is undefined. */
+  available?: boolean;
+  insight?: ExecInsight;
 }
 
 export interface ExecMilestonePoint {
@@ -74,27 +83,42 @@ export interface CommandCenterViewModel {
   programHealth: ExecGaugeMetric;
   activePrograms: {
     value: number;
-    trend: ExecTrend;
+    trend?: ExecTrend;
     sparkline: number[];
+    insight: ExecInsight;
   };
   portfolioTrend: ExecSeriesPoint[];
   portfolioTotals: { started: number; completed: number; delayed: number };
+  portfolioInsight: ExecInsight;
   mttr: ExecGaugeMetric;
   mtbf: ExecGaugeMetric;
   spi: ExecGaugeMetric;
-  openMaintenanceCases: { value: number; trend: ExecTrend };
-  delayedProjects: { value: number; trend: ExecTrend };
+  openMaintenanceCases: { value: number; trend?: ExecTrend; insight: ExecInsight };
+  delayedProjects: { value: number; trend?: ExecTrend; insight: ExecInsight };
   projectsByStatus: ExecNamedValue[];
+  projectsByStatusInsight: ExecInsight;
   milestones: ExecMilestonePoint[];
+  milestonesInsight: ExecInsight;
   topDelayed: ExecNamedValue[];
+  topDelayedInsight: ExecInsight;
   systemAvailability: ExecNamedValue[];
+  systemAvailabilityInsight: ExecInsight;
   hierarchy: ExecTreemapNode[];
+  hierarchyInsight: ExecInsight;
   topModifiedComponents: ExecNamedValue[];
   recentChanges: ExecConfigChangeRow[];
+  configInsight: ExecInsight;
   projectsByCustomer: ExecNamedValue[];
+  projectsByCustomerInsight: ExecInsight;
   alerts: ExecAlert[];
+  alertsInsight: ExecInsight;
   maintenanceByStatus: ExecNamedValue[];
+  maintenanceByStatusInsight: ExecInsight;
   maintenanceTrend: ExecNamedValue[];
+  maintenanceTrendInsight: ExecInsight;
   faultsByType: ExecNamedValue[];
+  faultsByTypeInsight: ExecInsight;
   faultVsMttr: ExecSeriesPoint[];
+  faultVsMttrInsight: ExecInsight;
+  filtersInsight: ExecInsight;
 }

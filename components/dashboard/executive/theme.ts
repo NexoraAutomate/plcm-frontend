@@ -22,6 +22,21 @@ export const EXEC_DONUT_COLORS = [
   EXEC.purple,
 ] as const;
 
+/** Fixed palette for Projects by Status buckets (order matters). */
+export const EXEC_PROJECT_STATUS_COLORS: Record<string, string> = {
+  'On Track': EXEC.success,
+  Delayed: EXEC.orange,
+  'On Hold': EXEC.yellow,
+  Completed: EXEC.cyan,
+};
+
+export const EXEC_PROJECT_STATUS_ORDER = [
+  'On Track',
+  'Delayed',
+  'On Hold',
+  'Completed',
+] as const;
+
 export const EXEC_MAINT_COLORS = [
   EXEC.purple,
   EXEC.orange,

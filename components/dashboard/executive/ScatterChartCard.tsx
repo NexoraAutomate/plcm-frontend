@@ -3,13 +3,14 @@
 import { useMemo } from 'react';
 import { Scatter } from '@ant-design/charts';
 import { DashboardCard } from './DashboardCard';
-import type { ExecMilestonePoint } from './types';
+import type { ExecInsight, ExecMilestonePoint } from './types';
 import { EXEC, PRIORITY_COLORS } from './theme';
 
 interface ScatterChartCardProps {
   title?: string;
   data: ExecMilestonePoint[];
   className?: string;
+  insight?: ExecInsight;
 }
 
 const Y_MAP = { Critical: 4, High: 3, Medium: 2, Low: 1 } as const;
@@ -18,6 +19,7 @@ export function ScatterChartCard({
   title = 'Project Milestone Timeline',
   data,
   className,
+  insight,
 }: ScatterChartCardProps) {
   const chartData = useMemo(
     () =>
@@ -88,6 +90,7 @@ export function ScatterChartCard({
     <DashboardCard
       className={className}
       title={title}
+      insight={insight}
       headerRight={
         <div className="hidden gap-2 text-[10px] xl:flex">
           {(Object.keys(counts) as (keyof typeof counts)[]).map((k) => (

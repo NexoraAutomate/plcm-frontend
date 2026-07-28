@@ -2,12 +2,13 @@
 
 import { AlertTriangle, CheckCircle2, Info, TriangleAlert } from 'lucide-react';
 import { DashboardCard } from './DashboardCard';
-import type { ExecAlert } from './types';
+import type { ExecAlert, ExecInsight } from './types';
 import { EXEC } from './theme';
 
 interface AlertPanelProps {
   alerts: ExecAlert[];
   className?: string;
+  insight?: ExecInsight;
 }
 
 const ICON = {
@@ -24,9 +25,9 @@ const COLOR = {
   info: EXEC.cyan,
 } as const;
 
-export function AlertPanel({ alerts, className }: AlertPanelProps) {
+export function AlertPanel({ alerts, className, insight }: AlertPanelProps) {
   return (
-    <DashboardCard className={className} title="Executive Alerts" noPadding>
+    <DashboardCard className={className} title="Executive Alerts" noPadding insight={insight}>
       <div className="h-[160px] overflow-y-auto px-2 pb-2">
         <ul className="space-y-1.5">
           {alerts.map((alert) => {

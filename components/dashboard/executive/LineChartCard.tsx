@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { Line } from '@ant-design/charts';
 import { DashboardCard } from './DashboardCard';
-import type { ExecNamedValue, ExecSeriesPoint } from './types';
+import type { ExecInsight, ExecNamedValue, ExecSeriesPoint } from './types';
 import { EXEC } from './theme';
 
 interface LineChartCardProps {
@@ -13,6 +13,7 @@ interface LineChartCardProps {
   seriesLabel?: string;
   className?: string;
   onClick?: () => void;
+  insight?: ExecInsight;
 }
 
 export function LineChartCard({
@@ -21,6 +22,7 @@ export function LineChartCard({
   color = EXEC.purple,
   className,
   onClick,
+  insight,
 }: LineChartCardProps) {
   const config = useMemo(
     () =>
@@ -47,7 +49,7 @@ export function LineChartCard({
   );
 
   return (
-    <DashboardCard className={className} title={title} onClick={onClick}>
+    <DashboardCard className={className} title={title} onClick={onClick} insight={insight}>
       <div className="h-[145px]">{data.length ? <Line {...config} /> : null}</div>
     </DashboardCard>
   );
@@ -57,9 +59,10 @@ interface DualLineChartCardProps {
   title: string;
   data: ExecSeriesPoint[];
   className?: string;
+  insight?: ExecInsight;
 }
 
-export function DualLineChartCard({ title, data, className }: DualLineChartCardProps) {
+export function DualLineChartCard({ title, data, className, insight }: DualLineChartCardProps) {
   const chartData = useMemo(() => {
     const rows: { month: string; value: number; type: string }[] = [];
     for (const row of data) {
@@ -104,7 +107,7 @@ export function DualLineChartCard({ title, data, className }: DualLineChartCardP
   );
 
   return (
-    <DashboardCard className={className} title={title}>
+    <DashboardCard className={className} title={title} insight={insight}>
       <div className="h-[145px]">{chartData.length ? <Line {...config} /> : null}</div>
     </DashboardCard>
   );

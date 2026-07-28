@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { DashboardCard } from './DashboardCard';
-import type { ExecTreemapNode } from './types';
+import type { ExecInsight, ExecTreemapNode } from './types';
 import { EXEC } from './theme';
 
 const ReactECharts = dynamic(() => import('echarts-for-react'), { ssr: false });
@@ -13,6 +13,7 @@ interface TreemapCardProps {
   tree: ExecTreemapNode[];
   className?: string;
   onNodeClick?: (node: ExecTreemapNode) => void;
+  insight?: ExecInsight;
 }
 
 function toEchartsTree(nodes: ExecTreemapNode[]): Record<string, unknown>[] {
@@ -30,6 +31,7 @@ export function TreemapCard({
   tree,
   className,
   onNodeClick,
+  insight,
 }: TreemapCardProps) {
   const option = useMemo(
     () => ({
@@ -90,7 +92,7 @@ export function TreemapCard({
   );
 
   return (
-    <DashboardCard className={className} title={title}>
+    <DashboardCard className={className} title={title} insight={insight}>
       <div className="h-[160px]">
         {tree.length ? (
           <ReactECharts

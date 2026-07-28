@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { Bar } from '@ant-design/charts';
 import { DashboardCard } from './DashboardCard';
-import type { ExecConfigChangeRow, ExecNamedValue } from './types';
+import type { ExecConfigChangeRow, ExecInsight, ExecNamedValue } from './types';
 import { EXEC } from './theme';
 
 function statusColor(status: string) {
@@ -18,9 +18,10 @@ interface ConfigSplitCardProps {
   components: ExecNamedValue[];
   rows: ExecConfigChangeRow[];
   className?: string;
+  insight?: ExecInsight;
 }
 
-export function ConfigSplitCard({ components, rows, className }: ConfigSplitCardProps) {
+export function ConfigSplitCard({ components, rows, className, insight }: ConfigSplitCardProps) {
   const sorted = useMemo(
     () => [...components].slice(0, 5).sort((a, b) => a.value - b.value),
     [components]
@@ -53,7 +54,7 @@ export function ConfigSplitCard({ components, rows, className }: ConfigSplitCard
   );
 
   return (
-    <DashboardCard className={className} title="Configuration Changes" noPadding>
+    <DashboardCard className={className} title="Configuration Changes" noPadding insight={insight}>
       <div className="grid h-[176px] grid-cols-2 gap-3 px-3 pb-2.5">
         <div className="min-w-0">
           <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#9CA3AF]">
