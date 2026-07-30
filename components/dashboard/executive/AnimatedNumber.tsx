@@ -1,15 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { motion, useSpring, useTransform } from 'framer-motion';
 
 interface AnimatedNumberProps {
   value: number;
   decimals?: number;
   className?: string;
+  style?: CSSProperties;
 }
 
-export function AnimatedNumber({ value, decimals = 0, className }: AnimatedNumberProps) {
+export function AnimatedNumber({ value, decimals = 0, className, style }: AnimatedNumberProps) {
   const spring = useSpring(0, { stiffness: 80, damping: 20 });
   const display = useTransform(spring, (v) =>
     decimals > 0 ? v.toFixed(decimals) : Math.round(v).toLocaleString()
@@ -26,7 +27,7 @@ export function AnimatedNumber({ value, decimals = 0, className }: AnimatedNumbe
   }, [display]);
 
   return (
-    <motion.span className={className} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+    <motion.span className={className} style={style} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
       {text}
     </motion.span>
   );

@@ -1,10 +1,11 @@
 'use client';
 
-import { ArrowDown, ArrowUp } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import type { LucideIcon } from 'lucide-react';
+import { Clock, Wrench } from 'lucide-react';
 import { DashboardCard } from './DashboardCard';
 import { AnimatedNumber } from './AnimatedNumber';
 import type { ExecInsight, ExecTrend } from './types';
+import { EXEC } from './theme';
 
 interface StatusMetricCardProps {
   label: string;
@@ -13,7 +14,13 @@ interface StatusMetricCardProps {
   className?: string;
   onClick?: () => void;
   insight?: ExecInsight;
+  variant?: 'maintenance' | 'delayed';
 }
+
+const VARIANT_ICON: Record<NonNullable<StatusMetricCardProps['variant']>, LucideIcon> = {
+  maintenance: Wrench,
+  delayed: Clock,
+};
 
 export function StatusMetricCard({
   label,
@@ -22,33 +29,40 @@ export function StatusMetricCard({
   className,
   onClick,
   insight,
+  variant = 'maintenance',
 }: StatusMetricCardProps) {
   const positive = trend?.positive ?? false;
-  const Icon = trend?.direction === 'down' ? ArrowDown : ArrowUp;
+  const trendGlyph =
+    trend?.direction === 'down' ? '▼' : trend?.direction === 'flat' ? '–' : '▲';
+  const Icon = VARIANT_ICON[variant];
+  const trendText = trend?.value.replace(/^[▲▼+\-\s]+/, '') ?? '';
 
   return (
-    <DashboardCard className={className} onClick={onClick} noPadding insight={insight}>
-      <div className="flex h-full items-center justify-between gap-2 px-3 py-2">
-        <div className="min-w-0">
-          <p className="truncate text-[10px] font-medium uppercase tracking-wide text-[#9CA3AF]">
-            {label}
-          </p>
+    <DashboardCard className={className} onClick={onClick} noPadding square insight={insight}>
+      <div className="flex h-full min-h-[52px] items-center gap-3 px-3 py-2">
+        <Icon className="h-5 w-5 shrink-0 text-[#A78BFA]" aria-hidden />
+
+        <p className="min-w-0 flex-1 truncate text-left text-[13px] font-medium text-[#F5F5F5]">
+          {label}
+        </p>
+
+        <div className="flex shrink-0 items-baseline gap-2.5">
           <AnimatedNumber
             value={value}
-            className="text-[20px] font-bold leading-none text-[#F5F5F5]"
+            className="text-[24px] font-bold leading-none tabular-nums text-[#F5F5F5]"
           />
+          {trend ? (
+            <p
+              className="whitespace-nowrap text-[11px] font-medium leading-none"
+              style={{ color: positive ? EXEC.success : EXEC.danger }}
+            >
+              <span className="mr-0.5 text-[9px]" aria-hidden>
+                {trendGlyph}
+              </span>
+              {trendText} <span className="font-normal text-[#9CA3AF]">vs last month</span>
+            </p>
+          ) : null}
         </div>
-        {trend ? (
-          <span
-            className={cn(
-              'inline-flex items-center gap-0.5 text-[11px] font-medium',
-              positive ? 'text-[#4ADE80]' : 'text-[#EF4444]'
-            )}
-          >
-            <Icon className="h-3 w-3" />
-            {trend.value}
-          </span>
-        ) : null}
       </div>
     </DashboardCard>
   );

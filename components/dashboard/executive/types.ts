@@ -24,6 +24,9 @@ export interface ExecSeriesPoint {
 
 export interface ExecGaugeMetric {
   label: string;
+  subtitle?: string;
+  /** Small label above the title (e.g. Schedule Performance above SPI). */
+  eyebrow?: string;
   value: number;
   displayValue: string;
   unit?: string;

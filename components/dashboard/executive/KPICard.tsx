@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DashboardCard } from './DashboardCard';
@@ -39,7 +40,58 @@ function formatTrendValue(value: string) {
   return value.replace(/^[▲▼+\-\s]+/, '').replace(/\s*vs last month\s*/i, '').trim();
 }
 
-function MiniSparkline({ values, color }: { values: number[]; color: string }) {
+function useFitOneLine(text: string, maxPx: number, minPx: number) {
+  const ref = useRef<HTMLElement | null>(null);
+  const [fontSize, setFontSize] = useState(maxPx);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const fit = () => {
+      let size = maxPx;
+      el.style.fontSize = `${size}px`;
+      el.style.whiteSpace = 'nowrap';
+      while (size > minPx && el.scrollWidth > el.clientWidth + 0.5) {
+        size -= 0.5;
+        el.style.fontSize = `${size}px`;
+      }
+      setFontSize(size);
+    };
+
+    fit();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [text, maxPx, minPx]);
+
+  return { ref, fontSize };
+}
+
+function scaleForCard(sizePx: number) {
+  const size = Math.max(sizePx, 1);
+  return {
+    value: Math.min(40, Math.max(18, size * 0.22)),
+    trend: Math.min(14, Math.max(9, size * 0.075)),
+    vs: Math.min(11, Math.max(8, size * 0.055)),
+    glyph: Math.min(11, Math.max(8, size * 0.05)),
+    sparkH: Math.min(44, Math.max(22, size * 0.22)),
+    stroke: Math.min(2.5, Math.max(1.25, size * 0.012)),
+  };
+}
+
+function MiniSparkline({
+  values,
+  color,
+  height,
+  strokeWidth,
+}: {
+  values: number[];
+  color: string;
+  height: number;
+  strokeWidth: number;
+}) {
   if (!values.length) return null;
   const max = Math.max(...values, 1);
   const min = Math.min(...values, 0);
@@ -58,9 +110,12 @@ function MiniSparkline({ values, color }: { values: number[]; color: string }) {
   return (
     <svg
       viewBox={`0 0 ${w} ${h}`}
-      className="mt-auto h-10 w-full"
+      className="mt-auto w-full shrink-0"
+      style={{
+        height,
+        filter: `drop-shadow(0 0 4px ${color}88)`,
+      }}
       preserveAspectRatio="none"
-      style={{ filter: `drop-shadow(0 0 4px ${color}88)` }}
     >
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -72,7 +127,7 @@ function MiniSparkline({ values, color }: { values: number[]; color: string }) {
       <polyline
         fill="none"
         stroke={color}
-        strokeWidth="2.25"
+        strokeWidth={strokeWidth}
         points={linePoints}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -96,37 +151,85 @@ export function KPICard({
   const trendGlyph =
     trend?.direction === 'down' ? '▼' : trend?.direction === 'flat' ? '–' : '▲';
 
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(() => scaleForCard(160));
+  const titleFit = useFitOneLine(label, 14, 8);
+
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+
+    const update = () => {
+      const basis = Math.min(el.clientWidth, el.clientHeight);
+      setScale(scaleForCard(basis));
+    };
+
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   return (
     <DashboardCard
       className={className}
       onClick={onClick}
       title={label}
+      showHeader={false}
       noPadding
       insight={insight}
     >
-      <div className="flex h-full flex-col px-3 pb-2.5 pt-1">
-        <div style={{ color: accent }}>
-          <AnimatedNumber
-            value={value}
-            decimals={decimals}
-            className="text-[34px] font-bold leading-none"
-          />
+      <div ref={bodyRef} className="flex h-full min-h-0 flex-col overflow-hidden">
+        <div className="shrink-0 px-2.5 pt-2 pb-0 sm:px-3 sm:pt-2.5">
+          <h3
+            ref={titleFit.ref as React.RefObject<HTMLHeadingElement>}
+            className="w-full overflow-hidden font-semibold leading-tight text-[#F5F5F5]"
+            style={{ fontSize: titleFit.fontSize }}
+          >
+            {label}
+          </h3>
         </div>
-        {trend ? (
-          <div className="mt-2">
-            <div
-              className="inline-flex items-center gap-1 text-[13px] font-semibold leading-none"
-              style={{ color: positive ? EXEC.success : EXEC.danger }}
-            >
-              <span className="text-[10px] leading-none" aria-hidden>
-                {trendGlyph}
-              </span>
-              {formatTrendValue(trend.value)}
-            </div>
-            <p className="mt-1 text-[11px] leading-tight text-[#9CA3AF]">vs last month</p>
+
+        <div className="flex min-h-0 flex-1 flex-col px-2.5 pb-2 pt-1 sm:px-3 sm:pb-2.5">
+          <div style={{ color: accent }}>
+            <AnimatedNumber
+              value={value}
+              decimals={decimals}
+              className="font-bold leading-none"
+              style={{ fontSize: scale.value }}
+            />
           </div>
-        ) : null}
-        {sparkline?.length ? <MiniSparkline values={sparkline} color={accent} /> : null}
+          {trend ? (
+            <div className="mt-1.5 shrink-0 sm:mt-2">
+              <div
+                className="inline-flex max-w-full items-center gap-0.5 font-semibold leading-none"
+                style={{
+                  color: positive ? EXEC.success : EXEC.danger,
+                  fontSize: scale.trend,
+                }}
+              >
+                <span style={{ fontSize: scale.glyph }} aria-hidden>
+                  {trendGlyph}
+                </span>
+                <span className="whitespace-nowrap">{formatTrendValue(trend.value)}</span>
+              </div>
+              <p
+                className="mt-0.5 whitespace-nowrap leading-tight text-[#9CA3AF] sm:mt-1"
+                style={{ fontSize: scale.vs }}
+              >
+                vs last month
+              </p>
+            </div>
+          ) : null}
+          {sparkline?.length ? (
+            <MiniSparkline
+              values={sparkline}
+              color={accent}
+              height={scale.sparkH}
+              strokeWidth={scale.stroke}
+            />
+          ) : null}
+        </div>
       </div>
     </DashboardCard>
   );

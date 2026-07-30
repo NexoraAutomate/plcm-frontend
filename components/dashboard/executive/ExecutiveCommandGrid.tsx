@@ -53,20 +53,25 @@ export function ExecutiveCommandGrid({
       }}
     >
       {/* ── Row 1 ── */}
-      <div className="col-span-2 grid min-h-0 grid-rows-[auto_1fr] gap-3">
-        <LogoCard />
-        <ProgramHealthCard metric={model.programHealth} />
+      {/* Active Programs ≈ title width; leftover goes to Logo + Program Health */}
+      <div
+        className="col-span-3 grid min-h-0 min-w-0 gap-2 sm:gap-3"
+        style={{ gridTemplateColumns: 'minmax(0, 1fr) minmax(7rem, 9rem)' }}
+      >
+        <div className="grid min-h-0 min-w-0 grid-rows-[auto_1fr] gap-2 sm:gap-3">
+          <LogoCard />
+          <ProgramHealthCard metric={model.programHealth} />
+        </div>
+        <KPICard
+          className="min-h-0 min-w-0"
+          label="Active Programs"
+          value={model.activePrograms.value}
+          trend={model.activePrograms.trend}
+          sparkline={model.activePrograms.sparkline}
+          insight={model.activePrograms.insight}
+          onClick={() => onNavigate?.('/projects')}
+        />
       </div>
-
-      <KPICard
-        className="col-span-1 min-h-0"
-        label="Active Programs"
-        value={model.activePrograms.value}
-        trend={model.activePrograms.trend}
-        sparkline={model.activePrograms.sparkline}
-        insight={model.activePrograms.insight}
-        onClick={() => onNavigate?.('/projects')}
-      />
 
       <AreaChartCard
         className="col-span-4 min-h-0"
@@ -76,32 +81,30 @@ export function ExecutiveCommandGrid({
         onClick={() => onNavigate?.('/projects')}
       />
 
-      <div className="col-span-3 grid min-h-0 grid-rows-[1fr_auto] gap-3">
-        <div className="grid min-h-0 grid-cols-3 gap-3">
-          <GaugeCard metric={model.mttr} compact onClick={() => onNavigate?.('/maintenance')} />
-          <GaugeCard metric={model.mtbf} compact onClick={() => onNavigate?.('/maintenance')} />
-          <GaugeCard metric={model.spi} compact onClick={() => onNavigate?.('/projects')} />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <StatusMetricCard
-            label="Open Maintenance Cases"
-            value={model.openMaintenanceCases.value}
-            trend={model.openMaintenanceCases.trend}
-            insight={model.openMaintenanceCases.insight}
-            onClick={() => onNavigate?.('/maintenance')}
-          />
-          <StatusMetricCard
-            label="Delayed Projects"
-            value={model.delayedProjects.value}
-            trend={model.delayedProjects.trend}
-            insight={model.delayedProjects.insight}
-            onClick={() => onNavigate?.('/projects')}
-          />
-        </div>
-      </div>
-
-      <div className="col-span-2 min-h-0">
+      <div
+        className="col-span-5 grid min-h-0 min-w-0 gap-2 sm:gap-3"
+        style={{
+          gridTemplateColumns: 'repeat(3, minmax(0, 1fr)) minmax(0, 1.1fr)',
+          gridTemplateRows: 'minmax(0, 1fr) auto',
+        }}
+      >
+        <GaugeCard
+          className="min-h-0 min-w-0 overflow-hidden"
+          metric={model.mttr}
+          onClick={() => onNavigate?.('/maintenance')}
+        />
+        <GaugeCard
+          className="min-h-0 min-w-0 overflow-hidden"
+          metric={model.mtbf}
+          onClick={() => onNavigate?.('/maintenance')}
+        />
+        <GaugeCard
+          className="min-h-0 min-w-0 overflow-hidden"
+          metric={model.spi}
+          onClick={() => onNavigate?.('/projects')}
+        />
         <FiltersPanel
+          className="min-h-0 min-w-0"
           filters={filters}
           customers={customers}
           programs={programs}
@@ -111,6 +114,24 @@ export function ExecutiveCommandGrid({
           fetching={fetching}
           onRefresh={onRefresh}
           insight={model.filtersInsight}
+        />
+        <StatusMetricCard
+          className="col-span-2 min-h-0 min-w-0"
+          label="Open Maintenance Cases"
+          value={model.openMaintenanceCases.value}
+          trend={model.openMaintenanceCases.trend}
+          insight={model.openMaintenanceCases.insight}
+          variant="maintenance"
+          onClick={() => onNavigate?.('/maintenance')}
+        />
+        <StatusMetricCard
+          className="col-span-2 min-h-0 min-w-0"
+          label="Delayed Projects"
+          value={model.delayedProjects.value}
+          trend={model.delayedProjects.trend}
+          insight={model.delayedProjects.insight}
+          variant="delayed"
+          onClick={() => onNavigate?.('/projects')}
         />
       </div>
 

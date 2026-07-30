@@ -74,9 +74,9 @@ export function ScatterChartCard({
 
   return (
     <DashboardCard className={className} title={title} insight={insight} noPadding>
-      <div className="grid h-[155px] grid-cols-[52px_minmax(0,1fr)_52px] gap-1 px-2 pb-2">
+      <div className="grid h-full grid-cols-[52px_minmax(0,1fr)_70px] gap-2 px-2 pb-2 pt-2 ">
         {/* Priority labels */}
-        <div className="flex flex-col justify-between py-3">
+        <div className="flex flex-col justify-between py-3 h-11/12">
           {PRIORITIES.map((p) => (
             <span
               key={p}
@@ -89,7 +89,7 @@ export function ScatterChartCard({
         </div>
 
         {/* Plot */}
-        <div className="relative min-h-0 min-w-0">
+        <div className="relative min-h-0 min-w-0 w-full">
           <div className="absolute inset-x-0 bottom-5 top-1">
             {/* Vertical month guides */}
             {months.map((_, i) => {
@@ -141,7 +141,7 @@ export function ScatterChartCard({
         </div>
 
         {/* Totals */}
-        <div className="flex flex-col justify-between border-l border-[#242424] py-1 pl-2">
+        <div className="flex flex-col justify-between border-l border-[#242424] py-1 pl-6 h-11/12">
           {PRIORITIES.map((p) => (
             <div key={p} className="min-w-0">
               <p className="text-[9px] leading-none text-[#E5E7EB]">{p}</p>

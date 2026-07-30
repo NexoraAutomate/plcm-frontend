@@ -7,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { RefreshCw } from 'lucide-react';
+import { CalendarDays, ExternalLink, RefreshCw } from 'lucide-react';
 import { DashboardCard } from './DashboardCard';
 import type { ExecFilterOption, ExecFiltersState, ExecInsight } from './types';
 
@@ -24,26 +24,53 @@ interface FiltersPanelProps {
   insight?: ExecInsight;
 }
 
+const DATE_RANGE_OPTIONS: ExecFilterOption[] = [
+  { value: '30d', label: 'Last 30 days' },
+  { value: '90d', label: 'Last 90 days' },
+  { value: 'ytd', label: 'Year to date' },
+  { value: '12m', label: 'Last 12 months' },
+];
+
+function formatDateRangeLabel(value?: string): string {
+  const now = new Date();
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  let start = new Date(end);
+  if (value === '90d') start.setUTCDate(start.getUTCDate() - 89);
+  else if (value === 'ytd') start = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+  else if (value === '12m') start.setUTCFullYear(start.getUTCFullYear() - 1);
+  else start.setUTCDate(start.getUTCDate() - 29);
+
+  const fmt = (d: Date) =>
+    d.toLocaleDateString(undefined, { month: 'short', day: '2-digit', year: 'numeric' });
+  return `${fmt(start)} - ${fmt(end)}`;
+}
+
 function FilterSelect({
   label,
   value,
   options,
+  displayValue,
   onValueChange,
 }: {
   label: string;
   value?: string;
   options: ExecFilterOption[];
+  displayValue?: string;
   onValueChange: (v: string) => void;
 }) {
   return (
     <div className="space-y-1">
-      <p className="text-[10px] font-medium uppercase tracking-wider text-white/70">{label}</p>
+      <p className="text-[10px] font-medium tracking-wide text-white/75">{label}</p>
       <Select value={value ?? 'all'} onValueChange={onValueChange}>
         <SelectTrigger
           size="sm"
-          className="h-7 w-full border-white/20 bg-black/20 text-[11px] text-white hover:bg-black/30"
+          className="h-8 w-full border-white/25 bg-black/25 text-[11px] text-white hover:bg-black/35"
         >
-          <SelectValue placeholder={`All ${label}`} />
+          {displayValue ? (
+            <span className="truncate">{displayValue}</span>
+          ) : (
+            <SelectValue placeholder={`All ${label}`} />
+          )}
         </SelectTrigger>
         <SelectContent className="border-[#242424] bg-[#141414] text-[#F5F5F5]">
           <SelectItem value="all">All {label}</SelectItem>
@@ -75,9 +102,11 @@ export function FiltersPanel({
       <DashboardCard
         gradient
         className="min-h-0 flex-1"
-        title="Global Filters"
+        title="Filters"
         noPadding
+        square
         insight={insight}
+        headerRight={<ExternalLink className="h-3.5 w-3.5 text-white/80" aria-hidden />}
       >
         <div className="space-y-2 px-3 pb-3">
           <FilterSelect
@@ -100,32 +129,32 @@ export function FiltersPanel({
           />
           <FilterSelect
             label="Date Range"
-            value={filters.dateRange}
-            options={[
-              { value: '30d', label: 'Last 30 days' },
-              { value: '90d', label: 'Last 90 days' },
-              { value: 'ytd', label: 'Year to date' },
-              { value: '12m', label: 'Last 12 months' },
-            ]}
+            value={filters.dateRange ?? '12m'}
+            options={DATE_RANGE_OPTIONS}
+            displayValue={formatDateRangeLabel(filters.dateRange ?? '12m')}
             onValueChange={(v) => onChange({ dateRange: v === 'all' ? undefined : v })}
           />
         </div>
       </DashboardCard>
-      <DashboardCard className="shrink-0" noPadding>
-        <div className="flex items-center justify-between gap-2 px-3 py-2">
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-[#9CA3AF]">Last Updated</p>
-            <p className="mt-0.5 text-[12px] font-medium text-[#F5F5F5]">
-              {lastUpdated
-                ? new Date(lastUpdated).toLocaleString(undefined, {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })
-                : '—'}
-            </p>
+
+      <DashboardCard className="shrink-0" noPadding square>
+        <div className="flex items-center justify-between gap-2 px-3 py-2.5">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <CalendarDays className="h-4 w-4 shrink-0 text-[#A78BFA]" aria-hidden />
+            <div className="min-w-0">
+              <p className="text-[10px] font-medium text-[#9CA3AF]">Last Updated</p>
+              <p className="mt-0.5 truncate text-[12px] font-medium text-[#F5F5F5]">
+                {lastUpdated
+                  ? new Date(lastUpdated).toLocaleString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })
+                  : '—'}
+              </p>
+            </div>
           </div>
           {onRefresh ? (
             <button

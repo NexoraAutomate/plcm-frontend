@@ -3,6 +3,7 @@ export interface KpiMetric {
   label: string;
   value: number;
   change_percent: number | null;
+  change_value?: number | null;
 }
 
 export interface ChartDataPoint {
@@ -46,6 +47,7 @@ export interface GaugeMetric {
   value: number;
   unit: string;
   max_value: number;
+  change_value?: number | null;
 }
 
 export interface ActivityItem {

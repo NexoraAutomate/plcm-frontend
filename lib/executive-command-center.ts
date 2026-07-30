@@ -69,6 +69,11 @@ function mapTree(nodes: TreemapNode[]): ExecTreemapNode[] {
   }));
 }
 
+function kpiChangeValue(data: ExecutiveDashboardResponse | null, key: string): number | null {
+  const raw = data?.kpis.metrics.find((m) => m.key === key)?.change_value;
+  return typeof raw === 'number' && Number.isFinite(raw) ? raw : null;
+}
+
 function trendFromChange(
   changePercent: number | null,
   opts?: { invertPositive?: boolean; unit?: string }
@@ -84,6 +89,26 @@ function trendFromChange(
   return {
     direction,
     value: `${abs}${unit}`,
+    positive,
+  };
+}
+
+function trendFromAbsolute(
+  delta: number | null,
+  opts: { unit?: string; invertPositive?: boolean; decimals?: number }
+): ExecTrend | undefined {
+  if (delta === null) return undefined;
+  const direction: ExecTrend['direction'] = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat';
+  const risingIsGood = !opts.invertPositive;
+  const positive =
+    direction === 'flat' ? true : direction === 'up' ? risingIsGood : !risingIsGood;
+  const abs = Math.abs(delta);
+  const formatted =
+    opts.decimals != null ? abs.toFixed(opts.decimals) : String(Math.round(abs * 10) / 10);
+  const unit = opts.unit ? ` ${opts.unit}` : '';
+  return {
+    direction,
+    value: `${formatted}${unit}`.trim(),
     positive,
   };
 }
@@ -258,7 +283,6 @@ function buildTopDelayed(data: ExecutiveDashboardResponse | null): ExecNamedValu
   return (data?.projects.progress ?? [])
     .filter((p) => (p.days_overdue ?? 0) > 0)
     .sort((a, b) => (b.days_overdue ?? 0) - (a.days_overdue ?? 0))
-    .slice(0, 5)
     .map((p) => ({
       name: p.name,
       value: p.days_overdue ?? 0,
@@ -423,6 +447,10 @@ export function buildCommandCenterViewModel(
   const mtbfVal = data?.reliability.mtbf.value ?? 0;
   const mttrMax = data?.reliability.mttr.max_value || Math.max(mttrVal, 1);
   const mtbfMax = data?.reliability.mtbf.max_value || Math.max(mtbfVal, 1);
+  const mttrChange = data?.reliability.mttr.change_value ?? null;
+  const mtbfChange = data?.reliability.mtbf.change_value ?? null;
+  const spiChange =
+    healthMomPts !== null ? Number((healthMomPts / 100).toFixed(2)) : null;
 
   const { series: portfolioTrend, totals: portfolioTotals } = buildPortfolioTrend(data);
   const sparkline = portfolioTrend.map((p) => Number(p.started) || 0);
@@ -526,41 +554,47 @@ export function buildCommandCenterViewModel(
     ),
     mttr: {
       label: 'MTTR',
+      subtitle: 'Mean Time To Repair',
       value: mttrVal,
       displayValue: mttrVal ? mttrVal.toFixed(1) : '—',
       unit: 'hrs',
       max: mttrMax,
-      color: EXEC.success,
+      color: EXEC.purple,
       available: mttrVal > 0,
+      trend: trendFromAbsolute(mttrChange, { unit: 'hrs', invertPositive: true, decimals: 1 }),
       insight: insight(
-        'Mean Time To Repair = average of (resolved_at − identified_at) in hours across resolved faulty entities in scope.',
+        'Mean Time To Repair = average of (resolved_at − identified_at) in hours across resolved faulty entities in scope. MoM compares average repair time for faults resolved this month vs last month.',
         'Lower MTTR means faster restoration. Rising MTTR with stable fault volume points to repair-process or spare-parts bottlenecks.'
       ),
     },
     mtbf: {
       label: 'MTBF',
+      subtitle: 'Mean Time Between Failures',
       value: mtbfVal,
       displayValue: mtbfVal ? String(Math.round(mtbfVal)) : '—',
       unit: 'days',
       max: mtbfMax,
-      color: EXEC.cyan,
+      color: EXEC.purple,
       available: mtbfVal > 0,
+      trend: trendFromAbsolute(mtbfChange, { unit: 'days', decimals: 0 }),
       insight: insight(
-        'Mean Time Between Failures from reliability analytics (average interval between fault events in scope), expressed in days.',
+        'Mean Time Between Failures = average days between successive fault identifications in scope. MoM compares gaps observed this month vs last month.',
         'Higher MTBF indicates more stable hardware/software. Declining MTBF warrants design or supplier quality review before the next build wave.'
       ),
     },
     spi: {
       label: 'SPI',
+      eyebrow: 'Schedule Performance',
       value: spi,
       displayValue: spiAvailable ? spi.toFixed(2) : 'N/A',
       unit: 'Index',
       max: 1.2,
-      color: !spiAvailable ? EXEC.muted : spi >= 1 ? EXEC.success : EXEC.danger,
+      color: !spiAvailable ? EXEC.muted : EXEC.success,
       available: spiAvailable,
+      trend: trendFromAbsolute(spiChange, { decimals: 2, invertPositive: false }),
       insight: spiAvailable
         ? insight(
-            `Schedule Performance Index (proxy) = (Total projects − Delayed) ÷ Total = (${totalProjects} − ${delayedProjects}) ÷ ${totalProjects} = ${spi.toFixed(2)}. 1.00 means no delayed projects; below 1.00 means schedule erosion.`,
+            `Schedule Performance Index (proxy) = (Total projects − Delayed) ÷ Total = (${totalProjects} − ${delayedProjects}) ÷ ${totalProjects} = ${spi.toFixed(2)}. MoM = change in program-health percentage points ÷ 100.`,
             'Treat SPI < 1 as a portfolio red flag. Use it with Top Delayed Projects to decide which programs need executive intervention.'
           )
         : insight(
@@ -570,19 +604,24 @@ export function buildCommandCenterViewModel(
     },
     openMaintenanceCases: {
       value: openCases,
-      trend: trendFromChange(kpiChange(data, 'open_maintenance_cases') ?? maintMom, {
-        invertPositive: true,
-      }),
+      trend: trendFromAbsolute(
+        kpiChangeValue(data, 'open_maintenance_cases') ??
+          (maintMom !== null && maintenanceTrend.length >= 2
+            ? maintenanceTrend[maintenanceTrend.length - 1].value -
+              maintenanceTrend[maintenanceTrend.length - 2].value
+            : null),
+        { invertPositive: true }
+      ),
       insight: insight(
-        `Count of maintenance cases in open statuses (Open, Under Inspection, Under Repair) in the current filter scope = ${openCases}.`,
+        `Count of maintenance cases in open statuses (Open, Under Inspection, Under Repair) in the current filter scope = ${openCases}. MoM compares cases reported this month vs last month.`,
         'Open cases consume engineering capacity. Growth here often precedes MTTR increases and delivery slips.'
       ),
     },
     delayedProjects: {
       value: delayedProjects,
-      trend: trendFromChange(kpiChange(data, 'delayed_projects'), { invertPositive: true }),
+      trend: trendFromAbsolute(kpiChangeValue(data, 'delayed_projects'), { invertPositive: true }),
       insight: insight(
-        `Count of projects where end_date < now and status ≠ Completed = ${delayedProjects} of ${totalProjects} total.`,
+        `Count of lifecycle projects where end_date < now = ${delayedProjects} of ${totalProjects} total. MoM = current delayed − delayed count as of last month-end.`,
         'Each delayed project is a contractual and resource risk. Drill into Top Delayed for days overdue and owners.'
       ),
     },

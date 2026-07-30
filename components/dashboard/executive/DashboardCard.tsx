@@ -18,6 +18,10 @@ interface DashboardCardProps {
   noPadding?: boolean;
   onClick?: () => void;
   insight?: ExecInsight;
+  /** Square corners (no border radius). */
+  square?: boolean;
+  /** When false, `title` is kept for insight tooltip only (no header row). */
+  showHeader?: boolean;
 }
 
 function InsightBody({ insight, title }: { insight: ExecInsight; title?: string }) {
@@ -38,6 +42,47 @@ function InsightBody({ insight, title }: { insight: ExecInsight; title?: string 
   );
 }
 
+function InsightTrigger({
+  insight,
+  title,
+  gradient,
+  className,
+}: {
+  insight: ExecInsight;
+  title?: string;
+  gradient?: boolean;
+  className?: string;
+}) {
+  return (
+    <Tooltip delayDuration={250}>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            'inline-flex shrink-0 items-center justify-center rounded p-0.5 opacity-50 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none',
+            className
+          )}
+          aria-label={title ? `About ${title}` : 'About this metric'}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <Info
+            className={cn('h-3 w-3', gradient ? 'text-white' : 'text-[#9CA3AF]')}
+            aria-hidden
+          />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent
+        side="top"
+        sideOffset={8}
+        className="z-[80] border border-[#3F3F46] bg-[#18181B] px-3 py-2.5 text-white shadow-xl"
+      >
+        <InsightBody insight={insight} title={title} />
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function DashboardCard({
   children,
   className,
@@ -48,8 +93,10 @@ export function DashboardCard({
   noPadding = false,
   onClick,
   insight,
+  square = false,
+  showHeader = true,
 }: DashboardCardProps) {
-  const card = (
+  return (
     <motion.div
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
@@ -78,10 +125,10 @@ export function DashboardCard({
           ? 'linear-gradient(145deg, #6D28D9 0%, #8B5CF6 45%, #5B21B6 100%)'
           : EXEC.card,
         borderColor: gradient ? 'transparent' : EXEC.border,
-        borderRadius: EXEC.radius,
+        borderRadius: square ? 0 : EXEC.radius,
       }}
     >
-      {(title || headerRight) && (
+      {(title || headerRight) && showHeader !== false && (
         <div
           className={cn(
             'flex shrink-0 items-start justify-between gap-2 px-3 pt-2.5 pb-1',
@@ -92,20 +139,12 @@ export function DashboardCard({
             {title ? (
               <h3
                 className={cn(
-                  'flex items-center gap-1 truncate text-[14px] font-semibold leading-tight',
+                  'flex items-center gap-1 text-[14px] font-semibold leading-tight',
                   gradient ? 'text-white' : 'text-[#F5F5F5]'
                 )}
               >
                 <span className="truncate">{title}</span>
-                {insight ? (
-                  <Info
-                    className={cn(
-                      'h-3 w-3 shrink-0 opacity-50 transition-opacity group-hover:opacity-100',
-                      gradient ? 'text-white' : 'text-[#9CA3AF]'
-                    )}
-                    aria-hidden
-                  />
-                ) : null}
+                {insight ? <InsightTrigger insight={insight} title={title} gradient={gradient} /> : null}
               </h3>
             ) : null}
             {subtitle ? (
@@ -122,22 +161,23 @@ export function DashboardCard({
           {headerRight}
         </div>
       )}
-      <div className={cn('min-h-0 flex-1', noPadding ? '' : 'px-3 pb-2.5')}>{children}</div>
-    </motion.div>
-  );
 
-  if (!insight) return card;
+      {insight && showHeader === false ? (
+        <InsightTrigger
+          insight={insight}
+          title={title}
+          className="absolute top-2 right-2 z-20 opacity-40 group-hover:opacity-90"
+        />
+      ) : null}
 
-  return (
-    <Tooltip delayDuration={350}>
-      <TooltipTrigger asChild>{card}</TooltipTrigger>
-      <TooltipContent
-        side="top"
-        sideOffset={8}
-        className="z-[80] border border-[#3F3F46] bg-[#18181B] px-3 py-2.5 text-white shadow-xl"
+      <div
+        className={cn(
+          'min-h-0 flex-1',
+          noPadding ? 'flex flex-col overflow-hidden' : 'px-3 pb-2.5'
+        )}
       >
-        <InsightBody insight={insight} title={title} />
-      </TooltipContent>
-    </Tooltip>
+        {children}
+      </div>
+    </motion.div>
   );
 }
