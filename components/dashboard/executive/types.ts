@@ -15,6 +15,8 @@ export interface ExecNamedValue {
   value: number;
   id?: number | null;
   color?: string;
+  /** Hierarchy level for filters (system | subsystem | module | unit). */
+  category?: string;
 }
 
 export interface ExecSeriesPoint {
@@ -65,6 +67,7 @@ export interface ExecConfigChangeRow {
   reason: string;
   status: string;
   date: string;
+  category?: string;
 }
 
 export interface ExecAlert {

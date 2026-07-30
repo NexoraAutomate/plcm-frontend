@@ -58,6 +58,7 @@ export interface ActivityItem {
   timestamp: string;
   link_type: string;
   link_id: number;
+  entity_type?: string | null;
 }
 
 export interface ExecutiveKpisSection {

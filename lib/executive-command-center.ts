@@ -489,18 +489,22 @@ export function buildCommandCenterViewModel(
     mttr: mttrVal,
   }));
 
-  const topModifiedComponents = (data?.configuration.top_modified_components ?? [])
-    .slice(0, 5)
-    .map((d) => ({ name: d.name, value: d.value }));
+  const topModifiedComponents = (data?.configuration.top_modified_components ?? []).map((d) => ({
+    name: d.name,
+    value: d.value,
+    category: (d.label || undefined)?.toLowerCase(),
+  }));
 
   const recentChanges = (data?.configuration.recent_timeline ?? []).map((item) => ({
     id: item.id,
     partNumber: item.title,
     reason: item.subtitle || '—',
     status: item.status || 'Pending',
+    category: item.entity_type?.toLowerCase() || undefined,
     date: new Date(item.timestamp).toLocaleDateString(undefined, {
       month: 'short',
       day: 'numeric',
+      year: 'numeric',
     }),
   }));
 
@@ -653,8 +657,8 @@ export function buildCommandCenterViewModel(
     topModifiedComponents,
     recentChanges,
     configInsight: insight(
-      'Left: components ranked by configuration change count. Right: most recent configuration history rows (part, reason, status, date).',
-      'High churn on the same part numbers signals instability. Pending approvals in the recent list are decision queues for configuration control.'
+      'Filter by System / Subsystem / Module / Unit. Bars show replacement counts for each entity name within that level (e.g. Module → BUC, RT Transmitter), aggregated across projects. Right: recent changes for the selected level.',
+      'High churn on a specific module or unit type flags design or supplier risk. Use the tabs to isolate which hierarchy level needs configuration control.'
     ),
     projectsByCustomer,
     projectsByCustomerInsight: insight(
