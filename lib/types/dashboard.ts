@@ -29,6 +29,7 @@ export interface ProjectProgressItem {
   status_name?: string | null;
   end_date?: string | null;
   days_overdue?: number | null;
+  days_until_due?: number | null;
 }
 
 export interface TreemapNode {

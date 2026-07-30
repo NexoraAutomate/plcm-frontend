@@ -8,6 +8,7 @@ export { DonutChartCard } from './DonutChartCard';
 export { RadarChartCard } from './RadarChartCard';
 export { TreemapCard } from './TreemapCard';
 export { ScatterChartCard } from './ScatterChartCard';
+export { TopDelayedProjectsCard } from './TopDelayedProjectsCard';
 export { HorizontalBarCard } from './HorizontalBarCard';
 export { LineChartCard, DualLineChartCard } from './LineChartCard';
 export { AlertPanel } from './AlertPanel';

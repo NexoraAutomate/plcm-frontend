@@ -111,8 +111,8 @@ export function DashboardCard({
             {subtitle ? (
               <p
                 className={cn(
-                  'mt-0.5 text-[11px] uppercase tracking-wide',
-                  gradient ? 'text-white/70' : 'text-[#9CA3AF]'
+                  'mt-0.5 text-[11px] leading-tight',
+                  gradient ? 'text-white/70' : 'text-[#D1D5DB]'
                 )}
               >
                 {subtitle}

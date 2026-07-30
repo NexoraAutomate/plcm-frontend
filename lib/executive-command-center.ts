@@ -32,31 +32,29 @@ function monthLabel(raw: string): string {
   return raw.slice(0, 3);
 }
 
-function monthKeySort(a: string, b: string): number {
-  return a.localeCompare(b);
-}
-
-function padMonthsFromMaps(
+function padCalendarMonths(
   maps: Record<string, number>[]
 ): { name: string; values: number[] }[] {
-  const keys = new Set<string>();
-  for (const map of maps) {
-    for (const k of Object.keys(map)) keys.add(k);
-  }
-  const sortedKeys = [...keys].sort(monthKeySort);
-  // Prefer calendar order within current year span when keys are YYYY-MM
-  const labeled = sortedKeys.map((key) => ({
-    name: monthLabel(key),
-    values: maps.map((map) => Number(map[key] ?? 0)),
+  // Collapse YYYY-MM keys into Jan–Dec buckets (current calendar view).
+  const byMonth = maps.map(() => Object.fromEntries(MONTHS.map((m) => [m, 0])) as Record<string, number>);
+  maps.forEach((map, mi) => {
+    for (const [key, value] of Object.entries(map)) {
+      const label = monthLabel(key);
+      if (label in byMonth[mi]) {
+        byMonth[mi][label] += Number(value) || 0;
+      }
+    }
+  });
+  return MONTHS.map((name) => ({
+    name,
+    values: byMonth.map((m) => m[name] ?? 0),
   }));
-  if (labeled.length) return labeled;
-  return MONTHS.map((name) => ({ name, values: maps.map(() => 0) }));
 }
 
 function toMonthMap(points: ChartDataPoint[]): Record<string, number> {
   const map: Record<string, number> = {};
   for (const p of points) {
-    map[p.name] = Number(p.value) || 0;
+    map[p.name] = (map[p.name] ?? 0) + (Number(p.value) || 0);
   }
   return map;
 }
@@ -163,26 +161,24 @@ function buildPortfolioTrend(data: ExecutiveDashboardResponse | null): {
 } {
   const startedMap = toMonthMap(data?.projects.timeline ?? []);
   const completedMap = toMonthMap(data?.projects.completed_timeline ?? []);
-  const delayedTotal = kpiValue(data, 'delayed_projects');
 
-  const rows = padMonthsFromMaps([startedMap, completedMap]);
-  // Only keep months that have real activity (or keep full year labels if both empty)
-  const hasAny = rows.some((r) => r.values.some((v) => v > 0));
-  const filtered = hasAny ? rows.filter((r) => r.values.some((v) => v > 0)) : [];
+  // Delayed-by-month: count overdue projects by the month their end_date fell due.
+  const delayedMap: Record<string, number> = {};
+  for (const p of data?.projects.progress ?? []) {
+    if ((p.days_overdue ?? 0) <= 0 || !p.end_date) continue;
+    const key = p.end_date.slice(0, 7);
+    delayedMap[key] = (delayedMap[key] ?? 0) + 1;
+  }
 
-  const series: ExecSeriesPoint[] = filtered.map((row) => ({
+  const rows = padCalendarMonths([startedMap, completedMap, delayedMap]);
+  const series: ExecSeriesPoint[] = rows.map((row) => ({
     month: row.name,
     started: row.values[0] ?? 0,
     completed: row.values[1] ?? 0,
-    // Delayed is a point-in-time KPI (projects past end date, not completed).
-    // Attribute the current delayed count only to the latest month with activity.
-    delayed: 0,
+    delayed: row.values[2] ?? 0,
   }));
 
-  if (series.length && delayedTotal > 0) {
-    series[series.length - 1].delayed = delayedTotal;
-  }
-
+  const delayedTotal = kpiValue(data, 'delayed_projects');
   const startedSum = series.reduce((s, r) => s + Number(r.started || 0), 0);
   const completedSum = series.reduce((s, r) => s + Number(r.completed || 0), 0);
 
@@ -196,31 +192,66 @@ function buildPortfolioTrend(data: ExecutiveDashboardResponse | null): {
   };
 }
 
-function priorityFromDaysOverdue(days: number): ExecMilestonePoint['priority'] {
-  if (days >= 30) return 'Critical';
-  if (days >= 14) return 'High';
-  if (days >= 1) return 'Medium';
-  return 'Low';
+function priorityFromSchedule(daysOverdue: number | null, daysUntilDue: number | null): {
+  priority: ExecMilestonePoint['priority'];
+  filled: boolean;
+} {
+  if (daysOverdue != null && daysOverdue > 0) {
+    if (daysOverdue >= 30) return { priority: 'Critical', filled: true };
+    if (daysOverdue >= 14) return { priority: 'High', filled: true };
+    if (daysOverdue >= 7) return { priority: 'Medium', filled: true };
+    return { priority: 'Low', filled: true };
+  }
+  const until = daysUntilDue ?? 999;
+  if (until <= 7) return { priority: 'Critical', filled: false };
+  if (until <= 14) return { priority: 'High', filled: false };
+  if (until <= 30) return { priority: 'Medium', filled: false };
+  return { priority: 'Low', filled: false };
+}
+
+function rollingSixMonths(from = new Date()): { key: string; label: string }[] {
+  const start = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), 1));
+  return Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + i, 1));
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+    return { key, label: MONTHS[d.getUTCMonth()] };
+  });
 }
 
 function buildMilestones(data: ExecutiveDashboardResponse | null): ExecMilestonePoint[] {
-  const progress = data?.projects.progress ?? [];
-  const overdue = progress.filter((p) => (p.days_overdue ?? 0) > 0);
-  if (!overdue.length) return [];
+  const window = rollingSixMonths();
+  const windowKeys = new Set(window.map((w) => w.key));
+  const yMap = { Critical: 4, High: 3, Medium: 2, Low: 1 } as const;
+  const points: ExecMilestonePoint[] = [];
 
-  return overdue.slice(0, 24).map((p) => {
-    const days = p.days_overdue ?? 0;
-    const priority = priorityFromDaysOverdue(days);
-    const yMap = { Critical: 4, High: 3, Medium: 2, Low: 1 } as const;
-    const month = p.end_date ? monthLabel(p.end_date.slice(0, 7)) : '—';
-    return {
-      month,
+  for (const p of data?.projects.progress ?? []) {
+    if (!p.end_date) continue;
+    const key = p.end_date.slice(0, 7);
+    // Plot overdue items that fell before the window on the first month.
+    let monthIndex = window.findIndex((w) => w.key === key);
+    if (monthIndex < 0) {
+      if ((p.days_overdue ?? 0) > 0) monthIndex = 0;
+      else continue;
+    }
+    if (!windowKeys.has(window[monthIndex].key) && monthIndex !== 0) continue;
+
+    const { priority, filled } = priorityFromSchedule(
+      p.days_overdue ?? null,
+      p.days_until_due ?? null
+    );
+    points.push({
+      month: window[monthIndex].label,
+      monthIndex,
       priority,
       y: yMap[priority],
       name: p.name,
       count: 1,
-    };
-  });
+      filled,
+      id: p.id,
+    });
+  }
+
+  return points.slice(0, 40);
 }
 
 function buildTopDelayed(data: ExecutiveDashboardResponse | null): ExecNamedValue[] {
@@ -229,7 +260,7 @@ function buildTopDelayed(data: ExecutiveDashboardResponse | null): ExecNamedValu
     .sort((a, b) => (b.days_overdue ?? 0) - (a.days_overdue ?? 0))
     .slice(0, 5)
     .map((p) => ({
-      name: p.name.length > 22 ? `${p.name.slice(0, 20)}…` : p.name,
+      name: p.name,
       value: p.days_overdue ?? 0,
       id: p.id,
     }));
@@ -490,8 +521,8 @@ export function buildCommandCenterViewModel(
     portfolioTrend,
     portfolioTotals,
     portfolioInsight: insight(
-      'Started = projects created that month (created_at). Completed = projects with status Completed grouped by end_date month. Delayed = current count of projects past end date (point-in-time), shown on the latest month — not a historical delayed series.',
-      'Compare intake vs completions to spot backlog growth. A spike in delayed on the latest month means schedule recovery should be the executive focus.'
+      'Started = projects created that month. Completed = projects marked Completed by end_date month. Delayed = overdue lifecycle projects counted in the month their end_date fell due. Right-side totals: annual started/completed sums and current delayed KPI. Axis shows full Jan–Dec; Y scales to 100 (or higher in steps of 20 if needed).',
+      'Compare intake vs completions to spot backlog growth. Rising delayed counts mean schedule recovery should be the executive focus.'
     ),
     mttr: {
       label: 'MTTR',
@@ -562,12 +593,12 @@ export function buildCommandCenterViewModel(
     ),
     milestones,
     milestonesInsight: insight(
-      'Each point is a project past its end date. X = end-date month; Y/priority = Critical (≥30d), High (≥14d), Medium (≥1d) based on days overdue.',
-      'Clusters of Critical/High points show where schedule risk concentrates by time window — useful for recovery sprint planning.'
+      'Each point is a lifecycle project deadline (end_date) in the rolling next-6-months window. Priority from urgency: overdue ≥30d Critical, ≥14d High, ≥7d Medium; upcoming ≤7d Critical, ≤14d High, ≤30d Medium, else Low. Filled markers = overdue; hollow = upcoming. Right totals count markers by priority.',
+      'Clusters of Critical/High points show where schedule risk concentrates — use them to prioritize recovery and upcoming delivery gates.'
     ),
     topDelayed,
     topDelayedInsight: insight(
-      'Top 5 non-completed projects ranked by days overdue = max(0, floor((now − end_date) / 1 day)).',
+      'Top 5 lifecycle projects with end_date < now, ranked by days overdue = floor((now − end_date) / 1 day).',
       'Start recovery with the longest-overdue programs; they usually carry the highest customer and cost exposure.'
     ),
     systemAvailability,

@@ -37,10 +37,15 @@ export interface ExecGaugeMetric {
 
 export interface ExecMilestonePoint {
   month: string;
+  /** Index into the rolling 6-month window (0–5). */
+  monthIndex: number;
   priority: 'Critical' | 'High' | 'Medium' | 'Low';
   y: number;
   name: string;
   count?: number;
+  /** Filled = overdue deadline; hollow = upcoming deadline. */
+  filled: boolean;
+  id?: number | null;
 }
 
 export interface ExecTreemapNode {

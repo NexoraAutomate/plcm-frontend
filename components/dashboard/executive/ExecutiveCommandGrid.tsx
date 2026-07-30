@@ -15,6 +15,7 @@ import { TreemapCard } from './TreemapCard';
 import { ConfigSplitCard } from './ConfigSplitCard';
 import { AlertPanel } from './AlertPanel';
 import { LineChartCard, DualLineChartCard } from './LineChartCard';
+import { TopDelayedProjectsCard } from './TopDelayedProjectsCard';
 import type { CommandCenterViewModel, ExecFilterOption, ExecFiltersState } from './types';
 import { EXEC_MAINT_COLORS, EXEC_FAULT_COLORS, EXEC } from './theme';
 
@@ -137,11 +138,9 @@ export function ExecutiveCommandGrid({
         data={model.milestones}
         insight={model.milestonesInsight}
       />
-      <HorizontalBarCard
+      <TopDelayedProjectsCard
         className="col-span-3 min-h-0"
-        title="Top Delayed Projects"
         data={model.topDelayed}
-        valueLabel="Days Overdue"
         insight={model.topDelayedInsight}
         onBarClick={(item) => item.id && onNavigate?.(`/projects/${item.id}`)}
       />

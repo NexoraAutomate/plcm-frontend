@@ -84,7 +84,7 @@ export function DonutChartCard({
   return (
     <DashboardCard className={className} title={title} insight={insight} noPadding={side}>
       {side ? (
-        <div className="grid h-[155px] grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] items-stretch gap-1 px-2 pb-2">
+        <div className="grid h-38.75 grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] items-stretch gap-1 px-2 pb-2">
           <div className="relative min-h-0 min-w-0">
             {data.length ? <Pie {...config} /> : null}
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
