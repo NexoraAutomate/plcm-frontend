@@ -45,13 +45,7 @@ interface HierarchyEntityDetailPanelProps {
   dossierMode?: HierarchyDossierMode;
 }
 
-const TYPE_LABELS: Record<HierarchyEntityType, string> = {
-  system: 'System',
-  subsystem: 'Subsystem',
-  module: 'Module',
-  unit: 'Unit',
-  component: 'Component',
-};
+import { useAppDefinitions } from '@/lib/app-definitions-context';
 
 const DETAIL_PATH: Record<HierarchyEntityType, (id: number) => string> = {
   system: (id) => `/systems/${id}`,
@@ -125,6 +119,7 @@ export function HierarchyEntityDetailPanel({
   statuses = [],
   dossierMode = 'bhd',
 }: HierarchyEntityDetailPanelProps) {
+  const { entityLabel } = useAppDefinitions();
   const { users } = useDataStore();
   const [linkedInventory, setLinkedInventory] = useState<Inventory[]>([]);
 
@@ -169,7 +164,7 @@ export function HierarchyEntityDetailPanel({
     return user ? formatUserRef(user) : `User #${entity.installed_by_id}`;
   }, [entity?.installed_by_id, users]);
 
-  const typeLabel = selection ? TYPE_LABELS[selection.type] : '';
+  const typeLabel = selection ? entityLabel(selection.type) : '';
   const detailPath = selection ? DETAIL_PATH[selection.type](selection.entityId) : '';
 
   return (

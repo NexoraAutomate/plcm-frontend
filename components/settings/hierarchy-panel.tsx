@@ -26,16 +26,17 @@ import { toast } from "sonner";
 import * as api from "@/lib/api";
 import type { Hierarchy } from "@/lib/models";
 import { JsonBatchUploadButton } from "@/components/settings/json-batch-upload-button";
+import { useAppDefinitions } from "@/lib/app-definitions-context";
 
-const HIERARCHY_LEVELS = [
-  { key: "system", label: "System" },
-  { key: "subsystem", label: "Subsystem" },
-  { key: "module", label: "Module" },
-  { key: "unit", label: "Unit" },
-  { key: "component", label: "Component" },
+const HIERARCHY_LEVEL_KEYS = [
+  "system",
+  "subsystem",
+  "module",
+  "unit",
+  "component",
 ] as const;
 
-type HierarchyLevel = (typeof HIERARCHY_LEVELS)[number]["key"];
+type HierarchyLevel = (typeof HIERARCHY_LEVEL_KEYS)[number];
 
 const PARENT_LEVEL: Record<HierarchyLevel, HierarchyLevel | null> = {
   system: null,
@@ -64,8 +65,11 @@ function buildHierarchyTree(entries: Hierarchy[]) {
   return grouped;
 }
 
-function getHierarchyLabel(level: HierarchyLevel) {
-  return HIERARCHY_LEVELS.find((item) => item.key === level)?.label || level;
+function resolveHierarchyLabel(
+  level: HierarchyLevel,
+  entityLabel: (level: string, plural?: boolean) => string
+) {
+  return entityLabel(level);
 }
 
 export type HierarchyPanelProps = {
@@ -73,6 +77,8 @@ export type HierarchyPanelProps = {
 };
 
 export function HierarchyPanel({ embedded = false }: HierarchyPanelProps) {
+  const { entityLabel } = useAppDefinitions();
+  const levelLabel = (level: HierarchyLevel) => resolveHierarchyLabel(level, entityLabel);
   const [hierarchies, setHierarchies] = useState<Hierarchy[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -151,7 +157,7 @@ export function HierarchyPanel({ embedded = false }: HierarchyPanelProps) {
     if (selectedLevel !== "system" && !currentParentId) {
       setValidationResult({
         valid: false,
-        message: `Select a parent ${getHierarchyLabel(PARENT_LEVEL[selectedLevel] as HierarchyLevel)} before creating a ${getHierarchyLabel(selectedLevel)}.`,
+        message: `Select a parent ${levelLabel(PARENT_LEVEL[selectedLevel] as HierarchyLevel)} before creating a ${levelLabel(selectedLevel)}.`,
       });
       return;
     }
@@ -166,7 +172,7 @@ export function HierarchyPanel({ embedded = false }: HierarchyPanelProps) {
       const res = await api.hierarchies.list();
       setHierarchies(res.data);
       setNewName("");
-      setValidationResult({ valid: true, message: `${getHierarchyLabel(selectedLevel)} created successfully.` });
+      setValidationResult({ valid: true, message: `${levelLabel(selectedLevel)} created successfully.` });
     } catch (err) {
       console.error("Failed to create hierarchy item", err);
       setValidationResult({ valid: false, message: "Failed to create hierarchy item." });
@@ -176,7 +182,7 @@ export function HierarchyPanel({ embedded = false }: HierarchyPanelProps) {
   };
 
   const handleBatchUpload = async (items: unknown[]) => {
-    const validTypes = new Set(HIERARCHY_LEVELS.map((level) => level.key));
+    const validTypes = new Set(HIERARCHY_LEVEL_KEYS);
     const payloads: Array<{
       name: string;
       hierarchy_type: string;
@@ -199,7 +205,7 @@ export function HierarchyPanel({ embedded = false }: HierarchyPanelProps) {
       }
       if (!hierarchyType || !validTypes.has(hierarchyType as HierarchyLevel)) {
         throw new Error(
-          `Item at index ${i} has an invalid hierarchy_type. Expected one of: ${HIERARCHY_LEVELS.map((l) => l.key).join(", ")}.`
+          `Item at index ${i} has an invalid hierarchy_type. Expected one of: ${HIERARCHY_LEVEL_KEYS.join(", ")}.`
         );
       }
 
@@ -636,9 +642,9 @@ export function HierarchyPanel({ embedded = false }: HierarchyPanelProps) {
                   <SelectValue placeholder="Select level" />
                 </SelectTrigger>
                 <SelectContent>
-                  {HIERARCHY_LEVELS.map((option) => (
-                    <SelectItem key={option.key} value={option.key}>
-                      {option.label}
+                  {HIERARCHY_LEVEL_KEYS.map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {entityLabel(key)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -647,7 +653,7 @@ export function HierarchyPanel({ embedded = false }: HierarchyPanelProps) {
 
             {selectedLevel !== "system" && (
               <div className="space-y-2">
-                <Label>{getHierarchyLabel(PARENT_LEVEL[selectedLevel] as HierarchyLevel)}</Label>
+                <Label>{levelLabel(PARENT_LEVEL[selectedLevel] as HierarchyLevel)}</Label>
                 <Select
                   value={String(currentParentId ?? "0")}
                   onValueChange={(value) => {
@@ -659,7 +665,7 @@ export function HierarchyPanel({ embedded = false }: HierarchyPanelProps) {
                   }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder={`Select ${getHierarchyLabel(PARENT_LEVEL[selectedLevel] as HierarchyLevel)}`} />
+                    <SelectValue placeholder={`Select ${levelLabel(PARENT_LEVEL[selectedLevel] as HierarchyLevel)}`} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="0">None</SelectItem>
@@ -678,18 +684,18 @@ export function HierarchyPanel({ embedded = false }: HierarchyPanelProps) {
             )}
 
             <div className="space-y-2 md:col-span-2">
-              <Label>{getHierarchyLabel(selectedLevel)} Name</Label>
+              <Label>{levelLabel(selectedLevel)} Name</Label>
               <Input
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder={`e.g. Primary ${getHierarchyLabel(selectedLevel)}`}
+                placeholder={`e.g. Primary ${levelLabel(selectedLevel)}`}
               />
             </div>
 
             <div className="md:col-span-2 flex flex-col gap-3">
               <Button onClick={handleCreateHierarchy} disabled={saving}>
                 <Plus className="mr-2 h-4 w-4" />
-                {saving ? "Saving..." : `Create ${getHierarchyLabel(selectedLevel)}`}
+                {saving ? "Saving..." : `Create ${levelLabel(selectedLevel)}`}
               </Button>
               {validationResult && (
                 <div className={`rounded-lg border p-3 text-sm ${validationResult.valid ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"}`}>

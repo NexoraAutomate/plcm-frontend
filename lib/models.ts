@@ -80,6 +80,40 @@ export interface SecuritySettings {
   updated_at?: string | null
 }
 
+export interface AppDefinitions {
+  id: number
+  serial_number_template: string
+  part_number_template: string
+  configuration_item_template: string
+  sku_template: string
+  label_system: string
+  label_systems: string
+  label_subsystem: string
+  label_subsystems: string
+  label_module: string
+  label_modules: string
+  label_unit: string
+  label_units: string
+  label_component: string
+  label_components: string
+  abbrev_system: string
+  abbrev_subsystem: string
+  abbrev_module: string
+  abbrev_unit: string
+  abbrev_component: string
+  part_template_system: string
+  serial_template_system: string
+  part_template_subsystem: string
+  serial_template_subsystem: string
+  part_template_module: string
+  serial_template_module: string
+  part_template_unit: string
+  serial_template_unit: string
+  part_template_component: string
+  serial_template_component: string
+  updated_at?: string | null
+}
+
 // Customer
 export interface Customer {
   id: number
@@ -342,6 +376,8 @@ export interface Hierarchy {
   name: string
   hierarchy_type: string
   parent_id?: number | null
+  description?: string | null
+  abbreviation?: string | null
   created_at: string
   updated_at?: string
 }

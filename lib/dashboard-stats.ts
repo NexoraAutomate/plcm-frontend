@@ -3,6 +3,7 @@ import {
   CaseStatus,
   FaultyEntityStatus,
 } from './models';
+import { resolveEntityTypeLabel } from '@/lib/app-definitions';
 import type {
   Customer,
   Order,
@@ -179,11 +180,11 @@ export function getHardwareFleetCounts(data: {
   components: Component[];
 }): { name: string; count: number }[] {
   return [
-    { name: 'Systems', count: data.systems.length },
-    { name: 'Subsystems', count: data.subsystems.length },
-    { name: 'Modules', count: data.modules.length },
-    { name: 'Units', count: data.units.length },
-    { name: 'Components', count: data.components.length },
+    { name: resolveEntityTypeLabel('system', true), count: data.systems.length },
+    { name: resolveEntityTypeLabel('subsystem', true), count: data.subsystems.length },
+    { name: resolveEntityTypeLabel('module', true), count: data.modules.length },
+    { name: resolveEntityTypeLabel('unit', true), count: data.units.length },
+    { name: resolveEntityTypeLabel('component', true), count: data.components.length },
   ];
 }
 

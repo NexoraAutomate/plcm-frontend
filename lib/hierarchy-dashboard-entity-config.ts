@@ -1,6 +1,11 @@
 import type { HierarchyDashboardSelection } from '@/lib/project-hierarchy-dashboard';
 import type { HierarchyEntityType } from '@/lib/system-hierarchy-graph';
 import type { Component, Module, Subsystem, System, Unit } from '@/lib/models';
+import {
+  getEntityTypeLabel,
+  resolveEntityTypeLabel,
+} from '@/lib/app-definitions';
+import type { AppDefinitions } from '@/lib/models';
 
 export type DashboardEntityType = HierarchyEntityType;
 
@@ -17,17 +22,16 @@ export interface DashboardLevelConfig {
   parentHierarchyType?: DashboardEntityType;
 }
 
-export const DASHBOARD_LEVELS: DashboardLevelConfig[] = [
+/** Structural level keys (labels come from App Definitions via getDashboardLevels). */
+const DASHBOARD_LEVEL_BASE: Omit<DashboardLevelConfig, 'label'>[] = [
   {
     selectionKey: 'projectId',
-    label: 'Project',
     childEntityType: 'system',
     parentSelectionKey: undefined,
   },
   {
     selectionKey: 'systemId',
     entityType: 'system',
-    label: 'System',
     childEntityType: 'subsystem',
     parentSelectionKey: 'projectId',
     statusType: 'systems',
@@ -36,7 +40,6 @@ export const DASHBOARD_LEVELS: DashboardLevelConfig[] = [
   {
     selectionKey: 'subsystemId',
     entityType: 'subsystem',
-    label: 'Subsystem',
     childEntityType: 'module',
     parentSelectionKey: 'systemId',
     statusType: 'subsystems',
@@ -46,7 +49,6 @@ export const DASHBOARD_LEVELS: DashboardLevelConfig[] = [
   {
     selectionKey: 'moduleId',
     entityType: 'module',
-    label: 'Module',
     childEntityType: 'unit',
     parentSelectionKey: 'subsystemId',
     statusType: 'modules',
@@ -56,7 +58,6 @@ export const DASHBOARD_LEVELS: DashboardLevelConfig[] = [
   {
     selectionKey: 'unitId',
     entityType: 'unit',
-    label: 'Unit',
     childEntityType: 'component',
     parentSelectionKey: 'moduleId',
     statusType: 'units',
@@ -66,13 +67,33 @@ export const DASHBOARD_LEVELS: DashboardLevelConfig[] = [
   {
     selectionKey: 'componentId',
     entityType: 'component',
-    label: 'Component',
     parentSelectionKey: 'unitId',
     statusType: 'components',
     hierarchyType: 'component',
     parentHierarchyType: 'unit',
   },
 ];
+
+function levelDisplayLabel(
+  base: Omit<DashboardLevelConfig, 'label'>,
+  label: (level: string, plural?: boolean) => string
+): string {
+  if (base.entityType) return label(base.entityType);
+  return 'Project';
+}
+
+/** Dashboard levels with labels from current App Definitions. */
+export function getDashboardLevels(
+  label: (level: string, plural?: boolean) => string = resolveEntityTypeLabel
+): DashboardLevelConfig[] {
+  return DASHBOARD_LEVEL_BASE.map((base) => ({
+    ...base,
+    label: levelDisplayLabel(base, label),
+  }));
+}
+
+/** @deprecated Prefer getDashboardLevels() so labels follow App Definitions. */
+export const DASHBOARD_LEVELS: DashboardLevelConfig[] = getDashboardLevels();
 
 export const SELECTION_KEY_BY_ENTITY: Record<DashboardEntityType, DashboardLevelKey> = {
   system: 'systemId',
@@ -91,11 +112,32 @@ export const CHILD_ENTITY_TYPE: Record<DashboardEntityType, DashboardEntityType 
 };
 
 export function getLevelConfig(selectionKey: DashboardLevelKey): DashboardLevelConfig | undefined {
-  return DASHBOARD_LEVELS.find((level) => level.selectionKey === selectionKey);
+  return getDashboardLevels().find((level) => level.selectionKey === selectionKey);
 }
 
-export function getEntityLabel(type: DashboardEntityType): string {
-  return type.charAt(0).toUpperCase() + type.slice(1);
+/** Hierarchy level display name from current App Definitions (singular by default). */
+export function getEntityLabel(type: DashboardEntityType, plural = false): string {
+  return resolveEntityTypeLabel(type, plural);
+}
+
+export function getEntityLabelFromDefinitions(
+  type: DashboardEntityType,
+  definitions: Pick<
+    AppDefinitions,
+    | 'label_system'
+    | 'label_systems'
+    | 'label_subsystem'
+    | 'label_subsystems'
+    | 'label_module'
+    | 'label_modules'
+    | 'label_unit'
+    | 'label_units'
+    | 'label_component'
+    | 'label_components'
+  > | null | undefined,
+  plural = false
+): string {
+  return getEntityTypeLabel(definitions, type, plural);
 }
 
 export const PARENT_ID_FIELD: Record<

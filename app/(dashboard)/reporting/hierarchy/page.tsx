@@ -34,34 +34,27 @@ import {
   registerGeneratedReport,
 } from '@/components/reporting/report-utils';
 import { cn } from '@/lib/utils';
+import { useAppDefinitions } from '@/lib/app-definitions-context';
 
-const LEVEL_STYLES: Record<
-  string,
-  { heading: string; label: string; indent: string }
-> = {
+const LEVEL_STYLES: Record<string, { heading: string; indent: string }> = {
   system: {
     heading: 'text-xl font-semibold tracking-tight',
-    label: 'System',
     indent: 'pl-0',
   },
   subsystem: {
     heading: 'text-lg font-semibold',
-    label: 'Subsystem',
     indent: 'pl-4 sm:pl-6',
   },
   module: {
     heading: 'text-base font-semibold',
-    label: 'Module',
     indent: 'pl-8 sm:pl-10',
   },
   unit: {
     heading: 'text-sm font-semibold',
-    label: 'Unit',
     indent: 'pl-12 sm:pl-14',
   },
   component: {
     heading: 'text-sm font-medium',
-    label: 'Component',
     indent: 'pl-16 sm:pl-20',
   },
 };
@@ -70,7 +63,6 @@ function entityLevelStyle(entityType: string) {
   return (
     LEVEL_STYLES[entityType] || {
       heading: 'text-sm font-medium',
-      label: entityType,
       indent: 'pl-0',
     }
   );
@@ -94,14 +86,16 @@ function HierarchyNodeBlock({
   node: HierarchyEntityNode;
   mode: HierarchyReportMode | string;
 }) {
+  const { entityLabel } = useAppDefinitions();
   const style = entityLevelStyle(node.entity_type);
   const showReplacement = mode === 'mmhd';
+  const typeLabel = entityLabel(node.entity_type) || node.entity_type;
 
   return (
     <div className={cn('space-y-3', style.indent)}>
       <div className="space-y-1.5 border-b border-border/60 pb-3">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          {style.label}
+          {typeLabel}
           {showReplacement && node.was_replaced ? ' · Replaced' : ''}
         </p>
         <h3 className={style.heading}>{node.name}</h3>
@@ -169,6 +163,14 @@ function flattenHierarchyRows(
 }
 
 export default function HierarchyReportsPage() {
+  const { entityLabel } = useAppDefinitions();
+  const L = {
+    systems: entityLabel('system', true),
+    subsystems: entityLabel('subsystem', true),
+    modules: entityLabel('module', true),
+    units: entityLabel('unit', true),
+    components: entityLabel('component', true),
+  };
   const { user } = useAuth();
   const { projects } = useDataStore();
   const printRef = useRef<HTMLDivElement>(null);
@@ -295,11 +297,11 @@ export default function HierarchyReportsPage() {
         columns,
         rows,
         summaryLines: [
-          `Systems: ${displayValue(data.summary?.systems)}`,
-          `Subsystems: ${displayValue(data.summary?.subsystems)}`,
-          `Modules: ${displayValue(data.summary?.modules)}`,
-          `Units: ${displayValue(data.summary?.units)}`,
-          `Components: ${displayValue(data.summary?.components)}`,
+          `${L.systems}: ${displayValue(data.summary?.systems)}`,
+          `${L.subsystems}: ${displayValue(data.summary?.subsystems)}`,
+          `${L.modules}: ${displayValue(data.summary?.modules)}`,
+          `${L.units}: ${displayValue(data.summary?.units)}`,
+          `${L.components}: ${displayValue(data.summary?.components)}`,
           ...(mode === 'mmhd'
             ? [`Replaced entities: ${displayValue(data.summary?.replaced_entities)}`]
             : []),
@@ -400,11 +402,11 @@ export default function HierarchyReportsPage() {
                 { key: 'value', header: 'Count' },
               ]}
               rows={[
-                { label: 'Systems', value: displayValue(data.summary?.systems) },
-                { label: 'Subsystems', value: displayValue(data.summary?.subsystems) },
-                { label: 'Modules', value: displayValue(data.summary?.modules) },
-                { label: 'Units', value: displayValue(data.summary?.units) },
-                { label: 'Components', value: displayValue(data.summary?.components) },
+                { label: L.systems, value: displayValue(data.summary?.systems) },
+                { label: L.subsystems, value: displayValue(data.summary?.subsystems) },
+                { label: L.modules, value: displayValue(data.summary?.modules) },
+                { label: L.units, value: displayValue(data.summary?.units) },
+                { label: L.components, value: displayValue(data.summary?.components) },
                 {
                   label: 'Total Entities',
                   value: displayValue(data.summary?.total_entities),

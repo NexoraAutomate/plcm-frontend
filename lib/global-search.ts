@@ -1,3 +1,4 @@
+import { resolveEntityTypeLabel } from '@/lib/app-definitions';
 import type {
   Component,
   Customer,
@@ -10,16 +11,7 @@ import type {
   Unit,
 } from '@/lib/models';
 
-export type GlobalSearchGroup =
-  | 'Customers'
-  | 'Orders'
-  | 'Projects'
-  | 'Maintenance Cases'
-  | 'Systems'
-  | 'Subsystems'
-  | 'Modules'
-  | 'Units'
-  | 'Components';
+export type GlobalSearchGroup = string;
 
 export interface GlobalSearchResult {
   id: number;
@@ -135,7 +127,7 @@ export function searchGlobal(query: string, data: GlobalSearchData): GlobalSearc
     ) {
       pushResult(results, seen, {
         id: system.id,
-        group: 'Systems',
+        group: resolveEntityTypeLabel('system', true),
         title: system.name,
         subtitle: system.part_number ?? system.serial_number ?? undefined,
         href: `/systems/${system.id}`,
@@ -151,7 +143,7 @@ export function searchGlobal(query: string, data: GlobalSearchData): GlobalSearc
     ) {
       pushResult(results, seen, {
         id: subsystem.id,
-        group: 'Subsystems',
+        group: resolveEntityTypeLabel('subsystem', true),
         title: subsystem.name,
         subtitle: subsystem.part_number ?? subsystem.serial_number ?? undefined,
         href: `/subsystems/${subsystem.id}`,
@@ -167,7 +159,7 @@ export function searchGlobal(query: string, data: GlobalSearchData): GlobalSearc
     ) {
       pushResult(results, seen, {
         id: module.id,
-        group: 'Modules',
+        group: resolveEntityTypeLabel('module', true),
         title: module.name,
         subtitle: module.part_number ?? module.serial_number ?? undefined,
         href: `/modules/${module.id}`,
@@ -183,7 +175,7 @@ export function searchGlobal(query: string, data: GlobalSearchData): GlobalSearc
     ) {
       pushResult(results, seen, {
         id: unit.id,
-        group: 'Units',
+        group: resolveEntityTypeLabel('unit', true),
         title: unit.name,
         subtitle: unit.part_number ?? unit.serial_number ?? undefined,
         href: `/units/${unit.id}`,
@@ -199,7 +191,7 @@ export function searchGlobal(query: string, data: GlobalSearchData): GlobalSearc
     ) {
       pushResult(results, seen, {
         id: component.id,
-        group: 'Components',
+        group: resolveEntityTypeLabel('component', true),
         title: component.name,
         subtitle: component.part_number ?? component.serial_number ?? undefined,
         href: `/components/${component.id}`,
@@ -210,14 +202,20 @@ export function searchGlobal(query: string, data: GlobalSearchData): GlobalSearc
   return results.slice(0, 50);
 }
 
-export const GLOBAL_SEARCH_GROUP_ORDER: GlobalSearchGroup[] = [
-  'Customers',
-  'Orders',
-  'Projects',
-  'Maintenance Cases',
-  'Systems',
-  'Subsystems',
-  'Modules',
-  'Units',
-  'Components',
-];
+export function getGlobalSearchGroupOrder(): GlobalSearchGroup[] {
+  return [
+    'Customers',
+    'Orders',
+    'Projects',
+    'Maintenance Cases',
+    resolveEntityTypeLabel('system', true),
+    resolveEntityTypeLabel('subsystem', true),
+    resolveEntityTypeLabel('module', true),
+    resolveEntityTypeLabel('unit', true),
+    resolveEntityTypeLabel('component', true),
+  ];
+}
+
+/** @deprecated use getGlobalSearchGroupOrder() for live labels */
+export const GLOBAL_SEARCH_GROUP_ORDER: GlobalSearchGroup[] = getGlobalSearchGroupOrder();
+

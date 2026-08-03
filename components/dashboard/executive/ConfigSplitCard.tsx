@@ -4,18 +4,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { DashboardCard } from './DashboardCard';
 import type { ExecConfigChangeRow, ExecInsight, ExecNamedValue } from './types';
 import { EXEC } from './theme';
+import { useAppDefinitions } from '@/lib/app-definitions-context';
 
 /** ~4.5 bars visible; scroll reveals the rest. */
 const VISIBLE_ROWS = 4.5;
 
-const HIERARCHY_FILTERS = [
-  { key: 'system', label: 'System' },
-  { key: 'subsystem', label: 'Subsystem' },
-  { key: 'module', label: 'Module' },
-  { key: 'unit', label: 'Unit' },
-] as const;
-
-type HierarchyKey = (typeof HIERARCHY_FILTERS)[number]['key'];
+const HIERARCHY_FILTER_KEYS = ['system', 'subsystem', 'module', 'unit'] as const;
+type HierarchyKey = (typeof HIERARCHY_FILTER_KEYS)[number];
 
 function statusStyle(status: string): { color: string; bg: string; pill: boolean } {
   const s = status.toLowerCase();
@@ -87,6 +82,16 @@ interface ConfigSplitCardProps {
 }
 
 export function ConfigSplitCard({ components, rows, className, insight }: ConfigSplitCardProps) {
+  const { entityLabel } = useAppDefinitions();
+  const HIERARCHY_FILTERS = useMemo(
+    () =>
+      HIERARCHY_FILTER_KEYS.map((key) => ({
+        key,
+        label: entityLabel(key),
+      })),
+    [entityLabel]
+  );
+
   const availableTypes = useMemo(() => {
     const set = new Set(
       components.map((c) => (c.category || '').toLowerCase()).filter(Boolean)
@@ -98,7 +103,7 @@ export function ConfigSplitCard({ components, rows, className, insight }: Config
     if (availableTypes.has('module')) return 'module';
     const first = HIERARCHY_FILTERS.find((f) => availableTypes.has(f.key));
     return first?.key ?? 'module';
-  }, [availableTypes]);
+  }, [availableTypes, HIERARCHY_FILTERS]);
 
   const [entityFilter, setEntityFilter] = useState<HierarchyKey>(defaultType);
 

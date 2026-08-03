@@ -1,5 +1,6 @@
 'use client';
 
+import { useAppDefinitions } from '@/lib/app-definitions-context';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useDataStore } from '@/lib/data-store';
@@ -42,6 +43,8 @@ import { useHierarchyCreateFormOptions } from '@/hooks/use-hierarchy-create-form
 import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
 
 export default function SubsystemDetailPage() {
+  const { entityLabel } = useAppDefinitions();
+
   const params = useParams();
   const subsystemId = params.id as string;
   const { pageLoading } = useEntityHierarchyGate();
@@ -109,7 +112,7 @@ export default function SubsystemDetailPage() {
     createInitialValues: moduleCreateInitialValues,
   } = useHierarchyCreateFormOptions({
     entityType: 'module',
-    entityLabel: 'Module',
+    entityLabel: entityLabel('module'),
     nameOptions,
     statusOptions,
     allowedNames,
@@ -128,7 +131,7 @@ export default function SubsystemDetailPage() {
     () => [
       {
         name: 'name',
-        label: 'Module Name',
+        label: `${entityLabel('module')} Name`,
         type: 'select' as const,
         required: true,
         options: nameOptions,
@@ -145,7 +148,7 @@ export default function SubsystemDetailPage() {
         label: 'Part #',
         type: 'text' as const,
         required: false,
-        placeholder: 'Enter Part Number of Module',
+        placeholder: `Enter Part Number of ${entityLabel('module')}`,
       },
       {
         name: 'id',
@@ -160,7 +163,7 @@ export default function SubsystemDetailPage() {
 
   async function handleAddModule(formData: Record<string, any>) {
     if (!subsystem) {
-      toast.error('Subsystem not found');
+      toast.error(`${entityLabel('subsystem')} not found`);
       return;
     }
     setIsSubmitting(true);
@@ -187,7 +190,7 @@ export default function SubsystemDetailPage() {
       toast.success(
         created.childrenInstalled > 0
           ? `Module added and ${created.childrenInstalled} child entit${created.childrenInstalled === 1 ? 'y' : 'ies'} installed from inventory`
-          : 'Module added successfully'
+          : `${entityLabel('module')} added successfully`
       );
     } catch (error) {
       console.error('Module creation error:', error);
@@ -232,7 +235,7 @@ export default function SubsystemDetailPage() {
       });
       setIsEditOpen(false);
       setEditingId(null);
-      toast.success('Module updated successfully');
+      toast.success(`${entityLabel('module')} updated successfully`);
     } catch (error) {
       console.error('Module update error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to update module';
@@ -244,7 +247,7 @@ export default function SubsystemDetailPage() {
 
   async function handleUseInventory(item: Inventory, instanceId?: number) {
     if (!subsystem) {
-      throw new Error('Subsystem not found');
+      throw new Error(`${entityLabel('subsystem')} not found`);
     }
 
     const defaultStatus = statuses[0];
@@ -319,7 +322,7 @@ export default function SubsystemDetailPage() {
   if (!subsystem) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
-        <h2 className="text-xl font-semibold">Subsystem Not Found</h2>
+        <h2 className="text-xl font-semibold">{`${entityLabel('subsystem')} Not Found`}</h2>
         <Link href="/subsystems" className="mt-2 text-sm text-primary underline">
           Back to Subsystems
         </Link>
@@ -448,8 +451,8 @@ export default function SubsystemDetailPage() {
                 }) ?? '#'
             : undefined
         }
-        addButtonLabel="Add Module"
-        emptyMessage="No modules yet. Click 'Add Module' to create one."
+        addButtonLabel={`Add ${entityLabel('module')}`}
+        emptyMessage={`No ${entityLabel('module', true).toLowerCase()} yet. Click Add ${entityLabel('module')} to create one.`}
         childEntityType="module"
         createPermission={P.create_modules}
         editPermission={P.edit_modules}
@@ -464,11 +467,11 @@ export default function SubsystemDetailPage() {
         onUseInventory={handleUseInventory}
       />
 
-      {/* Add Module Dialog */}
+      {/* {`Add ${entityLabel('module')}`} Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Module</DialogTitle>
+            <DialogTitle>{`Add ${entityLabel('module')}`}</DialogTitle>
             <DialogDescription>Create a new module for {subsystem.name}</DialogDescription>
           </DialogHeader>
           <EntityForm

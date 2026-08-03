@@ -13,6 +13,7 @@ import { RoleAccessPanel } from '@/components/settings/role-access-panel';
 import { StatusesPanel } from '@/components/settings/statuses-panel';
 import { AlertsPanel } from '@/components/settings/alerts-panel';
 import { SecurityPanel } from '@/components/settings/security-panel';
+import { DefinitionsPanel } from '@/components/settings/definitions-panel';
 import { HierarchyPanel } from '@/components/settings/hierarchy-panel';
 import { BackupPanel } from '@/components/settings/backup-panel';
 import {
@@ -37,6 +38,8 @@ function SettingsTabContent({ tab }: { tab: SettingsTabId }) {
       return <AlertsPanel embedded />;
     case 'security':
       return <SecurityPanel embedded />;
+    case 'definitions':
+      return <DefinitionsPanel embedded />;
     case 'hierarchy':
       return <HierarchyPanel embedded />;
     case 'backup':

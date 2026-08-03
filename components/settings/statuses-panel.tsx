@@ -28,17 +28,20 @@ import {
 } from "@/lib/status-colors";
 import { cn } from "@/lib/utils";
 import { useDataStore } from "@/lib/data-store";
+import { useAppDefinitions } from "@/lib/app-definitions-context";
 
-const STATUS_TYPES = [
-  { key: "projects", label: "Projects" },
-  { key: "systems", label: "Systems" },
-  { key: "subsystems", label: "Subsystems" },
-  { key: "modules", label: "Modules" },
-  { key: "units", label: "Units" },
-  { key: "components", label: "Components" },
-  { key: "orders", label: "Orders" },
-  { key: "customers", label: "Customers" },
-] as const;
+function getStatusTypes(entityLabel: (level: string, plural?: boolean) => string) {
+  return [
+    { key: "projects", label: "Projects" },
+    { key: "systems", label: entityLabel("system", true) },
+    { key: "subsystems", label: entityLabel("subsystem", true) },
+    { key: "modules", label: entityLabel("module", true) },
+    { key: "units", label: entityLabel("unit", true) },
+    { key: "components", label: entityLabel("component", true) },
+    { key: "orders", label: "Orders" },
+    { key: "customers", label: "Customers" },
+  ] as const;
+}
 
 function ColorPalettePicker({
   value,
@@ -162,6 +165,8 @@ export type StatusesPanelProps = {
 };
 
 export function StatusesPanel({ embedded = false }: StatusesPanelProps) {
+  const { entityLabel } = useAppDefinitions();
+  const STATUS_TYPES = getStatusTypes(entityLabel);
   const { statuses: storeStatuses, createStatus, updateStatus, deleteStatus } = useDataStore();
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loading, setLoading] = useState(true);

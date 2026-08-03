@@ -1,5 +1,6 @@
 'use client';
 
+import { useAppDefinitions } from '@/lib/app-definitions-context';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useDataStore } from '@/lib/data-store';
@@ -38,6 +39,8 @@ import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
 import { isCurrentInstallEntity } from '@/lib/entity-replacement';
 
 export default function ProjectDetailPage() {
+  const { entityLabel } = useAppDefinitions();
+
   const params = useParams();
   const projectId = params.id as string;
   const { pageLoading } = useEntityHierarchyGate();
@@ -100,7 +103,7 @@ export default function ProjectDetailPage() {
     createInitialValues: systemCreateInitialValues,
   } = useHierarchyCreateFormOptions({
     entityType: 'system',
-    entityLabel: 'System',
+    entityLabel: entityLabel('system'),
     nameOptions,
     statusOptions,
     allowedNames: allowedSystemNames,
@@ -120,7 +123,7 @@ export default function ProjectDetailPage() {
     () => [
       {
         name: 'name',
-        label: 'System Name',
+        label: `${entityLabel('system')} Name`,
         type: 'select' as const,
         required: true,
         options: nameOptions,
@@ -137,7 +140,7 @@ export default function ProjectDetailPage() {
         label: 'Part #',
         type: 'text' as const,
         required: false,
-        placeholder: 'Enter Part Number of System',
+        placeholder: `Enter Part Number of ${entityLabel('system')}`,
       },
       {
         name: 'project_id',
@@ -197,7 +200,7 @@ export default function ProjectDetailPage() {
       toast.success(
         created.childrenInstalled > 0
           ? `System added and ${created.childrenInstalled} child entit${created.childrenInstalled === 1 ? 'y' : 'ies'} installed from inventory`
-          : 'System added successfully'
+          : `${entityLabel('system')} added successfully`
       );
     } catch (error) {
       console.error('System creation error:', error);
@@ -250,7 +253,7 @@ export default function ProjectDetailPage() {
       });
       setIsEditOpen(false);
       setEditingId(null);
-      toast.success('System updated successfully');
+      toast.success(`${entityLabel('system')} updated successfully`);
     } catch (error) {
       console.error('System update error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to update system';
@@ -424,8 +427,8 @@ export default function ProjectDetailPage() {
         onDelete={handleDeleteSystem}
         detailPath={(id) => `/systems/${id}`}
         secondaryPath={(id) => `/projects/${projectId}/systems/${id}/hierarchy`}
-        addButtonLabel="Add System"
-        emptyMessage="No systems yet. Click 'Add System' to create one."
+        addButtonLabel={`Add ${entityLabel('system')}`}
+        emptyMessage={`No ${entityLabel('system', true).toLowerCase()} yet. Click Add ${entityLabel('system')} to create one.`}
         childEntityType="system"
         createPermission={P.create_systems}
         editPermission={P.edit_systems}
@@ -440,7 +443,7 @@ export default function ProjectDetailPage() {
         onUseInventory={handleUseInventory}
       />
 
-      {/* Add System Dialog */}
+      {/* {`Add ${entityLabel('system')}`} Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
         {/* <Button className="ml-auto" onClick={() => setIsAddOpen(true)}>
           + New System

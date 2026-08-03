@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react'
+import { useAppDefinitions } from '@/lib/app-definitions-context';
 import { useRouter } from 'next/navigation';
 import {
   PieChart,
@@ -102,6 +103,7 @@ export function ProjectsMiniDashboard({
   filteredOrder,
   totalCount,
 }: ProjectsMiniDashboardProps) {
+  const { entityLabel } = useAppDefinitions();
   const router = useRouter();
   const [activeChart, setActiveChart] = useState<'status' | 'progress' | 'systems' | 'timeline'>(
     'status'
@@ -406,12 +408,12 @@ export function ProjectsMiniDashboard({
           <>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Systems per Project</CardTitle>
+                <CardTitle className="text-sm font-medium">{`${entityLabel('system', true)} per Project`}</CardTitle>
                 <CardDescription>Click a bar to open project</CardDescription>
               </CardHeader>
               <CardContent>
                 {systemsData.length === 0 ? (
-                  <p className="py-12 text-center text-sm text-muted-foreground">No systems linked yet</p>
+                  <p className="py-12 text-center text-sm text-muted-foreground">{`No ${entityLabel('system', true).toLowerCase()} linked yet`}</p>
                 ) : (
                   <ResponsiveContainer width="100%" height={250}>
                     <BarChart data={systemsData} layout="vertical" margin={{ left: 8, right: 24, top: 8, bottom: 8 }}>
@@ -421,7 +423,7 @@ export function ProjectsMiniDashboard({
                       <Tooltip />
                       <Bar
                         dataKey="value"
-                        name="Systems"
+                        name={entityLabel("system", true)}
                         fill="oklch(0.60 0.12 280)"
                         radius={[0, 4, 4, 0]}
                         className="cursor-pointer"

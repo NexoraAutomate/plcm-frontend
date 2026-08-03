@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { useAppDefinitions } from '@/lib/app-definitions-context';
 import type { Project, Status, System, Subsystem } from '@/lib/models';
 import { FaultyEntityStatus } from '@/lib/models';
 import { CHART_COLORS } from '@/lib/dashboard-chart-theme';
@@ -109,6 +110,8 @@ export function SystemsListDashboard({
   getStatusName,
   totalCount,
 }: SystemsListDashboardProps) {
+  const { entityLabel } = useAppDefinitions();
+
   const router = useRouter();
   const [activeChart, setActiveChart] = useState<'status' | 'projects' | 'hierarchy' | 'timeline'>(
     'status'
@@ -182,7 +185,7 @@ export function SystemsListDashboard({
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiTile
-          label="Total Systems"
+          label={`Total ${entityLabel("system", true)}`}
           value={dbTotal}
           sub="Click chart to filter"
           icon={Server}
@@ -205,7 +208,7 @@ export function SystemsListDashboard({
           onClick={() => onStatusFilter('Operational')}
         />
         <KpiTile
-          label="Subsystems"
+          label={entityLabel("subsystem", true)}
           value={totalSubsystems}
           sub="On this page · linked to systems"
           icon={Network}
@@ -243,7 +246,7 @@ export function SystemsListDashboard({
           <>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Systems by Status</CardTitle>
+                <CardTitle className="text-sm font-medium">{`${entityLabel('system', true)} by Status`}</CardTitle>
                 <CardDescription>Click a segment to filter the table below</CardDescription>
               </CardHeader>
               <CardContent>
@@ -340,7 +343,7 @@ export function SystemsListDashboard({
           <>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Systems by Project</CardTitle>
+                <CardTitle className="text-sm font-medium">{`${entityLabel('system', true)} by Project`}</CardTitle>
                 <CardDescription>Click a bar to filter systems for that project</CardDescription>
               </CardHeader>
               <CardContent>
@@ -355,7 +358,7 @@ export function SystemsListDashboard({
                       <Tooltip />
                       <Bar
                         dataKey="value"
-                        name="Systems"
+                        name={entityLabel("system", true)}
                         fill="oklch(0.62 0.15 250)"
                         radius={[0, 4, 4, 0]}
                         className="cursor-pointer"
@@ -401,7 +404,7 @@ export function SystemsListDashboard({
           <>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Subsystems per System</CardTitle>
+                <CardTitle className="text-sm font-medium">{`${entityLabel('subsystem', true)} per ${entityLabel('system')}`}</CardTitle>
                 <CardDescription>Click a bar to open system detail</CardDescription>
               </CardHeader>
               <CardContent>
@@ -416,7 +419,7 @@ export function SystemsListDashboard({
                       <Tooltip />
                       <Bar
                         dataKey="subsystems"
-                        name="Subsystems"
+                        name={entityLabel("subsystem", true)}
                         fill="oklch(0.60 0.12 280)"
                         radius={[4, 4, 0, 0]}
                         className="cursor-pointer"
@@ -435,7 +438,7 @@ export function SystemsListDashboard({
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Recent Systems</CardTitle>
+                <CardTitle className="text-sm font-medium">{`Recent ${entityLabel('system', true)}`}</CardTitle>
                 <CardDescription>Quick navigation</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
@@ -459,7 +462,7 @@ export function SystemsListDashboard({
           <Card className="lg:col-span-2">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Fleet Growth</CardTitle>
-              <CardDescription>Systems added per month</CardDescription>
+              <CardDescription>{`${entityLabel('system', true)} added per month`}</CardDescription>
             </CardHeader>
             <CardContent>
               {timelineData.length === 0 ? (
@@ -480,7 +483,7 @@ export function SystemsListDashboard({
                     <Area
                       type="monotone"
                       dataKey="value"
-                      name="Systems"
+                      name={entityLabel("system", true)}
                       stroke="oklch(0.62 0.15 250)"
                       fill="url(#systemsPageFill)"
                     >

@@ -1,5 +1,6 @@
 'use client';
 
+import { useAppDefinitions } from '@/lib/app-definitions-context';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
@@ -53,6 +54,8 @@ import {
 const SYSTEM_STATUS_NAMES = ['Design', 'Development', 'Testing', 'Operational', 'Retired'];
 
 export default function SystemsPage() {
+  const { entityLabel } = useAppDefinitions();
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const { pageLoading } = useEntityHierarchyGate();
@@ -211,7 +214,7 @@ export default function SystemsPage() {
     try {
       await deleteSystem(id);
       pagination.invalidate();
-      toast.success('System deleted successfully');
+      toast.success(`${entityLabel('system')} deleted successfully`);
     } catch {
       toast.error('Failed to delete system');
     }
@@ -269,7 +272,7 @@ export default function SystemsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Systems</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{entityLabel('system', true)}</h1>
         <p className="text-muted-foreground mt-2">Manage satellite systems hierarchy</p>
       </div>
 
@@ -362,18 +365,18 @@ export default function SystemsPage() {
             <DialogTrigger asChild>
               <Button className="gap-2">
                 <Plus className="h-4 w-4" />
-                New System
+                {`New ${entityLabel('system')}`}
               </Button>
             </DialogTrigger>
           </Can>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create System</DialogTitle>
+              <DialogTitle>{`Create ${entityLabel('system')}`}</DialogTitle>
               <DialogDescription>Add a new satellite system</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label>System Name *</Label>
+                <Label>{`${entityLabel('system')} Name *`}</Label>
                 <Select
                   value={formData.name}
                   onValueChange={(value) => setFormData({ ...formData, name: value })}
@@ -395,7 +398,7 @@ export default function SystemsPage() {
                 <Input
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="System details"
+                  placeholder={`${entityLabel('system')} details`}
                 />
               </div>
               <div>
@@ -477,7 +480,7 @@ export default function SystemsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>All Systems</CardTitle>
+          <CardTitle>{`All ${entityLabel('system', true)}`}</CardTitle>
           <CardDescription>
             Showing {systems.length} on this page · {pagination.total} matching
           </CardDescription>
@@ -492,7 +495,7 @@ export default function SystemsPage() {
                   <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
                   <SortableTableHead column="installation_date" sort={sort} onSort={cycleSort}>Install Date</SortableTableHead>
                   <SortableTableHead column="installed_by_id" sort={sort} onSort={cycleSort}>Installer</SortableTableHead>
-                  <TableHead>Subsystems</TableHead>
+                  <TableHead>{entityLabel('subsystem', true)}</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -612,12 +615,12 @@ export default function SystemsPage() {
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit System</DialogTitle>
+            <DialogTitle>{`Edit ${entityLabel('system')}`}</DialogTitle>
             <DialogDescription>Update system details</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>System Name</Label>
+              <Label>{`${entityLabel('system')} Name`}</Label>
               <Select
                 value={formData.name}
                 onValueChange={(value) => setFormData({ ...formData, name: value })}
@@ -639,7 +642,7 @@ export default function SystemsPage() {
               <Input
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="System details"
+                placeholder={`${entityLabel('system')} details`}
               />
             </div>
             <div>

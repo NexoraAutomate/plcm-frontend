@@ -1,5 +1,6 @@
 'use client';
 
+import { useAppDefinitions } from '@/lib/app-definitions-context';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useDataStore } from '@/lib/data-store';
@@ -43,6 +44,8 @@ import { useHierarchyCreateFormOptions } from '@/hooks/use-hierarchy-create-form
 import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
 
 export default function UnitDetailPage() {
+  const { entityLabel } = useAppDefinitions();
+
   const params = useParams();
   const unitId = params.id as string;
   const { pageLoading } = useEntityHierarchyGate();
@@ -127,7 +130,7 @@ export default function UnitDetailPage() {
     createInitialValues: componentCreateInitialValues,
   } = useHierarchyCreateFormOptions({
     entityType: 'component',
-    entityLabel: 'Component',
+    entityLabel: entityLabel('component'),
     nameOptions,
     statusOptions,
     allowedNames,
@@ -146,7 +149,7 @@ export default function UnitDetailPage() {
     () => [
       {
         name: 'name',
-        label: 'Component Name',
+        label: `${entityLabel('component')} Name`,
         type: 'select' as const,
         required: true,
         options: nameOptions,
@@ -163,7 +166,7 @@ export default function UnitDetailPage() {
         label: 'Part #',
         type: 'text' as const,
         required: false,
-        placeholder: 'Enter Part Number of Component',
+        placeholder: `Enter Part Number of ${entityLabel('component')}`,
       },
       {
         name: 'id',
@@ -178,7 +181,7 @@ export default function UnitDetailPage() {
 
   async function handleAddComponent(formData: Record<string, any>) {
     if (!unit) {
-      toast.error('Unit not found');
+      toast.error(`${entityLabel('unit')} not found`);
       return;
     }
     setIsSubmitting(true);
@@ -206,7 +209,7 @@ export default function UnitDetailPage() {
       toast.success(
         created.childrenInstalled > 0
           ? `Component added and ${created.childrenInstalled} child entit${created.childrenInstalled === 1 ? 'y' : 'ies'} installed from inventory`
-          : 'Component added successfully'
+          : `${entityLabel('component')} added successfully`
       );
     } catch (error) {
       console.error('[v0] Component creation error:', error);
@@ -251,7 +254,7 @@ export default function UnitDetailPage() {
       });
       setIsEditOpen(false);
       setEditingId(null);
-      toast.success('Component updated successfully');
+      toast.success(`${entityLabel('component')} updated successfully`);
     } catch (error) {
       console.error('Component update error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to update component';
@@ -262,7 +265,7 @@ export default function UnitDetailPage() {
   }
   async function handleUseInventory(item: Inventory, instanceId?: number) {
     if (!unit) {
-      throw new Error('Unit not found');
+      throw new Error(`${entityLabel('unit')} not found`);
     }
 
     const defaultStatus = statuses[0];
@@ -336,7 +339,7 @@ export default function UnitDetailPage() {
   if (!unit) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
-        <h2 className="text-xl font-semibold">Unit Not Found</h2>
+        <h2 className="text-xl font-semibold">{`${entityLabel('unit')} Not Found`}</h2>
         <Link href="/units" className="mt-2 text-sm text-primary underline">
           Back to Units
         </Link>
@@ -462,8 +465,8 @@ export default function UnitDetailPage() {
                 }) ?? '#'
             : undefined
         }
-        addButtonLabel="Add Component"
-        emptyMessage="No components yet. Click 'Add Component' to create one."
+        addButtonLabel={`Add ${entityLabel('component')}`}
+        emptyMessage={`No ${entityLabel('component', true).toLowerCase()} yet. Click Add ${entityLabel('component')} to create one.`}
         childEntityType="component"
         createPermission={P.create_components}
         editPermission={P.edit_components}
@@ -478,11 +481,11 @@ export default function UnitDetailPage() {
         onUseInventory={handleUseInventory}
       />
 
-      {/* Add Component Dialog */}
+      {/* {`Add ${entityLabel('component')}`} Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Component</DialogTitle>
+            <DialogTitle>{`Add ${entityLabel('component')}`}</DialogTitle>
             <DialogDescription>Create a new component for {unit.name}</DialogDescription>
           </DialogHeader>
           <EntityForm

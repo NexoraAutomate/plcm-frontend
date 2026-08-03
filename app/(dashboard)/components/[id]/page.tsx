@@ -1,5 +1,6 @@
 'use client';
 
+import { useAppDefinitions } from '@/lib/app-definitions-context';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useDataStore } from '@/lib/data-store';
@@ -21,6 +22,8 @@ import {
 import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
 
 export default function ComponentDetailPage() {
+  const { entityLabel } = useAppDefinitions();
+
   const params = useParams();
   const componentId = params.id as string;
   const { pageLoading } = useEntityHierarchyGate();
@@ -60,7 +63,7 @@ export default function ComponentDetailPage() {
   if (!component) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
-        <h2 className="text-xl font-semibold">Component Not Found</h2>
+        <h2 className="text-xl font-semibold">{`${entityLabel('component')} Not Found`}</h2>
         <Link href="/components" className="mt-2 text-sm text-primary underline">
           Back to Components
         </Link>

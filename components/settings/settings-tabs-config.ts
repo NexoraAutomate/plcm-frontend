@@ -9,6 +9,7 @@ import {
   Lock,
   GitBranch,
   DatabaseBackup,
+  Tags,
 } from 'lucide-react';
 
 export type SettingsTabId =
@@ -18,6 +19,7 @@ export type SettingsTabId =
   | 'status'
   | 'alerts'
   | 'security'
+  | 'definitions'
   | 'hierarchy'
   | 'backup';
 
@@ -76,6 +78,13 @@ export const SETTINGS_TABS: SettingsTabConfig[] = [
     label: 'Security',
     description: 'Password policy, 2FA, and sessions',
     icon: Lock,
+    permission: P.manage_settings,
+  },
+  {
+    id: 'definitions',
+    label: 'Definitions',
+    description: 'Serial/part number templates and hierarchy entity display names',
+    icon: Tags,
     permission: P.manage_settings,
   },
   {

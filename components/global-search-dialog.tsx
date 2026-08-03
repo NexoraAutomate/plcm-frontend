@@ -1,5 +1,7 @@
 'use client';
 
+import { useAppDefinitions } from '@/lib/app-definitions-context';
+
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -13,7 +15,7 @@ import {
 import { useDataStore } from '@/lib/data-store';
 import { useEnsureHierarchy } from '@/hooks/use-ensure-hierarchy';
 import {
-  GLOBAL_SEARCH_GROUP_ORDER,
+  getGlobalSearchGroupOrder,
   GLOBAL_SEARCH_MIN_LENGTH,
   searchGlobal,
   type GlobalSearchGroup,
@@ -30,6 +32,8 @@ export function GlobalSearchDialog({
   onOpenChange,
   initialQuery = '',
 }: GlobalSearchDialogProps) {
+  const { definitions } = useAppDefinitions();
+  const groupOrder = useMemo(() => getGlobalSearchGroupOrder(), [definitions]);
   const router = useRouter();
   const {
     customers,
@@ -84,14 +88,14 @@ export function GlobalSearchDialog({
 
   const grouped = useMemo(() => {
     const map = new Map<GlobalSearchGroup, typeof results>();
-    for (const group of GLOBAL_SEARCH_GROUP_ORDER) {
+    for (const group of groupOrder) {
       map.set(group, []);
     }
     for (const result of results) {
       map.get(result.group)?.push(result);
     }
     return map;
-  }, [results]);
+  }, [results, groupOrder]);
 
   const handleSelect = (href: string) => {
     onOpenChange(false);
@@ -123,7 +127,7 @@ export function GlobalSearchDialog({
             Start typing to search across the application
           </p>
         ) : (
-          GLOBAL_SEARCH_GROUP_ORDER.map((group) => {
+          groupOrder.map((group) => {
             const items = grouped.get(group) ?? [];
             if (items.length === 0) return null;
             return (

@@ -63,6 +63,12 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Can } from '@/components/auth/can';
 import { useAuth } from '@/lib/auth-context';
+import { useAppDefinitions } from '@/lib/app-definitions-context';
+import {
+  buildEntityIdentifiersFromDefinitions,
+  nextInventorySequences,
+  suggestAbbreviation,
+} from '@/lib/app-definitions';
 import { P } from '@/lib/permission-codes';
 
 const ACTION_BTN =
@@ -87,21 +93,18 @@ const STOCK_FILTERS: { value: StockFilter; label: string }[] = [
   { value: 'out_of_stock', label: 'Out of Stock' },
 ];
 
-const ENTITY_TYPE_FILTERS: {
+const ENTITY_TYPE_FILTER_STYLES: {
   value: EntityType | 'all';
-  label: string;
   activeClass: string;
   inactiveClass: string;
 }[] = [
   {
     value: 'all',
-    label: 'All Types',
     activeClass: 'border-primary bg-primary text-primary-foreground',
     inactiveClass: 'border-transparent bg-muted/50 text-muted-foreground hover:bg-muted',
   },
   {
     value: 'system',
-    label: 'System',
     activeClass:
       'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300',
     inactiveClass:
@@ -109,7 +112,6 @@ const ENTITY_TYPE_FILTERS: {
   },
   {
     value: 'subsystem',
-    label: 'Subsystem',
     activeClass:
       'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-300',
     inactiveClass:
@@ -117,7 +119,6 @@ const ENTITY_TYPE_FILTERS: {
   },
   {
     value: 'module',
-    label: 'Module',
     activeClass:
       'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-300',
     inactiveClass:
@@ -125,7 +126,6 @@ const ENTITY_TYPE_FILTERS: {
   },
   {
     value: 'unit',
-    label: 'Unit',
     activeClass:
       'border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-800 dark:bg-cyan-950 dark:text-cyan-300',
     inactiveClass:
@@ -133,7 +133,6 @@ const ENTITY_TYPE_FILTERS: {
   },
   {
     value: 'component',
-    label: 'Component',
     activeClass:
       'border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-300',
     inactiveClass:
@@ -214,6 +213,7 @@ function enrichInventoryItems(
 }
 
 export default function InventoryPage() {
+  const { definitions, entityLabel } = useAppDefinitions();
   const router = useRouter();
   const { can, isInventoryManager } = useAuth();
   const inventoryManager = isInventoryManager();
@@ -221,6 +221,17 @@ export default function InventoryPage() {
   const canEditInventory = inventoryManager && can(P.edit_inventory);
   const canAddStock = canCreateInventory || canEditInventory;
   const canIssue = inventoryManager && can(P.issue_inventory);
+  const ENTITY_TYPE_FILTERS = useMemo(
+    () =>
+      ENTITY_TYPE_FILTER_STYLES.map((filter) => ({
+        ...filter,
+        label:
+          filter.value === 'all'
+            ? 'All Types'
+            : entityLabel(filter.value),
+      })),
+    [entityLabel]
+  );
   const { users, statuses, systems, subsystems, modules, units, components, ensureHierarchyLoaded } =
     useDataStore();
   const [search, setSearch] = useState('');
@@ -846,6 +857,8 @@ export default function InventoryPage() {
                   ...formData,
                   inventory_type: value,
                   name: '',
+                  part_number: '',
+                  serial_number: '',
                   quantity: inventorySupportsQuantity(newType) ? formData.quantity : 1,
                 });
               }}
@@ -854,11 +867,11 @@ export default function InventoryPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="system">System</SelectItem>
-                <SelectItem value="subsystem">Subsystem</SelectItem>
-                <SelectItem value="module">Module</SelectItem>
-                <SelectItem value="unit">Unit</SelectItem>
-                <SelectItem value="component">Component</SelectItem>
+                <SelectItem value="system">{entityLabel('system')}</SelectItem>
+                <SelectItem value="subsystem">{entityLabel('subsystem')}</SelectItem>
+                <SelectItem value="module">{entityLabel('module')}</SelectItem>
+                <SelectItem value="unit">{entityLabel('unit')}</SelectItem>
+                <SelectItem value="component">{entityLabel('component')}</SelectItem>
               </SelectContent>
             </Select>
           ) : (
@@ -872,7 +885,15 @@ export default function InventoryPage() {
           </Label>
           <Select
             value={formData.name}
-            onValueChange={(value) => setFormData({ ...formData, name: value })}
+            onValueChange={(value) => {
+              if (mode === 'create') {
+                setFormData((prev) =>
+                  applyDefinitionIdentifiers(selectedEntityType, value, prev.oem_name, prev)
+                );
+              } else {
+                setFormData({ ...formData, name: value });
+              }
+            }}
           >
             <SelectTrigger>
               <SelectValue placeholder={`Select ${selectedEntityType} from hierarchy`} />
@@ -1033,12 +1054,27 @@ export default function InventoryPage() {
         ) : null}
 
         <div className={mode === 'edit' ? undefined : 'sm:col-span-2'}>
-          <Label>OEM Name</Label>
+          <Label>Vendor / OEM acronym</Label>
           <Input
             value={formData.oem_name}
-            onChange={(e) => setFormData({ ...formData, oem_name: e.target.value })}
-            placeholder="Original Equipment Manufacturer"
+            onChange={(e) => {
+              const vendor = e.target.value;
+              if (mode === 'create' && formData.name) {
+                setFormData((prev) =>
+                  applyDefinitionIdentifiers(selectedEntityType, prev.name, vendor, {
+                    ...prev,
+                    oem_name: vendor,
+                  })
+                );
+              } else {
+                setFormData({ ...formData, oem_name: vendor });
+              }
+            }}
+            placeholder="Short acronym for {vendor} token, e.g. AMP"
           />
+          <p className="text-xs text-muted-foreground">
+            Fills the {'{vendor}'} placeholder in Definitions SN/PN templates when stocking.
+          </p>
         </div>
       </TabsContent>
 
@@ -1267,9 +1303,34 @@ export default function InventoryPage() {
     </Tabs>
   );
 
-  const getEntityDisplayName = (entityType: EntityType) => {
-    return entityType.charAt(0).toUpperCase() + entityType.slice(1);
-  };
+  const getEntityDisplayName = (entityType: EntityType) => entityLabel(entityType);
+
+  function applyDefinitionIdentifiers(
+    type: EntityType,
+    name: string,
+    vendor: string,
+    prev: typeof formData
+  ): typeof formData {
+    if (!name.trim()) return prev;
+    const hierarchyHit = hierarchyCategories.find((h) => h.name === name);
+    const { pnSeq, snSeq } = nextInventorySequences(inventory, type, name);
+    const ids = buildEntityIdentifiersFromDefinitions(definitions, {
+      name,
+      level: type,
+      entityAbbr: hierarchyHit?.abbreviation || suggestAbbreviation(name),
+      vendor: vendor.trim() || prev.oem_name.trim(),
+      seq: snSeq,
+      pnSeq,
+    });
+    return {
+      ...prev,
+      name,
+      part_number: ids.part_number,
+      serial_number: ids.serial_number,
+      configuration_item: ids.configuration_item || ids.part_number,
+      sku: type === 'component' ? ids.sku : prev.sku,
+    };
+  }
 
   if (loading) return <PageLoader />;
 

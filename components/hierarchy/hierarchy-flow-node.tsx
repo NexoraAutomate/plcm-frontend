@@ -6,38 +6,31 @@ import { ChevronRight, CornerDownRight, Edit, History, Plus, Trash2 } from 'luci
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { HierarchyNodeFieldLines } from '@/components/hierarchy-node-legend';
-import { CHILD_ENTITY_TYPE, getEntityLabel } from '@/lib/hierarchy-dashboard-entity-config';
+import { CHILD_ENTITY_TYPE } from '@/lib/hierarchy-dashboard-entity-config';
+import { useAppDefinitions } from '@/lib/app-definitions-context';
 import type { HierarchyEntityActionHandlers } from '@/components/hierarchy-dashboard/use-hierarchy-entity-actions';
 import type { HierarchyEntityType, HierarchyNodeData } from '@/lib/system-hierarchy-graph';
 
-const LEVEL_STYLES: Record<
-  HierarchyEntityType,
-  { border: string; badge: string; label: string }
-> = {
+const LEVEL_STYLES: Record<HierarchyEntityType, { border: string; badge: string }> = {
   system: {
     border: 'border-primary/40',
     badge: 'bg-primary/10 text-primary',
-    label: 'System',
   },
   subsystem: {
     border: 'border-sky-400/40',
     badge: 'bg-sky-500/10 text-sky-700 dark:text-sky-300',
-    label: 'Subsystem',
   },
   module: {
     border: 'border-violet-400/40',
     badge: 'bg-violet-500/10 text-violet-700 dark:text-violet-300',
-    label: 'Module',
   },
   unit: {
     border: 'border-amber-400/40',
     badge: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
-    label: 'Unit',
   },
   component: {
     border: 'border-emerald-400/40',
     badge: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-    label: 'Component',
   },
 };
 
@@ -78,7 +71,9 @@ export function HierarchyFlowActionsProvider({
 
 function HierarchyFlowNode({ data }: NodeProps<Node<HierarchyNodeData>>) {
   const actions = useContext(HierarchyFlowActionsContext);
+  const { entityLabel } = useAppDefinitions();
   const styles = LEVEL_STYLES[data.type];
+  const levelLabel = entityLabel(data.type);
   const highlightState = data.highlightState ?? 'normal';
   const canNavigate = Boolean(actions?.onNavigate);
 
@@ -107,7 +102,7 @@ function HierarchyFlowNode({ data }: NodeProps<Node<HierarchyNodeData>>) {
   const isMmhdView = data.dossierMode === 'mmhd';
   const entityActions = actions?.entityActions;
   const childType = CHILD_ENTITY_TYPE[data.type];
-  const typeLabel = getEntityLabel(data.type).toLowerCase();
+  const typeLabel = levelLabel.toLowerCase();
 
   const stopEvent = (event: React.SyntheticEvent) => {
     event.preventDefault();
@@ -177,7 +172,7 @@ function HierarchyFlowNode({ data }: NodeProps<Node<HierarchyNodeData>>) {
       >
         <div className="mb-1.5 flex items-center justify-between gap-2">
           <Badge variant="outline" className={cn('text-[10px] uppercase', styles.badge)}>
-            {styles.label}
+            {levelLabel}
           </Badge>
           {(data.replacementSequence ?? 0) > 0 ? (
             <Badge variant="secondary" className="text-[10px]">
@@ -242,7 +237,7 @@ function HierarchyFlowNode({ data }: NodeProps<Node<HierarchyNodeData>>) {
             )}
             {childType
               ? renderEntityAction(
-                  `Add ${getEntityLabel(childType).toLowerCase()}`,
+                  `Add ${entityLabel(childType).toLowerCase()}`,
                   <CornerDownRight className="pointer-events-none h-3 w-3" aria-hidden="true" />,
                   () => entityActions.onAddChild(data.entityId, data.type)
                 )

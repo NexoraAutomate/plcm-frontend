@@ -1,5 +1,6 @@
 'use client';
 
+import { useAppDefinitions } from '@/lib/app-definitions-context';
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
@@ -36,7 +37,7 @@ import { ParentEntityLink } from '@/components/entity-link';
 import { buildHierarchyPageUrl } from '@/lib/hierarchy-page-filters';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
-import { MODULES_DASHBOARD_CONFIG, MODULE_STATUS_NAMES } from '@/lib/hierarchy-dashboard-configs';
+import { getModulesDashboardConfig, MODULE_STATUS_NAMES } from '@/lib/hierarchy-dashboard-configs';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
 import { useAuth } from '@/lib/auth-context';
@@ -48,6 +49,8 @@ import {
 } from '@/components/installer-filter-select';
 
 export default function ModulesPage() {
+  const { entityLabel } = useAppDefinitions();
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const { pageLoading } = useEntityHierarchyGate();
@@ -203,7 +206,7 @@ export default function ModulesPage() {
     try {
       await deleteModule(id);
       pagination.invalidate();
-      toast.success('Module deleted successfully');
+      toast.success(`${entityLabel('module')} deleted successfully`);
     } catch {
       toast.error('Failed to delete module');
     }
@@ -233,12 +236,12 @@ export default function ModulesPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Modules</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{entityLabel('module', true)}</h1>
         <p className="text-muted-foreground mt-2">Manage subsystem modules</p>
       </div>
 
       <HierarchyListDashboard
-        config={MODULES_DASHBOARD_CONFIG}
+        config={getModulesDashboardConfig(entityLabel)}
         items={modules}
         parents={subsystems}
         children={units}
@@ -307,7 +310,7 @@ export default function ModulesPage() {
             <SelectValue placeholder="Filter by subsystem" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Subsystems</SelectItem>
+            <SelectItem value="all">{`All ${entityLabel('subsystem', true)}`}</SelectItem>
             {subsystems.map((s) => (
               <SelectItem key={s.id} value={s.id.toString()}>
                 {s.name}
@@ -328,13 +331,13 @@ export default function ModulesPage() {
             <DialogTrigger asChild>
               <Button className="gap-2">
                 <Plus className="h-4 w-4" />
-                New Module
+                {`New ${entityLabel('module')}`}
               </Button>
             </DialogTrigger>
           </Can>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create Module</DialogTitle>
+              <DialogTitle>{`Create ${entityLabel('module')}`}</DialogTitle>
               <DialogDescription>Add a new module</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -365,13 +368,13 @@ export default function ModulesPage() {
                 />
               </div>
               <div>
-                <Label>Subsystem *</Label>
+                <Label>{`${entityLabel('subsystem')} *`}</Label>
                 <Select
                   value={formData.subsystem_id.toString()}
                   onValueChange={(v) => setFormData({ ...formData, subsystem_id: parseInt(v), name: '' })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select subsystem" />
+                    <SelectValue placeholder={`Select ${entityLabel('subsystem').toLowerCase()}`} />
                   </SelectTrigger>
                   <SelectContent>
                     {subsystems.map((s) => (
@@ -395,7 +398,7 @@ export default function ModulesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>All Modules</CardTitle>
+          <CardTitle>{`All ${entityLabel('module', true)}`}</CardTitle>
           <CardDescription>
             Showing {modules.length} on this page · {pagination.total} matching
           </CardDescription>
@@ -406,9 +409,9 @@ export default function ModulesPage() {
               <TableHeader>
                 <TableRow>
                   <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Name</SortableTableHead>
-                  <SortableTableHead column="subsystem_id" sort={sort} onSort={cycleSort}>Subsystem</SortableTableHead>
+                  <SortableTableHead column="subsystem_id" sort={sort} onSort={cycleSort}>{entityLabel('subsystem')}</SortableTableHead>
                   <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
-                  <TableHead>Units</TableHead>
+                  <TableHead>{entityLabel('unit', true)}</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -416,7 +419,7 @@ export default function ModulesPage() {
                 {modules.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                      No modules found
+                      {`No ${entityLabel('module', true).toLowerCase()} found`}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -497,7 +500,7 @@ export default function ModulesPage() {
                               </Can>
                             ) : null}
                             {/* <ConfirmDialog
-                              title="Delete Module"
+                              title={`Delete ${entityLabel('module')}`}
                               description="Are you sure you want to delete this module?"
                               onConfirm={() => handleDelete(module.id)}
                             >
@@ -534,7 +537,7 @@ export default function ModulesPage() {
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Module</DialogTitle>
+            <DialogTitle>{`Edit ${entityLabel('module')}`}</DialogTitle>
             <DialogDescription>Update module details</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -564,7 +567,7 @@ export default function ModulesPage() {
               />
             </div>
             <div>
-              <Label>Subsystem</Label>
+              <Label>{entityLabel('subsystem')}</Label>
               <Select
                 value={formData.subsystem_id.toString()}
                 onValueChange={(v) => setFormData({ ...formData, subsystem_id: parseInt(v) })}

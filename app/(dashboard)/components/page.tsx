@@ -1,5 +1,6 @@
 'use client';
 
+import { useAppDefinitions } from '@/lib/app-definitions-context';
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
@@ -36,7 +37,7 @@ import { buildHierarchyPageUrl } from '@/lib/hierarchy-page-filters';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import {
-  COMPONENTS_DASHBOARD_CONFIG,
+  getComponentsDashboardConfig,
   COMPONENT_STATUS_NAMES,
 } from '@/lib/hierarchy-dashboard-configs';
 import { Can } from '@/components/auth/can';
@@ -50,6 +51,8 @@ import {
 } from '@/components/installer-filter-select';
 
 export default function ComponentsPage() {
+  const { entityLabel } = useAppDefinitions();
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const { pageLoading } = useEntityHierarchyGate();
@@ -198,7 +201,7 @@ export default function ComponentsPage() {
     try {
       await deleteComponent(id);
       pagination.invalidate();
-      toast.success('Component deleted successfully');
+      toast.success(`${entityLabel('component')} deleted successfully`);
     } catch {
       toast.error('Failed to delete component');
     }
@@ -228,12 +231,12 @@ export default function ComponentsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Components</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{entityLabel('component', true)}</h1>
         <p className="text-muted-foreground mt-2">Manage unit components and parts</p>
       </div>
 
       <HierarchyListDashboard
-        config={COMPONENTS_DASHBOARD_CONFIG}
+        config={getComponentsDashboardConfig(entityLabel)}
         items={components}
         parents={units}
         children={inventory}
@@ -302,7 +305,7 @@ export default function ComponentsPage() {
             <SelectValue placeholder="Filter by unit" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Units</SelectItem>
+            <SelectItem value="all">{`All ${entityLabel('unit', true)}`}</SelectItem>
             {units.map((u) => (
               <SelectItem key={u.id} value={u.id.toString()}>
                 {u.name}
@@ -323,13 +326,13 @@ export default function ComponentsPage() {
             <DialogTrigger asChild>
               <Button className="gap-2">
                 <Plus className="h-4 w-4" />
-                New Component
+                {`New ${entityLabel('component')}`}
               </Button>
             </DialogTrigger>
           </Can>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create Component</DialogTitle>
+              <DialogTitle>{`Create ${entityLabel('component')}`}</DialogTitle>
               <DialogDescription>Add a new component</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -360,13 +363,13 @@ export default function ComponentsPage() {
                 />
               </div>
               <div>
-                <Label>Unit *</Label>
+                <Label>{`${entityLabel('unit')} *`}</Label>
                 <Select
                   value={formData.unit_id.toString()}
                   onValueChange={(v) => setFormData({ ...formData, unit_id: parseInt(v), name: '' })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select unit" />
+                    <SelectValue placeholder={`Select ${entityLabel('unit').toLowerCase()}`} />
                   </SelectTrigger>
                   <SelectContent>
                     {units.map((u) => (
@@ -390,7 +393,7 @@ export default function ComponentsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>All Components</CardTitle>
+          <CardTitle>{`All ${entityLabel('component', true)}`}</CardTitle>
           <CardDescription>
             Showing {components.length} on this page · {pagination.total} matching
           </CardDescription>
@@ -401,7 +404,7 @@ export default function ComponentsPage() {
               <TableHeader>
                 <TableRow>
                   <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Name</SortableTableHead>
-                  <SortableTableHead column="unit_id" sort={sort} onSort={cycleSort}>Unit</SortableTableHead>
+                  <SortableTableHead column="unit_id" sort={sort} onSort={cycleSort}>{entityLabel('unit')}</SortableTableHead>
                   <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
                   <TableHead>Inventory Qty</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -411,7 +414,7 @@ export default function ComponentsPage() {
                 {components.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                      No components found
+                      {`No ${entityLabel('component', true).toLowerCase()} found`}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -492,7 +495,7 @@ export default function ComponentsPage() {
                               </Can>
                             ) : null}
                             {/* <ConfirmDialog
-                              title="Delete Component"
+                              title={`Delete ${entityLabel('component')}`}
                               description="Are you sure you want to delete this component?"
                               onConfirm={() => handleDelete(component.id)}
                             >
@@ -529,7 +532,7 @@ export default function ComponentsPage() {
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Component</DialogTitle>
+            <DialogTitle>{`Edit ${entityLabel('component')}`}</DialogTitle>
             <DialogDescription>Update component details</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -559,7 +562,7 @@ export default function ComponentsPage() {
               />
             </div>
             <div>
-              <Label>Unit</Label>
+              <Label>{entityLabel('unit')}</Label>
               <Select
                 value={formData.unit_id.toString()}
                 onValueChange={(v) => setFormData({ ...formData, unit_id: parseInt(v) })}

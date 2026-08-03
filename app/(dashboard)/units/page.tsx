@@ -1,5 +1,6 @@
 'use client';
 
+import { useAppDefinitions } from '@/lib/app-definitions-context';
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
@@ -36,7 +37,7 @@ import { ParentEntityLink } from '@/components/entity-link';
 import { buildHierarchyPageUrl } from '@/lib/hierarchy-page-filters';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
-import { UNITS_DASHBOARD_CONFIG, UNIT_STATUS_NAMES } from '@/lib/hierarchy-dashboard-configs';
+import { getUnitsDashboardConfig, UNIT_STATUS_NAMES } from '@/lib/hierarchy-dashboard-configs';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
 import { useAuth } from '@/lib/auth-context';
@@ -48,6 +49,8 @@ import {
 } from '@/components/installer-filter-select';
 
 export default function UnitsPage() {
+  const { entityLabel } = useAppDefinitions();
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const { pageLoading } = useEntityHierarchyGate();
@@ -208,7 +211,7 @@ export default function UnitsPage() {
     try {
       await deleteUnit(id);
       pagination.invalidate();
-      toast.success('Unit deleted successfully');
+      toast.success(`${entityLabel('unit')} deleted successfully`);
     } catch {
       toast.error('Failed to delete unit');
     }
@@ -239,12 +242,12 @@ export default function UnitsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Units</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{entityLabel('unit', true)}</h1>
         <p className="text-muted-foreground mt-2">Manage module units and assemblies</p>
       </div>
 
       <HierarchyListDashboard
-        config={UNITS_DASHBOARD_CONFIG}
+        config={getUnitsDashboardConfig(entityLabel)}
         items={units}
         parents={modules}
         children={components}
@@ -313,7 +316,7 @@ export default function UnitsPage() {
             <SelectValue placeholder="Filter by module" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Modules</SelectItem>
+            <SelectItem value="all">{`All ${entityLabel('module', true)}`}</SelectItem>
             {modules.map((m) => (
               <SelectItem key={m.id} value={m.id.toString()}>
                 {m.name}
@@ -334,13 +337,13 @@ export default function UnitsPage() {
             <DialogTrigger asChild>
               <Button className="gap-2">
                 <Plus className="h-4 w-4" />
-                New Unit
+                {`New ${entityLabel('unit')}`}
               </Button>
             </DialogTrigger>
           </Can>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create Unit</DialogTitle>
+              <DialogTitle>{`Create ${entityLabel('unit')}`}</DialogTitle>
               <DialogDescription>Add a new unit</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -371,13 +374,13 @@ export default function UnitsPage() {
                 />
               </div>
               <div>
-                <Label>Module *</Label>
+                <Label>{`${entityLabel('module')} *`}</Label>
                 <Select
                   value={formData.module_id.toString()}
                   onValueChange={(v) => setFormData({ ...formData, module_id: parseInt(v), name: '' })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select module" />
+                    <SelectValue placeholder={`Select ${entityLabel('module').toLowerCase()}`} />
                   </SelectTrigger>
                   <SelectContent>
                     {modules.map((m) => (
@@ -401,7 +404,7 @@ export default function UnitsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>All Units</CardTitle>
+          <CardTitle>{`All ${entityLabel('unit', true)}`}</CardTitle>
           <CardDescription>
             Showing {units.length} on this page · {pagination.total} matching
           </CardDescription>
@@ -412,9 +415,9 @@ export default function UnitsPage() {
               <TableHeader>
                 <TableRow>
                   <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Name</SortableTableHead>
-                  <SortableTableHead column="module_id" sort={sort} onSort={cycleSort}>Module</SortableTableHead>
+                  <SortableTableHead column="module_id" sort={sort} onSort={cycleSort}>{entityLabel('module')}</SortableTableHead>
                   <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
-                  <TableHead>Components</TableHead>
+                  <TableHead>{entityLabel('component', true)}</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -422,7 +425,7 @@ export default function UnitsPage() {
                 {units.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                      No units found
+                      {`No ${entityLabel('unit', true).toLowerCase()} found`}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -503,7 +506,7 @@ export default function UnitsPage() {
                               </Can>
                             ) : null}
                             {/* <ConfirmDialog
-                              title="Delete Unit"
+                              title={`Delete ${entityLabel('unit')}`}
                               description="Are you sure you want to delete this unit?"
                               onConfirm={() => handleDelete(unit.id)}
                             >
@@ -540,7 +543,7 @@ export default function UnitsPage() {
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Unit</DialogTitle>
+            <DialogTitle>{`Edit ${entityLabel('unit')}`}</DialogTitle>
             <DialogDescription>Update unit details</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -570,7 +573,7 @@ export default function UnitsPage() {
               />
             </div>
             <div>
-              <Label>Module</Label>
+              <Label>{entityLabel('module')}</Label>
               <Select
                 value={formData.module_id.toString()}
                 onValueChange={(v) => setFormData({ ...formData, module_id: parseInt(v) })}

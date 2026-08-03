@@ -7,14 +7,14 @@ import * as api from '@/lib/api';
 import { useDataStore } from '@/lib/data-store';
 import {
   CHILD_ENTITY_TYPE,
-  DASHBOARD_LEVELS,
-  getEntityLabel,
+  getDashboardLevels,
   PARENT_ID_FIELD,
   resolveEntityParentIds,
   SELECTION_KEY_BY_ENTITY,
   type DashboardEntityType,
   type DashboardLevelKey,
 } from '@/lib/hierarchy-dashboard-entity-config';
+import { useAppDefinitions } from '@/lib/app-definitions-context';
 import {
   hierarchyInstallFormFields,
   hierarchyInstallInitialValues,
@@ -80,12 +80,12 @@ function formatAxiosError(error: unknown, fallback: string): string {
   return fallback;
 }
 
-const PARENT_LABEL: Record<DashboardEntityType, string> = {
-  system: 'Project',
-  subsystem: 'System',
-  module: 'Subsystem',
-  unit: 'Module',
-  component: 'Unit',
+const PARENT_LEVEL: Record<DashboardEntityType, string | 'project'> = {
+  system: 'project',
+  subsystem: 'system',
+  module: 'subsystem',
+  unit: 'module',
+  component: 'unit',
 };
 
 export function useHierarchyEntityActions({
@@ -95,6 +95,17 @@ export function useHierarchyEntityActions({
   systemsOverride = [],
   onEntityChanged,
 }: UseHierarchyEntityActionsOptions) {
+  const { entityLabel } = useAppDefinitions();
+  const dashboardLevels = useMemo(() => getDashboardLevels(entityLabel), [entityLabel]);
+
+  const parentLabelFor = useCallback(
+    (type: DashboardEntityType) => {
+      const parent = PARENT_LEVEL[type];
+      return parent === 'project' ? 'Project' : entityLabel(parent);
+    },
+    [entityLabel]
+  );
+
   const {
     systems: storeSystems,
     subsystems,
@@ -225,7 +236,7 @@ export function useHierarchyEntityActions({
 
   const loadFormData = useCallback(
     async (entityType: DashboardEntityType, parentId: number) => {
-      const config = DASHBOARD_LEVELS.find((level) => level.entityType === entityType);
+      const config = dashboardLevels.find((level) => level.entityType === entityType);
       if (!config?.statusType || !config.hierarchyType) {
         setStatuses([]);
         setHierarchyNames([]);
@@ -427,9 +438,9 @@ export function useHierarchyEntityActions({
 
       const next = { ...selection };
       delete next[selectionKey];
-      const levelIndex = DASHBOARD_LEVELS.findIndex((level) => level.selectionKey === selectionKey);
-      for (let index = levelIndex + 1; index < DASHBOARD_LEVELS.length; index += 1) {
-        delete next[DASHBOARD_LEVELS[index].selectionKey];
+      const levelIndex = dashboardLevels.findIndex((level) => level.selectionKey === selectionKey);
+      for (let index = levelIndex + 1; index < dashboardLevels.length; index += 1) {
+        delete next[dashboardLevels[index].selectionKey];
       }
       onSelectionChange(next);
       await notifyEntityChanged();
@@ -591,14 +602,14 @@ export function useHierarchyEntityActions({
     if (entityType === 'system') {
       const project = projects.find((item) => item.id === parentId);
       return project
-        ? { fieldName: 'project_id', label: PARENT_LABEL.system, id: project.id, name: project.name }
+        ? { fieldName: 'project_id', label: parentLabelFor('system'), id: project.id, name: project.name }
         : null;
     }
     const parentEntity = getParentEntity(entityType, parentId);
     if (!parentEntity) return null;
     return {
       fieldName: PARENT_ID_FIELD[entityType],
-      label: PARENT_LABEL[entityType],
+      label: parentLabelFor(entityType),
       id: parentEntity.id,
       name: parentEntity.name,
     };
@@ -611,7 +622,7 @@ export function useHierarchyEntityActions({
     const fields: FormField[] = [
       {
         name: 'name',
-        label: `${getEntityLabel(dialogState.entityType)} Name`,
+        label: `${entityLabel(dialogState.entityType)} Name`,
         type: 'select',
         required: true,
         options: hierarchyNames.map((item) => ({ label: item.name, value: item.name })),
@@ -732,11 +743,11 @@ export function useHierarchyEntityActions({
           <DialogHeader>
             <DialogTitle>
               {dialogState?.mode === 'edit'
-                ? `Edit ${getEntityLabel(dialogState.entityType)}`
+                ? `Edit ${entityLabel(dialogState.entityType)}`
                 : dialogState?.mode === 'add-child'
-                  ? `Add ${getEntityLabel(dialogState.entityType)}`
+                  ? `Add ${entityLabel(dialogState.entityType)}`
                   : dialogState
-                    ? `Add sibling ${getEntityLabel(dialogState.entityType)}`
+                    ? `Add sibling ${entityLabel(dialogState.entityType)}`
                     : 'Entity'}
             </DialogTitle>
             <DialogDescription>
@@ -772,7 +783,7 @@ export function useHierarchyEntityActions({
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null);
         }}
-        title={`Delete ${deleteTarget ? getEntityLabel(deleteTarget.entityType) : 'entity'}?`}
+        title={`Delete ${deleteTarget ? entityLabel(deleteTarget.entityType) : 'entity'}?`}
         description={`Delete "${deleteTarget?.name ?? 'this entity'}" and its descendants from the hierarchy. This action cannot be undone.`}
         onConfirm={() => void handleDelete()}
       />

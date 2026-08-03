@@ -1,5 +1,6 @@
 'use client';
 
+import { useAppDefinitions } from '@/lib/app-definitions-context';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useDataStore } from '@/lib/data-store';
@@ -43,6 +44,8 @@ import { useHierarchyCreateFormOptions } from '@/hooks/use-hierarchy-create-form
 import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
 
 export default function ModuleDetailPage() {
+  const { entityLabel } = useAppDefinitions();
+
   const params = useParams();
   const moduleId = params.id as string;
   const { pageLoading } = useEntityHierarchyGate();
@@ -126,7 +129,7 @@ export default function ModuleDetailPage() {
     createInitialValues: unitCreateInitialValues,
   } = useHierarchyCreateFormOptions({
     entityType: 'unit',
-    entityLabel: 'Unit',
+    entityLabel: entityLabel('unit'),
     nameOptions,
     statusOptions,
     allowedNames,
@@ -145,7 +148,7 @@ export default function ModuleDetailPage() {
     () => [
       {
         name: 'name',
-        label: 'Unit Name',
+        label: `${entityLabel('unit')} Name`,
         type: 'select' as const,
         required: true,
         options: nameOptions,
@@ -162,7 +165,7 @@ export default function ModuleDetailPage() {
         label: 'Part #',
         type: 'text' as const,
         required: false,
-        placeholder: 'Enter Part Number of Unit',
+        placeholder: `Enter Part Number of ${entityLabel('unit')}`,
       },
       {
         name: 'id',
@@ -177,7 +180,7 @@ export default function ModuleDetailPage() {
 
   async function handleAddUnit(formData: Record<string, any>) {
     if (!module) {
-      toast.error('Module not found');
+      toast.error(`${entityLabel('module')} not found`);
       return;
     }
     setIsSubmitting(true);
@@ -204,7 +207,7 @@ export default function ModuleDetailPage() {
       toast.success(
         created.childrenInstalled > 0
           ? `Unit added and ${created.childrenInstalled} child entit${created.childrenInstalled === 1 ? 'y' : 'ies'} installed from inventory`
-          : 'Unit added successfully'
+          : `${entityLabel('unit')} added successfully`
       );
     } catch (error) {
       console.error('[v0] Unit creation error:', error);
@@ -249,7 +252,7 @@ export default function ModuleDetailPage() {
       });
       setIsEditOpen(false);
       setEditingId(null);
-      toast.success('Unit updated successfully');
+      toast.success(`${entityLabel('unit')} updated successfully`);
     } catch (error) {
       console.error('Unit update error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to update unit';
@@ -261,7 +264,7 @@ export default function ModuleDetailPage() {
 
   async function handleUseInventory(item: Inventory, instanceId?: number) {
     if (!module) {
-      throw new Error('Module not found');
+      throw new Error(`${entityLabel('module')} not found`);
     }
 
     const defaultStatus = statuses[0];
@@ -335,7 +338,7 @@ export default function ModuleDetailPage() {
   if (!module) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
-        <h2 className="text-xl font-semibold">Module Not Found</h2>
+        <h2 className="text-xl font-semibold">{`${entityLabel('module')} Not Found`}</h2>
         <Link href="/modules" className="mt-2 text-sm text-primary underline">
           Back to Modules
         </Link>
@@ -461,8 +464,8 @@ export default function ModuleDetailPage() {
                 }) ?? '#'
             : undefined
         }
-        addButtonLabel="Add Unit"
-        emptyMessage="No units yet. Click 'Add Unit' to create one."
+        addButtonLabel={`Add ${entityLabel('unit')}`}
+        emptyMessage={`No ${entityLabel('unit', true).toLowerCase()} yet. Click Add ${entityLabel('unit')} to create one.`}
         childEntityType="unit"
         createPermission={P.create_units}
         editPermission={P.edit_units}
@@ -477,11 +480,11 @@ export default function ModuleDetailPage() {
         onUseInventory={handleUseInventory}
       />
       
-      {/* Add Unit Dialog */}
+      {/* {`Add ${entityLabel('unit')}`} Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Unit</DialogTitle>
+            <DialogTitle>{`Add ${entityLabel('unit')}`}</DialogTitle>
             <DialogDescription>Create a new unit for {module.name}</DialogDescription>
           </DialogHeader>
           <EntityForm

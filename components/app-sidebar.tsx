@@ -29,6 +29,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { useAppDefinitions } from "@/lib/app-definitions-context";
 import { NAV_PERMISSIONS, SETTINGS_ACCESS_PERMISSIONS, type PermissionCode } from "@/lib/permission-codes";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -186,6 +187,14 @@ const hierarchyItems: NavItem[] = [
   },
 ];
 
+const HIERARCHY_LABEL_BY_HREF: Record<string, string> = {
+  "/systems": "system",
+  "/subsystems": "subsystem",
+  "/modules": "module",
+  "/units": "unit",
+  "/components": "component",
+};
+
 const settingsItem: NavItem = {
   label: "Settings",
   href: "/settings",
@@ -239,6 +248,7 @@ function NavLink({
 export function AppSidebar() {
   const pathname = usePathname();
   const { logout, can } = useAuth();
+  const { entityLabel } = useAppDefinitions();
   const { enter: enterFullscreen } = useAppFullscreen();
   const [pinned, setPinned] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -269,8 +279,14 @@ export function AppSidebar() {
     [can]
   );
   const visibleHierarchy = useMemo(
-    () => hierarchyItems.filter((item) => !item.permission || can(item.permission)),
-    [can]
+    () =>
+      hierarchyItems
+        .filter((item) => !item.permission || can(item.permission))
+        .map((item) => {
+          const level = HIERARCHY_LABEL_BY_HREF[item.href];
+          return level ? { ...item, label: entityLabel(level, true) } : item;
+        }),
+    [can, entityLabel]
   );
   const canSeeSettings = !settingsItem.permission || can(settingsItem.permission);
   const visibleReportingChildren = useMemo(

@@ -2,9 +2,11 @@
 
 import { X } from 'lucide-react';
 import {
-  DASHBOARD_LEVELS,
+  getDashboardLevels,
   type DashboardLevelKey,
 } from '@/lib/hierarchy-dashboard-entity-config';
+import { useAppDefinitions } from '@/lib/app-definitions-context';
+import { useMemo } from 'react';
 import type { HierarchyDashboardSelection } from '@/lib/project-hierarchy-dashboard';
 import type { Project } from '@/lib/models';
 import type { HierarchyDossierMode } from '@/lib/hierarchy-dossier-mode';
@@ -46,6 +48,9 @@ export function HierarchyDashboardControls({
   dossierMode,
   onDossierModeChange,
 }: HierarchyDashboardControlsProps) {
+  const { entityLabel } = useAppDefinitions();
+  const dashboardLevels = useMemo(() => getDashboardLevels(entityLabel), [entityLabel]);
+
   const hasSelection = Boolean(
     selection.projectId ||
       selection.systemId ||
@@ -76,7 +81,7 @@ export function HierarchyDashboardControls({
     }
   };
 
-  const visibleLevels = DASHBOARD_LEVELS.filter((level) => {
+  const visibleLevels = dashboardLevels.filter((level) => {
     if (level.selectionKey === 'projectId') return true;
     if (!level.parentSelectionKey) return false;
     return Boolean(getSelectionValue(level.parentSelectionKey));

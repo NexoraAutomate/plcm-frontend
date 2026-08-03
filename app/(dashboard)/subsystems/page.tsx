@@ -1,5 +1,6 @@
 'use client';
 
+import { useAppDefinitions } from '@/lib/app-definitions-context';
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
@@ -37,7 +38,7 @@ import { buildHierarchyPageUrl } from '@/lib/hierarchy-page-filters';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import {
-  SUBSYSTEMS_DASHBOARD_CONFIG,
+  getSubsystemsDashboardConfig,
   SUBSYSTEM_STATUS_NAMES,
 } from '@/lib/hierarchy-dashboard-configs';
 import { Can } from '@/components/auth/can';
@@ -51,6 +52,8 @@ import {
 } from '@/components/installer-filter-select';
 
 export default function SubsystemsPage() {
+  const { entityLabel } = useAppDefinitions();
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const { pageLoading } = useEntityHierarchyGate();
@@ -181,7 +184,7 @@ export default function SubsystemsPage() {
       pagination.invalidate();
       setFormData({ name: '', description: '', system_id: 0 });
       setIsCreateOpen(false);
-      toast.success('Subsystem created successfully');
+      toast.success(`${entityLabel('subsystem')} created successfully`);
     } catch {
       toast.error('Failed to create subsystem');
     }
@@ -199,7 +202,7 @@ export default function SubsystemsPage() {
       setFormData({ name: '', description: '', system_id: 0 });
       setEditingId(null);
       setIsEditOpen(false);
-      toast.success('Subsystem updated successfully');
+      toast.success(`${entityLabel('subsystem')} updated successfully`);
     } catch {
       toast.error('Failed to update subsystem');
     }
@@ -209,7 +212,7 @@ export default function SubsystemsPage() {
     try {
       await deleteSubsystem(id);
       pagination.invalidate();
-      toast.success('Subsystem deleted successfully');
+      toast.success(`${entityLabel('subsystem')} deleted successfully`);
     } catch {
       toast.error('Failed to delete subsystem');
     }
@@ -239,12 +242,12 @@ export default function SubsystemsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Subsystems</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{entityLabel('subsystem', true)}</h1>
         <p className="text-muted-foreground mt-2">Manage system subsystems</p>
       </div>
 
       <HierarchyListDashboard
-        config={SUBSYSTEMS_DASHBOARD_CONFIG}
+        config={getSubsystemsDashboardConfig(entityLabel)}
         items={subsystems}
         parents={systems}
         children={modules}
@@ -313,7 +316,7 @@ export default function SubsystemsPage() {
             <SelectValue placeholder="Filter by system" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Systems</SelectItem>
+            <SelectItem value="all">{`All ${entityLabel('system', true)}`}</SelectItem>
             {systems.map((s) => (
               <SelectItem key={s.id} value={s.id.toString()}>
                 {s.name}
@@ -334,13 +337,13 @@ export default function SubsystemsPage() {
             <DialogTrigger asChild>
               <Button className="gap-2">
                 <Plus className="h-4 w-4" />
-                New Subsystem
+                {`New ${entityLabel('subsystem')}`}
               </Button>
             </DialogTrigger>
           </Can>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create Subsystem</DialogTitle>
+              <DialogTitle>{`Create ${entityLabel('subsystem')}`}</DialogTitle>
               <DialogDescription>Add a new subsystem</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -371,13 +374,13 @@ export default function SubsystemsPage() {
                 />
               </div>
               <div>
-                <Label>System *</Label>
+                <Label>{`${entityLabel('system')} *`}</Label>
                 <Select
                   value={formData.system_id.toString()}
                   onValueChange={(v) => setFormData({ ...formData, system_id: parseInt(v), name: '' })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select system" />
+                    <SelectValue placeholder={`Select ${entityLabel('system').toLowerCase()}`} />
                   </SelectTrigger>
                   <SelectContent>
                     {systems.map((s) => (
@@ -401,7 +404,7 @@ export default function SubsystemsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>All Subsystems</CardTitle>
+          <CardTitle>{`All ${entityLabel('subsystem', true)}`}</CardTitle>
           <CardDescription>
             Showing {subsystems.length} on this page · {pagination.total} matching
           </CardDescription>
@@ -412,9 +415,9 @@ export default function SubsystemsPage() {
               <TableHeader>
                 <TableRow>
                   <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Name</SortableTableHead>
-                  <SortableTableHead column="system_id" sort={sort} onSort={cycleSort}>System</SortableTableHead>
+                  <SortableTableHead column="system_id" sort={sort} onSort={cycleSort}>{entityLabel('system')}</SortableTableHead>
                   <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
-                  <TableHead>Modules</TableHead>
+                  <TableHead>{entityLabel('module', true)}</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -422,7 +425,7 @@ export default function SubsystemsPage() {
                 {subsystems.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                      No subsystems found
+                      {`No ${entityLabel('subsystem', true).toLowerCase()} found`}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -503,7 +506,7 @@ export default function SubsystemsPage() {
                               </Can>
                             ) : null}
                             {/* <ConfirmDialog
-                              title="Delete Subsystem"
+                              title={`Delete ${entityLabel('subsystem')}`}
                               description="Are you sure you want to delete this subsystem?"
                               onConfirm={() => handleDelete(subsystem.id)}
                             >
@@ -540,7 +543,7 @@ export default function SubsystemsPage() {
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Subsystem</DialogTitle>
+            <DialogTitle>{`Edit ${entityLabel('subsystem')}`}</DialogTitle>
             <DialogDescription>Update subsystem details</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -570,7 +573,7 @@ export default function SubsystemsPage() {
               />
             </div>
             <div>
-              <Label>System</Label>
+              <Label>{entityLabel('system')}</Label>
               <Select
                 value={formData.system_id.toString()}
                 onValueChange={(v) => setFormData({ ...formData, system_id: parseInt(v) })}

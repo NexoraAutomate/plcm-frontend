@@ -1,4 +1,5 @@
 import type { HierarchyListDashboardConfig } from '@/components/hierarchy/hierarchy-list-dashboard';
+import { resolveEntityTypeLabel } from '@/lib/app-definitions';
 
 const LIFECYCLE_COLORS: Record<string, string> = {
   Design: 'oklch(0.62 0.15 250)',
@@ -16,78 +17,108 @@ const LIFECYCLE_COLORS: Record<string, string> = {
   Rejected: 'oklch(0.55 0.2 15)',
 };
 
+export type EntityLabelFn = (level: string, plural?: boolean) => string;
+
 export const SUBSYSTEM_STATUS_NAMES = ['Design', 'Integration', 'Testing', 'Operational'];
 
-export const SUBSYSTEMS_DASHBOARD_CONFIG: HierarchyListDashboardConfig = {
-  entityPlural: 'Subsystems',
-  entityScope: 'subsystem',
-  statusNames: SUBSYSTEM_STATUS_NAMES,
-  statusColors: LIFECYCLE_COLORS,
-  readyStatusName: 'Operational',
-  childKpi: { label: 'Modules', route: '/modules' },
-  parentChartTitle: 'Subsystems by System',
-  parentFilterLabel: 'System',
-  hierarchyChartTitle: 'Modules per Subsystem',
-  hierarchyCountLabel: 'modules',
-  timelineLabel: 'Growth timeline',
-  gradientId: 'subsystemsPageFill',
-  detailRoute: (id) => `/subsystems/${id}`,
-  parentDetailRoute: (id) => `/systems/${id}`,
-};
+export function getSubsystemsDashboardConfig(
+  label: EntityLabelFn = resolveEntityTypeLabel
+): HierarchyListDashboardConfig {
+  return {
+    entityPlural: label('subsystem', true),
+    entityScope: 'subsystem',
+    statusNames: SUBSYSTEM_STATUS_NAMES,
+    statusColors: LIFECYCLE_COLORS,
+    readyStatusName: 'Operational',
+    childKpi: { label: label('module', true), route: '/modules' },
+    parentChartTitle: `${label('subsystem', true)} by ${label('system')}`,
+    parentFilterLabel: label('system'),
+    hierarchyChartTitle: `${label('module', true)} per ${label('subsystem')}`,
+    hierarchyCountLabel: label('module', true).toLowerCase(),
+    timelineLabel: 'Growth timeline',
+    gradientId: 'subsystemsPageFill',
+    detailRoute: (id) => `/subsystems/${id}`,
+    parentDetailRoute: (id) => `/systems/${id}`,
+  };
+}
+
+/** @deprecated Use getSubsystemsDashboardConfig(entityLabel) for live renames */
+export const SUBSYSTEMS_DASHBOARD_CONFIG = getSubsystemsDashboardConfig();
 
 export const MODULE_STATUS_NAMES = ['Design', 'Development', 'Testing', 'Integrated'];
 
-export const MODULES_DASHBOARD_CONFIG: HierarchyListDashboardConfig = {
-  entityPlural: 'Modules',
-  entityScope: 'module',
-  statusNames: MODULE_STATUS_NAMES,
-  statusColors: LIFECYCLE_COLORS,
-  readyStatusName: 'Integrated',
-  childKpi: { label: 'Units', route: '/units' },
-  parentChartTitle: 'Modules by Subsystem',
-  parentFilterLabel: 'Subsystem',
-  hierarchyChartTitle: 'Units per Module',
-  hierarchyCountLabel: 'units',
-  timelineLabel: 'Growth timeline',
-  gradientId: 'modulesPageFill',
-  detailRoute: (id) => `/modules/${id}`,
-  parentDetailRoute: (id) => `/subsystems/${id}`,
-};
+export function getModulesDashboardConfig(
+  label: EntityLabelFn = resolveEntityTypeLabel
+): HierarchyListDashboardConfig {
+  return {
+    entityPlural: label('module', true),
+    entityScope: 'module',
+    statusNames: MODULE_STATUS_NAMES,
+    statusColors: LIFECYCLE_COLORS,
+    readyStatusName: 'Integrated',
+    childKpi: { label: label('unit', true), route: '/units' },
+    parentChartTitle: `${label('module', true)} by ${label('subsystem')}`,
+    parentFilterLabel: label('subsystem'),
+    hierarchyChartTitle: `${label('unit', true)} per ${label('module')}`,
+    hierarchyCountLabel: label('unit', true).toLowerCase(),
+    timelineLabel: 'Growth timeline',
+    gradientId: 'modulesPageFill',
+    detailRoute: (id) => `/modules/${id}`,
+    parentDetailRoute: (id) => `/subsystems/${id}`,
+  };
+}
+
+/** @deprecated Use getModulesDashboardConfig(entityLabel) for live renames */
+export const MODULES_DASHBOARD_CONFIG = getModulesDashboardConfig();
 
 export const UNIT_STATUS_NAMES = ['Manufacturing', 'Assembled', 'Testing', 'Qualified'];
 
-export const UNITS_DASHBOARD_CONFIG: HierarchyListDashboardConfig = {
-  entityPlural: 'Units',
-  entityScope: 'unit',
-  statusNames: UNIT_STATUS_NAMES,
-  statusColors: LIFECYCLE_COLORS,
-  readyStatusName: 'Qualified',
-  childKpi: { label: 'Components', route: '/components' },
-  parentChartTitle: 'Units by Module',
-  parentFilterLabel: 'Module',
-  hierarchyChartTitle: 'Components per Unit',
-  hierarchyCountLabel: 'components',
-  timelineLabel: 'Growth timeline',
-  gradientId: 'unitsPageFill',
-  detailRoute: (id) => `/units/${id}`,
-  parentDetailRoute: (id) => `/modules/${id}`,
-};
+export function getUnitsDashboardConfig(
+  label: EntityLabelFn = resolveEntityTypeLabel
+): HierarchyListDashboardConfig {
+  return {
+    entityPlural: label('unit', true),
+    entityScope: 'unit',
+    statusNames: UNIT_STATUS_NAMES,
+    statusColors: LIFECYCLE_COLORS,
+    readyStatusName: 'Qualified',
+    childKpi: { label: label('component', true), route: '/components' },
+    parentChartTitle: `${label('unit', true)} by ${label('module')}`,
+    parentFilterLabel: label('module'),
+    hierarchyChartTitle: `${label('component', true)} per ${label('unit')}`,
+    hierarchyCountLabel: label('component', true).toLowerCase(),
+    timelineLabel: 'Growth timeline',
+    gradientId: 'unitsPageFill',
+    detailRoute: (id) => `/units/${id}`,
+    parentDetailRoute: (id) => `/modules/${id}`,
+  };
+}
+
+/** @deprecated Use getUnitsDashboardConfig(entityLabel) for live renames */
+export const UNITS_DASHBOARD_CONFIG = getUnitsDashboardConfig();
 
 export const COMPONENT_STATUS_NAMES = ['Procured', 'In Inspection', 'Approved', 'Rejected'];
 
-export const COMPONENTS_DASHBOARD_CONFIG: HierarchyListDashboardConfig = {
-  entityPlural: 'Components',
-  entityScope: 'component',
-  statusNames: COMPONENT_STATUS_NAMES,
-  statusColors: LIFECYCLE_COLORS,
-  readyStatusName: 'Approved',
-  childKpi: { label: 'Inventory', route: '/inventory' },
-  parentChartTitle: 'Components by Unit',
-  parentFilterLabel: 'Unit',
-  hierarchyChartTitle: 'Inventory per Component',
-  hierarchyCountLabel: 'inventory',
-  timelineLabel: 'Growth timeline',
-  gradientId: 'componentsPageFill',
-  detailRoute: (id) => `/components/${id}`,
-  parentDetailRoute: (id) => `/units/${id}`,
-};
+export function getComponentsDashboardConfig(
+  label: EntityLabelFn = resolveEntityTypeLabel
+): HierarchyListDashboardConfig {
+  return {
+    entityPlural: label('component', true),
+    entityScope: 'component',
+    statusNames: COMPONENT_STATUS_NAMES,
+    statusColors: LIFECYCLE_COLORS,
+    readyStatusName: 'Approved',
+    childKpi: { label: 'Inventory', route: '/inventory' },
+    parentChartTitle: `${label('component', true)} by ${label('unit')}`,
+    parentFilterLabel: label('unit'),
+    hierarchyChartTitle: `Inventory per ${label('component')}`,
+    hierarchyCountLabel: 'inventory',
+    timelineLabel: 'Growth timeline',
+    gradientId: 'componentsPageFill',
+    detailRoute: (id) => `/components/${id}`,
+    parentDetailRoute: (id) => `/units/${id}`,
+  };
+}
+
+/** @deprecated Use getComponentsDashboardConfig(entityLabel) for live renames */
+export const COMPONENTS_DASHBOARD_CONFIG = getComponentsDashboardConfig();

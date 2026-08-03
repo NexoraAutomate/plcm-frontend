@@ -151,6 +151,9 @@ export const auth = {
   getSecuritySettings: () => api.get<Models.SecuritySettings>("/auth/security-settings"),
   updateSecuritySettings: (data: Partial<Models.SecuritySettings>) =>
     api.put<Models.SecuritySettings>("/auth/security-settings", data),
+  getAppDefinitions: () => api.get<Models.AppDefinitions>("/definitions"),
+  updateAppDefinitions: (data: Partial<Models.AppDefinitions>) =>
+    api.put<Models.AppDefinitions>("/definitions", data),
   getPasswordPolicy: () => api.get<Models.PasswordPolicyPublic>("/auth/password-policy"),
   listSessions: (skip = 0, limit = 100) =>
     api.get<Models.ActiveSession[]>("/auth/sessions", {
