@@ -1,0 +1,781 @@
+<mxfile host="app.diagrams.net" agent="SatLife-Workflow" pages="6">
+  <diagram id="page-overview" name="01 Overview">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Hierarchy &amp; Inventory Management Workflow — End-to-End" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontStyle=1;fontSize=20;fontColor=#1a365d;" vertex="1" parent="1">
+          <mxGeometry x="280" y="20" width="1000" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="roles" value="Roles: PD · Project Director &amp;nbsp;|&amp;nbsp; HM · Hierarchy Manager &amp;nbsp;|&amp;nbsp; IM · Inventory Manager &amp;nbsp;|&amp;nbsp; Dev · Developer &amp;nbsp;|&amp;nbsp; Admin" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#edf2f7;strokeColor=#4a5568;fontSize=11;fontColor=#2d3748;" vertex="1" parent="1">
+          <mxGeometry x="200" y="70" width="1160" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="p1" value="1. Hierarchy Configuration&#xa;(Admin)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bee3f8;strokeColor=#2b6cb0;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="80" y="140" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="p2" value="2. Project Create &amp;&#xa;Approval (PD/HM/Admin)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c6f6d5;strokeColor=#276749;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="320" y="140" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="p3" value="3. Inventory Reservation&#xa;&amp; Shortage (HM/IM)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fefcbf;strokeColor=#975a16;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="560" y="140" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="p4" value="4. Issue to Developer&#xa;(HM/Dev/IM)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e9d8fd;strokeColor=#6b46c1;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="800" y="140" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="p5" value="5. Install / Test /&#xa;Verify (Dev/HM)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fed7d7;strokeColor=#c53030;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="140" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="p6" value="6. Defect / Rework&#xa;or Recall" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#feebc8;strokeColor=#c05621;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1280" y="140" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#2d3748;" edge="1" parent="1" source="p1" target="p2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e23" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#2d3748;" edge="1" parent="1" source="p2" target="p3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e34" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#2d3748;" edge="1" parent="1" source="p3" target="p4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e45" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#2d3748;" edge="1" parent="1" source="p4" target="p5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e56" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#2d3748;" edge="1" parent="1" source="p5" target="p6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e65" value="retest" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#c05621;dashed=1;fontSize=10;" edge="1" parent="1" source="p6" target="p5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1370" y="250" />
+              <mxPoint x="1130" y="250" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="stitle" value="Inventory / Item Status Flow" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=14;fontColor=#1a365d;" vertex="1" parent="1">
+          <mxGeometry x="80" y="300" width="400" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="s1" value="Available" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c6f6d5;strokeColor=#276749;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="80" y="350" width="120" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="s2" value="Reserved" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fefcbf;strokeColor=#975a16;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="250" y="350" width="120" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="s3" value="Issued" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e9d8fd;strokeColor=#6b46c1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="420" y="350" width="120" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="s4" value="Installation&#xa;in Progress" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bee3f8;strokeColor=#2b6cb0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="590" y="350" width="120" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="s5" value="Under Testing&#xa;/ Review" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fed7e2;strokeColor=#b83280;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="760" y="350" width="120" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="s6" value="Installed&#xa;Verified" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#9ae6b4;strokeColor=#22543d;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="930" y="350" width="120" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="es1" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;endFill=1;strokeWidth=1.5;strokeColor=#2d3748;" edge="1" parent="1" source="s1" target="s2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="es2" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;endFill=1;strokeWidth=1.5;strokeColor=#2d3748;" edge="1" parent="1" source="s2" target="s3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="es3" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;endFill=1;strokeWidth=1.5;strokeColor=#2d3748;" edge="1" parent="1" source="s3" target="s4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="es4" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;endFill=1;strokeWidth=1.5;strokeColor=#2d3748;" edge="1" parent="1" source="s4" target="s5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="es5" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;endFill=1;strokeWidth=1.5;strokeColor=#2d3748;" edge="1" parent="1" source="s5" target="s6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="r1" value="Returned" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#feebc8;strokeColor=#c05621;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="420" y="450" width="110" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="r2" value="Inspection" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#feebc8;strokeColor=#c05621;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="580" y="450" width="110" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="r3" value="Reusable" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c6f6d5;strokeColor=#276749;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="760" y="430" width="100" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="r4" value="Repairable" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fefcbf;strokeColor=#975a16;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="760" y="475" width="100" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="r5" value="Scrapped" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#feb2b2;strokeColor=#c53030;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="760" y="520" width="100" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="er1" value="if returned" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;endFill=1;dashed=1;strokeColor=#c05621;fontSize=10;" edge="1" parent="1" source="s3" target="r1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="er2" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;endFill=1;strokeColor=#c05621;" edge="1" parent="1" source="r1" target="r2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="er3" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;endFill=1;strokeColor=#276749;" edge="1" parent="1" source="r2" target="r3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="er4" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;endFill=1;strokeColor=#975a16;" edge="1" parent="1" source="r2" target="r4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="er5" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;endFill=1;strokeColor=#c53030;" edge="1" parent="1" source="r2" target="r5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="er6" value="back to stock" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;endFill=1;dashed=1;strokeColor=#276749;fontSize=10;" edge="1" parent="1" source="r3" target="s1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="810" y="580" />
+              <mxPoint x="140" y="580" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="audit" value="7. Audit Trail (System-Wide)&#xa;&#xa;Every action logged immutably: who · role · date/time · IP/device · old → new · remarks&#xa;Actions: Reserved · Released · Issued · Installation in Progress · Under Testing · Installed Verified · Returned · Re-Issued · Modified · Deleted · …" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e2e8f0;strokeColor=#2d3748;align=left;spacingLeft=12;fontSize=11;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="80" y="620" width="1380" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="note" value="See pages 02–06 for detailed subprocess flows." style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=11;fontColor=#718096;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="80" y="740" width="400" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="page-config-project" name="02 Config &amp; Project">
+    <mxGraphModel dx="2102" dy="928" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="t1" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=16;fontColor=#2b6cb0;" value="Section 1 — Smart SDLS Hierarchy Configuration by Admin" vertex="1">
+          <mxGeometry height="30" width="760" x="40" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="a11" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bee3f8;strokeColor=#2b6cb0;fontSize=11;" value="1.1 Admin creates Hierarchy Configuration&#xa;for Smart SDLS production" vertex="1">
+          <mxGeometry height="70" width="200" x="40" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="a12" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bee3f8;strokeColor=#2b6cb0;fontSize=11;" value="1.2 Define fixed hierarchy levels:&#xa;Product Type → Flight → SDLS →&#xa;System → Subsystem → Module → Unit → Component" vertex="1">
+          <mxGeometry height="75" width="250" x="270" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="a13" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bee3f8;strokeColor=#2b6cb0;fontSize=11;" value="1.3 Configure Product Types&#xa;• SSDLS-1 — High Data Rate&#xa;• SSDLS-2 — Low Data Rate" vertex="1">
+          <mxGeometry height="75" width="220" x="550" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="a14" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bee3f8;strokeColor=#2b6cb0;fontSize=11;" value="1.4 Save Configuration in Settings&#xa;Admin may create multiple configurations&#xa;for different project/product requirements." vertex="1">
+          <mxGeometry height="75" width="250" x="800" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="a15" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bee3f8;strokeColor=#2b6cb0;fontSize=11;" value="1.5 Configuration Available to HM&#xa;HM selects an approved configuration&#xa;when creating a project / flight." vertex="1">
+          <mxGeometry height="75" width="240" x="1080" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="e_a1" edge="1" parent="1" source="a11" style="endArrow=block;endFill=1;strokeColor=#2b6cb0;strokeWidth=1.5;" target="a12" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_a2" edge="1" parent="1" source="a12" style="endArrow=block;endFill=1;strokeColor=#2b6cb0;strokeWidth=1.5;" target="a13" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_a3" edge="1" parent="1" source="a13" style="endArrow=block;endFill=1;strokeColor=#2b6cb0;strokeWidth=1.5;" target="a14" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_a4" edge="1" parent="1" source="a14" style="endArrow=block;endFill=1;strokeColor=#2b6cb0;strokeWidth=1.5;" target="a15" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="exTitle" parent="1" style="text;html=1;align=left;fontStyle=1;fontSize=14;fontColor=#2b6cb0;" value="Smart SDLS Production Hierarchy — Example" vertex="1">
+          <mxGeometry height="30" width="1280" x="40" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="ex0" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2b6cb0;fontColor=#fff;fontStyle=1;fontSize=11;" value="PRODUCT TYPE&#xa;SSDLS-1 / SSDLS-2" vertex="1">
+          <mxGeometry height="55" width="150" x="60" y="215" as="geometry" />
+        </mxCell>
+        <mxCell id="ex1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#3182ce;fontColor=#fff;fontSize=11;" value="FLIGHT-1&#xa;(1 … n flights)" vertex="1">
+          <mxGeometry height="55" width="150" x="250" y="215" as="geometry" />
+        </mxCell>
+        <mxCell id="ex2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4299e1;fontColor=#fff;fontSize=11;" value="SDLS-1 … SDLS-n&#xa;(any number per flight)" vertex="1">
+          <mxGeometry height="55" width="170" x="440" y="215" as="geometry" />
+        </mxCell>
+        <mxCell id="ex3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#63b3ed;fontColor=#1a202c;fontSize=11;" value="System-1 … System-n&#xa;Admin-defined system set" vertex="1">
+          <mxGeometry height="55" width="180" x="650" y="215" as="geometry" />
+        </mxCell>
+        <mxCell id="ex4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#90cdf4;fontColor=#1a202c;fontSize=11;" value="Subsystem → Module&#xa;→ Unit → Component" vertex="1">
+          <mxGeometry height="55" width="190" x="870" y="215" as="geometry" />
+        </mxCell>
+        <mxCell id="ex5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ebf8ff;strokeColor=#2b6cb0;fontSize=10;" value="Same lower-level hierarchy&#xa;for every SDLS; maintained&#xa;by Admin in Settings" vertex="1">
+          <mxGeometry height="75" width="210" x="1090" y="205" as="geometry" />
+        </mxCell>
+        <mxCell id="ee1" edge="1" parent="1" source="ex0" style="endArrow=block;endFill=1;strokeColor=#2b6cb0;strokeWidth=1.5;" target="ex1" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ee2" edge="1" parent="1" source="ex1" style="endArrow=block;endFill=1;strokeColor=#2b6cb0;strokeWidth=1.5;" target="ex2" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ee3" edge="1" parent="1" source="ex2" style="endArrow=block;endFill=1;strokeColor=#2b6cb0;strokeWidth=1.5;" target="ex3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ee4" edge="1" parent="1" source="ex3" style="endArrow=block;endFill=1;strokeColor=#2b6cb0;strokeWidth=1.5;" target="ex4" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ee5" edge="1" parent="1" source="ex4" style="endArrow=block;endFill=1;strokeColor=#2b6cb0;strokeWidth=1.5;" target="ex5" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="note1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#edf2f7;strokeColor=#718096;fontSize=10;align=left;spacingLeft=10;" value="Configuration rule: Customer order determines the Product Type, number of Flights, and number of SDLS per Flight.&#xa;Admin defines the common lower-level hierarchy once; HM selects the approved configuration and does not redesign the structure during normal project creation." vertex="1">
+          <mxGeometry height="55" width="1240" x="60" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="t2" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=16;fontColor=#276749;" value="Section 2 — Project Creation &amp; Approval" vertex="1">
+          <mxGeometry height="30" width="600" x="40" y="390" as="geometry" />
+        </mxCell>
+        <mxCell id="b21" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c6f6d5;strokeColor=#276749;fontSize=11;" value="2.1 Project / Flight&#xa;Assigned to HM by PD&#xa;(Customer order defines product scope)" vertex="1">
+          <mxGeometry height="75" width="180" x="40" y="450" as="geometry" />
+        </mxCell>
+        <mxCell id="b22" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c6f6d5;strokeColor=#276749;fontSize=11;" value="2.2 HM selects approved&#xa;configuration from Settings&#xa;and creates Project / Flight&#xa;Status: DRAFT" vertex="1">
+          <mxGeometry height="85" width="200" x="250" y="450" as="geometry" />
+        </mxCell>
+        <mxCell id="b23" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#9ae6b4;strokeColor=#22543d;fontStyle=1;fontSize=11;" value="2.3 Admin reviews&#xa;Project / Flight creation&#xa;and approves&#xa;Status: APPROVED" vertex="1">
+          <mxGeometry height="85" width="180" x="480" y="450" as="geometry" />
+        </mxCell>
+        <mxCell id="b24" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fefcbf;strokeColor=#975a16;fontStyle=1;fontSize=11;" value="2.4 Generate Hierarchy&#xa;button is DISABLED before&#xa;Admin approval; enabled after&#xa;approval" vertex="1">
+          <mxGeometry height="85" width="200" x="690" y="450" as="geometry" />
+        </mxCell>
+        <mxCell id="b25" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c6f6d5;strokeColor=#276749;fontSize=11;" value="2.5 System auto-generates&#xa;selected Smart SDLS hierarchy&#xa;for the approved project&#xa;Hierarchy READY" vertex="1">
+          <mxGeometry height="85" width="210" x="920" y="450" as="geometry" />
+        </mxCell>
+        <mxCell id="b26" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c6f6d5;strokeColor=#276749;fontSize=11;" value="2.6 Project / Flight ready&#xa;for inventory assignment&#xa;&amp; reservation" vertex="1">
+          <mxGeometry height="85" width="150" x="1160" y="450" as="geometry" />
+        </mxCell>
+        <mxCell id="eb1" edge="1" parent="1" source="b21" style="endArrow=block;endFill=1;strokeColor=#276749;strokeWidth=1.5;" target="b22" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eb2" edge="1" parent="1" source="b22" style="endArrow=block;endFill=1;strokeColor=#276749;strokeWidth=1.5;" target="b23" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eb3" edge="1" parent="1" source="b23" style="endArrow=block;endFill=1;strokeColor=#276749;strokeWidth=1.5;" target="b24" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eb4" edge="1" parent="1" source="b24" style="endArrow=block;endFill=1;strokeColor=#276749;strokeWidth=1.5;" target="b25" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eb5" edge="1" parent="1" source="b25" style="endArrow=block;endFill=1;strokeColor=#276749;strokeWidth=1.5;" target="b26" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="warn" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fed7d7;strokeColor=#c53030;fontStyle=1;fontSize=11;" value="⚠ BEFORE ADMIN APPROVAL → “Generate Hierarchy” remains DISABLED.&#xa;Only APPROVED projects can proceed to hierarchy generation and subsequent inventory reservation." vertex="1">
+          <mxGeometry height="50" width="650" x="250" y="570" as="geometry" />
+        </mxCell>
+        <mxCell id="draft" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e2e8f0;strokeColor=#4a5568;fontSize=11;" value="DRAFT" vertex="1">
+          <mxGeometry height="50" width="90" x="300" y="632" as="geometry" />
+        </mxCell>
+        <mxCell id="approved" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#9ae6b4;strokeColor=#22543d;fontStyle=1;fontSize=11;" value="APPROVED" vertex="1">
+          <mxGeometry height="50" width="100" x="520" y="632" as="geometry" />
+        </mxCell>
+        <mxCell id="generated" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#bee3f8;strokeColor=#2b6cb0;fontSize=11;" value="HIERARCHY&#xa;GENERATED" vertex="1">
+          <mxGeometry height="50" width="120" x="760" y="632" as="geometry" />
+        </mxCell>
+        <mxCell id="ready" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#c6f6d5;strokeColor=#276749;fontSize=11;" value="READY FOR&#xa;INVENTORY" vertex="1">
+          <mxGeometry height="50" width="120" x="1020" y="632" as="geometry" />
+        </mxCell>
+        <mxCell id="ed1" edge="1" parent="1" style="endArrow=block;endFill=1;fontSize=10;" value="Admin approval">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="390" y="658" as="sourcePoint" />
+            <mxPoint x="520" y="658" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ed2" edge="1" parent="1" style="endArrow=block;endFill=1;fontSize=10;" value="Generate hierarchy">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="620" y="658" as="sourcePoint" />
+            <mxPoint x="760" y="658" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ed3" edge="1" parent="1" style="endArrow=block;endFill=1;fontSize=10;" value="Inventory assignment">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="880" y="658" as="sourcePoint" />
+            <mxPoint x="1020" y="658" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="foot" parent="1" style="text;html=1;align=left;fontSize=10;fontColor=#718096;" value="This page defines the Smart SDLS project structure only. The subsequent Reservation, Issue, Installation, Defect/Rework, Recall and Audit workflows remain on their existing pages." vertex="1">
+          <mxGeometry height="45" width="1270" x="43" y="960" as="geometry" />
+        </mxCell>
+        <mxCell id="ccTitle" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontStyle=1;fontSize=14;fontColor=#1a365d;" value="Configuration Change Workflow — After Hierarchy Setup / Inventory Reservation" vertex="1">
+          <mxGeometry height="35" width="1270" x="45" y="697" as="geometry" />
+        </mxCell>
+        <mxCell id="cc1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#edf2f7;strokeColor=#718096;fontSize=10;" value="CC-1 HM requests configuration change&#xa;after hierarchy setup / reservation" vertex="1">
+          <mxGeometry height="75" width="180" x="40" y="747" as="geometry" />
+        </mxCell>
+        <mxCell id="cc2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fed7d7;strokeColor=#c53030;fontStyle=1;fontSize=10;" value="CC-2 Return ALL project inventory&#xa;to IM (Reserved + Issued + related items)" vertex="1">
+          <mxGeometry height="75" width="205" x="245" y="747" as="geometry" />
+        </mxCell>
+        <mxCell id="cc3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fefcbf;strokeColor=#975a16;fontSize=10;" value="CC-3 IM inspects returned items&#xa;and releases / restores inventory&#xa;to Available or appropriate status" vertex="1">
+          <mxGeometry height="75" width="220" x="480" y="747" as="geometry" />
+        </mxCell>
+        <mxCell id="cc4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ebf8ff;strokeColor=#3182ce;fontSize=10;" value="CC-4 HM submits Change Request&#xa;with desired approved configuration" vertex="1">
+          <mxGeometry height="75" width="205" x="730" y="747" as="geometry" />
+        </mxCell>
+        <mxCell id="cc5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#9ae6b4;strokeColor=#22543d;fontStyle=1;fontSize=10;" value="CC-5 Admin reviews &amp; approves&#xa;configuration change" vertex="1">
+          <mxGeometry height="75" width="170" x="965" y="747" as="geometry" />
+        </mxCell>
+        <mxCell id="cc6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c6f6d5;strokeColor=#276749;fontStyle=1;fontSize=10;" value="CC-6 Create NEW Project / Flight&#xa;using approved configuration&#xa;→ new hierarchy + new reservation" vertex="1">
+          <mxGeometry height="75" width="145" x="1165" y="747" as="geometry" />
+        </mxCell>
+        <mxCell id="ccE1" edge="1" parent="1" source="cc1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4a5568;endArrow=block;" target="cc2" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ccE2" edge="1" parent="1" source="cc2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4a5568;endArrow=block;" target="cc3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ccE3" edge="1" parent="1" source="cc3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4a5568;endArrow=block;" target="cc4" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ccE4" edge="1" parent="1" source="cc4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4a5568;endArrow=block;" target="cc5" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ccE5" edge="1" parent="1" source="cc5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4a5568;endArrow=block;" target="cc6" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ccRule" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffaf0;strokeColor=#dd6b20;fontStyle=1;fontSize=10;" value="CONTROL RULE: &lt;span style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;span style=&quot;color: rgb(255, 44, 0);&quot;&gt;&lt;span style=&quot;color: rgb(255, 72, 19);&quot;&gt;&lt;span style=&quot;background-color: rgb(194, 255, 27);&quot;&gt;&lt;span style=&quot;background-color: rgb(255, 242, 27);&quot;&gt;Existing project configuration is NOT edited in place after hierarchy setup / reservation.&lt;br&gt;The previous project remains traceable; the desired configuration is implemented through a new approved Project / Flight.&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;" vertex="1">
+          <mxGeometry height="55" width="1270" x="40" y="864" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="page-reservation" name="03 Reservation &amp; Shortage">
+    <mxGraphModel dx="1801" dy="864" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-1" parent="1" style="text;html=1;fontStyle=1;fontSize=16;fontColor=#975a16;" value="Section 3 — Inventory Reservation (Flight → SDLS → LRU) with Shortage Handling" vertex="1">
+          <mxGeometry height="30" width="700" x="50" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fefcbf;strokeColor=#975a16;fontSize=11;" value="3.1 System checks inventory&lt;br&gt;availability for all required&lt;br&gt;hierarchy items" vertex="1">
+          <mxGeometry height="60" width="220" x="682" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-3" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#faf089;strokeColor=#975a16;fontStyle=1;fontSize=12;" value="&lt;div&gt;3.2 Item (x) available&amp;nbsp;&lt;/div&gt;&lt;div&gt;in Inventory?&lt;/div&gt;" vertex="1">
+          <mxGeometry height="100" width="230" x="677" y="249" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c6f6d5;strokeColor=#276749;fontSize=11;" value="3.3 — Reserve inventory&lt;br&gt;for HM against&lt;br&gt;Flight(s) → SDLS(s) → hierarchy items" vertex="1">
+          <mxGeometry height="70" width="200" x="327" y="264" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-5" edge="1" parent="1" source="rCP1Uh4NSTmYJTd-lIzL-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" target="rCP1Uh4NSTmYJTd-lIzL-2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="230.06" y="454" />
+              <mxPoint x="230.06" y="180" />
+            </Array>
+            <mxPoint x="350" y="510" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#9ae6b4;strokeColor=#22543d;fontSize=11;imageHeight=224;" value="3.4 Inventory reserved against&lt;br&gt;Flight → SDLS and locked&lt;br&gt;until used / released / auto-released" vertex="1">
+          <mxGeometry height="45" width="200" x="327" y="440" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fed7d7;strokeColor=#c53030;fontSize=11;" value="3.5 — Notify HM &amp;amp; IM of short items&lt;br&gt;(Part Number, Qty, Flight, SDLS, LRU)" vertex="1">
+          <mxGeometry height="70" width="260" x="1029" y="264" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#feebc8;strokeColor=#c05621;fontSize=11;" value="3.6 Wait until required&#xa;inventory becomes available" vertex="1">
+          <mxGeometry height="50" width="200" x="1059" y="363" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-9" edge="1" parent="1" source="rCP1Uh4NSTmYJTd-lIzL-10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="rCP1Uh4NSTmYJTd-lIzL-11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-10" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#feebc8;strokeColor=#c05621;fontSize=11;imageHeight=224;" value="3.7 IM enters received&#xa;Part Number / Serial Number&#xa;in Inventory Management System" vertex="1">
+          <mxGeometry height="45" width="200" x="1059" y="440" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-11" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#faf089;strokeColor=#975a16;fontStyle=1;fontSize=11;imageHeight=224;" value="3.8 Auto-remove from shortage list&lt;br&gt;&amp;amp; reserve for Flight → SDLS&lt;br&gt;on first-come-first-reserved basis" vertex="1">
+          <mxGeometry height="45" width="240" x="672" y="440" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-12" edge="1" parent="1" source="rCP1Uh4NSTmYJTd-lIzL-2" style="endArrow=block;endFill=1;strokeWidth=1.5;" target="rCP1Uh4NSTmYJTd-lIzL-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-13" edge="1" parent="1" source="rCP1Uh4NSTmYJTd-lIzL-3" style="endArrow=block;endFill=1;strokeColor=#276749;fontStyle=1;fontSize=12;" target="rCP1Uh4NSTmYJTd-lIzL-4" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-14" edge="1" parent="1" source="rCP1Uh4NSTmYJTd-lIzL-3" style="endArrow=block;endFill=1;strokeColor=#c53030;fontStyle=1;fontSize=12;" target="rCP1Uh4NSTmYJTd-lIzL-7" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-15" edge="1" parent="1" source="rCP1Uh4NSTmYJTd-lIzL-4" style="endArrow=block;endFill=1;strokeColor=#276749;" target="rCP1Uh4NSTmYJTd-lIzL-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-16" edge="1" parent="1" source="rCP1Uh4NSTmYJTd-lIzL-7" style="endArrow=block;endFill=1;strokeColor=#c05621;" target="rCP1Uh4NSTmYJTd-lIzL-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-17" edge="1" parent="1" source="rCP1Uh4NSTmYJTd-lIzL-8" style="endArrow=block;endFill=1;strokeColor=#c05621;" target="rCP1Uh4NSTmYJTd-lIzL-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-18" edge="1" parent="1" source="rCP1Uh4NSTmYJTd-lIzL-11" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;endFill=1;dashed=1;strokeColor=#975a16;fontSize=10;entryX=0.75;entryY=1;entryDx=0;entryDy=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;" target="rCP1Uh4NSTmYJTd-lIzL-4" value="FCFS auto-reserve">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="792.06" y="390" />
+              <mxPoint x="477" y="390" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-19" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#fffaf0;strokeColor=#975a16;size=14;align=left;spacingLeft=8;fontSize=11;verticalAlign=top;" value="Reservation Scope &amp;amp; Details&lt;br&gt;&lt;br&gt;• Flight / Project No.&lt;br&gt;• SDLS&lt;br&gt;• Reserved By (HM)&lt;br&gt;• Part Number / Serial Number&lt;br&gt;• Reserved Date&lt;br&gt;• Expiry Date&lt;br&gt;• Last Reminder&lt;br&gt;• Extension Count" vertex="1">
+          <mxGeometry height="200" width="140" x="60" y="224" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-20" parent="1" style="text;html=1;fontStyle=1;fontSize=14;fontColor=#c53030;" value="Side process — Reservation Expiry (deadlock prevention)" vertex="1">
+          <mxGeometry height="30" width="500" x="50" y="690" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-21" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fefcbf;strokeColor=#975a16;" value="Reserved" vertex="1">
+          <mxGeometry height="44" width="110" x="50" y="740" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-22" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#feebc8;strokeColor=#c05621;" value="Idle 30 days" vertex="1">
+          <mxGeometry height="44" width="110" x="200" y="740" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-23" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fed7d7;strokeColor=#c53030;" value="Reminder → HM" vertex="1">
+          <mxGeometry height="44" width="120" x="350" y="740" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-24" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#feb2b2;strokeColor=#c53030;fontSize=10;" value="No response" vertex="1">
+          <mxGeometry height="64" width="100" x="510" y="730" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-25" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#feebc8;strokeColor=#c05621;" value="+7 day grace" vertex="1">
+          <mxGeometry height="44" width="110" x="650" y="740" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-26" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c6f6d5;strokeColor=#276749;fontStyle=1;" value="Auto-release&#xa;back to stock" vertex="1">
+          <mxGeometry height="44" width="130" x="800" y="740" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-27" edge="1" parent="1" source="rCP1Uh4NSTmYJTd-lIzL-21" style="endArrow=block;endFill=1;" target="rCP1Uh4NSTmYJTd-lIzL-22">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-28" edge="1" parent="1" source="rCP1Uh4NSTmYJTd-lIzL-22" style="endArrow=block;endFill=1;" target="rCP1Uh4NSTmYJTd-lIzL-23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-29" edge="1" parent="1" source="rCP1Uh4NSTmYJTd-lIzL-23" style="endArrow=block;endFill=1;" target="rCP1Uh4NSTmYJTd-lIzL-24">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-30" edge="1" parent="1" source="rCP1Uh4NSTmYJTd-lIzL-24" style="endArrow=block;endFill=1;" target="rCP1Uh4NSTmYJTd-lIzL-25">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rCP1Uh4NSTmYJTd-lIzL-31" edge="1" parent="1" source="rCP1Uh4NSTmYJTd-lIzL-25" style="endArrow=block;endFill=1;" target="rCP1Uh4NSTmYJTd-lIzL-26">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="page-issue-install" name="04 Issue &amp; Install">
+    <mxGraphModel dx="2451" dy="504" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="t4" parent="1" style="text;html=1;fontStyle=1;fontSize=16;fontColor=#6b46c1;fillColor=#E7FFCF;" value="Section 4 — Issue Inventory to Developer" vertex="1">
+          <mxGeometry height="30" width="500" x="40" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="i41" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e9d8fd;strokeColor=#6b46c1;fontSize=12;" value="4.1 HM assigns hierarchy item&#xa;(module/subsystem/unit/…)&#xa;to a Developer" vertex="1">
+          <mxGeometry height="70" width="200" x="40" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="i42" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e9d8fd;strokeColor=#6b46c1;fontSize=12;" value="4.2 Developer requests&#xa;the item from IM" vertex="1">
+          <mxGeometry height="70" width="180" x="280" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="i43" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d6bcfa;strokeColor=#553c9a;fontStyle=1;fontSize=12;" value="4.3 IM issues inventory&#xa;with signature&#xa;(hard copy or digital)" vertex="1">
+          <mxGeometry height="70" width="180" x="500" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="i44" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e9d8fd;strokeColor=#6b46c1;fontSize=12;" value="4.4 Status auto-updates&#xa;to ISSUED" vertex="1">
+          <mxGeometry height="70" width="160" x="720" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="i45" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bee3f8;strokeColor=#2b6cb0;fontStyle=1;fontSize=12;" value="4.5 After 24 hours, status&#xa;auto-updates to&#xa;INSTALLATION IN PROGRESS" vertex="1">
+          <mxGeometry height="70" width="200" x="920" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ei1" edge="1" parent="1" source="i41" style="endArrow=block;endFill=1;strokeColor=#6b46c1;fontSize=12;" target="i42">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ei2" edge="1" parent="1" source="i42" style="endArrow=block;endFill=1;strokeColor=#6b46c1;fontSize=12;" target="i43">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ei3" edge="1" parent="1" source="i43" style="endArrow=block;endFill=1;strokeColor=#6b46c1;fontSize=12;" target="i44">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ei4" edge="1" parent="1" source="i44" style="endArrow=block;endFill=1;strokeColor=#2b6cb0;fontStyle=1;fontSize=12;" target="i45" value="+24h auto">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="note4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#faf5ff;strokeColor=#6b46c1;fontStyle=2;fontSize=12;" value="All status changes are automatic — no manual update needed" vertex="1">
+          <mxGeometry height="20" width="420" x="285" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="t5" parent="1" style="text;html=1;fontStyle=1;fontSize=16;fontColor=#000000;fillColor=#E7FFCF;" value="Section 5 — Installation, Testing &amp;amp; Verification" vertex="1">
+          <mxGeometry height="30" width="500" x="40" y="196" as="geometry" />
+        </mxCell>
+        <mxCell id="j51" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fed7d7;strokeColor=#c53030;fontSize=12;" value="5.1 Developer installs item" vertex="1">
+          <mxGeometry height="50" width="160" x="40" y="310" as="geometry" />
+        </mxCell>
+        <mxCell id="j52" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fed7d7;strokeColor=#c53030;fontSize=12;" value="5.2 Developer tests / inspects" vertex="1">
+          <mxGeometry height="50" width="180" x="240" y="310" as="geometry" />
+        </mxCell>
+        <mxCell id="j53" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#feb2b2;strokeColor=#c53030;fontStyle=1;fontSize=12;" value="5.3 Test result?" vertex="1">
+          <mxGeometry height="90" width="120" x="470" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="j54" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c6f6d5;strokeColor=#276749;fontSize=12;" value="5.4 Dev reports&#xa;installation complete" vertex="1">
+          <mxGeometry height="35" width="160" x="680" y="317.5" as="geometry" />
+        </mxCell>
+        <mxCell id="j55" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c6f6d5;strokeColor=#276749;fontSize=12;" value="5.5 HM verifies" vertex="1">
+          <mxGeometry height="35" width="100" x="880" y="317.5" as="geometry" />
+        </mxCell>
+        <mxCell id="j56" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#9ae6b4;strokeColor=#22543d;fontStyle=1;fontSize=12;" value="5.6 Status →&#xa;INSTALLED VERIFIED&#xa;(only after testing + HM verification)" vertex="1">
+          <mxGeometry height="55" width="180" x="1050" y="305" as="geometry" />
+        </mxCell>
+        <mxCell id="jfail" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#feebc8;strokeColor=#c05621;fontStyle=1;fontSize=12;" value="FAIL → go to&lt;br&gt;Section 6.2 (Defect/Rework)" vertex="1">
+          <mxGeometry height="35" width="170" x="680" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="ej1" edge="1" parent="1" source="j51" style="endArrow=block;endFill=1;fontSize=12;" target="j52">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ej2" edge="1" parent="1" source="j52" style="endArrow=block;endFill=1;fontSize=12;" target="j53">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ej3" edge="1" parent="1" source="j53" style="endArrow=block;endFill=1;strokeColor=#276749;fontStyle=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;fontSize=12;" target="j54" value="Pass">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ej4" edge="1" parent="1" source="j54" style="endArrow=block;endFill=1;strokeColor=#276749;fontSize=12;" target="j55">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ej5" edge="1" parent="1" source="j55" style="endArrow=block;endFill=1;strokeColor=#22543d;fontSize=12;" target="j56">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ej6" edge="1" parent="1" source="j53" style="endArrow=block;endFill=1;strokeColor=#c05621;fontStyle=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;rounded=0;curved=0;jumpSize=5;fontSize=12;" target="jfail" value="Fail">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="530" y="390" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="link45" edge="1" parent="1" source="i45" style="endArrow=block;endFill=1;dashed=1;strokeColor=#718096;fontSize=12;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="j51" value="from 4.5">
+          <mxGeometry relative="1" x="0.0189" y="20" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="1020" y="235" />
+              <mxPoint x="120" y="235" />
+            </Array>
+            <mxPoint x="1030" y="185" as="sourcePoint" />
+            <mxPoint x="130" y="344.9999999999999" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="actors" parent="1" style="shape=note;whiteSpace=wrap;html=1;fillColor=#faf5ff;strokeColor=#6b46c1;size=14;align=left;spacingLeft=8;fontSize=11;verticalAlign=top;" value="Actor map&#xa;&#xa;HM → assign hierarchy item, verify installation&#xa;Developer → request, install, test (Pass/Fail)&#xa;IM → issue / inventory lifecycle&#xa;System → automatic status &amp; weighted progress calculation" vertex="1">
+          <mxGeometry height="125" width="220" x="-200" y="455" as="geometry" />
+        </mxCell>
+        <mxCell id="pTitle" parent="1" style="text;html=1;strokeColor=none;fillColor=#f5f5f5;align=left;verticalAlign=middle;fontStyle=1;fontSize=12;fontColor=#333333;" value="Section 5A — Automatic Project Progress Calculation (Smart SDLS Hierarchy)" vertex="1">
+          <mxGeometry height="35" width="460" x="40" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="p51" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ebf8ff;strokeColor=#3182ce;fontSize=12;" value="&lt;font&gt;P-1 Hierarchy weight is derived&lt;br&gt;from actual tree concentration:&lt;br&gt;Product Type → Flight → SDLS → System →&lt;br&gt;Subsystem → Module → Unit → Component&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="220" x="40" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="p52" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ebf8ff;strokeColor=#3182ce;fontSize=12;" value="&lt;font&gt;P-2 Each required hierarchy node&lt;br&gt;contributes according to its weighted&lt;br&gt;share of the project tree — not simply&lt;br&gt;by equal System count&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="220" x="285" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="p53" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fefcbf;strokeColor=#975a16;fontSize=12;" value="P-3 Node progress follows events:&#xa;Procurement → Procured → Reserved →&#xa;Issued → Installation In Progress →&#xa;Under Testing/Review → Installed Verified" vertex="1">
+          <mxGeometry height="100" width="250" x="530" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="p54" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c6f6d5;strokeColor=#276749;fontSize=12;" value="P-4 System calculates weighted average&#xa;across all required hierarchy nodes&#xa;automatically. Example:&#xa;18 of 20 equivalent weighted units ≠ always 90%&#xa;if tree concentrations differ." vertex="1">
+          <mxGeometry height="100" width="235" x="805" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="p55" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c6f6d5;strokeColor=#276749;fontSize=12;" value="P-5 Dashboard shows:&#xa;• Overall % progress&#xa;• Flight progress&#xa;• SDLS progress&#xa;• System / subtree progress&#xa;• Current status bottlenecks" vertex="1">
+          <mxGeometry height="100" width="200" x="1065" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="pE1" edge="1" parent="1" source="p51" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4a5568;endArrow=block;" target="p52" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pE2" edge="1" parent="1" source="p52" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4a5568;endArrow=block;" target="p53" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pE3" edge="1" parent="1" source="p53" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4a5568;endArrow=block;" target="p54" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pE4" edge="1" parent="1" source="p54" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4a5568;endArrow=block;" target="p55" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="formula" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f7fafc;strokeColor=#4a5568;fontStyle=1;fontSize=11;" value="Progress of parent = Σ (Children Nodes Installed Verified) / Total Children Nodes&lt;br&gt;Node completion is driven by recorded lifecycle events; no manual project percentage entry." vertex="1">
+          <mxGeometry height="60" width="1225" x="40" y="595" as="geometry" />
+        </mxCell>
+        <mxCell id="pnote" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffaf0;strokeColor=#dd6b20;fontStyle=1;fontSize=10;" value="Completion gate: Project becomes COMPLETED / READY TO DELIVER only when all required hierarchy items reach the required final verified state. Partial completion remains visible as an automatic percentage." vertex="1">
+          <mxGeometry height="55" width="1225" x="40" y="675" as="geometry" />
+        </mxCell>
+        <mxCell id="progressLink" edge="1" parent="1" source="j56" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#276749;endArrow=block;" target="p53" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;Verified state updates progress&lt;/font&gt;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1140" y="430" />
+              <mxPoint x="655" y="430" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="hierModel" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#edf2f7;strokeColor=#718096;fontSize=10;" value="Smart SDLS progress hierarchy:&#xa;Product Type → Flight → SDLS → System → Subsystem → Module → Unit → Component" vertex="1">
+          <mxGeometry height="50" width="1225" x="40" y="750" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="page-rework-recall" name="05 Defect Rework &amp; Recall">
+    <mxGraphModel dx="1261" dy="605" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="t6" parent="1" style="text;html=1;fontStyle=1;fontSize=16;fontColor=#c05621;" value="Section 6 — Defect / Rework Loop" vertex="1">
+          <mxGeometry height="30" width="500" x="40" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="k61" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#feebc8;strokeColor=#c05621;fontSize=12;" value="6.1 Item installed" vertex="1">
+          <mxGeometry height="50" width="120" x="40" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="k62" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fed7d7;strokeColor=#c53030;fontSize=12;" value="6.2 Fails test /&#xa;defect found" vertex="1">
+          <mxGeometry height="50" width="120" x="190" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="k63" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#feebc8;strokeColor=#c05621;fontSize=12;" value="6.3 Item removed" vertex="1">
+          <mxGeometry height="50" width="120" x="340" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="k64" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#feebc8;strokeColor=#c05621;fontSize=12;" value="6.4 Returned to IM" vertex="1">
+          <mxGeometry height="50" width="120" x="490" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="k65" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fefcbf;strokeColor=#975a16;fontSize=12;" value="6.5 IM inspects" vertex="1">
+          <mxGeometry height="50" width="110" x="640" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="k66" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fefcbf;strokeColor=#975a16;fontSize=12;" value="6.6 Repaired&#xa;or replaced" vertex="1">
+          <mxGeometry height="50" width="120" x="780" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="k67" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e9d8fd;strokeColor=#6b46c1;fontSize=12;" value="6.7 Re-issued&#xa;to Developer" vertex="1">
+          <mxGeometry height="50" width="120" x="930" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="k68" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fed7d7;strokeColor=#c53030;fontSize=12;" value="6.8 Developer&#xa;re-installs" vertex="1">
+          <mxGeometry height="50" width="110" x="1080" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="k69" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fed7d7;strokeColor=#c53030;fontSize=12;" value="6.9 Re-tested /&#xa;inspected" vertex="1">
+          <mxGeometry height="50" width="110" x="1080" y="180" as="geometry" />
+        </mxCell>
+        <mxCell id="k610" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c6f6d5;strokeColor=#276749;fontStyle=1;fontSize=12;" value="6.10 HM verifies&#xa;&amp;amp; updates status" vertex="1">
+          <mxGeometry height="50" width="140" x="880" y="180" as="geometry" />
+        </mxCell>
+        <mxCell id="kloop" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#feb2b2;strokeColor=#c53030;fontSize=12;" value="Fails again?&#xa;Loop to 6.2" vertex="1">
+          <mxGeometry height="80" width="130" x="640" y="165" as="geometry" />
+        </mxCell>
+        <mxCell id="ek1" edge="1" parent="1" source="k61" style="endArrow=block;endFill=1;fontSize=12;" target="k62">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ek2" edge="1" parent="1" source="k62" style="endArrow=block;endFill=1;fontSize=12;" target="k63">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ek3" edge="1" parent="1" source="k63" style="endArrow=block;endFill=1;fontSize=12;" target="k64">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ek4" edge="1" parent="1" source="k64" style="endArrow=block;endFill=1;fontSize=12;" target="k65">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ek5" edge="1" parent="1" source="k65" style="endArrow=block;endFill=1;fontSize=12;" target="k66">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ek6" edge="1" parent="1" source="k66" style="endArrow=block;endFill=1;fontSize=12;" target="k67">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ek7" edge="1" parent="1" source="k67" style="endArrow=block;endFill=1;fontSize=12;" target="k68">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ek8" edge="1" parent="1" source="k68" style="endArrow=block;endFill=1;fontSize=12;" target="k69">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ek9" edge="1" parent="1" source="k69" style="endArrow=block;endFill=1;fontSize=12;" target="k610">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ek10" edge="1" parent="1" source="k610" style="endArrow=block;endFill=1;fontSize=12;" target="kloop">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ek11" edge="1" parent="1" source="kloop" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;endFill=1;dashed=1;strokeColor=#c53030;fontSize=12;exitX=0;exitY=0.5;exitDx=0;exitDy=0;fontStyle=1" target="k62" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="250" y="205" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="kok" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#9ae6b4;strokeColor=#22543d;fontStyle=1;fontSize=12;" value="INSTALLED&#xa;VERIFIED" vertex="1">
+          <mxGeometry height="40" width="110" x="650" y="293" as="geometry" />
+        </mxCell>
+        <mxCell id="ek13" edge="1" parent="1" source="kloop" style="endArrow=block;endFill=1;strokeColor=#276749;fontSize=12;" target="kok">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="f_E06cl7CIJQzS8DvLxy-1" connectable="0" parent="ek13" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=12;fontStyle=1" value="No" vertex="1">
+          <mxGeometry relative="1" x="0.1252" as="geometry">
+            <mxPoint y="-12" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tr" parent="1" style="text;html=1;fontStyle=1;fontSize=14;fontColor=#2b6cb0;" value="Side process — Inventory Recall (project cancelled)" vertex="1">
+          <mxGeometry height="30" width="500" x="40" y="340" as="geometry" />
+        </mxCell>
+        <mxCell id="rc1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bee3f8;strokeColor=#2b6cb0;fontSize=11;" value="PD/HM cancels project" vertex="1">
+          <mxGeometry height="50" width="160" x="40" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="rc2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bee3f8;strokeColor=#2b6cb0;fontSize=11;" value="Recall issued items&#xa;from Developer" vertex="1">
+          <mxGeometry height="50" width="160" x="240" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="rc3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fefcbf;strokeColor=#975a16;fontSize=11;" value="IM inspects" vertex="1">
+          <mxGeometry height="50" width="120" x="440" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="rc4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c6f6d5;strokeColor=#276749;fontSize=11;" value="Reusable&#xa;→ back to stock" vertex="1">
+          <mxGeometry height="50" width="140" x="760" y="350" as="geometry" />
+        </mxCell>
+        <mxCell id="rc5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fefcbf;strokeColor=#975a16;fontSize=11;" value="Repairable&#xa;→ sent to repair" vertex="1">
+          <mxGeometry height="50" width="140" x="760" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="rc6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#feb2b2;strokeColor=#c53030;fontSize=11;" value="Scrapped&#xa;→ not usable" vertex="1">
+          <mxGeometry height="50" width="140" x="760" y="490" as="geometry" />
+        </mxCell>
+        <mxCell id="er1" edge="1" parent="1" source="rc1" style="endArrow=block;endFill=1;" target="rc2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="er2" edge="1" parent="1" source="rc2" style="endArrow=block;endFill=1;" target="rc3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="er3" edge="1" parent="1" source="rc3" style="endArrow=block;endFill=1;strokeColor=#276749;rounded=0;curved=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="rc4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="670" y="375" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="er4" edge="1" parent="1" source="rc3" style="endArrow=block;endFill=1;strokeColor=#975a16;" target="rc5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="er5" edge="1" parent="1" source="rc3" style="endArrow=block;endFill=1;strokeColor=#c53030;rounded=0;curved=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="rc6">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="670" y="515" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="f_E06cl7CIJQzS8DvLxy-3" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Text" vertex="1">
+          <mxGeometry height="30" width="60" x="600" y="300" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="page-audit-roles" name="06 Audit &amp; Roles">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="t7" value="Section 7 — Audit Trail (System-Wide)" style="text;html=1;fontStyle=1;fontSize=16;fontColor=#2d3748;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="500" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="aud_box" value="Immutable log for every action" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=36;fillColor=#2d3748;fontColor=#ffffff;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;strokeColor=#1a202c;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="520" height="280" as="geometry" />
+        </mxCell>
+        <mxCell id="aud1" value="Who performed the action" style="text;strokeColor=none;fillColor=#edf2f7;align=left;spacingLeft=10;fontSize=12;fontColor=#1a202c;" vertex="1" parent="aud_box">
+          <mxGeometry y="36" width="520" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="aud2" value="Role (Admin / PD / HM / IM / Developer)" style="text;strokeColor=none;fillColor=#e2e8f0;align=left;spacingLeft=10;fontSize=12;fontColor=#1a202c;" vertex="1" parent="aud_box">
+          <mxGeometry y="70" width="520" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="aud3" value="Date / time" style="text;strokeColor=none;fillColor=#edf2f7;align=left;spacingLeft=10;fontSize=12;fontColor=#1a202c;" vertex="1" parent="aud_box">
+          <mxGeometry y="104" width="520" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="aud4" value="IP / device" style="text;strokeColor=none;fillColor=#e2e8f0;align=left;spacingLeft=10;fontSize=12;fontColor=#1a202c;" vertex="1" parent="aud_box">
+          <mxGeometry y="138" width="520" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="aud5" value="Old value → New value" style="text;strokeColor=none;fillColor=#edf2f7;align=left;spacingLeft=10;fontSize=12;fontColor=#1a202c;" vertex="1" parent="aud_box">
+          <mxGeometry y="172" width="520" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="aud6" value="Remarks" style="text;strokeColor=none;fillColor=#e2e8f0;align=left;spacingLeft=10;fontSize=12;fontColor=#1a202c;" vertex="1" parent="aud_box">
+          <mxGeometry y="206" width="520" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="aud7" value="Actions: Reserved · Released · Issued · Installation in Progress ·&#xa;Under Testing · Installed Verified · Returned · Re-Issued · Modified · Deleted" style="text;strokeColor=none;fillColor=#cbd5e0;align=left;spacingLeft=10;fontSize=11;fontColor=#1a202c;" vertex="1" parent="aud_box">
+          <mxGeometry y="240" width="520" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="roles_t" value="Roles — Responsibility Summary" style="text;html=1;fontStyle=1;fontSize=16;fontColor=#2d3748;" vertex="1" parent="1">
+          <mxGeometry x="600" y="20" width="400" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="role_admin" value="Admin&#xa;Hierarchy configs · Approve projects · Approve config changes" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2b6cb0;fontColor=#fff;fontSize=11;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="600" y="70" width="340" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="role_pd" value="PD — Project Director&#xa;Assign projects to HM · Cancel project / trigger recall" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#276749;fontColor=#fff;fontSize=11;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="600" y="140" width="340" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="role_hm" value="HM — Hierarchy Manager&#xa;Create draft · Select config · Generate hierarchy · Reserve · Assign Dev · Verify" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#975a16;fontColor=#fff;fontSize=11;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="600" y="210" width="340" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="role_im" value="IM — Inventory Manager&#xa;Stock receipt · Issue + signature · Inspection · Shortage fulfill" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#6b46c1;fontColor=#fff;fontSize=11;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="600" y="280" width="340" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="role_dev" value="Developer (User / Engineer)&#xa;Request item · Install · Test (Pass/Fail) · Report complete" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c53030;fontColor=#fff;fontSize=11;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="600" y="350" width="340" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" value="Diagram file notes&#xa;&#xa;• Multi-page: Overview | Config &amp; Project | Reservation | Issue &amp; Install | Rework &amp; Recall | Audit &amp; Roles&#xa;• Open in diagrams.net (draw.io) or VS Code Draw.io extension&#xa;• Export to Visio: File → Export as → VSDX…" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#edf2f7;strokeColor=#4a5568;align=left;spacingLeft=12;fontSize=11;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="40" y="400" width="900" height="120" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
