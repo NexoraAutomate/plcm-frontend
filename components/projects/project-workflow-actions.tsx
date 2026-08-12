@@ -240,7 +240,7 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
           ) : null}
           {isReady ? (
             <p className="w-full text-xs text-muted-foreground">
-              Hierarchy generated — project is ready for inventory reservation (Spec 04).
+              Hierarchy generated — reserve inventory against Flight → SDLS nodes below.
             </p>
           ) : null}
         </WorkflowCan>

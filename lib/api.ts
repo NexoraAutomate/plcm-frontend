@@ -296,6 +296,40 @@ export const projects = {
         }>;
       }>;
     }>(`/projects/${id}/hierarchy-tree/`),
+  listReservations: (id: number, activeOnly = false) =>
+    api.get<Models.InventoryReservation[]>(`/projects/${id}/reservations/`, {
+      params: { active_only: activeOnly },
+    }),
+  checkReservationAvailability: (
+    id: number,
+    params: {
+      target_entity_type: string;
+      target_entity_id: number;
+      part_number?: string;
+    }
+  ) =>
+    api.get<Models.InventoryAvailabilityCheck>(
+      `/projects/${id}/reservations/availability`,
+      { params }
+    ),
+  createReservation: (
+    id: number,
+    data: {
+      target_entity_type: string;
+      target_entity_id: number;
+      flight_id?: number;
+      sdls_id?: number;
+      inventory_id?: number;
+      inventory_instance_id?: number;
+      part_number?: string;
+      serial_number?: string;
+      notes?: string;
+    }
+  ) => api.post<Models.InventoryReservation>(`/projects/${id}/reservations/`, data),
+  releaseReservation: (projectId: number, reservationId: number) =>
+    api.post<Models.InventoryReservation>(
+      `/projects/${projectId}/reservations/${reservationId}/release/`
+    ),
   update: (id: number, data: Partial<Models.Project>) => api.put<Models.Project>(`/projects/${id}/`, data),
   delete: (id: number) => api.delete(`/projects/${id}/`),
   getSystems: (id: number) => api.get<Models.System[]>(`/projects/${id}/systems/`),

@@ -109,12 +109,12 @@ AVAILABLE → RESERVED
 
 ## Acceptance criteria
 
-- [ ] Available unit can be reserved for a specific Flight/SDLS hierarchy node.
-- [ ] Same unit cannot be reserved twice / by another project.
-- [ ] Reservation metadata fields stored as specified.
-- [ ] Item shows status `RESERVED`.
-- [ ] HM can release before issue → `AVAILABLE`.
-- [ ] Project not ready for inventory cannot reserve.
+- [x] Available unit can be reserved for a specific Flight/SDLS hierarchy node.
+- [x] Same unit cannot be reserved twice / by another project.
+- [x] Reservation metadata fields stored as specified.
+- [x] Item shows status `RESERVED`.
+- [x] HM can release before issue → `AVAILABLE`.
+- [x] Project not ready for inventory cannot reserve.
 
 ---
 

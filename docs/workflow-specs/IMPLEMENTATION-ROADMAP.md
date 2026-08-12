@@ -8,7 +8,7 @@ Use this checklist while shipping. Mark each row only after **implementation + t
 | ☑ | 01 | Hierarchy configuration | Admin creates SSDLS-1/2 configs |
 | ☑ | 02 | Project create & approve | Draft blocked; Admin approve enables gate |
 | ☑ | 03 | Hierarchy generation | Tree counts match scope; ready for inventory |
-| ☐ | 04 | Inventory reservation | AVAILABLE→RESERVED lock |
+| ☑ | 04 | Inventory reservation | AVAILABLE→RESERVED lock |
 | ☐ | 05 | Shortage & FCFS | Notify + receipt auto-reserve order |
 | ☐ | 06 | Reservation expiry | Reminder 30d + grace 7d + auto-release |
 | ☐ | 07 | Issue to developer | Signature + ISSUED + 24h install-in-progress |

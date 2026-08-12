@@ -37,6 +37,7 @@ import { syncEntityPicture } from '@/lib/entity-picture-upload';
 import { useHierarchyCreateFormOptions } from '@/hooks/use-hierarchy-create-form-options';
 import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
 import { ProjectWorkflowActions } from '@/components/projects/project-workflow-actions';
+import { ProjectReservationsPanel } from '@/components/projects/project-reservations-panel';
 
 export default function ProjectDetailPage() {
   const { entityLabel } = useAppDefinitions();
@@ -387,6 +388,8 @@ export default function ProjectDetailPage() {
         users={users}
         onUpdated={(next) => setWorkflowProject(next)}
       />
+
+      <ProjectReservationsPanel project={project} />
 
       {/* Project Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

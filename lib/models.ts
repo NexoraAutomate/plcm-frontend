@@ -282,6 +282,49 @@ export interface ProjectDraftCreate {
   sdls_per_flight: number
 }
 
+/** Spec 04 — project hierarchy inventory reservation */
+export interface InventoryReservation {
+  id: number
+  project_id: number
+  flight_id: number
+  sdls_id: number
+  target_entity_type: string
+  target_entity_id: number
+  inventory_id: number
+  inventory_instance_id?: number | null
+  reserved_by_user_id: number
+  reserved_at: string
+  expires_at: string
+  last_reminder_at?: string | null
+  extension_count: number
+  part_number?: string | null
+  serial_number?: string | null
+  status: string
+  released_at?: string | null
+  released_by_user_id?: number | null
+  notes?: string | null
+  flight_code?: string | null
+  flight_name?: string | null
+  sdls_code?: string | null
+  sdls_name?: string | null
+  inventory_name?: string | null
+  reserved_by_name?: string | null
+}
+
+export interface InventoryAvailabilityCheck {
+  available: boolean
+  free_quantity?: number | null
+  inventory_id?: number | null
+  inventory_name?: string | null
+  part_number?: string | null
+  serial_numbers?: string[] | null
+  flight_id?: number | null
+  sdls_id?: number | null
+  system_id?: number | null
+  reservation_id?: number | null
+  reason?: string | null
+}
+
 // Shared install metadata for hierarchy hardware entities
 export interface HierarchyInstallFields {
   installation_date?: string

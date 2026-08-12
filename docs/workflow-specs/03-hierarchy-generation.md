@@ -99,13 +99,13 @@ APPROVED  ──Generate hierarchy──►  HIERARCHY_GENERATED  ──►  REA
 
 ## Acceptance criteria
 
-- [ ] Generate is disabled for `DRAFT` projects (UI + API).
-- [ ] Generate succeeds for `APPROVED` and creates full level tree.
-- [ ] Flight count and SDLS-per-flight match project scope fields.
-- [ ] Each SDLS has the same System→…→Component template structure from config.
-- [ ] Project ends in `READY_FOR_INVENTORY` (or `HIERARCHY_GENERATED` then ready).
-- [ ] Second generate is blocked unless explicitly designed otherwise.
-- [ ] Non-HM cannot generate.
+- [x] Generate is disabled for `DRAFT` projects (UI + API).
+- [x] Generate succeeds for `APPROVED` and creates full level tree.
+- [x] Flight count and SDLS-per-flight match project scope fields.
+- [x] Each SDLS has the same System→…→Component template structure from config.
+- [x] Project ends in `READY_FOR_INVENTORY` (or `HIERARCHY_GENERATED` then ready).
+- [x] Second generate is blocked unless explicitly designed otherwise.
+- [x] Non-HM cannot generate.
 
 ---
 
