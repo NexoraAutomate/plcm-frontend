@@ -159,11 +159,11 @@ Later: `READY_FOR_INVENTORY` (and mid-life states) may go to `CANCELLED` (Spec 1
 
 ## Acceptance criteria
 
-- [ ] Five roles are distinguishable in auth/RBAC for a test user matrix.
-- [ ] All happy-path and return-path item statuses exist and display consistently.
-- [ ] Project statuses `DRAFT`, `APPROVED`, `HIERARCHY_GENERATED`, `READY_FOR_INVENTORY` exist.
-- [ ] Illegal transition is rejected by domain helper in unit tests (even if no UI yet).
-- [ ] Permission keys listed above exist or are documented as stubs for Spec 01+.
+- [x] Five roles are distinguishable in auth/RBAC for a test user matrix.
+- [x] All happy-path and return-path item statuses exist and display consistently.
+- [x] Project statuses `DRAFT`, `APPROVED`, `HIERARCHY_GENERATED`, `READY_FOR_INVENTORY` exist.
+- [x] Illegal transition is rejected by domain helper in unit tests (even if no UI yet).
+- [x] Permission keys listed above exist or are documented as stubs for Spec 01+.
 
 ---
 

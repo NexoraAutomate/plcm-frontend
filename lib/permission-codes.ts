@@ -142,6 +142,26 @@ export const P = {
   create_configuration_history: 'create_configuration_history',
   edit_configuration_history: 'edit_configuration_history',
   delete_configuration_history: 'delete_configuration_history',
+
+  // Workflow stubs (Spec 00 — enforced in Spec 01+)
+  hierarchy_config_manage: 'hierarchy_config.manage',
+  project_assign_hm: 'project.assign_hm',
+  project_create_draft: 'project.create_draft',
+  project_approve: 'project.approve',
+  hierarchy_generate: 'hierarchy.generate',
+  inventory_reserve: 'inventory.reserve',
+  inventory_release: 'inventory.release',
+  inventory_receive: 'inventory.receive',
+  inventory_issue_workflow: 'inventory.issue',
+  hierarchy_assign_developer: 'hierarchy.assign_developer',
+  item_request: 'item.request',
+  item_install_test: 'item.install_test',
+  item_verify: 'item.verify',
+  item_inspect: 'item.inspect',
+  project_cancel: 'project.cancel',
+  config_change_request: 'config_change.request',
+  config_change_approve: 'config_change.approve',
+  audit_read: 'audit.read',
 } as const;
 
 export type PermissionCode = (typeof P)[keyof typeof P];
@@ -169,6 +189,24 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [P.cascade_faults]: 'Cascade Faults',
   [P.suspect_children]: 'Suspect Children',
   [P.close_maintenance]: 'Close Maintenance',
+  [P.hierarchy_config_manage]: 'Manage Hierarchy Config',
+  [P.project_assign_hm]: 'Assign Hierarchy Manager',
+  [P.project_create_draft]: 'Create Draft Project',
+  [P.project_approve]: 'Approve Project',
+  [P.hierarchy_generate]: 'Generate Hierarchy',
+  [P.inventory_reserve]: 'Reserve Inventory',
+  [P.inventory_release]: 'Release Reservation',
+  [P.inventory_receive]: 'Receive Inventory',
+  [P.inventory_issue_workflow]: 'Issue Inventory (Workflow)',
+  [P.hierarchy_assign_developer]: 'Assign Developer',
+  [P.item_request]: 'Request Item',
+  [P.item_install_test]: 'Install / Test Item',
+  [P.item_verify]: 'Verify Installation',
+  [P.item_inspect]: 'Inspect Returned Item',
+  [P.project_cancel]: 'Cancel Project',
+  [P.config_change_request]: 'Request Config Change',
+  [P.config_change_approve]: 'Approve Config Change',
+  [P.audit_read]: 'Read Audit Trail',
 };
 
 export function permissionTooltip(permission: string | string[]): string {
@@ -205,6 +243,7 @@ export const NAV_PERMISSIONS: Record<string, PermissionCode | PermissionCode[]> 
     P.view_hierarchy,
     P.manage_settings,
     P.manage_notifications,
+    P.hierarchy_config_manage,
   ],
   '/dashboard': P.view_executive_dashboard,
   '/maintenanceLogs': P.view_maintenance,
@@ -227,6 +266,7 @@ export const SETTINGS_ACCESS_PERMISSIONS: PermissionCode[] = [
   P.manage_notifications,
   P.backup_database,
   P.restore_database,
+  P.hierarchy_config_manage,
 ];
 
 /**

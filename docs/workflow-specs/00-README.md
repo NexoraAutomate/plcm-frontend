@@ -4,6 +4,8 @@
 **Purpose:** Individual, sequential feature specs for one-by-one implementation and test.  
 **Rule:** Implement and test the current spec fully before starting the next.
 
+**Progress:** Spec 00 and Spec 01 are implemented. Next: Spec 02 (project create & approve).
+
 ---
 
 ## Implementation order
@@ -32,17 +34,20 @@
 ```
 1. Hierarchy Configuration (Admin)
         ↓
-2. Project Create & Approval (PD / HM / Admin)
+2. Project Create (HM)
         ↓
-3. Inventory Reservation & Shortage (HM / IM)
+3. Project Approval (PD / Admin)
         ↓
-4. Issue to Developer (HM / Dev / IM)
+4. Inventory Reservation & Shortage (HM / IM)
         ↓
-5. Install / Test / Verify (Dev / HM)
+5. Issue to Developer (HM / Dev / IM)
         ↓
-6. Defect / Rework  ⟷  retest  |  or Recall on cancel
+6. Install / Test / Verify (Dev / HM)
         ↓
-7. Audit Trail (system-wide, all steps above)
+7. Defect / Rework  ⟷  retest  |  or Recall on cancel
+        ↓
+8. Audit Trail (system-wide, all steps above)
+
 ```
 
 ### Happy-path inventory status chain

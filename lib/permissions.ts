@@ -8,13 +8,23 @@ import { permissionTooltip } from '@/lib/permission-codes';
  * Prefer `can('create_users')` over raw string comparisons.
  */
 export function usePermissions() {
-  const { permissions, can, hasAllPermissions, hasAccess, user } = useAuth();
+  const {
+    permissions,
+    can,
+    hasAllPermissions,
+    hasAccess,
+    hasWorkflowRole,
+    isInventoryManager,
+    user,
+  } = useAuth();
   return {
     permissions,
     loading: false,
     can,
     hasAllPermissions,
     hasAccess,
+    hasWorkflowRole,
+    isInventoryManager,
     user,
     tooltip: permissionTooltip,
   };

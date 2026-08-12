@@ -1,0 +1,35 @@
+---
+description: Require user permission and vulnerability checks before installing any new NPM package
+alwaysApply: true
+---
+
+# NPM Package Install Policy
+
+Before installing, adding, or upgrading any NPM package (`npm install`, `npm i`, `npx` that installs deps, editing `package.json` dependencies, or equivalent):
+
+## 1. Ask permission first
+
+- Stop and ask the user for explicit approval **before** running any install command.
+- Include: package name, version (or range), why it is needed, and whether it is a prod or dev dependency.
+- Do **not** install until the user confirms.
+
+## 2. Check for known vulnerabilities / malware
+
+Before asking (or as part of the permission request), check the package against **verified online sources**:
+
+- **npm advisory / audit data**: `npm audit` (after dry-run consideration) and [https://www.npmjs.com/package/<name>](https://www.npmjs.com)
+- **GitHub Advisory / OSV**: [https://github.com/advisories](https://github.com/advisories) or [https://osv.dev](https://osv.dev)
+- **Snyk** (when available): [https://security.snyk.io](https://security.snyk.io) package lookup
+- Prefer packages with clear maintainers, recent releases, and a real repository; flag typosquatting, brand-new empty packages, or sudden maintainer changes.
+
+Summarize findings for the user: known CVEs/severity, malware reports, or "no known issues found" plus which sources you checked.
+
+## 3. Only install after approval
+
+- If the user declines, or a serious vulnerability/malware signal exists and they do not accept the risk: do **not** install; propose alternatives if useful.
+- After approval: install only the agreed package/version; avoid unrelated dependency changes.
+
+```text
+❌ BAD: npm install lodash  (no ask, no security check)
+✅ GOOD: Propose lodash@x.y.z → check npm/OSV/Snyk → report findings → wait for user "yes" → then install
+```

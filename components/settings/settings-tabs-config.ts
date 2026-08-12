@@ -10,6 +10,7 @@ import {
   GitBranch,
   DatabaseBackup,
   Tags,
+  Network,
 } from 'lucide-react';
 
 export type SettingsTabId =
@@ -20,6 +21,7 @@ export type SettingsTabId =
   | 'alerts'
   | 'security'
   | 'definitions'
+  | 'hierarchy-configs'
   | 'hierarchy'
   | 'backup';
 
@@ -86,6 +88,13 @@ export const SETTINGS_TABS: SettingsTabConfig[] = [
     description: 'Serial/part number templates and hierarchy entity display names',
     icon: Tags,
     permission: P.manage_settings,
+  },
+  {
+    id: 'hierarchy-configs',
+    label: 'SDLS Configurations',
+    description: 'Smart SDLS hierarchy configurations (product types + System→Component template)',
+    icon: Network,
+    permission: P.hierarchy_config_manage,
   },
   {
     id: 'hierarchy',

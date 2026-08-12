@@ -8,6 +8,10 @@ import {
   statusBadgeStyleFromColor,
 } from "@/lib/status-colors";
 import { DataStoreStatusesContext } from "@/lib/status-color-context";
+import {
+  workflowStatusColor,
+  workflowStatusLabel,
+} from "@/lib/workflow-status";
 
 /** Dark solid backgrounds with white text (legacy name fallbacks) */
 const statusColors: Record<string, string> = {
@@ -69,11 +73,15 @@ export function StatusBadge({
   className?: string;
 }) {
   const storeColors = useContext(DataStoreStatusesContext);
-  const fromStore = storeColors?.[status];
+  const label = workflowStatusLabel(status);
+  const fromStore = storeColors?.[status] ?? storeColors?.[label];
+  const fromWorkflow = workflowStatusColor(status);
   const resolved =
     color ||
     fromStore ||
+    fromWorkflow ||
     DEFAULT_STATUS_COLOR_BY_NAME[status] ||
+    DEFAULT_STATUS_COLOR_BY_NAME[label] ||
     null;
   const customStyle = statusBadgeStyleFromColor(resolved);
 
@@ -83,11 +91,14 @@ export function StatusBadge({
       style={customStyle}
       className={cn(
         "text-xs font-medium border",
-        !customStyle && (statusColors[status] || "bg-slate-700 text-white border-slate-800"),
+        !customStyle &&
+          (statusColors[status] ||
+            statusColors[label] ||
+            "bg-slate-700 text-white border-slate-800"),
         className
       )}
     >
-      {status}
+      {label}
     </Badge>
   );
 }

@@ -9,6 +9,10 @@ import {
   type ReactNode,
 } from 'react';
 import * as Models from './models';
+import {
+  hasWorkflowRole as matchWorkflowRole,
+  type WorkflowRoleCode,
+} from './workflow-roles';
 
 interface AuthContextType {
   user: Models.User | null;
@@ -28,8 +32,10 @@ interface AuthContextType {
   /** True if the user has every listed permission (AND). */
   hasAllPermissions: (permissions: string[]) => boolean;
   can: (permission: string | string[]) => boolean;
-  /** Admin or SubAdmin — full warehouse + issue/accept returns. */
+  /** Admin, SubAdmin, or InventoryManager — warehouse + issue/accept returns. */
   isInventoryManager: () => boolean;
+  /** Spec 00 workflow role check (ADMIN / PD / HM / IM / DEV or DB names). */
+  hasWorkflowRole: (role: WorkflowRoleCode | WorkflowRoleCode[] | string | string[]) => boolean;
   refreshUser: () => Promise<void>;
 }
 
@@ -281,9 +287,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isInventoryManager = useCallback(() => {
     return (user?.roles ?? []).some((role) => {
       const name = role.toLowerCase();
-      return name === 'admin' || name === 'subadmin';
+      return (
+        name === 'admin' ||
+        name === 'subadmin' ||
+        name === 'inventorymanager' ||
+        name === 'inventory manager'
+      );
     });
   }, [user?.roles]);
+
+  const hasWorkflowRole = useCallback(
+    (role: WorkflowRoleCode | WorkflowRoleCode[] | string | string[]) => {
+      if (!user) return false;
+      if (isAdmin()) return true;
+      const need = (Array.isArray(role) ? role : [role]) as WorkflowRoleCode[];
+      return matchWorkflowRole(user.roles ?? [], need);
+    },
+    [user, isAdmin]
+  );
 
   const can = useCallback(
     (permission: string | string[]) => {
@@ -345,6 +366,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         hasAllPermissions,
         can,
         isInventoryManager,
+        hasWorkflowRole,
         refreshUser,
       }}
     >

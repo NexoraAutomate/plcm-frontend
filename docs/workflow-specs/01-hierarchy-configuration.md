@@ -116,13 +116,13 @@ PRODUCT TYPE (SSDLS-1 / SSDLS-2)
 
 ## Acceptance criteria
 
-- [ ] Admin can create a Smart SDLS configuration with the fixed 8-level model.
-- [ ] Admin can define SSDLS-1 and SSDLS-2 (and mark product types).
-- [ ] Admin can define System set and lower hierarchy template once per config.
-- [ ] Multiple configs can exist and be listed.
-- [ ] Non-Admin cannot create/edit configs.
-- [ ] HM (or public project-create API) can list only available configurations.
-- [ ] Saved config retains structure required for auto-generation in Spec 03.
+- [x] Admin can create a Smart SDLS configuration with the fixed 8-level model.
+- [x] Admin can define SSDLS-1 and SSDLS-2 (and mark product types).
+- [x] Admin can define System set and lower hierarchy template once per config.
+- [x] Multiple configs can exist and be listed.
+- [x] Non-Admin cannot create/edit configs.
+- [x] HM (or public project-create API) can list only available configurations.
+- [x] Saved config retains structure required for auto-generation in Spec 03.
 
 ---
 
@@ -133,6 +133,8 @@ PRODUCT TYPE (SSDLS-1 / SSDLS-2)
 3. Mark Config B unavailable → HM list excludes B.
 4. Reload app / re-fetch API → structure stable.
 5. Snapshot storage: editing Config A later does not rewrite fields of a previously frozen snapshot if snapshots are implemented (or document deferred freeze until Spec 03).
+
+**Snapshot note (Spec 01):** Configurations carry a monotonic `version` field bumped on each edit. Immutable project-bound snapshots are deferred to Spec 03 (hierarchy generation), when a project freezes `configuration_id` + `version`.
 
 ---
 

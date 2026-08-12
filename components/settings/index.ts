@@ -8,6 +8,7 @@ export { RolesPanel } from './roles-panel';
 export { RoleAccessPanel } from './role-access-panel';
 export { StatusesPanel } from './statuses-panel';
 export { HierarchyPanel } from './hierarchy-panel';
+export { HierarchyConfigPanel } from './hierarchy-config-panel';
 export { SecurityPanel } from './security-panel';
 export { AlertsPanel } from './alerts-panel';
 export { BackupPanel } from './backup-panel';

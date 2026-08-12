@@ -382,6 +382,73 @@ export interface Hierarchy {
   updated_at?: string
 }
 
+/** Spec 01 — Smart SDLS hierarchy configuration */
+export interface HierarchyConfigProductType {
+  id?: number
+  code: string
+  name: string
+  description?: string | null
+  sort_order?: number
+}
+
+export interface HierarchyConfigNode {
+  id?: number
+  client_key: string
+  parent_id?: number | null
+  parent_client_key?: string | null
+  level: string
+  name: string
+  description?: string | null
+  abbreviation?: string | null
+  sort_order?: number
+}
+
+export interface HierarchyConfiguration {
+  id: number
+  code: string
+  name: string
+  description?: string | null
+  notes?: string | null
+  is_available: boolean
+  version: number
+  created_at?: string
+  updated_at?: string
+  created_by_id?: number | null
+  product_types: HierarchyConfigProductType[]
+  nodes: HierarchyConfigNode[]
+}
+
+export interface HierarchyConfigurationSummary {
+  id: number
+  code: string
+  name: string
+  description?: string | null
+  is_available: boolean
+  version: number
+  product_type_codes: string[]
+}
+
+export interface HierarchyConfigurationWrite {
+  code: string
+  name: string
+  description?: string | null
+  notes?: string | null
+  is_available?: boolean
+  product_types: HierarchyConfigProductType[]
+  nodes: HierarchyConfigNode[]
+}
+
+export interface HierarchyConfigMeta {
+  fixed_levels: Array<{
+    code: string
+    label: string
+    order: number
+    is_template_level: boolean
+  }>
+  default_product_types: Array<{ code: string; name: string; description?: string }>
+  default_notes: string
+}
+
 // Inventory — fields mirror hierarchy entities for install-from-stock
 export interface InventoryInstance extends HierarchyInstallFields {
   id: number

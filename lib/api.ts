@@ -327,6 +327,33 @@ export const hierarchies = {
   delete: (id: number) => api.delete(`/hierarchies/${id}/`),
 };
 
+// Spec 01 — Smart SDLS hierarchy configurations
+export const hierarchyConfigurations = {
+  meta: () => api.get<Models.HierarchyConfigMeta>("/hierarchy-configurations/meta"),
+  list: (availableOnly = false) =>
+    api.get<Models.HierarchyConfiguration[]>("/hierarchy-configurations/", {
+      params: buildQueryParams({ available_only: availableOnly || undefined }),
+    }),
+  listAvailable: () =>
+    api.get<Models.HierarchyConfigurationSummary[]>(
+      "/hierarchy-configurations/available"
+    ),
+  get: (id: number) =>
+    api.get<Models.HierarchyConfiguration>(`/hierarchy-configurations/${id}`),
+  create: (data: Models.HierarchyConfigurationWrite) =>
+    api.post<Models.HierarchyConfiguration>("/hierarchy-configurations/", data),
+  update: (id: number, data: Partial<Models.HierarchyConfigurationWrite>) =>
+    api.put<Models.HierarchyConfiguration>(`/hierarchy-configurations/${id}`, data),
+  setAvailable: (id: number, isAvailable: boolean) =>
+    api.patch<Models.HierarchyConfiguration>(
+      `/hierarchy-configurations/${id}/availability`,
+      null,
+      { params: { is_available: isAvailable } }
+    ),
+  remove: (id: number, hard = false) =>
+    api.delete(`/hierarchy-configurations/${id}`, { params: { hard } }),
+};
+
 // Inventory
 export const inventory = {
   list: (skip = 0, limit = 100, inventoryType?: string, filters?: ListFilterParams) =>
