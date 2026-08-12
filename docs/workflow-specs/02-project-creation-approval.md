@@ -74,6 +74,8 @@ Generate Hierarchy remains **disabled** until Spec 03 runs after approval.
 4. Customer order defines product scope (type, flights, SDLS counts) — fields must be captured on create/edit in draft.
 5. Editing material scope fields after approve may require re-approval (decide and document; default: freeze config selection and core counts at approval, allow only non-structural fields unless Admin reopens).
 
+**Spec 02 decision:** After `APPROVED`, structural fields (`hierarchy_config_id`, `product_type`, `flight_count`, `sdls_per_flight`, config version) are frozen on update. Non-structural fields (name, description, dates) remain editable.
+
 ---
 
 ## Data model (minimum fields)
@@ -111,12 +113,12 @@ Generate Hierarchy remains **disabled** until Spec 03 runs after approval.
 
 ## Acceptance criteria
 
-- [ ] PD can assign an HM to a project context.
-- [ ] HM can create a project in `DRAFT` with a selected Spec 01 configuration.
-- [ ] Only Admin can move status to `APPROVED`.
-- [ ] Non-Admin approve attempts fail.
-- [ ] Generate Hierarchy cannot succeed for `DRAFT` (API + UI).
-- [ ] Approved project still does not auto-generate hierarchy until Spec 03 action.
+- [x] PD can assign an HM to a project context.
+- [x] HM can create a project in `DRAFT` with a selected Spec 01 configuration.
+- [x] Only Admin can move status to `APPROVED`.
+- [x] Non-Admin approve attempts fail.
+- [x] Generate Hierarchy cannot succeed for `DRAFT` (API + UI).
+- [x] Approved project still does not auto-generate hierarchy until Spec 03 action.
 
 ---
 

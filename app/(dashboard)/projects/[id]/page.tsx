@@ -36,7 +36,7 @@ import {
 import { syncEntityPicture } from '@/lib/entity-picture-upload';
 import { useHierarchyCreateFormOptions } from '@/hooks/use-hierarchy-create-form-options';
 import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
-import { isCurrentInstallEntity } from '@/lib/entity-replacement';
+import { ProjectWorkflowActions } from '@/components/projects/project-workflow-actions';
 
 export default function ProjectDetailPage() {
   const { entityLabel } = useAppDefinitions();
@@ -48,6 +48,7 @@ export default function ProjectDetailPage() {
     projects,
     systems,
     orders,
+    users,
     createSystem,
     createSubsystem,
     createModule,
@@ -55,9 +56,9 @@ export default function ProjectDetailPage() {
     createComponent,
     deleteSystem,
     updateSystem,
-    users,
     runSilentEntityBatch,
   } = useDataStore();
+  const [workflowProject, setWorkflowProject] = useState<Models.Project | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -67,7 +68,19 @@ export default function ProjectDetailPage() {
   const [loadingStatuses, setLoadingStatuses] = useState(true);
   const [systemHierarchyNames, setSystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
 
-  const project = projects.find((p) => String(p.id) === projectId);
+  const project =
+    workflowProject && String(workflowProject.id) === projectId
+      ? workflowProject
+      : projects.find((p) => String(p.id) === projectId);
+
+  useEffect(() => {
+    const id = Number(projectId);
+    if (!Number.isFinite(id)) return;
+    void api.projects
+      .get(id)
+      .then((res) => setWorkflowProject(res.data))
+      .catch(() => undefined);
+  }, [projectId]);
   const projectSystems = project
     ? systems.filter((s) => s.project_id === project.id && isCurrentInstallEntity(s))
     : [];
@@ -368,6 +381,12 @@ export default function ProjectDetailPage() {
           </Link>
         </Button>
       </div>
+
+      <ProjectWorkflowActions
+        project={project}
+        users={users}
+        onUpdated={(next) => setWorkflowProject(next)}
+      />
 
       {/* Project Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

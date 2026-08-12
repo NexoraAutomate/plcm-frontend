@@ -37,13 +37,10 @@ import { EntityCountCell } from '@/components/entity-count-cell';
 import { Progress } from '@/components/ui/progress';
 import { ProjectProgressDialog } from '@/components/projects/project-progress-dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-  createCompleteHierarchy,
-  summarizeHierarchyCounts,
-} from '@/lib/create-complete-hierarchy';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
+import * as api from '@/lib/api';
+import type { HierarchyConfigurationSummary } from '@/lib/models';
 
 export default function ProjectsPage(){
   const router = useRouter();
@@ -78,8 +75,8 @@ export default function ProjectsPage(){
   const [isProgressOpen, setIsProgressOpen] = useState(false);
   const [progressProject, setProgressProject] = useState<Models.Project | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [createCompleteHierarchyEnabled, setCreateCompleteHierarchyEnabled] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [availableConfigs, setAvailableConfigs] = useState<HierarchyConfigurationSummary[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -88,6 +85,10 @@ export default function ProjectsPage(){
     owner_id: 0,
     order_id: 0,
     status_id: 0,
+    hierarchy_config_id: 0,
+    product_type: '',
+    flight_count: 1,
+    sdls_per_flight: 1,
   });
   const { data: statuses = [] } = useStatusesByTypeQuery('projects');
 
@@ -100,9 +101,20 @@ export default function ProjectsPage(){
       owner_id: 0,
       order_id: 0,
       status_id: statuses[0]?.id ?? 0,
+      hierarchy_config_id: 0,
+      product_type: '',
+      flight_count: 1,
+      sdls_per_flight: 1,
     });
-    setCreateCompleteHierarchyEnabled(true);
   }
+
+  useEffect(() => {
+    if (!isCreateOpen) return;
+    void api.hierarchyConfigurations
+      .listAvailable()
+      .then((res) => setAvailableConfigs(res.data ?? []))
+      .catch(() => setAvailableConfigs([]));
+  }, [isCreateOpen]);
 
   useEffect(() => {
     if (isCreateOpen && formData.status_id === 0 && statuses[0]?.id) {
@@ -155,39 +167,42 @@ export default function ProjectsPage(){
   );
 
   async function handleCreate() {
-    if (!formData.name.trim() || !formData.owner_id  || !formData.order_id || !formData.start_date || !formData.end_date) {
-      toast.error('Please fill in all required fields');
+    if (
+      !formData.name.trim() ||
+      !formData.hierarchy_config_id ||
+      !formData.product_type ||
+      !formData.flight_count ||
+      !formData.sdls_per_flight
+    ) {
+      toast.error('Name, configuration, product type, and scope counts are required');
       return;
     }
     setIsCreating(true);
     try {
-      const project = await createProject(formData);
-
-      if (createCompleteHierarchyEnabled) {
-        try {
-          const counts = await createCompleteHierarchy(project.id, formData.name.trim());
-          await ensureHierarchyLoaded({ force: true });
-          if (counts.systems === 0) {
-            toast.info(
-              'Project created. No Systems Hierarchy entries were found to auto-create.'
-            );
-          } else {
-            toast.success(
-              `Complete hierarchy created: ${summarizeHierarchyCounts(counts)}.`
-            );
-          }
-        } catch {
-          toast.error(
-            'Project created, but failed to create the complete hierarchy. You can add systems manually.'
-          );
-        }
-      }
-
+      const res = await api.projects.createDraft({
+        name: formData.name.trim(),
+        description: formData.description || null,
+        start_date: formData.start_date
+          ? `${formData.start_date}T00:00:00`
+          : undefined,
+        end_date: formData.end_date ? `${formData.end_date}T00:00:00` : undefined,
+        owner_id: formData.owner_id || undefined,
+        order_id: formData.order_id || undefined,
+        hierarchy_config_id: formData.hierarchy_config_id,
+        product_type: formData.product_type,
+        flight_count: Number(formData.flight_count),
+        sdls_per_flight: Number(formData.sdls_per_flight),
+      });
+      toast.success(`Draft project created (${res.data.status_name || 'DRAFT'})`);
       pagination.invalidate();
       resetCreateForm();
       setIsCreateOpen(false);
-    } catch {
-      // Error handled by DataStore
+      router.push(`/projects/${res.data.id}`);
+    } catch (error: unknown) {
+      const detail =
+        (error as { response?: { data?: { detail?: string } } })?.response?.data
+          ?.detail || 'Failed to create draft project';
+      toast.error(typeof detail === 'string' ? detail : 'Failed to create draft project');
     } finally {
       setIsCreating(false);
     }
@@ -328,18 +343,21 @@ export default function ProjectsPage(){
             if (!open) resetCreateForm();
           }}
         >
-          <Can permission={P.create_projects}>
+          <Can permission={[P.project_create_draft, P.create_projects]}>
             <DialogTrigger asChild>
               <Button className="gap-2">
                 <Plus className="h-4 w-4" />
-                New Project
+                New Draft Project
               </Button>
             </DialogTrigger>
           </Can>
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle>Create Project</DialogTitle>
-              <DialogDescription>Set up a new satellite project</DialogDescription>
+              <DialogTitle>Create Draft Project</DialogTitle>
+              <DialogDescription>
+                Select an available Smart SDLS configuration and product scope. Status starts as
+                DRAFT until Admin approval.
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
@@ -347,7 +365,7 @@ export default function ProjectsPage(){
                 <Input
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Sat-A Lifecycle"
+                  placeholder="e.g. Flight Program Alpha"
                   disabled={isCreating}
                 />
               </div>
@@ -359,6 +377,87 @@ export default function ProjectsPage(){
                   placeholder="Project details"
                   disabled={isCreating}
                 />
+              </div>
+              <div>
+                <Label>Hierarchy Configuration *</Label>
+                <Select
+                  value={formData.hierarchy_config_id ? String(formData.hierarchy_config_id) : ''}
+                  onValueChange={(v) => {
+                    const id = parseInt(v, 10);
+                    const cfg = availableConfigs.find((c) => c.id === id);
+                    setFormData({
+                      ...formData,
+                      hierarchy_config_id: id,
+                      product_type: cfg?.product_type_codes?.[0] || '',
+                    });
+                  }}
+                  disabled={isCreating}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select available configuration" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableConfigs.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name} ({c.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Product Type *</Label>
+                <Select
+                  value={formData.product_type}
+                  onValueChange={(v) => setFormData({ ...formData, product_type: v })}
+                  disabled={isCreating || !formData.hierarchy_config_id}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="SSDLS-1 / SSDLS-2" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(
+                      availableConfigs.find((c) => c.id === formData.hierarchy_config_id)
+                        ?.product_type_codes ?? []
+                    ).map((code) => (
+                      <SelectItem key={code} value={code}>
+                        {code}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Flight count *</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={formData.flight_count}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        flight_count: Math.max(1, Number(e.target.value) || 1),
+                      })
+                    }
+                    disabled={isCreating}
+                  />
+                </div>
+                <div>
+                  <Label>SDLS per flight *</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={formData.sdls_per_flight}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        sdls_per_flight: Math.max(1, Number(e.target.value) || 1),
+                      })
+                    }
+                    disabled={isCreating}
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -381,36 +480,22 @@ export default function ProjectsPage(){
                 </div>
               </div>
               <div>
-                <Label>Owner *</Label>
+                <Label>Order (optional)</Label>
                 <Select
-                  value={formData.owner_id.toString()}
-                  onValueChange={(v) => setFormData({ ...formData, owner_id: parseInt(v) })}
-                  disabled={isCreating}
-                >
-                  <SelectTrigger className='w-full'>
-                    <SelectValue placeholder="Select owner" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {users.map((u) => (
-                      <SelectItem key={u.id} value={u.id.toString()}>
-                        {u.full_name}
-                      </SelectItem>
-                    ))
+                  value={formData.order_id ? formData.order_id.toString() : 'none'}
+                  onValueChange={(v) =>
+                    setFormData({
+                      ...formData,
+                      order_id: v === 'none' ? 0 : parseInt(v),
+                    })
                   }
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Order</Label>
-                <Select
-                  value={formData.order_id.toString()}
-                  onValueChange={(v) => setFormData({ ...formData, order_id: parseInt(v) })}
                   disabled={isCreating}
                 >
-                  <SelectTrigger className='w-full'>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select order (optional)" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
                     {orders.map((o) => (
                       <SelectItem key={o.id} value={o.id.toString()}>
                         {o.order_number}
@@ -419,48 +504,10 @@ export default function ProjectsPage(){
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label>Status *</Label>
-                <Select
-                  value={formData.status_id.toString()}
-                  onValueChange={(v) => setFormData({ ...formData, status_id: parseInt(v) })}
-                  disabled={isCreating}
-                >
-                  <SelectTrigger className='w-full'>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {statuses.map((s) => (
-                      <SelectItem key={s.id} value={s.id.toString()}>
-                        {s.status_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-start gap-3 rounded-lg border p-3">
-                <Checkbox
-                  id="create-complete-hierarchy"
-                  checked={createCompleteHierarchyEnabled}
-                  onCheckedChange={(checked) =>
-                    setCreateCompleteHierarchyEnabled(checked === true)
-                  }
-                  disabled={isCreating}
-                />
-                <div className="space-y-1">
-                  <Label
-                    htmlFor="create-complete-hierarchy"
-                    className="cursor-pointer font-medium leading-none"
-                  >
-                    Create Complete Hierarchy
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Creates blank Systems, Sub-Systems, Modules, Units, and Components from the
-                    defined Systems Hierarchy. Entity names match the hierarchy templates; part and
-                    serial numbers are prefixed with the project name.
-                  </p>
-                </div>
-              </div>
+              <p className="text-xs text-muted-foreground">
+                Status will be set to <strong>DRAFT</strong>. Generate Hierarchy stays disabled
+                until Admin approval (Spec 03).
+              </p>
               <div className="flex gap-2 justify-end pt-4">
                 <Button
                   variant="outline"
@@ -469,12 +516,8 @@ export default function ProjectsPage(){
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleCreate} disabled={isCreating}>
-                  {isCreating
-                    ? createCompleteHierarchyEnabled
-                      ? 'Creating hierarchy...'
-                      : 'Creating...'
-                    : 'Create'}
+                <Button onClick={() => void handleCreate()} disabled={isCreating}>
+                  {isCreating ? 'Creating…' : 'Create Draft'}
                 </Button>
               </div>
             </div>

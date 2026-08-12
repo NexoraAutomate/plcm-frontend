@@ -256,6 +256,30 @@ export interface Project {
   order?: Order
   status_name?: string
   systems?: System[]
+  /** Spec 02 workflow fields */
+  hierarchy_config_id?: number | null
+  hierarchy_config_version?: number | null
+  product_type?: string | null
+  flight_count?: number | null
+  sdls_per_flight?: number | null
+  assigned_hm_id?: number | null
+  created_by_id?: number | null
+  approved_by_id?: number | null
+  approved_at?: string | null
+}
+
+export interface ProjectDraftCreate {
+  name: string
+  description?: string | null
+  start_date?: string | null
+  end_date?: string | null
+  owner_id?: number | null
+  order_id?: number | null
+  assigned_hm_id?: number | null
+  hierarchy_config_id: number
+  product_type: string
+  flight_count: number
+  sdls_per_flight: number
 }
 
 // Shared install metadata for hierarchy hardware entities

@@ -4,7 +4,7 @@
 **Purpose:** Individual, sequential feature specs for one-by-one implementation and test.  
 **Rule:** Implement and test the current spec fully before starting the next.
 
-**Progress:** Spec 00 and Spec 01 are implemented. Next: Spec 02 (project create & approve).
+**Progress:** Specs 00–02 are implemented. Next: Spec 03 (hierarchy generation).
 
 ---
 

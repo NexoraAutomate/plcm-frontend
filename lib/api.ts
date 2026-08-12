@@ -253,6 +253,13 @@ export const projects = {
     api.get<Models.Project[]>("/projects/", { params: listParams(skip, limit, options, filters) }),
   get: (id: number) => api.get<Models.Project>(`/projects/${id}/`),
   create: (data: Partial<Models.Project>) => api.post<Models.Project>("/projects/", data),
+  createDraft: (data: Models.ProjectDraftCreate) =>
+    api.post<Models.Project>("/projects/draft/", data),
+  assignHm: (id: number, hmUserId: number) =>
+    api.post<Models.Project>(`/projects/${id}/assign-hm/`, { hm_user_id: hmUserId }),
+  approve: (id: number) => api.post<Models.Project>(`/projects/${id}/approve/`),
+  generateHierarchy: (id: number) =>
+    api.post<{ ok: boolean }>(`/projects/${id}/generate-hierarchy/`),
   update: (id: number, data: Partial<Models.Project>) => api.put<Models.Project>(`/projects/${id}/`, data),
   delete: (id: number) => api.delete(`/projects/${id}/`),
   getSystems: (id: number) => api.get<Models.System[]>(`/projects/${id}/systems/`),

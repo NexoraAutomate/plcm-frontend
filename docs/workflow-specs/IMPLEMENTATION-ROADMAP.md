@@ -6,7 +6,7 @@ Use this checklist while shipping. Mark each row only after **implementation + t
 |------|-----|------|----------------------------------|
 | ☑ | 00 | Roles & status foundations | Transition matrix unit tests; 5 role users |
 | ☑ | 01 | Hierarchy configuration | Admin creates SSDLS-1/2 configs |
-| ☐ | 02 | Project create & approve | Draft blocked; Admin approve enables gate |
+| ☑ | 02 | Project create & approve | Draft blocked; Admin approve enables gate |
 | ☐ | 03 | Hierarchy generation | Tree counts match scope; ready for inventory |
 | ☐ | 04 | Inventory reservation | AVAILABLE→RESERVED lock |
 | ☐ | 05 | Shortage & FCFS | Notify + receipt auto-reserve order |
