@@ -259,7 +259,43 @@ export const projects = {
     api.post<Models.Project>(`/projects/${id}/assign-hm/`, { hm_user_id: hmUserId }),
   approve: (id: number) => api.post<Models.Project>(`/projects/${id}/approve/`),
   generateHierarchy: (id: number) =>
-    api.post<{ ok: boolean }>(`/projects/${id}/generate-hierarchy/`),
+    api.post<{
+      ok: boolean;
+      project_id: number;
+      status: string;
+      config_code?: string;
+      config_name?: string;
+      product_type?: string;
+      counts: {
+        flights: number;
+        sdls: number;
+        systems: number;
+        subsystems: number;
+        modules: number;
+        units: number;
+        components: number;
+      };
+      project?: Models.Project;
+    }>(`/projects/${id}/generate-hierarchy/`),
+  hierarchyTree: (id: number) =>
+    api.get<{
+      project_id: number;
+      status?: string;
+      flights: Array<{
+        id: number;
+        name: string;
+        code?: string;
+        sequence: number;
+        sdls: Array<{
+          id: number;
+          name: string;
+          code?: string;
+          sequence: number;
+          product_type?: string;
+          systems: Array<{ id: number; name: string; subsystem_count: number }>;
+        }>;
+      }>;
+    }>(`/projects/${id}/hierarchy-tree/`),
   update: (id: number, data: Partial<Models.Project>) => api.put<Models.Project>(`/projects/${id}/`, data),
   delete: (id: number) => api.delete(`/projects/${id}/`),
   getSystems: (id: number) => api.get<Models.System[]>(`/projects/${id}/systems/`),
