@@ -27,6 +27,7 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useTableSorting } from '@/hooks/use-table-sorting';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
+import { ListContentSuspense } from '@/components/list-content-suspense';
 import { ListPageError } from '@/components/list-page-error';
 import { useListPageLoader } from '@/hooks/use-list-page-loader';
 import { OrdersMiniDashboard } from '@/components/orders/orders-mini-dashboard';
@@ -235,6 +236,7 @@ export default function OrdersPage() {
         <p className="text-muted-foreground mt-2">Manage all orders</p>
       </div>
 
+      <ListContentSuspense loading={pagination.fetching}>
       <OrdersMiniDashboard
         orders={orders}
         projects={projects}
@@ -246,6 +248,7 @@ export default function OrdersPage() {
         onCustomerFilter={setCustomerFilter}
         totalCount={pagination.total}
       />
+      </ListContentSuspense>
 
       {(statusFilter !== 'all' || customerFilter !== 'all') && (
         <div className="flex flex-wrap items-center gap-2">
@@ -511,6 +514,7 @@ export default function OrdersPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <ListContentSuspense loading={pagination.fetching}>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -645,6 +649,7 @@ export default function OrdersPage() {
               </TableBody>
             </Table>
           </div>
+          </ListContentSuspense>
           <EntityListPagination
             page={pagination.page}
             totalPages={pagination.totalPages}

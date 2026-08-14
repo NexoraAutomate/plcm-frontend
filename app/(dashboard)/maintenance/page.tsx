@@ -28,9 +28,11 @@ import { fetchMaintenanceCasesPage } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
 import { usePaginatedList } from '@/hooks/use-paginated-list';
 import { useListPageLoader } from '@/hooks/use-list-page-loader';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useMaintenanceCaseStatusCounts } from '@/hooks/use-maintenance-case-status-counts';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
+import { ListContentSuspense } from '@/components/list-content-suspense';
 import type { ListFilterParams } from '@/lib/list-filters';
 import { useAuth } from '@/lib/auth-context';
 import { P } from '@/lib/permission-codes';
@@ -56,6 +58,7 @@ export default function MaintenancePage() {
   } = useDataStore();
 
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [statusFilter, setStatusFilter] = useState<string>(searchParams.get('status') || 'all');
   const [projectFilter, setProjectFilter] = useState<string>('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -74,10 +77,11 @@ export default function MaintenancePage() {
 
   const listFilters = useMemo((): ListFilterParams | undefined => {
     const filters: ListFilterParams = { ...listFilterPatch };
+    if (debouncedSearch.trim()) filters.search = debouncedSearch.trim();
     if (statusFilter !== 'all') filters.status = statusFilter;
     if (projectFilter !== 'all') filters.project_id = Number(projectFilter);
     return Object.keys(filters).length > 0 ? filters : undefined;
-  }, [statusFilter, projectFilter, listFilterPatch]);
+  }, [debouncedSearch, statusFilter, projectFilter, listFilterPatch]);
 
   const pagination = usePaginatedList({
     queryKey: queryKeys.maintenanceCasesPage(listFilters),
@@ -88,6 +92,7 @@ export default function MaintenancePage() {
   const { data: statusCounts, refetch: refetchStatusCounts } = useMaintenanceCaseStatusCounts();
 
   const showLoader = useListPageLoader(pagination, {
+    debouncedSearch,
     filtersActive: statusFilter !== 'all' || projectFilter !== 'all',
     hasData: paginatedCases.length > 0,
   });
@@ -115,15 +120,7 @@ export default function MaintenancePage() {
     }
   }, [searchParams, router]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return paginatedCases;
-    return paginatedCases.filter(
-      (c) =>
-        c.case_number.toLowerCase().includes(q) ||
-        (c.description ?? '').toLowerCase().includes(q)
-    );
-  }, [paginatedCases, search]);
+  const filtered = paginatedCases;
 
   const handleCreate = async (data: MaintenanceTypes.CreateMaintenanceCasePayload) => {
     try {
@@ -404,18 +401,20 @@ export default function MaintenancePage() {
         <p className="text-sm text-muted-foreground">
           Showing {filtered.length} on this page · {pagination.total} total in database
         </p>
+        <ListContentSuspense loading={pagination.fetching || isMutating}>
         <MaintenanceTable
           cases={filtered}
           onEdit={canEditCase ? handleEdit : undefined}
           onDelete={canDeleteCase ? handleDelete : undefined}
           onView={handleView}
-          isLoading={isMutating || pagination.loading}
+          isLoading={false}
           getFaultyEntities={getFaultyEntities}
           getMaintenanceActions={getMaintenanceActions}
           getMaintenanceDeliveries={getMaintenanceDeliveries}
           sort={sort}
           onSort={cycleSort}
         />
+        </ListContentSuspense>
         <EntityListPagination
           page={pagination.page}
           totalPages={pagination.totalPages}

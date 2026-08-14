@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { Inventory, InventoryInstance } from '@/lib/models';
-import { getSelectableInstances } from '@/lib/inventory-install';
+import { getSelectableInstances, isProjectReservedInstance } from '@/lib/inventory-install';
 
 interface InventorySerialSelectDialogProps {
   item: Inventory | null;
@@ -36,6 +36,9 @@ function formatInstanceLabel(instance: InventoryInstance, index: number): string
   const base = serial || `Unit ${index + 1}`;
   if (instance.open_issuance_status === 'return_pending') {
     return `${base} (return pending)`;
+  }
+  if (isProjectReservedInstance(instance)) {
+    return `${base} (reserved)`;
   }
   return instance.is_reserved ? `${base} (issued)` : base;
 }

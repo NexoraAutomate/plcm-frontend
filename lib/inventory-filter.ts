@@ -6,7 +6,8 @@ import {
 } from '@/lib/entity-hierarchy';
 import {
   getReturnPendingInstances,
-  getSelectableInstances,
+  getAvailableInstances,
+  isProjectReservedInstance,
 } from '@/lib/inventory-install';
 
 /**
@@ -19,14 +20,20 @@ export function isInventoryInStock(item: Inventory): boolean {
 
   const type = item.inventory_type as HierarchyEntityType;
   if (inventoryUsesInstances(type)) {
-    const installable = getSelectableInstances(item);
-    if (installable.length > 0) return true;
-    // Instances hydrated but none installable (e.g. all return_pending)
-    if ((item.instances ?? []).some((instance) => Boolean(instance?.id))) return false;
+    if (getAvailableInstances(item).length > 0) return true;
+    // Instances hydrated but none free (issued, HM-reserved, or return_pending)
+    if ((item.instances ?? []).some((instance) => Boolean(instance?.id))) {
+      return false;
+    }
     // Fallback when instance rows were not hydrated on the list payload.
     return Number(item.quantity ?? 0) > 0;
   }
   return Number(item.quantity ?? 0) > 0;
+}
+
+/** True when at least one serialized unit is held by an HM project reservation. */
+export function isInventoryProjectReserved(item: Inventory): boolean {
+  return (item.instances ?? []).some(isProjectReservedInstance);
 }
 
 /** Held stock is only awaiting admin return acceptance (nothing installable). */

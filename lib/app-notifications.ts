@@ -1,6 +1,6 @@
 import { CaseStatus, FaultyEntityStatus } from '@/lib/models';
 import { getCaseStatusMeta, mapCaseStatusFromApi } from '@/lib/maintenance-workflow';
-import type { Customer, FaultyEntity, InventoryInstallerNotice, InventoryReturnNotice, InventoryShortageNotice, MaintenanceCase, Project } from '@/lib/models';
+import type { Customer, FaultyEntity, InventoryInstallerNotice, InventoryReservationExpiryNotice, InventoryReturnNotice, InventoryShortageNotice, MaintenanceCase, Project } from '@/lib/models';
 import { parseApiDate } from '@/lib/parse-api-date';
 
 export type AppNotificationType =
@@ -20,7 +20,9 @@ export type AppNotificationType =
   | 'inventory_return_rejected'
   | 'inventory_shortage'
   | 'inventory_shortage_fulfilled'
-  | 'inventory_shortage_partial';
+  | 'inventory_shortage_partial'
+  | 'reservation_idle_reminder'
+  | 'reservation_auto_released';
 
 export interface AppNotification {
   id: string;
@@ -65,6 +67,7 @@ export function buildAppNotifications(input: {
   inventoryReturnNotices?: InventoryReturnNotice[];
   inventoryInstallerNotices?: InventoryInstallerNotice[];
   inventoryShortageNotices?: InventoryShortageNotice[];
+  inventoryReservationExpiryNotices?: InventoryReservationExpiryNotice[];
 }): AppNotification[] {
   const {
     maintenanceCases,
@@ -74,6 +77,7 @@ export function buildAppNotifications(input: {
     inventoryReturnNotices = [],
     inventoryInstallerNotices = [],
     inventoryShortageNotices = [],
+    inventoryReservationExpiryNotices = [],
   } = input;
   const notifications: AppNotification[] = [];
 
@@ -416,6 +420,42 @@ export function buildAppNotifications(input: {
         searchText,
       });
     }
+  }
+
+  for (const notice of inventoryReservationExpiryNotices) {
+    const flight = notice.flight_code || notice.flight_name || 'Flight';
+    const sdls = notice.sdls_code || notice.sdls_name || 'SDLS';
+    const item = notice.inventory_name || notice.serial_number || 'unit';
+    const href = notice.project_id ? `/projects/${notice.project_id}` : '/projects';
+    const isRead = Boolean(notice.read_at);
+    const searchText = [
+      notice.part_number,
+      notice.serial_number,
+      flight,
+      sdls,
+      item,
+      notice.project_name,
+      notice.message,
+      notice.notice_type,
+    ]
+      .filter(Boolean)
+      .join(' ');
+    const autoReleased = notice.notice_type === 'reservation_auto_released';
+    notifications.push({
+      id: `reservation-expiry-notice-${notice.id}`,
+      type: autoReleased ? 'reservation_auto_released' : 'reservation_idle_reminder',
+      title: autoReleased ? 'Reservation auto-released' : 'Idle reservation reminder',
+      message:
+        notice.message ||
+        `${item} · ${flight} / ${sdls}${notice.part_number ? ` · PN ${notice.part_number}` : ''}`,
+      href,
+      timestamp: notice.created_at,
+      priority: isRead ? 'low' : autoReleased ? 'medium' : 'high',
+      metaId: notice.id,
+      serverRead: isRead,
+      persistent: true,
+      searchText,
+    });
   }
 
   return notifications.sort(

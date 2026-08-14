@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LIST_PAGE_SIZE } from '@/lib/data-loading';
 import type { ListFilterParams } from '@/lib/list-filters';
 import { normalizeListFilters } from '@/lib/list-filters';
 import type { PaginatedResult } from '@/lib/paginated-api';
+import { useSyncedPage } from '@/hooks/use-synced-page';
 
 export interface UsePaginatedListOptions<T> {
   queryKey: readonly unknown[];
@@ -23,18 +24,14 @@ export function usePaginatedList<T>({
   filters,
 }: UsePaginatedListOptions<T>) {
   const queryClient = useQueryClient();
-  const [page, setPage] = useState(0);
   const normalizedFilters = useMemo(() => normalizeListFilters(filters), [filters]);
   const filtersKey = useMemo(() => JSON.stringify(normalizedFilters ?? {}), [normalizedFilters]);
-
-  useEffect(() => {
-    setPage(0);
-  }, [filtersKey]);
+  const { page, setPage } = useSyncedPage(filtersKey);
 
   const skip = page * pageSize;
 
   const { data, isLoading, isFetching, error, refetch } = useQuery({
-    queryKey: [...queryKey, page, pageSize],
+    queryKey: [...queryKey, filtersKey, page, pageSize],
     queryFn: () => fetchPage(skip, pageSize, normalizedFilters),
     enabled,
     placeholderData: (previous) => previous,
@@ -51,16 +48,16 @@ export function usePaginatedList<T>({
     (nextPage: number) => {
       setPage(Math.max(0, nextPage));
     },
-    []
+    [setPage]
   );
 
   const nextPage = useCallback(() => {
     if (hasNext) setPage((p) => p + 1);
-  }, [hasNext]);
+  }, [hasNext, setPage]);
 
   const prevPage = useCallback(() => {
     if (hasPrev) setPage((p) => Math.max(0, p - 1));
-  }, [hasPrev]);
+  }, [hasPrev, setPage]);
 
   const invalidate = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey });

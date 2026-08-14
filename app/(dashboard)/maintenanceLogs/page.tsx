@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import type * as Models from '@/lib/models';
 import { entities, maintenanceCases } from '@/lib/api';
 import { useDataStore } from '@/lib/data-store';
@@ -8,8 +8,10 @@ import { fetchMaintenanceLogsPage } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
 import { usePaginatedList } from '@/hooks/use-paginated-list';
 import { useTableSorting } from '@/hooks/use-table-sorting';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
+import { ListContentSuspense } from '@/components/list-content-suspense';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,7 +26,17 @@ import { toast } from 'sonner';
 export default function MaintenancePage() {
   const { users, createMaintenanceLog } = useDataStore();
   const { sort, cycleSort, listFilterPatch } = useTableSorting();
-  const listFilters = useMemo(() => ({ ...listFilterPatch }), [listFilterPatch]);
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const listFilters = useMemo(
+    () => ({
+      ...listFilterPatch,
+      search: debouncedSearch.trim() || undefined,
+      status: statusFilter !== 'all' ? statusFilter : undefined,
+    }),
+    [listFilterPatch, debouncedSearch, statusFilter]
+  );
   const pagination = usePaginatedList({
     queryKey: queryKeys.maintenanceLogsPage(listFilters),
     fetchPage: fetchMaintenanceLogsPage,
@@ -32,8 +44,6 @@ export default function MaintenancePage() {
   });
   const maintenanceLogs = pagination.items;
   const loading = pagination.loading;
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedLog, setSelectedLog] = useState<typeof maintenanceLogs[0] | null>(null);
   const [formData, setFormData] = useState({
@@ -47,18 +57,9 @@ export default function MaintenancePage() {
   const [lookupError, setLookupError] = useState('');
   const [isLookupLoading, setIsLookupLoading] = useState(false);
 
-  useEffect(() => {
-    pagination.setPage(0);
-  }, [search, statusFilter]);
-
-  const filtered = maintenanceLogs.filter((log) => {
-    const entityName = log.entity?.display_name || `Entity #${log.entity_id}`;
-    const matchesSearch =
-      entityName.toLowerCase().includes(search.toLowerCase()) ||
-      (log.notes?.toLowerCase() ?? '').includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || log.maintenance_type === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filtered = maintenanceLogs.filter(
+    (log) => statusFilter === 'all' || log.maintenance_type === statusFilter
+  );
 
   async function handleCreate() {
     if (!formData.entity_id || !formData.performed_by || !formData.notes.trim()) {
@@ -124,7 +125,7 @@ export default function MaintenancePage() {
     }
   };
 
-  if (loading) return <PageLoader />;
+  if (loading && maintenanceLogs.length === 0) return <PageLoader />;
 
   return (
     <div className="space-y-8">
@@ -298,6 +299,7 @@ export default function MaintenancePage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <ListContentSuspense loading={pagination.fetching}>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -344,6 +346,7 @@ export default function MaintenancePage() {
               </TableBody>
             </Table>
           </div>
+          </ListContentSuspense>
           <EntityListPagination
             page={pagination.page}
             totalPages={pagination.totalPages}

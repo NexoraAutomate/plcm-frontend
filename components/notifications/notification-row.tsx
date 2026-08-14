@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Bell, Wrench, AlertTriangle, CheckCircle2, Users, Rocket, Package } from 'lucide-react';
+import { Bell, Wrench, AlertTriangle, CheckCircle2, Users, Rocket, Package, Clock, Unlock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { AppNotification } from '@/lib/app-notifications';
 import { parseApiDate } from '@/lib/parse-api-date';
@@ -25,6 +25,8 @@ const TYPE_ICON: Record<AppNotification['type'], typeof Bell> = {
   inventory_shortage: AlertTriangle,
   inventory_shortage_fulfilled: CheckCircle2,
   inventory_shortage_partial: Package,
+  reservation_idle_reminder: Clock,
+  reservation_auto_released: Unlock,
 };
 
 interface NotificationRowProps {

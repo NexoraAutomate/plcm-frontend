@@ -31,6 +31,9 @@ import { Badge } from '@/components/ui/badge';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { useTableSorting } from '@/hooks/use-table-sorting';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { useSyncedPage } from '@/hooks/use-synced-page';
+import { ListContentSuspense } from '@/components/list-content-suspense';
 import * as api from '@/lib/api';
 import type { User, UserLoginHistory } from '@/lib/models';
 
@@ -64,20 +67,23 @@ type Props = {
 export function UserLoginHistoryDialog({ open, onOpenChange, user }: Props) {
   const [rows, setRows] = useState<UserLoginHistory[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [statusFilter, setStatusFilter] = useState<'all' | 'Success' | 'Failed'>('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const { sort, cycleSort, listFilterPatch } = useTableSorting();
+  const { page, setPage } = useSyncedPage(
+    `${debouncedSearch}|${statusFilter}|${dateFrom}|${dateTo}|${sort.sortBy ?? ''}|${sort.sortOrder ?? ''}`
+  );
 
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     try {
       const res = await api.users.loginHistory(user.id, page * PAGE_SIZE, PAGE_SIZE, {
-        search: search.trim() || undefined,
+        search: debouncedSearch.trim() || undefined,
         login_status: statusFilter === 'all' ? undefined : statusFilter,
         date_from: dateFrom ? new Date(dateFrom).toISOString() : undefined,
         date_to: dateTo ? new Date(`${dateTo}T23:59:59`).toISOString() : undefined,
@@ -94,17 +100,13 @@ export function UserLoginHistoryDialog({ open, onOpenChange, user }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [user, page, search, statusFilter, dateFrom, dateTo, listFilterPatch]);
+  }, [user, page, debouncedSearch, statusFilter, dateFrom, dateTo, listFilterPatch]);
 
   useEffect(() => {
     if (open && user) {
       void load();
     }
   }, [open, user, load]);
-
-  useEffect(() => {
-    setPage(0);
-  }, [search, statusFilter, dateFrom, dateTo, sort]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const rangeStart = total === 0 ? 0 : page * PAGE_SIZE + 1;
@@ -159,6 +161,7 @@ export function UserLoginHistoryDialog({ open, onOpenChange, user }: Props) {
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto rounded-md border">
+          <ListContentSuspense loading={loading}>
           <Table>
             <TableHeader>
               <TableRow>
@@ -185,13 +188,7 @@ export function UserLoginHistoryDialog({ open, onOpenChange, user }: Props) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">
-                    Loading…
-                  </TableCell>
-                </TableRow>
-              ) : rows.length === 0 ? (
+              {rows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">
                     No login history found
@@ -229,6 +226,7 @@ export function UserLoginHistoryDialog({ open, onOpenChange, user }: Props) {
               )}
             </TableBody>
           </Table>
+          </ListContentSuspense>
         </div>
 
         <EntityListPagination

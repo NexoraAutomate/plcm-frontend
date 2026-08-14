@@ -100,6 +100,10 @@ Make values configurable (settings/env) for testability.
 1. Reservation shows expiry / countdown.
 2. Show last reminder date.
 3. History note when auto-released (list may show historical rows).
+4. Each serialized inventory unit (serial number) shows status **Reserved** while an HM project hold is active.
+5. Clicking a reserved serial (or its Reserved badge) opens a dialog with the hold: project, flight, SDLS, hierarchy node (system etc.), reserved by, and dates.
+6. Inventory list stock filters include **Reserved** alongside Available and Out of Stock.
+7. IM can still **Issue to developer** on reserved serials (physical handover); do not hide that action because of the HM hold.
 
 ---
 
@@ -110,6 +114,8 @@ Make values configurable (settings/env) for testability.
 - [ ] Issued items are not auto-released by this job.
 - [ ] Released stock can be reserved by another project.
 - [ ] Last Reminder and closed reservation reason recorded.
+- [ ] Inventory serials with an HM hold display status Reserved.
+- [ ] Clicking a reserved serial opens a dialog with flight / SDLS / system (hierarchy) details.
 
 ---
 
@@ -119,6 +125,7 @@ Make values configurable (settings/env) for testability.
 2. Partially progressed (ISSUED) reservation excluded.
 3. Extension (if implemented) resets or prolongs timer and increments Extension Count.
 4. Multiple reservations evaluated independently.
+5. Reserved serial exposes flight / SDLS / system hold for inventory UI.
 
 ---
 

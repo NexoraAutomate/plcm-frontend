@@ -57,8 +57,10 @@ import { fetchUsersPage } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
 import { usePaginatedList } from '@/hooks/use-paginated-list';
 import { useTableSorting } from '@/hooks/use-table-sorting';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
+import { ListContentSuspense } from '@/components/list-content-suspense';
 import { formatRoleNames, roleName } from '@/lib/user-display';
 import { SettingsCard } from '@/components/settings/settings-card';
 import { UserStatusBadge } from '@/components/settings/user-status-badge';
@@ -105,15 +107,16 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
   const { sort, cycleSort, listFilterPatch } = useTableSorting();
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
 
   const listFilters = useMemo(
     () => ({
       ...listFilterPatch,
-      search: search.trim() || undefined,
+      search: debouncedSearch.trim() || undefined,
       is_active:
         statusFilter === 'all' ? undefined : statusFilter === 'active' ? true : false,
     }),
-    [listFilterPatch, search, statusFilter]
+    [listFilterPatch, debouncedSearch, statusFilter]
   );
 
   const pagination = usePaginatedList({
@@ -199,10 +202,6 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
     fetchData();
     void refreshStats();
   }, [refreshStats]);
-
-  useEffect(() => {
-    pagination.setPage(0);
-  }, [search, statusFilter]);
 
   async function handleCreate() {
     if (!formData.username.trim() || !formData.password.trim() || !formData.full_name.trim()) {
@@ -338,7 +337,7 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
     setIsEditOpen(true);
   }
 
-  if (loading) return <PageLoader />;
+  if (loading && users.length === 0) return <PageLoader />;
 
   return (
     <div className="space-y-8">
@@ -466,6 +465,7 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
         title="All Users"
         description={`Showing ${users.length} on this page · ${pagination.total} total in database`}
       >
+        <ListContentSuspense loading={pagination.fetching}>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -571,6 +571,7 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
             </TableBody>
           </Table>
         </div>
+        </ListContentSuspense>
         <EntityListPagination
           page={pagination.page}
           totalPages={pagination.totalPages}

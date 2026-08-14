@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/auth-context';
 import { parseApiDate } from '@/lib/parse-api-date';
 import { Input } from '@/components/ui/input';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { ListContentSuspense } from '@/components/list-content-suspense';
 
 function groupLabel(date: Date): string {
   if (isToday(date)) return 'Today';
@@ -78,9 +79,8 @@ export default function NotificationsPage() {
         />
       </div>
 
-      {loading ? (
-        <p className="text-sm text-muted-foreground">Loading notifications…</p>
-      ) : notifications.length === 0 ? (
+      <ListContentSuspense loading={loading}>
+      {notifications.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border bg-card py-16 text-center">
           <Bell className="mb-3 h-10 w-10 text-muted-foreground/40" />
           <p className="text-sm font-medium">
@@ -114,6 +114,7 @@ export default function NotificationsPage() {
           ))}
         </div>
       )}
+      </ListContentSuspense>
 
       <InventoryReturnDecisionDialog
         notice={returnDialogNotice}

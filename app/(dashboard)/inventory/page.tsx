@@ -32,8 +32,11 @@ import { fetchInventoryPage } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
 import { usePaginatedList } from '@/hooks/use-paginated-list';
 import { useTableSorting } from '@/hooks/use-table-sorting';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
+import { ListContentSuspense } from '@/components/list-content-suspense';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import {
   getInventorySerialNumbers,
@@ -51,14 +54,14 @@ import {
   canAddInventoryChildren,
   resolveInventoryInstanceSerial,
 } from '@/lib/inventory-child-install';
-import { getSelectableInstances, needsSerialSelection } from '@/lib/inventory-install';
+import { getSelectableInstances, isProjectReservedInstance, needsSerialSelection } from '@/lib/inventory-install';
 import { duplicateInventoryEntity } from '@/lib/inventory-duplicate';
 import { InventorySerialSelectDialog } from '@/components/inventory-serial-select-dialog';
 import { InventoryDeleteDialog } from '@/components/inventory-delete-dialog';
 import { InventoryHierarchyDialog } from '@/components/inventory-hierarchy-dialog';
 import { InventoryIssueDialog } from '@/components/inventory-issue-dialog';
+import { InventoryReservationHoldDialog } from '@/components/inventory-reservation-hold-dialog';
 import { IssuanceRemarksDialog } from '@/components/inventory/issuance-remarks-dialog';
-import { isInventoryInStock } from '@/lib/inventory-filter';
 import { StatusBadge } from '@/components/status-badge';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -86,11 +89,12 @@ const ACTION_ICON = {
 } as const;
 
 type EntityType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
-type StockFilter = 'all' | 'available' | 'out_of_stock';
+type StockFilter = 'all' | 'available' | 'reserved' | 'out_of_stock';
 
 const STOCK_FILTERS: { value: StockFilter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'available', label: 'Available' },
+  { value: 'reserved', label: 'Reserved' },
   { value: 'out_of_stock', label: 'Out of Stock' },
 ];
 
@@ -236,11 +240,21 @@ export default function InventoryPage() {
   const { users, statuses, systems, subsystems, modules, units, components, ensureHierarchyLoaded } =
     useDataStore();
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [entityTypeFilter, setEntityTypeFilter] = useState<EntityType | 'all'>('all');
   const [stockFilter, setStockFilter] = useState<StockFilter>('all');
   const { sort, cycleSort, listFilterPatch } = useTableSorting();
   const inventoryTypeParam = entityTypeFilter !== 'all' ? entityTypeFilter : undefined;
-  const listFilters = useMemo(() => ({ ...listFilterPatch }), [listFilterPatch]);
+  const listFilters = useMemo(
+    () =>
+      buildListFilters({
+        search: debouncedSearch,
+        inventoryType: inventoryTypeParam,
+        stock: stockFilter !== 'all' ? stockFilter : undefined,
+        ...listFilterPatch,
+      }),
+    [debouncedSearch, inventoryTypeParam, stockFilter, listFilterPatch]
+  );
   const pagination = usePaginatedList({
     queryKey: queryKeys.inventoryPage(inventoryTypeParam, listFilters),
     fetchPage: (skip, limit, filters) =>
@@ -300,6 +314,8 @@ export default function InventoryPage() {
     item: InventoryItem;
     instanceId?: number;
   } | null>(null);
+  const [reservationHoldInstance, setReservationHoldInstance] =
+    useState<InventoryInstance | null>(null);
   const [returnIssuanceId, setReturnIssuanceId] = useState<number | null>(null);
   const [returnRemarksBusy, setReturnRemarksBusy] = useState(false);
 
@@ -310,27 +326,6 @@ export default function InventoryPage() {
   const [pendingPictureFile, setPendingPictureFile] = useState<File | null>(null);
   const [removePicture, setRemovePicture] = useState(false);
   const [formTab, setFormTab] = useState('general');
-
-  useEffect(() => {
-    pagination.setPage(0);
-  }, [search, entityTypeFilter, stockFilter]);
-
-  const filtered = inventory.filter((item) => {
-    const searchLower = search.toLowerCase();
-    const matchesType = entityTypeFilter === 'all' || item.inventory_type === entityTypeFilter;
-    const matchesSearch =
-      search === '' ||
-      item.entityName?.toLowerCase().includes(searchLower) ||
-      item.serialNumber?.toLowerCase().includes(searchLower) ||
-      item.serialNumbers?.some((serial) => serial.toLowerCase().includes(searchLower)) ||
-      item.partNumber?.toLowerCase().includes(searchLower);
-    const inStock = isInventoryInStock(item);
-    const matchesStock =
-      stockFilter === 'all' ||
-      (stockFilter === 'available' && inStock) ||
-      (stockFilter === 'out_of_stock' && !inStock);
-    return matchesType && matchesSearch && matchesStock;
-  });
 
   function toggleExpandedRow(id: number) {
     setExpandedRows((prev) => {
@@ -1338,7 +1333,7 @@ export default function InventoryPage() {
     };
   }
 
-  if (loading) return <PageLoader />;
+  if (loading && inventory.length === 0) return <PageLoader />;
 
   return (
     <div className="space-y-8">
@@ -1459,10 +1454,11 @@ export default function InventoryPage() {
         <CardHeader>
           <CardTitle>Inventory Items</CardTitle>
           <CardDescription>
-            Showing {filtered.length} on this page · {pagination.total} total in database
+            Showing {inventory.length} on this page · {pagination.total} total in database
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <ListContentSuspense loading={pagination.fetching}>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -1481,16 +1477,16 @@ export default function InventoryPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.length === 0 ? (
+                {inventory.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                       No inventory items found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((item) => {
+                  inventory.map((item) => {
                     const serialInstances = getExpandableSerialInstances(item);
-                    const isExpandable = serialInstances.length > 1;
+                    const isExpandable = serialInstances.length >= 1;
                     const isExpanded = expandedRows.has(item.id);
 
                     return (
@@ -1543,10 +1539,19 @@ export default function InventoryPage() {
                           <TableCell>
                             <div className="flex flex-col gap-0.5">
                               <span>{item.quantity}</span>
-                              {(item.reserved_quantity ?? 0) > 0 ? (
+                              {(item.reserved_quantity ?? 0) > 0 ||
+                              (item.instances ?? []).some(isProjectReservedInstance) ? (
                                 <Badge variant="secondary" className="w-fit text-[10px]">
-                                  {item.available_quantity ?? Math.max(0, item.quantity - (item.reserved_quantity ?? 0))} avail ·{' '}
-                                  {item.reserved_quantity} issued
+                                  {item.available_quantity ??
+                                    Math.max(0, item.quantity - (item.reserved_quantity ?? 0))}{' '}
+                                  avail
+                                  {(item.instances ?? []).filter(isProjectReservedInstance).length >
+                                  0
+                                    ? ` · ${(item.instances ?? []).filter(isProjectReservedInstance).length} reserved`
+                                    : ''}
+                                  {(item.reserved_quantity ?? 0) > 0
+                                    ? ` · ${item.reserved_quantity} issued`
+                                    : ''}
                                 </Badge>
                               ) : null}
                             </div>
@@ -1740,7 +1745,20 @@ export default function InventoryPage() {
                                         return (
                                           <TableRow key={instance.id}>
                                             <TableCell className="font-mono text-sm">
-                                              {instanceSerialNumber(instance) || '—'}
+                                              {isProjectReservedInstance(instance) ? (
+                                                <button
+                                                  type="button"
+                                                  className="cursor-pointer underline-offset-2 hover:underline"
+                                                  onClick={() =>
+                                                    setReservationHoldInstance(instance)
+                                                  }
+                                                  title="View reservation details"
+                                                >
+                                                  {instanceSerialNumber(instance) || '—'}
+                                                </button>
+                                              ) : (
+                                                instanceSerialNumber(instance) || '—'
+                                              )}
                                             </TableCell>
                                             <TableCell>
                                               {holder ? formatUserRef(holder) : '—'}
@@ -1749,8 +1767,19 @@ export default function InventoryPage() {
                                             <TableCell>
                                               {instance.is_reserved ? (
                                                 <Badge variant="secondary">Issued</Badge>
+                                              ) : isProjectReservedInstance(instance) ? (
+                                                <button
+                                                  type="button"
+                                                  className="cursor-pointer rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                  onClick={() =>
+                                                    setReservationHoldInstance(instance)
+                                                  }
+                                                  title="View reservation details"
+                                                >
+                                                  <StatusBadge status="RESERVED" />
+                                                </button>
                                               ) : (
-                                                <span className="text-muted-foreground text-xs">Available</span>
+                                                <StatusBadge status="AVAILABLE" />
                                               )}
                                             </TableCell>
                                             <TableCell>
@@ -1816,6 +1845,7 @@ export default function InventoryPage() {
               </TableBody>
             </Table>
           </div>
+          </ListContentSuspense>
           <EntityListPagination
             page={pagination.page}
             totalPages={pagination.totalPages}
@@ -2088,6 +2118,14 @@ export default function InventoryPage() {
         }}
         onDeleteAll={handleDeleteAll}
         onDeleteOne={handleDeleteOneSerial}
+      />
+
+      <InventoryReservationHoldDialog
+        instance={reservationHoldInstance}
+        open={reservationHoldInstance != null}
+        onOpenChange={(open) => {
+          if (!open) setReservationHoldInstance(null);
+        }}
       />
 
       <InventoryIssueDialog

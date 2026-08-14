@@ -330,6 +330,10 @@ export const projects = {
     api.post<Models.InventoryReservation>(
       `/projects/${projectId}/reservations/${reservationId}/release/`
     ),
+  extendReservation: (projectId: number, reservationId: number) =>
+    api.post<Models.InventoryReservation>(
+      `/projects/${projectId}/reservations/${reservationId}/extend/`
+    ),
   listShortages: (id: number, activeOnly = true) =>
     api.get<Models.InventoryShortage[]>(`/projects/${id}/shortages/`, {
       params: { active_only: activeOnly },
@@ -570,6 +574,19 @@ export const inventory = {
     ),
   markAllShortageNoticesRead: () =>
     api.post<{ ok: boolean; marked: number }>('/inventory/shortage-notices/read-all/'),
+  listReservationExpiryNotices: (options?: { unreadOnly?: boolean }) =>
+    api.get<Models.InventoryReservationExpiryNotice[]>(
+      '/inventory/reservation-expiry-notices/',
+      { params: { unread_only: options?.unreadOnly ?? false } }
+    ),
+  markReservationExpiryNoticeRead: (noticeId: number) =>
+    api.post<Models.InventoryReservationExpiryNotice>(
+      `/inventory/reservation-expiry-notices/${noticeId}/read/`
+    ),
+  markAllReservationExpiryNoticesRead: () =>
+    api.post<{ ok: boolean; marked: number }>(
+      '/inventory/reservation-expiry-notices/read-all/'
+    ),
   updateInstance: (instanceId: number, data: Partial<Models.InventoryInstance>) =>
     api.put<Models.InventoryInstance>(`/inventory/instances/${instanceId}/`, data),
   deleteInstance: (instanceId: number) => api.delete(`/inventory/instances/${instanceId}/`),

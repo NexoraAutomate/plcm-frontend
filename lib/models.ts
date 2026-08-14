@@ -297,6 +297,7 @@ export interface InventoryReservation {
   expires_at: string
   last_reminder_at?: string | null
   extension_count: number
+  auto_release_at?: string | null
   part_number?: string | null
   serial_number?: string | null
   status: string
@@ -366,6 +367,26 @@ export interface InventoryShortageNotice {
   sdls_code?: string | null
   sdls_name?: string | null
   lru_name?: string | null
+  project_id?: number | null
+  project_name?: string | null
+  message?: string | null
+  created_at: string
+  read_at?: string | null
+}
+
+/** Spec 06 — idle reservation reminder / auto-release notice for HM */
+export interface InventoryReservationExpiryNotice {
+  id: number
+  user_id: number
+  reservation_id: number
+  notice_type: string
+  part_number?: string | null
+  serial_number?: string | null
+  flight_code?: string | null
+  flight_name?: string | null
+  sdls_code?: string | null
+  sdls_name?: string | null
+  inventory_name?: string | null
   project_id?: number | null
   project_name?: string | null
   message?: string | null
@@ -584,6 +605,30 @@ export interface HierarchyConfigMeta {
   default_notes: string
 }
 
+/** Spec 04/06 — HM project hold shown on a reserved serial */
+export interface InventoryProjectHold {
+  id: number
+  project_id: number
+  project_name?: string | null
+  flight_id: number
+  flight_code?: string | null
+  flight_name?: string | null
+  sdls_id: number
+  sdls_code?: string | null
+  sdls_name?: string | null
+  target_entity_type: string
+  target_entity_id: number
+  target_entity_name?: string | null
+  reserved_by_user_id: number
+  reserved_by_name?: string | null
+  reserved_at: string
+  expires_at: string
+  last_reminder_at?: string | null
+  serial_number?: string | null
+  part_number?: string | null
+  inventory_name?: string | null
+}
+
 // Inventory — fields mirror hierarchy entities for install-from-stock
 export interface InventoryInstance extends HierarchyInstallFields {
   id: number
@@ -597,6 +642,9 @@ export interface InventoryInstance extends HierarchyInstallFields {
   shelf_life_expires_at?: string
   updated_at?: string
   is_reserved?: boolean
+  is_project_reserved?: boolean
+  status_name?: string | null
+  project_reservation?: InventoryProjectHold | null
   open_issuance_id?: number | null
   open_issuance_status?: string | null
   fcfs_fulfillments?: FCFSFulfillment[] | null

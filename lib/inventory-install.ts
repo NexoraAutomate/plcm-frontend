@@ -40,6 +40,14 @@ export function isInstanceReturnPending(instance: InventoryInstance): boolean {
   return instance.open_issuance_status === 'return_pending';
 }
 
+export function isProjectReservedInstance(instance: InventoryInstance): boolean {
+  return Boolean(
+    instance.is_project_reserved ||
+      instance.project_reservation ||
+      instance.status_name === 'RESERVED'
+  );
+}
+
 /** Serials that may be installed / composed (excludes return_pending). */
 export function getSelectableInstances(item: Inventory): InventoryInstance[] {
   return (item.instances ?? []).filter(
@@ -55,7 +63,11 @@ export function getReturnPendingInstances(item: Inventory): InventoryInstance[] 
 
 export function getAvailableInstances(item: Inventory): InventoryInstance[] {
   return (item.instances ?? []).filter(
-    (instance) => instance.id && !instance.is_reserved && !isInstanceReturnPending(instance)
+    (instance) =>
+      instance.id &&
+      !instance.is_reserved &&
+      !isProjectReservedInstance(instance) &&
+      !isInstanceReturnPending(instance)
   );
 }
 

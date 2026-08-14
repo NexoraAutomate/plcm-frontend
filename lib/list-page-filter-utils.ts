@@ -25,6 +25,7 @@ export function buildListFilters(input: {
   moduleId?: number | null;
   unitId?: number | null;
   inventoryType?: string;
+  stock?: string;
   installedById?: number | null;
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
@@ -46,6 +47,7 @@ export function buildListFilters(input: {
     module_id: input.moduleId ?? undefined,
     unit_id: input.unitId ?? undefined,
     inventory_type: input.inventoryType,
+    stock: input.stock,
     installed_by_id: input.installedById ?? undefined,
     sort_by: input.sort_by,
     sort_order: input.sort_order,

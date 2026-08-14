@@ -22,6 +22,7 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useTableSorting } from '@/hooks/use-table-sorting';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
+import { ListContentSuspense } from '@/components/list-content-suspense';
 import { ListPageError } from '@/components/list-page-error';
 import { useListPageLoader } from '@/hooks/use-list-page-loader';
 import { toast } from 'sonner';
@@ -244,6 +245,7 @@ export default function CustomersPage() {
         <p className="text-muted-foreground mt-2">Manage your customer list</p>
       </div>
 
+      <ListContentSuspense loading={pagination.fetching}>
       <CustomersListDashboard
         customers={customers}
         orders={orders}
@@ -253,6 +255,7 @@ export default function CustomersPage() {
         onStatusFilter={setStatusFilter}
         totalCount={pagination.total}
       />
+      </ListContentSuspense>
 
       {statusFilter !== 'all' && filteredStatusLabel && (
         <div className="flex flex-wrap items-center gap-2">
@@ -466,6 +469,7 @@ export default function CustomersPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <ListContentSuspense loading={pagination.fetching}>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader  className='bg-slate-200 dark:bg-black hover:bg-slate-200'>
@@ -597,6 +601,7 @@ export default function CustomersPage() {
               </TableBody>
             </Table>
           </div>
+          </ListContentSuspense>
           <EntityListPagination
             page={pagination.page}
             totalPages={pagination.totalPages}

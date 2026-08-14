@@ -30,6 +30,7 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useTableSorting } from '@/hooks/use-table-sorting';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
+import { ListContentSuspense } from '@/components/list-content-suspense';
 import { ListPageError } from '@/components/list-page-error';
 import { useListPageLoader } from '@/hooks/use-list-page-loader';
 import { HierarchyListDashboard } from '@/components/hierarchy/hierarchy-list-dashboard';
@@ -246,6 +247,7 @@ export default function SubsystemsPage() {
         <p className="text-muted-foreground mt-2">Manage system subsystems</p>
       </div>
 
+      <ListContentSuspense loading={pagination.fetching}>
       <HierarchyListDashboard
         config={getSubsystemsDashboardConfig(entityLabel)}
         items={subsystems}
@@ -261,6 +263,7 @@ export default function SubsystemsPage() {
         onParentFilter={applyParentFilter}
         totalCount={pagination.total}
       />
+      </ListContentSuspense>
 
       {(statusFilter !== 'all' || parentFilter !== 'all') && (
         <div className="flex flex-wrap items-center gap-2">
@@ -410,6 +413,7 @@ export default function SubsystemsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <ListContentSuspense loading={pagination.fetching}>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -526,6 +530,7 @@ export default function SubsystemsPage() {
               </TableBody>
             </Table>
           </div>
+          </ListContentSuspense>
           <EntityListPagination
             page={pagination.page}
             totalPages={pagination.totalPages}

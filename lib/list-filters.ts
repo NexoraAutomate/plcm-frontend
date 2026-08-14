@@ -15,6 +15,8 @@ export interface ListFilterParams {
   module_id?: number;
   unit_id?: number;
   inventory_type?: string;
+  /** Inventory stock bucket: available | reserved | out_of_stock */
+  stock?: string;
   /** Filter hierarchy entities by installer (installed_by_id) */
   installed_by_id?: number;
   /** Server-side sort column (model field name) */

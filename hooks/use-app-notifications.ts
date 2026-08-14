@@ -11,7 +11,7 @@ import {
 import { useNotificationState } from '@/hooks/use-notification-state';
 import { useAuth } from '@/lib/auth-context';
 import * as api from '@/lib/api';
-import type { InventoryInstallerNotice, InventoryReturnNotice, InventoryShortageNotice } from '@/lib/models';
+import type { InventoryInstallerNotice, InventoryReservationExpiryNotice, InventoryReturnNotice, InventoryShortageNotice } from '@/lib/models';
 import {
   readAlertSettings,
   type AlertSettingsState,
@@ -27,6 +27,11 @@ const SHORTAGE_NOTICE_TYPES = new Set([
   'inventory_shortage',
   'inventory_shortage_fulfilled',
   'inventory_shortage_partial',
+]);
+
+const EXPIRY_NOTICE_TYPES = new Set([
+  'reservation_idle_reminder',
+  'reservation_auto_released',
 ]);
 
 function playNotificationSound() {
@@ -77,6 +82,7 @@ export function useAppNotifications(options?: { search?: string }) {
   const [returnNotices, setReturnNotices] = useState<InventoryReturnNotice[]>([]);
   const [installerNotices, setInstallerNotices] = useState<InventoryInstallerNotice[]>([]);
   const [shortageNotices, setShortageNotices] = useState<InventoryShortageNotice[]>([]);
+  const [expiryNotices, setExpiryNotices] = useState<InventoryReservationExpiryNotice[]>([]);
   const [returnDialogNotice, setReturnDialogNotice] = useState<InventoryReturnNotice | null>(
     null
   );
@@ -87,6 +93,8 @@ export function useAppNotifications(options?: { search?: string }) {
   const installerToastReady = useRef(false);
   const seenShortageIds = useRef<Set<number>>(new Set());
   const shortageToastReady = useRef(false);
+  const seenExpiryIds = useRef<Set<number>>(new Set());
+  const expiryToastReady = useRef(false);
 
   useEffect(() => {
     const onChange = () => setAlertSettings(readAlertSettings());
@@ -200,18 +208,56 @@ export function useAppNotifications(options?: { search?: string }) {
     }
   }, [inAppEnabled, announceNewNotice]);
 
+  const loadExpiryNotices = useCallback(async () => {
+    if (!inAppEnabled) {
+      setExpiryNotices([]);
+      return;
+    }
+    try {
+      const res = await api.inventory.listReservationExpiryNotices();
+      const rows = res.data ?? [];
+      const unread = rows.filter((r) => !r.read_at);
+      if (expiryToastReady.current) {
+        for (const row of unread) {
+          if (seenExpiryIds.current.has(row.id)) continue;
+          seenExpiryIds.current.add(row.id);
+          announceNewNotice(
+            row.notice_type === 'reservation_auto_released'
+              ? 'Reservation auto-released'
+              : 'Idle reservation reminder',
+            row.message || undefined
+          );
+        }
+      } else {
+        for (const row of rows) seenExpiryIds.current.add(row.id);
+        expiryToastReady.current = true;
+      }
+      setExpiryNotices(rows);
+    } catch {
+      setExpiryNotices([]);
+    }
+  }, [inAppEnabled, announceNewNotice]);
+
   useEffect(() => {
     void loadReturnNotices();
     void loadInstallerNotices();
     void loadShortageNotices();
+    void loadExpiryNotices();
     if (!inAppEnabled) return;
     const id = window.setInterval(() => {
       void loadReturnNotices();
       void loadInstallerNotices();
       void loadShortageNotices();
+      void loadExpiryNotices();
     }, 60_000);
     return () => window.clearInterval(id);
-  }, [loadReturnNotices, loadInstallerNotices, loadShortageNotices, inAppEnabled]);
+  }, [
+    loadReturnNotices,
+    loadInstallerNotices,
+    loadShortageNotices,
+    loadExpiryNotices,
+    inAppEnabled,
+  ]);
 
   const allNotifications = useMemo(() => {
     if (!inAppEnabled) return [];
@@ -223,6 +269,7 @@ export function useAppNotifications(options?: { search?: string }) {
       inventoryReturnNotices: returnNotices,
       inventoryInstallerNotices: installerNotices,
       inventoryShortageNotices: shortageNotices,
+      inventoryReservationExpiryNotices: expiryNotices,
     });
   }, [
     inAppEnabled,
@@ -233,6 +280,7 @@ export function useAppNotifications(options?: { search?: string }) {
     returnNotices,
     installerNotices,
     shortageNotices,
+    expiryNotices,
   ]);
 
   const notifications = useMemo(() => {
@@ -337,6 +385,26 @@ export function useAppNotifications(options?: { search?: string }) {
     }
   }, []);
 
+  const markExpiryNotice = useCallback(async (noticeId?: number) => {
+    if (noticeId == null) return;
+    try {
+      const res = await api.inventory.markReservationExpiryNoticeRead(noticeId);
+      const updated = res.data;
+      setExpiryNotices((prev) =>
+        prev.map((n) =>
+          n.id === noticeId
+            ? {
+                ...n,
+                read_at: updated?.read_at ?? new Date().toISOString(),
+              }
+            : n
+        )
+      );
+    } catch {
+      // Keep unread state if mark-read fails.
+    }
+  }, []);
+
   const handleNotificationActivate = useCallback(
     (item: AppNotification) => {
       if (item.type === 'inventory_returned' && item.metaId != null) {
@@ -349,11 +417,14 @@ export function useAppNotifications(options?: { search?: string }) {
       if (SHORTAGE_NOTICE_TYPES.has(item.type) && !item.serverRead) {
         void markShortageNotice(item.metaId);
       }
+      if (EXPIRY_NOTICE_TYPES.has(item.type) && !item.serverRead) {
+        void markExpiryNotice(item.metaId);
+      }
       if (!item.persistent) {
         markLocalRead(item.id);
       }
     },
-    [openReturnDecision, markInstallerNotice, markShortageNotice, markLocalRead]
+    [openReturnDecision, markInstallerNotice, markShortageNotice, markExpiryNotice, markLocalRead]
   );
 
   const markAsRead = useCallback(
@@ -372,6 +443,10 @@ export function useAppNotifications(options?: { search?: string }) {
         void markShortageNotice(n.metaId);
         return;
       }
+      if (n && EXPIRY_NOTICE_TYPES.has(n.type) && !n.serverRead) {
+        void markExpiryNotice(n.metaId);
+        return;
+      }
       if (!n?.persistent) {
         markLocalRead(id);
       }
@@ -383,6 +458,7 @@ export function useAppNotifications(options?: { search?: string }) {
       openReturnDecision,
       markInstallerNotice,
       markShortageNotice,
+      markExpiryNotice,
     ]
   );
 
@@ -403,6 +479,14 @@ export function useAppNotifications(options?: { search?: string }) {
       });
     void api.inventory.markAllShortageNoticesRead().then(() => {
       setShortageNotices((prev) =>
+        prev.map((n) => ({
+          ...n,
+          read_at: n.read_at ?? new Date().toISOString(),
+        }))
+      );
+    });
+    void api.inventory.markAllReservationExpiryNoticesRead().then(() => {
+      setExpiryNotices((prev) =>
         prev.map((n) => ({
           ...n,
           read_at: n.read_at ?? new Date().toISOString(),

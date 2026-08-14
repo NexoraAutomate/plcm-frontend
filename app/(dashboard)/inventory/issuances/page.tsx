@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { ArrowLeft, Check, RefreshCw, Undo2, X } from 'lucide-react';
@@ -29,7 +30,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { PageLoader } from '@/components/page-loader';
+import { ListContentSuspense } from '@/components/list-content-suspense';
 import { useAuth } from '@/lib/auth-context';
 import {
   IssuanceRemarksDialog,
@@ -83,6 +84,7 @@ export default function InventoryIssuancesPage() {
   const [status, setStatus] = useState('all');
   const [issuedTo, setIssuedTo] = useState('all');
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [actionId, setActionId] = useState<number | null>(null);
   const [remarksOpen, setRemarksOpen] = useState(false);
   const [remarksAction, setRemarksAction] = useState<IssuanceRemarksAction | null>(null);
@@ -97,7 +99,7 @@ export default function InventoryIssuancesPage() {
         status: status !== 'all' ? status : undefined,
         issued_to_user_id:
           inventoryManager && issuedTo !== 'all' ? Number(issuedTo) : undefined,
-        search: search.trim() || undefined,
+        search: debouncedSearch.trim() || undefined,
       });
       setRows(res.data ?? []);
     } catch {
@@ -106,7 +108,7 @@ export default function InventoryIssuancesPage() {
     } finally {
       setLoading(false);
     }
-  }, [status, issuedTo, search, inventoryManager]);
+  }, [status, issuedTo, debouncedSearch, inventoryManager]);
 
   useEffect(() => {
     void load();
@@ -244,9 +246,8 @@ export default function InventoryIssuancesPage() {
 
       <Card>
         <CardContent className="pt-6">
-          {loading ? (
-            <PageLoader />
-          ) : rows.length === 0 ? (
+          <ListContentSuspense loading={loading}>
+          {rows.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">No issuances found.</p>
           ) : (
             <div className="overflow-x-auto">
@@ -364,6 +365,7 @@ export default function InventoryIssuancesPage() {
               </Table>
             </div>
           )}
+          </ListContentSuspense>
         </CardContent>
       </Card>
 

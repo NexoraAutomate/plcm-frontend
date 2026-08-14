@@ -31,6 +31,7 @@ import { SettingsCard } from '@/components/settings/settings-card';
 import { PageLoader } from '@/components/page-loader';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { useTableSorting } from '@/hooks/use-table-sorting';
+import { useSyncedPage } from '@/hooks/use-synced-page';
 import { auth } from '@/lib/api';
 import { P } from '@/lib/permission-codes';
 import type { Permission } from '@/lib/models';
@@ -54,7 +55,6 @@ export function PermissionsPanel({ embedded = false }: PermissionsPanelProps) {
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(0);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editing, setEditing] = useState<Permission | null>(null);
@@ -66,6 +66,9 @@ export function PermissionsPanel({ embedded = false }: PermissionsPanelProps) {
     permission: null,
   });
   const { sort, cycleSort, listFilterPatch } = useTableSorting();
+  const { page, setPage } = useSyncedPage(
+    `${search}|${sort.sortBy ?? ''}|${sort.sortOrder ?? ''}`
+  );
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -85,10 +88,6 @@ export function PermissionsPanel({ embedded = false }: PermissionsPanelProps) {
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  useEffect(() => {
-    setPage(0);
-  }, [search, sort]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

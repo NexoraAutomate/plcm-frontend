@@ -169,6 +169,9 @@ export function InventoryIssueDialog({
                     {availableInstances.map((inst) => (
                       <SelectItem key={inst.id} value={String(inst.id)}>
                         {inst.serial_number || `Instance #${inst.id}`}
+                        {inst.is_project_reserved || inst.project_reservation
+                          ? ' (reserved)'
+                          : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>

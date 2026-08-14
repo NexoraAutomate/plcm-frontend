@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Lock, Unlock } from 'lucide-react';
+import { Clock, Lock, Unlock } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -40,6 +40,24 @@ function apiError(error: unknown, fallback: string): string {
   return typeof detail === 'string' ? detail : fallback;
 }
 
+function formatCountdown(iso?: string | null): string {
+  if (!iso) return '—';
+  const ms = new Date(iso).getTime() - Date.now();
+  if (Number.isNaN(ms)) return '—';
+  if (ms <= 0) return 'due';
+  const days = Math.floor(ms / 86_400_000);
+  const hours = Math.floor((ms % 86_400_000) / 3_600_000);
+  if (days > 1) return `${days}d`;
+  if (days === 1) return hours > 0 ? `1d ${hours}h` : '1d';
+  if (hours > 0) return `${hours}h`;
+  const mins = Math.max(1, Math.floor(ms / 60_000));
+  return `${mins}m`;
+}
+
+function isAutoReleased(row: InventoryReservation): boolean {
+  return Boolean(row.notes?.includes('AUTO_RELEASE_EXPIRY'));
+}
+
 export function ProjectReservationsPanel({ project }: Props) {
   const status = project.status_name ?? '';
   const isReady = status === ProjectWorkflowStatus.READY_FOR_INVENTORY;
@@ -55,7 +73,7 @@ export function ProjectReservationsPanel({ project }: Props) {
     if (!isReady) return;
     const [treeRes, listRes] = await Promise.all([
       api.projects.hierarchyTree(project.id),
-      api.projects.listReservations(project.id, true),
+      api.projects.listReservations(project.id, false),
     ]);
     setTree(treeRes.data);
     setReservations(listRes.data);
@@ -177,15 +195,31 @@ export function ProjectReservationsPanel({ project }: Props) {
     }
   }
 
+  async function handleExtend(reservationId: number) {
+    setBusy(true);
+    try {
+      await api.projects.extendReservation(project.id, reservationId);
+      toast.success('Reservation extended — idle timer delayed');
+      await refresh();
+    } catch (error: unknown) {
+      toast.error(apiError(error, 'Extend failed'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!isReady) return null;
+
+  const active = reservations.filter((r) => r.status === 'active');
+  const history = reservations.filter((r) => r.status !== 'active');
 
   return (
     <div className="space-y-4 rounded-lg border p-4">
       <div>
         <h3 className="text-sm font-medium">Inventory reservations</h3>
         <p className="text-xs text-muted-foreground">
-          Reserve AVAILABLE stock against Flight → SDLS → System (Spec 04). Locked until
-          released or issued.
+          Reserve AVAILABLE stock against Flight → SDLS → System (Spec 04). Idle
+          reservations remind at 30 days, then auto-release after a 7-day grace (Spec 06).
         </p>
       </div>
 
@@ -230,11 +264,11 @@ export function ProjectReservationsPanel({ project }: Props) {
         </div>
       </Can>
 
-      {reservations.length === 0 ? (
+      {active.length === 0 ? (
         <p className="text-xs text-muted-foreground">No active project reservations.</p>
       ) : (
         <ul className="space-y-2 text-sm">
-          {reservations.map((r) => (
+          {active.map((r) => (
             <li
               key={r.id}
               className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 px-3 py-2"
@@ -249,26 +283,83 @@ export function ProjectReservationsPanel({ project }: Props) {
                   {r.part_number ? ` · PN ${r.part_number}` : ''}
                   {' · '}
                   by {r.reserved_by_name || r.reserved_by_user_id}
-                  {' · '}
-                  expires {new Date(r.expires_at).toLocaleDateString()}
                   {r.notes?.includes('shortage fulfillment') ? ' · auto-reserved (shortage)' : ''}
+                  {r.extension_count > 0 ? ` · extended ×${r.extension_count}` : ''}
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    reminder {formatCountdown(r.expires_at)}
+                    {' · '}
+                    {new Date(r.expires_at).toLocaleDateString()}
+                  </span>
+                  <span>
+                    auto-release {formatCountdown(r.auto_release_at)}
+                    {r.auto_release_at
+                      ? ` · ${new Date(r.auto_release_at).toLocaleDateString()}`
+                      : ''}
+                  </span>
+                  {r.last_reminder_at ? (
+                    <span>last reminder {new Date(r.last_reminder_at).toLocaleString()}</span>
+                  ) : (
+                    <span>last reminder —</span>
+                  )}
                 </div>
               </div>
-              <Can permission={P.inventory_release}>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => setReleaseId(r.id)}
-                >
-                  <Unlock className="mr-1 h-3.5 w-3.5" />
-                  Release
-                </Button>
-              </Can>
+              <div className="flex flex-wrap gap-2">
+                <Can permission={P.inventory_reserve}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => void handleExtend(r.id)}
+                  >
+                    Extend
+                  </Button>
+                </Can>
+                <Can permission={P.inventory_release}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => setReleaseId(r.id)}
+                  >
+                    <Unlock className="mr-1 h-3.5 w-3.5" />
+                    Release
+                  </Button>
+                </Can>
+              </div>
             </li>
           ))}
         </ul>
       )}
+
+      {history.length > 0 ? (
+        <div className="space-y-2">
+          <h4 className="text-xs font-medium text-muted-foreground">Reservation history</h4>
+          <ul className="space-y-2 text-sm">
+            {history.map((r) => (
+              <li
+                key={r.id}
+                className="rounded-md border border-dashed bg-muted/10 px-3 py-2 text-xs text-muted-foreground"
+              >
+                <div className="font-medium text-foreground">
+                  {r.flight_name || `Flight #${r.flight_id}`} / {r.sdls_name || `SDLS #${r.sdls_id}`}{' '}
+                  · {r.inventory_name || r.target_entity_type}
+                  {r.serial_number ? ` · SN ${r.serial_number}` : ''}
+                </div>
+                <div>
+                  {isAutoReleased(r) ? 'Auto-released (AUTO_RELEASE_EXPIRY)' : 'Released'}
+                  {r.released_at ? ` · ${new Date(r.released_at).toLocaleString()}` : ''}
+                  {r.last_reminder_at
+                    ? ` · last reminder ${new Date(r.last_reminder_at).toLocaleString()}`
+                    : ''}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <AlertDialog
         open={releaseId != null}

@@ -26,6 +26,7 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useTableSorting } from '@/hooks/use-table-sorting';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
+import { ListContentSuspense } from '@/components/list-content-suspense';
 import { ListPageError } from '@/components/list-page-error';
 import { useListPageLoader } from '@/hooks/use-list-page-loader';
 import { ProjectsMiniDashboard } from '@/components/projects/projects-mini-dashboard';
@@ -303,6 +304,7 @@ export default function ProjectsPage(){
         ) : null}
       </div>
 
+      <ListContentSuspense loading={pagination.fetching}>
       <ProjectsMiniDashboard
         projects={orderScopedProjects}
         systems={systems}
@@ -312,6 +314,7 @@ export default function ProjectsPage(){
         filteredOrder={filteredOrder}
         totalCount={pagination.total}
       />
+      </ListContentSuspense>
 
       {statusFilter !== 'Total' && (
         <div className="flex flex-wrap items-center gap-2">
@@ -541,6 +544,7 @@ export default function ProjectsPage(){
           </Button>
         </CardHeader>
         <CardContent>
+          <ListContentSuspense loading={pagination.fetching}>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -645,6 +649,7 @@ export default function ProjectsPage(){
               </TableBody>
             </Table>
           </div>
+          </ListContentSuspense>
           <EntityListPagination
             page={pagination.page}
             totalPages={pagination.totalPages}

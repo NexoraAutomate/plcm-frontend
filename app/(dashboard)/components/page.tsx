@@ -30,6 +30,7 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useTableSorting } from '@/hooks/use-table-sorting';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
+import { ListContentSuspense } from '@/components/list-content-suspense';
 import { ListPageError } from '@/components/list-page-error';
 import { HierarchyListDashboard } from '@/components/hierarchy/hierarchy-list-dashboard';
 import { ParentEntityLink } from '@/components/entity-link';
@@ -217,7 +218,7 @@ export default function ComponentsPage() {
     setIsEditOpen(true);
   }
 
-  if (pageLoading || pagination.loading) return <PageLoader />;
+  if (pageLoading || (pagination.loading && components.length === 0)) return <PageLoader />;
 
   if (pagination.error) {
     return (
@@ -235,6 +236,7 @@ export default function ComponentsPage() {
         <p className="text-muted-foreground mt-2">Manage unit components and parts</p>
       </div>
 
+      <ListContentSuspense loading={pagination.fetching}>
       <HierarchyListDashboard
         config={getComponentsDashboardConfig(entityLabel)}
         items={components}
@@ -250,6 +252,7 @@ export default function ComponentsPage() {
         onParentFilter={applyParentFilter}
         totalCount={pagination.total}
       />
+      </ListContentSuspense>
 
       {(statusFilter !== 'all' || parentFilter !== 'all') && (
         <div className="flex flex-wrap items-center gap-2">
@@ -399,6 +402,7 @@ export default function ComponentsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <ListContentSuspense loading={pagination.fetching}>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -515,6 +519,7 @@ export default function ComponentsPage() {
               </TableBody>
             </Table>
           </div>
+          </ListContentSuspense>
           <EntityListPagination
             page={pagination.page}
             totalPages={pagination.totalPages}
