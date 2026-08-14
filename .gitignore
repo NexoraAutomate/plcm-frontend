@@ -11,3 +11,6 @@ node_modules/
 !.env.example
 .DS_Store
 .vercel
+
+# Word lock files (created while a .docx is open)
+**/~$*
