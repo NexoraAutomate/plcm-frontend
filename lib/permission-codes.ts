@@ -224,6 +224,7 @@ export const NAV_PERMISSIONS: Record<string, PermissionCode | PermissionCode[]> 
   '/projects': P.view_projects,
   '/inventory': P.view_inventory,
   '/inventory/issuances': P.view_inventory_issuances,
+  '/shortages': [P.view_inventory, P.inventory_receive],
   '/maintenance': P.view_maintenance_cases,
   '/notifications': P.view_notifications,
   '/hierarchy-dashboard': P.view_hierarchy_dashboard,

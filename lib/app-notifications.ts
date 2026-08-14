@@ -1,6 +1,6 @@
 import { CaseStatus, FaultyEntityStatus } from '@/lib/models';
 import { getCaseStatusMeta, mapCaseStatusFromApi } from '@/lib/maintenance-workflow';
-import type { Customer, FaultyEntity, InventoryInstallerNotice, InventoryReturnNotice, MaintenanceCase, Project } from '@/lib/models';
+import type { Customer, FaultyEntity, InventoryInstallerNotice, InventoryReturnNotice, InventoryShortageNotice, MaintenanceCase, Project } from '@/lib/models';
 import { parseApiDate } from '@/lib/parse-api-date';
 
 export type AppNotificationType =
@@ -17,7 +17,10 @@ export type AppNotificationType =
   | 'inventory_returned'
   | 'inventory_issued'
   | 'inventory_return_accepted'
-  | 'inventory_return_rejected';
+  | 'inventory_return_rejected'
+  | 'inventory_shortage'
+  | 'inventory_shortage_fulfilled'
+  | 'inventory_shortage_partial';
 
 export interface AppNotification {
   id: string;
@@ -61,6 +64,7 @@ export function buildAppNotifications(input: {
   customers: Customer[];
   inventoryReturnNotices?: InventoryReturnNotice[];
   inventoryInstallerNotices?: InventoryInstallerNotice[];
+  inventoryShortageNotices?: InventoryShortageNotice[];
 }): AppNotification[] {
   const {
     maintenanceCases,
@@ -69,6 +73,7 @@ export function buildAppNotifications(input: {
     customers,
     inventoryReturnNotices = [],
     inventoryInstallerNotices = [],
+    inventoryShortageNotices = [],
   } = input;
   const notifications: AppNotification[] = [];
 
@@ -338,6 +343,74 @@ export function buildAppNotifications(input: {
         priority: isRead ? 'low' : 'high',
         metaId: notice.id,
         metaIssuanceId: notice.issuance_id ?? undefined,
+        serverRead: isRead,
+        persistent: true,
+        searchText,
+      });
+    }
+  }
+
+  for (const notice of inventoryShortageNotices) {
+    const flight = notice.flight_code || notice.flight_name || 'Flight';
+    const sdls = notice.sdls_code || notice.sdls_name || 'SDLS';
+    const lru = notice.lru_name || 'item';
+    const pn = notice.part_number || '—';
+    const href = notice.project_id ? `/projects/${notice.project_id}` : '/shortages';
+    const isRead = Boolean(notice.read_at);
+    const searchText = [
+      pn,
+      notice.qty,
+      flight,
+      sdls,
+      lru,
+      notice.project_name,
+      notice.message,
+      notice.notice_type,
+    ]
+      .filter(Boolean)
+      .join(' ');
+    const message =
+      notice.message ||
+      `PN ${pn}, Qty ${notice.qty}, Flight ${flight}, SDLS ${sdls}, LRU ${lru}`;
+
+    if (notice.notice_type === 'shortage_fulfilled') {
+      notifications.push({
+        id: `shortage-notice-${notice.id}`,
+        type: 'inventory_shortage_fulfilled',
+        title: 'Shortage fulfilled — auto-reserved',
+        message,
+        href,
+        timestamp: notice.created_at,
+        priority: isRead ? 'low' : 'medium',
+        metaId: notice.id,
+        serverRead: isRead,
+        persistent: true,
+        searchText,
+      });
+    } else if (notice.notice_type === 'shortage_partial') {
+      notifications.push({
+        id: `shortage-notice-${notice.id}`,
+        type: 'inventory_shortage_partial',
+        title: 'Shortage partially fulfilled',
+        message,
+        href,
+        timestamp: notice.created_at,
+        priority: isRead ? 'low' : 'medium',
+        metaId: notice.id,
+        serverRead: isRead,
+        persistent: true,
+        searchText,
+      });
+    } else {
+      notifications.push({
+        id: `shortage-notice-${notice.id}`,
+        type: 'inventory_shortage',
+        title: 'Inventory shortage',
+        message,
+        href,
+        timestamp: notice.created_at,
+        priority: isRead ? 'low' : 'high',
+        metaId: notice.id,
         serverRead: isRead,
         persistent: true,
         searchText,

@@ -23,6 +23,7 @@ import {
   GitBranch,
   Bell,
   FileText,
+  AlertTriangle,
   ChevronDown,
   ChevronRight,
   Settings,
@@ -94,6 +95,12 @@ const navItems: NavItem[] = [
     href: "/inventory",
     icon: Package,
     permission: NAV_PERMISSIONS["/inventory"] as PermissionCode,
+  },
+  {
+    label: "Shortages",
+    href: "/shortages",
+    icon: AlertTriangle,
+    permission: NAV_PERMISSIONS["/shortages"] as PermissionCode,
   },
   {
     label: "Maintenance",

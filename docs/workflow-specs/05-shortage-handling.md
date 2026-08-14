@@ -8,7 +8,7 @@
 
 ## Goal
 
-When stock is insufficient, notify HM & IM, track shortage until IM receives inventory, then **auto-remove shortage and reserve** for the waiting Flight → SDLS demand on a **first-come-first-reserved** basis.
+When stock is insufficient, notify HM & IM, track shortage until IM receives inventory, then **auto-remove shortage and then reserve the inventory** for in queue demands of waiting Flight → SDLS demand on a **first-come-first-reserved** basis.
 
 ---
 
@@ -65,7 +65,7 @@ When stock is insufficient, notify HM & IM, track shortage until IM receives inv
 
 1. **FCFS:** shortage (or reservation request) timestamps determine which project/Flight/SDLS gets stock first when units arrive.
 2. On receipt, system matches part numbers (and qty) to open shortage demand; does not require HM to re-click reserve for matched auto path.
-3. Notifications must include Part Number, Qty, Flight, SDLS, LRU/hierarchy item.
+`3. Notifications must include Part Number, Qty, Flight, SDLS, LRU/hierarchy item.
 4. Partial receipt fulfills partial qty; remainder stays short.
 5. Status: received unit may briefly be `AVAILABLE` then immediately `RESERVED` for winner on FCFS; or reserve atomically on receipt.
 6. Audit-friendly: record why auto-reserve occurred (shortage fulfillment).

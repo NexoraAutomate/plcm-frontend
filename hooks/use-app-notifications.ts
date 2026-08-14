@@ -11,7 +11,7 @@ import {
 import { useNotificationState } from '@/hooks/use-notification-state';
 import { useAuth } from '@/lib/auth-context';
 import * as api from '@/lib/api';
-import type { InventoryInstallerNotice, InventoryReturnNotice } from '@/lib/models';
+import type { InventoryInstallerNotice, InventoryReturnNotice, InventoryShortageNotice } from '@/lib/models';
 import {
   readAlertSettings,
   type AlertSettingsState,
@@ -21,6 +21,12 @@ const INSTALLER_NOTICE_TYPES = new Set([
   'inventory_issued',
   'inventory_return_accepted',
   'inventory_return_rejected',
+]);
+
+const SHORTAGE_NOTICE_TYPES = new Set([
+  'inventory_shortage',
+  'inventory_shortage_fulfilled',
+  'inventory_shortage_partial',
 ]);
 
 function playNotificationSound() {
@@ -70,6 +76,7 @@ export function useAppNotifications(options?: { search?: string }) {
   } = useNotificationState();
   const [returnNotices, setReturnNotices] = useState<InventoryReturnNotice[]>([]);
   const [installerNotices, setInstallerNotices] = useState<InventoryInstallerNotice[]>([]);
+  const [shortageNotices, setShortageNotices] = useState<InventoryShortageNotice[]>([]);
   const [returnDialogNotice, setReturnDialogNotice] = useState<InventoryReturnNotice | null>(
     null
   );
@@ -78,6 +85,8 @@ export function useAppNotifications(options?: { search?: string }) {
   );
   const seenInstallerIds = useRef<Set<number>>(new Set());
   const installerToastReady = useRef(false);
+  const seenShortageIds = useRef<Set<number>>(new Set());
+  const shortageToastReady = useRef(false);
 
   useEffect(() => {
     const onChange = () => setAlertSettings(readAlertSettings());
@@ -155,16 +164,54 @@ export function useAppNotifications(options?: { search?: string }) {
     }
   }, [inventoryManager, inAppEnabled, announceNewNotice]);
 
+  const loadShortageNotices = useCallback(async () => {
+    if (!inAppEnabled) {
+      setShortageNotices([]);
+      return;
+    }
+    try {
+      const res = await api.inventory.listShortageNotices();
+      const rows = res.data ?? [];
+      const unread = rows.filter((r) => !r.read_at);
+      if (shortageToastReady.current) {
+        for (const row of unread) {
+          if (seenShortageIds.current.has(row.id)) continue;
+          seenShortageIds.current.add(row.id);
+          announceNewNotice(
+            row.message || 'Inventory shortage',
+            [
+              row.part_number ? `PN ${row.part_number}` : null,
+              `Qty ${row.qty}`,
+              row.flight_name || row.flight_code,
+              row.sdls_name || row.sdls_code,
+              row.lru_name,
+            ]
+              .filter(Boolean)
+              .join(' · ')
+          );
+        }
+      } else {
+        for (const row of rows) seenShortageIds.current.add(row.id);
+        shortageToastReady.current = true;
+      }
+      setShortageNotices(rows);
+    } catch {
+      setShortageNotices([]);
+    }
+  }, [inAppEnabled, announceNewNotice]);
+
   useEffect(() => {
     void loadReturnNotices();
     void loadInstallerNotices();
+    void loadShortageNotices();
     if (!inAppEnabled) return;
     const id = window.setInterval(() => {
       void loadReturnNotices();
       void loadInstallerNotices();
+      void loadShortageNotices();
     }, 60_000);
     return () => window.clearInterval(id);
-  }, [loadReturnNotices, loadInstallerNotices, inAppEnabled]);
+  }, [loadReturnNotices, loadInstallerNotices, loadShortageNotices, inAppEnabled]);
 
   const allNotifications = useMemo(() => {
     if (!inAppEnabled) return [];
@@ -175,6 +222,7 @@ export function useAppNotifications(options?: { search?: string }) {
       customers,
       inventoryReturnNotices: returnNotices,
       inventoryInstallerNotices: installerNotices,
+      inventoryShortageNotices: shortageNotices,
     });
   }, [
     inAppEnabled,
@@ -184,6 +232,7 @@ export function useAppNotifications(options?: { search?: string }) {
     customers,
     returnNotices,
     installerNotices,
+    shortageNotices,
   ]);
 
   const notifications = useMemo(() => {
@@ -268,6 +317,26 @@ export function useAppNotifications(options?: { search?: string }) {
     }
   }, []);
 
+  const markShortageNotice = useCallback(async (noticeId?: number) => {
+    if (noticeId == null) return;
+    try {
+      const res = await api.inventory.markShortageNoticeRead(noticeId);
+      const updated = res.data;
+      setShortageNotices((prev) =>
+        prev.map((n) =>
+          n.id === noticeId
+            ? {
+                ...n,
+                read_at: updated?.read_at ?? new Date().toISOString(),
+              }
+            : n
+        )
+      );
+    } catch {
+      // Keep unread state if mark-read fails.
+    }
+  }, []);
+
   const handleNotificationActivate = useCallback(
     (item: AppNotification) => {
       if (item.type === 'inventory_returned' && item.metaId != null) {
@@ -277,11 +346,14 @@ export function useAppNotifications(options?: { search?: string }) {
       if (INSTALLER_NOTICE_TYPES.has(item.type) && !item.serverRead) {
         void markInstallerNotice(item.metaId);
       }
+      if (SHORTAGE_NOTICE_TYPES.has(item.type) && !item.serverRead) {
+        void markShortageNotice(item.metaId);
+      }
       if (!item.persistent) {
         markLocalRead(item.id);
       }
     },
-    [openReturnDecision, markInstallerNotice, markLocalRead]
+    [openReturnDecision, markInstallerNotice, markShortageNotice, markLocalRead]
   );
 
   const markAsRead = useCallback(
@@ -296,6 +368,10 @@ export function useAppNotifications(options?: { search?: string }) {
         void markInstallerNotice(n.metaId);
         return;
       }
+      if (n && SHORTAGE_NOTICE_TYPES.has(n.type) && !n.serverRead) {
+        void markShortageNotice(n.metaId);
+        return;
+      }
       if (!n?.persistent) {
         markLocalRead(id);
       }
@@ -306,6 +382,7 @@ export function useAppNotifications(options?: { search?: string }) {
       allNotifications,
       openReturnDecision,
       markInstallerNotice,
+      markShortageNotice,
     ]
   );
 
@@ -324,6 +401,14 @@ export function useAppNotifications(options?: { search?: string }) {
           }))
         );
       });
+    void api.inventory.markAllShortageNoticesRead().then(() => {
+      setShortageNotices((prev) =>
+        prev.map((n) => ({
+          ...n,
+          read_at: n.read_at ?? new Date().toISOString(),
+        }))
+      );
+    });
   }, [markLocalAllRead, allNotifications, isCleared, inventoryManager]);
 
   const clearAll = useCallback(() => {

@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Plus, Edit, Trash2, Search, Layers, Network, Copy, ChevronDown, PackageMinus, ListOrdered, Undo2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { toastFulfillments } from '@/lib/fcfs-toast';
 import * as api from '@/lib/api';
 import { EntityAttachmentsSection, type PendingAttachmentUpload } from '@/components/entity-attachments-section';
 import {
@@ -472,13 +473,14 @@ export default function InventoryPage() {
     setAddMoreSubmitting(true);
     try {
       if (inventoryUsesInstances(addMoreItem.inventory_type as EntityType)) {
-        await api.inventory.createInstance(addMoreItem.id, {
+        const created = await api.inventory.createInstance(addMoreItem.id, {
           serial_number: serialNumber,
           holder_user_id: holderUserId,
           location,
         });
+        toastFulfillments(created.data?.fcfs_fulfillments);
       } else {
-        await api.inventory.create({
+        const created = await api.inventory.create({
           name: addMoreItem.name,
           inventory_type: addMoreItem.inventory_type,
           description: addMoreItem.description,
@@ -492,6 +494,7 @@ export default function InventoryPage() {
           holder_user_id: holderUserId,
           location,
         });
+        toastFulfillments(created.data?.fcfs_fulfillments);
       }
       toast.success(`Added another ${addMoreItem.name} to inventory`);
       setAddMoreItem(null);
@@ -584,6 +587,7 @@ export default function InventoryPage() {
           await syncMedia(mediaOwnerType, mediaOwnerId);
         }
       }
+      toastFulfillments(created.data?.fcfs_fulfillments);
       toast.success(
         usesInstances
           ? 'Serialized unit added to inventory group'
@@ -619,7 +623,8 @@ export default function InventoryPage() {
     }
 
     try {
-      await api.inventory.update(editingId, buildGroupPayload());
+      const updated = await api.inventory.update(editingId, buildGroupPayload());
+      toastFulfillments(updated.data?.fcfs_fulfillments);
 
       if (usesInstances && editingInstanceId) {
         await api.inventory.updateInstance(editingInstanceId, buildInstancePayload());
@@ -701,6 +706,7 @@ export default function InventoryPage() {
       if (created.data?.id) {
         await syncMedia('inventory_instance', created.data.id);
       }
+      toastFulfillments(created.data?.fcfs_fulfillments);
       const refreshed = await api.inventory.get(editingId);
       const nextInstances = refreshed.data?.instances ?? [];
       setInstances(nextInstances);
