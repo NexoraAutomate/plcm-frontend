@@ -325,6 +325,74 @@ export interface InventoryAvailabilityCheck {
   reason?: string | null
 }
 
+/** Spec 05 — waiting demand while stock is short */
+export interface InventoryShortage {
+  id: number
+  project_id: number
+  flight_id: number
+  sdls_id: number
+  target_entity_type: string
+  target_entity_id: number
+  inventory_id?: number | null
+  part_number?: string | null
+  qty_short: number
+  qty_original: number
+  lru_name?: string | null
+  requested_by_user_id: number
+  requested_at: string
+  status: 'OPEN' | 'PARTIAL' | 'FULFILLED' | 'CANCELLED' | string
+  last_notified_at?: string | null
+  fulfilled_reservation_id?: number | null
+  cancelled_at?: string | null
+  cancelled_by_user_id?: number | null
+  notes?: string | null
+  project_name?: string | null
+  flight_code?: string | null
+  flight_name?: string | null
+  sdls_code?: string | null
+  sdls_name?: string | null
+  requested_by_name?: string | null
+}
+
+export interface InventoryShortageNotice {
+  id: number
+  user_id: number
+  shortage_id: number
+  notice_type: string
+  part_number?: string | null
+  qty: number
+  flight_code?: string | null
+  flight_name?: string | null
+  sdls_code?: string | null
+  sdls_name?: string | null
+  lru_name?: string | null
+  project_id?: number | null
+  project_name?: string | null
+  message?: string | null
+  created_at: string
+  read_at?: string | null
+}
+
+export interface FCFSFulfillment {
+  shortage_id: number
+  reservation_id?: number | null
+  project_id: number
+  project_name?: string | null
+  part_number?: string | null
+  qty_applied: number
+  shortage_status: string
+  serial_number?: string | null
+  flight_name?: string | null
+  sdls_name?: string | null
+  lru_name?: string | null
+}
+
+export interface ReserveOutcome {
+  outcome: 'reserved' | 'shortage' | string
+  reservation?: InventoryReservation | null
+  shortage?: InventoryShortage | null
+}
+
 // Shared install metadata for hierarchy hardware entities
 export interface HierarchyInstallFields {
   installation_date?: string
@@ -531,6 +599,7 @@ export interface InventoryInstance extends HierarchyInstallFields {
   is_reserved?: boolean
   open_issuance_id?: number | null
   open_issuance_status?: string | null
+  fcfs_fulfillments?: FCFSFulfillment[] | null
 }
 
 export interface Inventory extends HierarchyInstallFields {
@@ -556,6 +625,7 @@ export interface Inventory extends HierarchyInstallFields {
   updated_at?: string
   instances?: InventoryInstance[]
   component?: Component
+  fcfs_fulfillments?: FCFSFulfillment[] | null
 }
 
 export type InventoryIssuanceStatus =

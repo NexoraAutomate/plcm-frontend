@@ -72,6 +72,21 @@ export function ProjectReservationsPanel({ project }: Props) {
     });
   }, [isReady, refresh]);
 
+  useEffect(() => {
+    if (!isReady) return;
+    const id = window.setInterval(() => {
+      void refresh().catch(() => undefined);
+    }, 12_000);
+    const onFocus = () => {
+      void refresh().catch(() => undefined);
+    };
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [isReady, refresh]);
+
   const systemOptions =
     tree?.flights.flatMap((flight) =>
       flight.sdls.flatMap((sdls) =>
@@ -124,9 +139,19 @@ export function ProjectReservationsPanel({ project }: Props) {
         target_entity_id: Number(systemKey),
         serial_number: serial || undefined,
       });
-      toast.success(
-        `Reserved ${res.data.serial_number || res.data.inventory_name || 'unit'} for project`
-      );
+      if (res.data.outcome === 'shortage' && res.data.shortage) {
+        const s = res.data.shortage;
+        toast.message('Shortage recorded — HM and IM notified', {
+          description: `PN ${s.part_number || '—'}, Qty ${s.qty_short}, ${
+            s.flight_name || s.flight_code || 'Flight'
+          } / ${s.sdls_name || s.sdls_code || 'SDLS'} / ${s.lru_name || 'item'}`,
+        });
+      } else {
+        const reserved = res.data.reservation;
+        toast.success(
+          `Reserved ${reserved?.serial_number || reserved?.inventory_name || 'unit'} for project`
+        );
+      }
       setSystemKey('');
       setSerial('');
       await refresh();
@@ -166,7 +191,7 @@ export function ProjectReservationsPanel({ project }: Props) {
 
       <Can permission={P.inventory_reserve}>
         <div className="flex flex-wrap items-end gap-2">
-          <div className="min-w-[260px] space-y-1">
+          <div className="min-w-65 space-y-1">
             <Label>Hierarchy node</Label>
             <Select value={systemKey} onValueChange={setSystemKey} disabled={busy}>
               <SelectTrigger>
@@ -182,7 +207,7 @@ export function ProjectReservationsPanel({ project }: Props) {
             </Select>
           </div>
           {serialOptions.length > 0 ? (
-            <div className="min-w-[180px] space-y-1">
+            <div className="min-w-45 space-y-1">
               <Label>Serial</Label>
               <Select value={serial} onValueChange={setSerial} disabled={busy}>
                 <SelectTrigger>
@@ -226,6 +251,7 @@ export function ProjectReservationsPanel({ project }: Props) {
                   by {r.reserved_by_name || r.reserved_by_user_id}
                   {' · '}
                   expires {new Date(r.expires_at).toLocaleDateString()}
+                  {r.notes?.includes('shortage fulfillment') ? ' · auto-reserved (shortage)' : ''}
                 </div>
               </div>
               <Can permission={P.inventory_release}>

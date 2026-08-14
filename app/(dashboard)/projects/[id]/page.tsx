@@ -38,6 +38,7 @@ import { useHierarchyCreateFormOptions } from '@/hooks/use-hierarchy-create-form
 import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
 import { ProjectWorkflowActions } from '@/components/projects/project-workflow-actions';
 import { ProjectReservationsPanel } from '@/components/projects/project-reservations-panel';
+import { ShortageListPanel } from '@/components/shortages/shortage-list-panel';
 
 export default function ProjectDetailPage() {
   const { entityLabel } = useAppDefinitions();
@@ -390,6 +391,18 @@ export default function ProjectDetailPage() {
       />
 
       <ProjectReservationsPanel project={project} />
+
+      {project.status_name === 'READY_FOR_INVENTORY' ? (
+        <div className="space-y-2 rounded-lg border p-4">
+          <div>
+            <h3 className="text-sm font-medium">Shortages</h3>
+            <p className="text-xs text-muted-foreground">
+              Waiting demand for this project. Matching receipts auto-reserve FCFS.
+            </p>
+          </div>
+          <ShortageListPanel projectId={project.id} pollMs={12_000} />
+        </div>
+      ) : null}
 
       {/* Project Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

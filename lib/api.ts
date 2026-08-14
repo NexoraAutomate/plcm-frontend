@@ -325,10 +325,18 @@ export const projects = {
       serial_number?: string;
       notes?: string;
     }
-  ) => api.post<Models.InventoryReservation>(`/projects/${id}/reservations/`, data),
+  ) => api.post<Models.ReserveOutcome>(`/projects/${id}/reservations/`, data),
   releaseReservation: (projectId: number, reservationId: number) =>
     api.post<Models.InventoryReservation>(
       `/projects/${projectId}/reservations/${reservationId}/release/`
+    ),
+  listShortages: (id: number, activeOnly = true) =>
+    api.get<Models.InventoryShortage[]>(`/projects/${id}/shortages/`, {
+      params: { active_only: activeOnly },
+    }),
+  cancelShortage: (projectId: number, shortageId: number) =>
+    api.post<Models.InventoryShortage>(
+      `/projects/${projectId}/shortages/${shortageId}/cancel/`
     ),
   update: (id: number, data: Partial<Models.Project>) => api.put<Models.Project>(`/projects/${id}/`, data),
   delete: (id: number) => api.delete(`/projects/${id}/`),
@@ -544,6 +552,24 @@ export const inventory = {
     api.get<Models.InventoryInstance[]>(`/inventory/${inventoryId}/instances/`),
   createInstance: (inventoryId: number, data: Partial<Models.InventoryInstance>) =>
     api.post<Models.InventoryInstance>(`/inventory/${inventoryId}/instances/`, data),
+  listShortages: (options?: { activeOnly?: boolean; projectId?: number; mine?: boolean }) =>
+    api.get<Models.InventoryShortage[]>('/inventory/shortages/', {
+      params: {
+        active_only: options?.activeOnly ?? true,
+        project_id: options?.projectId,
+        mine: options?.mine ?? false,
+      },
+    }),
+  listShortageNotices: (options?: { unreadOnly?: boolean }) =>
+    api.get<Models.InventoryShortageNotice[]>('/inventory/shortage-notices/', {
+      params: { unread_only: options?.unreadOnly ?? false },
+    }),
+  markShortageNoticeRead: (noticeId: number) =>
+    api.post<Models.InventoryShortageNotice>(
+      `/inventory/shortage-notices/${noticeId}/read/`
+    ),
+  markAllShortageNoticesRead: () =>
+    api.post<{ ok: boolean; marked: number }>('/inventory/shortage-notices/read-all/'),
   updateInstance: (instanceId: number, data: Partial<Models.InventoryInstance>) =>
     api.put<Models.InventoryInstance>(`/inventory/instances/${instanceId}/`, data),
   deleteInstance: (instanceId: number) => api.delete(`/inventory/instances/${instanceId}/`),
