@@ -14,6 +14,7 @@ import {
   buildEntityHierarchyTree,
   buildSystemHierarchyTree,
   hierarchyTreeToFlow,
+  applyInventoryFlagsToNodes,
   DEFAULT_NODE_FIELD_VISIBILITY,
   type HierarchyEntityType,
   type HierarchyNodeFieldVisibility,
@@ -36,6 +37,7 @@ import type {
   System,
   Unit,
 } from '@/lib/models';
+import { useProjectInventoryFlags } from '@/hooks/use-project-inventory-flags';
 
 interface SystemHierarchyFlowProps {
   system: System;
@@ -85,6 +87,7 @@ export function SystemHierarchyFlow({
   const [fieldVisibility, setFieldVisibility] = useState<HierarchyNodeFieldVisibility>(
     DEFAULT_NODE_FIELD_VISIBILITY
   );
+  const inventoryFlags = useProjectInventoryFlags(project?.id);
 
   const resolvedRootId = rootEntityId ?? system.id;
   const resolvedRootType = rootType;
@@ -133,13 +136,16 @@ export function SystemHierarchyFlow({
     const flow = hierarchyTreeToFlow(tree);
 
     return {
-      nodes: flow.nodes.map((node) => ({
-        ...node,
-        data: {
-          ...node.data,
-          fieldVisibility,
-        },
-      })),
+      nodes: applyInventoryFlagsToNodes(
+        flow.nodes.map((node) => ({
+          ...node,
+          data: {
+            ...node.data,
+            fieldVisibility,
+          },
+        })),
+        inventoryFlags
+      ),
       edges: flow.edges,
       rootMissing: false,
     };
@@ -153,6 +159,7 @@ export function SystemHierarchyFlow({
     statuses,
     resolvedRootType,
     resolvedRootId,
+    inventoryFlags,
   ]);
 
   if (rootMissing || nodes.length === 0) {

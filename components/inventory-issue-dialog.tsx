@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
-import type { Inventory, InventoryInstance, User } from '@/lib/models';
+import type { Inventory, InventoryInstance, ItemIssueRequest, User } from '@/lib/models';
 import { inventoryUsesInstances } from '@/lib/entity-hierarchy';
 import { formatUserRef } from '@/lib/user-display';
+import { hasWorkflowRole } from '@/lib/workflow-roles';
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  IssueSignatureFields,
+  useIssueSignature,
+} from '@/components/inventory/issue-signature-fields';
 
 type Props = {
   open: boolean;
@@ -32,7 +37,6 @@ type Props = {
   item: Inventory | null;
   users: User[];
   onIssued?: () => void;
-  /** Preselect a serial instance when opening from a row expander */
   presetInstanceId?: number | null;
 };
 
@@ -49,32 +53,76 @@ export function InventoryIssueDialog({
   const [quantity, setQuantity] = useState('1');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState<ItemIssueRequest[]>([]);
+  const signature = useIssueSignature();
 
   const usesInstances = item
     ? inventoryUsesInstances(item.inventory_type as 'system' | 'subsystem' | 'module' | 'unit' | 'component')
     : false;
 
-  const availableInstances: InventoryInstance[] = useMemo(() => {
+  const issuableInstances: InventoryInstance[] = useMemo(() => {
     if (!item?.instances) return [];
     return item.instances.filter((i) => i.id && !i.is_reserved);
   }, [item]);
 
+  const selectedInstance = useMemo(
+    () => issuableInstances.find((row) => String(row.id) === instanceId) ?? null,
+    [issuableInstances, instanceId]
+  );
+  const reservedHold = Boolean(
+    selectedInstance?.is_project_reserved || selectedInstance?.project_reservation
+  );
+  const matchingRequest = useMemo(() => {
+    if (!selectedInstance?.id) return null;
+    return (
+      pendingRequests.find((row) => row.inventory_instance_id === selectedInstance.id) ?? null
+    );
+  }, [pendingRequests, selectedInstance?.id]);
+
+  const developers = useMemo(
+    () => users.filter((user) => hasWorkflowRole(user.roles ?? [], ['DEV', 'ADMIN'])),
+    [users]
+  );
+
   useEffect(() => {
     if (!open || !item) return;
-    setIssuedToUserId('');
     setNotes('');
     setQuantity('1');
+    signature.reset();
     if (presetInstanceId) {
       setInstanceId(String(presetInstanceId));
-    } else if (availableInstances.length === 1) {
-      setInstanceId(String(availableInstances[0].id));
+    } else if (issuableInstances.length === 1) {
+      setInstanceId(String(issuableInstances[0].id));
     } else {
       setInstanceId('');
     }
-  }, [open, item, presetInstanceId, availableInstances]);
+    void api.inventory
+      .listItemRequests({ status: 'pending' })
+      .then((res) => setPendingRequests(res.data ?? []))
+      .catch(() => setPendingRequests([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, item, presetInstanceId, issuableInstances]);
+
+  useEffect(() => {
+    if (matchingRequest) {
+      setIssuedToUserId(String(matchingRequest.assigned_developer_id));
+    } else if (open) {
+      setIssuedToUserId('');
+    }
+  }, [matchingRequest, open]);
 
   const handleSubmit = async () => {
     if (!item) return;
+    const signed = signature.payload();
+    if (!signed) {
+      toast.error('Signature is required to issue');
+      return;
+    }
+    if (usesInstances && reservedHold && !matchingRequest) {
+      toast.error('Developer must request this reserved item before it can be issued');
+      return;
+    }
+
     const developerId = Number(issuedToUserId);
     if (!Number.isFinite(developerId) || developerId <= 0) {
       toast.error('Select a developer');
@@ -100,12 +148,20 @@ export function InventoryIssueDialog({
 
     setSubmitting(true);
     try {
-      await api.inventory.issue(item.id, {
-        issued_to_user_id: developerId,
-        quantity: usesInstances ? 1 : qty,
-        instance_id: resolvedInstanceId ?? null,
-        notes: notes.trim() || null,
-      });
+      if (matchingRequest) {
+        await api.inventory.issueItemRequest(matchingRequest.id, {
+          ...signed,
+          notes: notes.trim() || null,
+        });
+      } else {
+        await api.inventory.issue(item.id, {
+          issued_to_user_id: developerId,
+          quantity: usesInstances ? 1 : qty,
+          instance_id: resolvedInstanceId ?? null,
+          notes: notes.trim() || null,
+          ...signed,
+        });
+      }
       toast.success('Inventory item issued to developer');
       onOpenChange(false);
       onIssued?.();
@@ -125,8 +181,8 @@ export function InventoryIssueDialog({
         <DialogHeader>
           <DialogTitle>Issue to developer</DialogTitle>
           <DialogDescription>
-            Reserve stock for a developer without decreasing inventory quantity. Stock
-            decreases only when the item is installed.
+            Signature is required. Reserved serials can only be issued after the assigned
+            developer requests them.
           </DialogDescription>
         </DialogHeader>
 
@@ -137,19 +193,23 @@ export function InventoryIssueDialog({
               <div className="text-muted-foreground">
                 {item.part_number || '—'}
                 {usesInstances
-                  ? ` · ${availableInstances.length} available serial(s)`
+                  ? ` · ${issuableInstances.length} serial(s)`
                   : ` · ${item.available_quantity ?? item.quantity} available / ${item.quantity} total`}
               </div>
             </div>
 
             <div className="space-y-2">
               <Label>Developer</Label>
-              <Select value={issuedToUserId} onValueChange={setIssuedToUserId}>
+              <Select
+                value={issuedToUserId}
+                onValueChange={setIssuedToUserId}
+                disabled={Boolean(matchingRequest)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select user" />
                 </SelectTrigger>
                 <SelectContent>
-                  {users.map((u) => (
+                  {(matchingRequest ? users : developers).map((u) => (
                     <SelectItem key={u.id} value={String(u.id)}>
                       {formatUserRef(u) || u.username || `User #${u.id}`}
                     </SelectItem>
@@ -166,7 +226,7 @@ export function InventoryIssueDialog({
                     <SelectValue placeholder="Select serial" />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableInstances.map((inst) => (
+                    {issuableInstances.map((inst) => (
                       <SelectItem key={inst.id} value={String(inst.id)}>
                         {inst.serial_number || `Instance #${inst.id}`}
                         {inst.is_project_reserved || inst.project_reservation
@@ -176,6 +236,11 @@ export function InventoryIssueDialog({
                     ))}
                   </SelectContent>
                 </Select>
+                {reservedHold && !matchingRequest ? (
+                  <p className="text-xs text-amber-700">
+                    Waiting for the assigned developer to request this reserved item.
+                  </p>
+                ) : null}
               </div>
             ) : (
               <div className="space-y-2">
@@ -189,6 +254,16 @@ export function InventoryIssueDialog({
                 />
               </div>
             )}
+
+            <IssueSignatureFields
+              signatureType={signature.signatureType}
+              onSignatureTypeChange={signature.setSignatureType}
+              digitalPayload={signature.digitalPayload}
+              onDigitalPayloadChange={signature.setDigitalPayload}
+              hardCopyAck={signature.hardCopyAck}
+              onHardCopyAckChange={signature.setHardCopyAck}
+              disabled={submitting}
+            />
 
             <div className="space-y-2">
               <Label>Notes (optional)</Label>

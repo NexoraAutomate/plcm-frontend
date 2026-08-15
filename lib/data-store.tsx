@@ -186,6 +186,7 @@ interface DataStoreContextType {
 
   /** Soft-clear a reverted install from local hierarchy state immediately. */
   markLocalInstallReverted: (entityType: string, entityId: number) => void;
+  patchHierarchyEntity: (entityType: string, entityId: number, patch: Record<string, unknown>) => void;
 
   // Refresh
   refreshData: (options?: { silent?: boolean }) => Promise<void>;
@@ -389,6 +390,20 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     else if (type === 'unit') setUnits(mark);
     else if (type === 'component') setComponents(mark);
   }, []);
+
+  const patchHierarchyEntity = useCallback(
+    (entityType: string, entityId: number, patch: Record<string, unknown>) => {
+      const type = entityType.trim().toLowerCase();
+      const apply = <T extends { id: number }>(rows: T[]) =>
+        rows.map((row) => (row.id === entityId ? { ...row, ...patch } : row));
+      if (type === 'system') setSystems(apply);
+      else if (type === 'subsystem') setSubsystems(apply);
+      else if (type === 'module') setModules(apply);
+      else if (type === 'unit') setUnits(apply);
+      else if (type === 'component') setComponents(apply);
+    },
+    []
+  );
 
   const ensureHierarchyLoadedRef = useRef(ensureHierarchyLoaded);
   ensureHierarchyLoadedRef.current = ensureHierarchyLoaded;
@@ -1656,6 +1671,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     refreshLightweight,
     ensureHierarchyLoaded,
     markLocalInstallReverted,
+    patchHierarchyEntity,
     runSilentEntityBatch,
     }),
     [
@@ -1685,6 +1701,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       refreshLightweight,
       ensureHierarchyLoaded,
       markLocalInstallReverted,
+      patchHierarchyEntity,
       runSilentEntityBatch,
     ]
   );

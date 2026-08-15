@@ -416,6 +416,21 @@ export const hierarchies = {
   delete: (id: number) => api.delete(`/hierarchies/${id}/`),
 };
 
+export const hierarchyWorkflow = {
+  assignDeveloper: (entityType: string, entityId: number, developerUserId: number | null) =>
+    api.post<Models.HierarchyAssignDeveloperResult>(
+      `/hierarchy/${entityType}/${entityId}/assign-developer/`,
+      { developer_user_id: developerUserId }
+    ),
+  assignmentStatus: (entityType: string, ids: number[] | string) =>
+    api.get<Models.HierarchyAssignmentStatus[]>('/item-assignments/status/', {
+      params: {
+        entity_type: entityType,
+        ids: Array.isArray(ids) ? ids.join(',') : ids,
+      },
+    }),
+};
+
 // Spec 01 — Smart SDLS hierarchy configurations
 export const hierarchyConfigurations = {
   meta: () => api.get<Models.HierarchyConfigMeta>("/hierarchy-configurations/meta"),
@@ -475,6 +490,24 @@ export const inventory = {
     }),
   issue: (id: number, data: Models.InventoryIssuePayload) =>
     api.post<Models.InventoryIssuance>(`/inventory/${id}/issue/`, data),
+  listItemRequests: (params?: { status?: string; mine?: boolean }) =>
+    api.get<Models.ItemIssueRequest[]>('/item-requests/', { params }),
+  createItemRequest: (data: { entity_type: string; entity_id: number; notes?: string | null }) =>
+    api.post<Models.ItemIssueRequest>('/item-requests/', data),
+  createItemRequestsBulk: (data: {
+    mode: 'all' | 'reserved' | 'selected' | string
+    items?: Array<{ entity_type: string; entity_id: number }>
+    notes?: string | null
+  }) => api.post<Models.ItemIssueRequestBulkResult>('/item-requests/bulk/', data),
+  listMyAssignments: () => api.get<Models.DeveloperAssignedWork[]>('/item-assignments/mine/'),
+  issueItemRequest: (
+    requestId: number,
+    data: {
+      signature_type: string
+      signature_payload?: string | null
+      notes?: string | null
+    }
+  ) => api.post<Models.ItemIssueRequest>(`/item-requests/${requestId}/issue/`, data),
   listIssuances: (params?: {
     status?: string
     issued_to_user_id?: number

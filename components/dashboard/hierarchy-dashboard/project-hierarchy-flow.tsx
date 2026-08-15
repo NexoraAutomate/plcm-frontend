@@ -17,6 +17,7 @@ import {
 } from '@/lib/project-hierarchy-dashboard';
 import {
   DEFAULT_NODE_FIELD_VISIBILITY,
+  applyInventoryFlagsToNodes,
   type HierarchyEntityType,
   type HierarchyNodeFieldVisibility,
 } from '@/lib/system-hierarchy-graph';
@@ -38,6 +39,7 @@ import type {
   System,
   Unit,
 } from '@/lib/models';
+import { useProjectInventoryFlags } from '@/hooks/use-project-inventory-flags';
 
 interface ProjectHierarchyFlowProps {
   selection: HierarchyDashboardSelection;
@@ -87,6 +89,7 @@ export function ProjectHierarchyFlow({
   const [fieldVisibility, setFieldVisibility] = useState<HierarchyNodeFieldVisibility>(
     DEFAULT_NODE_FIELD_VISIBILITY
   );
+  const inventoryFlags = useProjectInventoryFlags(selection.projectId ?? project?.id);
 
   const handleToggleDetails = useCallback((entityId: number, type: HierarchyEntityType) => {
     setPanel((prev) => {
@@ -118,13 +121,16 @@ export function ProjectHierarchyFlow({
     );
 
     return {
-      nodes: flow.nodes.map((node) => ({
-        ...node,
-        data: {
-          ...node.data,
-          fieldVisibility,
-        },
-      })),
+      nodes: applyInventoryFlagsToNodes(
+        flow.nodes.map((node) => ({
+          ...node,
+          data: {
+            ...node.data,
+            fieldVisibility,
+          },
+        })),
+        inventoryFlags
+      ),
       edges: flow.edges,
     };
   }, [
@@ -136,6 +142,7 @@ export function ProjectHierarchyFlow({
     components,
     statuses,
     fieldVisibility,
+    inventoryFlags,
   ]);
 
   const fitViewKey = useMemo(

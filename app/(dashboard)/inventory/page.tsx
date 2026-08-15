@@ -225,7 +225,7 @@ export default function InventoryPage() {
   const canCreateInventory = inventoryManager && can(P.create_inventory);
   const canEditInventory = inventoryManager && can(P.edit_inventory);
   const canAddStock = canCreateInventory || canEditInventory;
-  const canIssue = inventoryManager && can(P.issue_inventory);
+  const canIssue = inventoryManager && can([P.issue_inventory, P.inventory_issue_workflow]);
   const ENTITY_TYPE_FILTERS = useMemo(
     () =>
       ENTITY_TYPE_FILTER_STYLES.map((filter) => ({
@@ -1364,6 +1364,13 @@ export default function InventoryPage() {
               </Link>
             </Button>
           </Can>
+          <Can permission={[P.inventory_issue_workflow, P.issue_inventory]}>
+            <Button variant="outline" asChild>
+              <Link href="/issue-queue">
+                Issue queue
+              </Link>
+            </Button>
+          </Can>
         </div>
       </div>
 
@@ -1607,7 +1614,7 @@ export default function InventoryPage() {
                                   <Copy className={ACTION_ICON.duplicate} />
                                 </Button>
                               ) : null}
-                              <Can permission={P.issue_inventory}>
+                              <Can permission={[P.issue_inventory, P.inventory_issue_workflow]}>
                                 {canIssue ? (
                                 <Button
                                   size="icon-sm"
@@ -1766,7 +1773,11 @@ export default function InventoryPage() {
                                             <TableCell>{instance.location?.trim() || '—'}</TableCell>
                                             <TableCell>
                                               {instance.is_reserved ? (
-                                                <Badge variant="secondary">Issued</Badge>
+                                                <StatusBadge
+                                                  status={
+                                                    instance.status_name || 'ISSUED'
+                                                  }
+                                                />
                                               ) : isProjectReservedInstance(instance) ? (
                                                 <button
                                                   type="button"
@@ -1784,7 +1795,7 @@ export default function InventoryPage() {
                                             </TableCell>
                                             <TableCell>
                                               {!instance.is_reserved && canIssue ? (
-                                                <Can permission={P.issue_inventory}>
+                                                <Can permission={[P.issue_inventory, P.inventory_issue_workflow]}>
                                                   <Button
                                                     size="icon-sm"
                                                     variant="ghost"

@@ -27,6 +27,7 @@ import { P } from '@/lib/permission-codes';
 import * as api from '@/lib/api';
 import type { InventoryReservation, Project } from '@/lib/models';
 import { ProjectWorkflowStatus } from '@/lib/workflow-status';
+import { useDataStore } from '@/lib/data-store';
 
 type HierarchyTree = Awaited<ReturnType<typeof api.projects.hierarchyTree>>['data'];
 
@@ -68,6 +69,8 @@ export function ProjectReservationsPanel({ project }: Props) {
   const [serial, setSerial] = useState('');
   const [serialOptions, setSerialOptions] = useState<string[]>([]);
   const [releaseId, setReleaseId] = useState<number | null>(null);
+  const [releaseAllOpen, setReleaseAllOpen] = useState(false);
+  const { ensureHierarchyLoaded } = useDataStore();
 
   const refresh = useCallback(async () => {
     if (!isReady) return;
@@ -185,11 +188,31 @@ export function ProjectReservationsPanel({ project }: Props) {
     setBusy(true);
     try {
       await api.projects.releaseReservation(project.id, releaseId);
-      toast.success('Reservation released — unit AVAILABLE');
+      toast.success('Reservation released — assignment removed from developer');
       setReleaseId(null);
-      await refresh();
+      await Promise.all([refresh(), ensureHierarchyLoaded({ force: true })]);
     } catch (error: unknown) {
       toast.error(apiError(error, 'Release failed'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleReleaseAll() {
+    const ids = reservations.filter((row) => row.status === 'active').map((row) => row.id);
+    if (ids.length === 0) return;
+    setBusy(true);
+    try {
+      for (const id of ids) {
+        await api.projects.releaseReservation(project.id, id);
+      }
+      toast.success(
+        `Released ${ids.length} reservation${ids.length === 1 ? '' : 's'} — developer assignments removed`
+      );
+      setReleaseAllOpen(false);
+      await Promise.all([refresh(), ensureHierarchyLoaded({ force: true })]);
+    } catch (error: unknown) {
+      toast.error(apiError(error, 'Release all failed'));
     } finally {
       setBusy(false);
     }
@@ -267,6 +290,20 @@ export function ProjectReservationsPanel({ project }: Props) {
       {active.length === 0 ? (
         <p className="text-xs text-muted-foreground">No active project reservations.</p>
       ) : (
+        <div className="space-y-2">
+          <div className="flex items-center justify-end">
+            <Can permission={P.inventory_release}>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy}
+                onClick={() => setReleaseAllOpen(true)}
+              >
+                <Unlock className="mr-1 h-3.5 w-3.5" />
+                Release all
+              </Button>
+            </Can>
+          </div>
         <ul className="space-y-2 text-sm">
           {active.map((r) => (
             <li
@@ -332,6 +369,7 @@ export function ProjectReservationsPanel({ project }: Props) {
             </li>
           ))}
         </ul>
+        </div>
       )}
 
       {history.length > 0 ? (
@@ -371,7 +409,9 @@ export function ProjectReservationsPanel({ project }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle>Release reservation?</AlertDialogTitle>
             <AlertDialogDescription>
-              This returns the unit to AVAILABLE so other projects can reserve it.
+              This returns the unit to AVAILABLE. If a developer is assigned to this item, that
+              assignment is removed after you confirm, and they will no longer see it. Pending
+              handover requests are cancelled.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -384,6 +424,36 @@ export function ProjectReservationsPanel({ project }: Props) {
               }}
             >
               {busy ? 'Releasing…' : 'Release'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={releaseAllOpen}
+        onOpenChange={(open) => {
+          if (!open) setReleaseAllOpen(false);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Release all reservations?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {`This releases ${active.length} reserved unit${
+                active.length === 1 ? '' : 's'
+              } back to AVAILABLE. Developer assignments on those items will also be removed after you confirm.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={busy}
+              onClick={(e) => {
+                e.preventDefault();
+                void handleReleaseAll();
+              }}
+            >
+              {busy ? 'Releasing…' : 'Release all'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2, ArrowRight, Network, Pencil, Replace } from 'lucide-react';
+import { Plus, Trash2, ArrowRight, Network, Pencil, Replace, UserPlus } from 'lucide-react';
 import { StatusBadge } from './status-badge';
 import { resolveStatusName } from '@/lib/entity-status';
 import type { Status } from '@/lib/models';
@@ -17,6 +17,11 @@ import { RevertToInventoryButton } from '@/components/revert-to-inventory-button
 import { useDataStore } from '@/lib/data-store';
 import { canManageInstall, isOwnInstall } from '@/lib/install-ownership';
 import { cn } from '@/lib/utils';
+import { WorkflowCan } from '@/components/auth';
+import { P } from '@/lib/permission-codes';
+import { AssignDeveloperDialog } from '@/components/hierarchy/assign-developer-dialog';
+import * as api from '@/lib/api';
+import type { HierarchyAssignmentStatus } from '@/lib/models';
 
 interface EntityCardsProps {
   title: string;
@@ -35,6 +40,7 @@ interface EntityCardsProps {
     replacement_sequence?: number;
     is_current_install?: boolean;
     installed_by_id?: number | null;
+    assigned_developer_id?: number | null;
   }>;
   statuses?: Status[];
   onAdd?: () => void;
@@ -81,12 +87,54 @@ export function EntityCards({
   deletePermission,
 }: EntityCardsProps) {
   const { can, user, isInventoryManager } = useAuth();
-  const { ensureHierarchyLoaded, markLocalInstallReverted } = useDataStore();
+  const { ensureHierarchyLoaded, markLocalInstallReverted, users, patchHierarchyEntity } =
+    useDataStore();
   const inventoryManager = isInventoryManager();
   const canCreate = !createPermission || can(createPermission);
   const canEditPerm = !editPermission || can(editPermission);
   const canDeletePerm = !deletePermission || can(deletePermission);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const [assignTarget, setAssignTarget] = useState<{
+    id: number;
+    name: string;
+    developerId?: number | null;
+    issued: boolean;
+  } | null>(null);
+  const [assignmentById, setAssignmentById] = useState<Record<number, HierarchyAssignmentStatus>>(
+    {}
+  );
+
+  const entityStatusKey = entities
+    .map((entity) => `${entity.id}:${entity.assigned_developer_id ?? ''}`)
+    .join(',');
+
+  useEffect(() => {
+    if (!childEntityType || !entityStatusKey) {
+      setAssignmentById({});
+      return;
+    }
+    const ids = entityStatusKey
+      .split(',')
+      .map((part) => Number(part.split(':')[0]))
+      .filter((id) => Number.isFinite(id) && id > 0);
+    let cancelled = false;
+    api.hierarchyWorkflow
+      .assignmentStatus(childEntityType, ids)
+      .then((res) => {
+        if (cancelled) return;
+        const next: Record<number, HierarchyAssignmentStatus> = {};
+        for (const row of res.data ?? []) {
+          next[row.id] = row;
+        }
+        setAssignmentById(next);
+      })
+      .catch(() => {
+        if (!cancelled) setAssignmentById({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [childEntityType, entityStatusKey]);
 
   return (
     <>
@@ -112,6 +160,11 @@ export function EntityCards({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {entities.map((entity) => {
               const statusLabel = resolveStatusName(entity, statuses);
+              const assignment = assignmentById[entity.id];
+              const assignedId =
+                assignment?.assigned_developer_id ?? entity.assigned_developer_id ?? null;
+              const issued = Boolean(assignment?.issued);
+              const showAssigned = Boolean(assignedId) && !issued;
               const ownsInstall = canManageInstall({
                 isInventoryManager: inventoryManager,
                 currentUserId: user?.id,
@@ -186,7 +239,11 @@ export function EntityCards({
                               className="h-10 w-10 shrink-0 rounded border object-cover"
                             />
                           ) : null}
-                          <div className="flex shrink-0 items-center gap-1">
+                          <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                            {showAssigned ? <StatusBadge status="Assigned" /> : null}
+                            {issued && !['ISSUED', 'Issued'].includes(statusLabel) ? (
+                              <StatusBadge status="ISSUED" />
+                            ) : null}
                             {statusLabel !== 'Unknown' && (
                               <StatusBadge status={statusLabel} />
                             )}
@@ -248,6 +305,31 @@ export function EntityCards({
                           </Button>
                         ) : null}
                       </div>
+                      {childEntityType ? (
+                        <WorkflowCan role={['HM', 'ADMIN']} permission={P.hierarchy_assign_developer}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full gap-1.5"
+                            disabled={issued}
+                            onClick={() =>
+                              setAssignTarget({
+                                id: entity.id,
+                                name: entity.name,
+                                developerId: assignedId,
+                                issued,
+                              })
+                            }
+                          >
+                            <UserPlus className="h-3 w-3" />
+                            {issued
+                              ? 'Issued'
+                              : assignedId
+                                ? 'Reassign developer'
+                                : 'Assign developer'}
+                          </Button>
+                        </WorkflowCan>
+                      ) : null}
                       {canRevert && childEntityType ? (
                         <RevertToInventoryButton
                           entityType={childEntityType}
@@ -294,6 +376,35 @@ export function EntityCards({
         }
       }}
     />
+    {childEntityType ? (
+      <AssignDeveloperDialog
+        open={assignTarget !== null}
+        onOpenChange={(open) => !open && setAssignTarget(null)}
+        entityType={childEntityType}
+        entityId={assignTarget?.id ?? 0}
+        entityName={assignTarget?.name}
+        users={users}
+        currentDeveloperId={assignTarget?.developerId}
+        issued={assignTarget?.issued}
+        onAssigned={(developerId, developerName) => {
+          if (!assignTarget || !childEntityType) return;
+          patchHierarchyEntity(childEntityType, assignTarget.id, {
+            assigned_developer_id: developerId,
+          });
+          setAssignmentById((prev) => ({
+            ...prev,
+            [assignTarget.id]: {
+              entity_type: childEntityType,
+              id: assignTarget.id,
+              name: assignTarget.name,
+              assigned_developer_id: developerId,
+              assigned_developer_name: developerName,
+              issued: assignTarget.issued,
+            },
+          }));
+        }}
+      />
+    ) : null}
     </>
   );
 }

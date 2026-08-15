@@ -6,6 +6,7 @@ import { ChevronRight, CornerDownRight, Edit, History, Plus, Trash2 } from 'luci
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { HierarchyNodeFieldLines } from '@/components/hierarchy-node-legend';
+import { StatusBadge } from '@/components/status-badge';
 import { CHILD_ENTITY_TYPE } from '@/lib/hierarchy-dashboard-entity-config';
 import { useAppDefinitions } from '@/lib/app-definitions-context';
 import type { HierarchyEntityActionHandlers } from '@/components/hierarchy-dashboard/use-hierarchy-entity-actions';
@@ -223,6 +224,14 @@ function HierarchyFlowNode({ data }: NodeProps<Node<HierarchyNodeData>>) {
         >
           {data.label}
         </p>
+        {data.assigned || data.reserved || data.shortage || data.issued ? (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {data.assigned && !data.issued ? <StatusBadge status="Assigned" className="text-[10px]" /> : null}
+            {data.reserved ? <StatusBadge status="RESERVED" className="text-[10px]" /> : null}
+            {data.shortage ? <StatusBadge status="Shortage" className="text-[10px]" /> : null}
+            {data.issued ? <StatusBadge status="ISSUED" className="text-[10px]" /> : null}
+          </div>
+        ) : null}
         <HierarchyNodeFieldLines data={data} />
         {entityActions ? (
           <div

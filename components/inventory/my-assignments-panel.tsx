@@ -1,0 +1,242 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import * as api from '@/lib/api';
+import type { DeveloperAssignedWork } from '@/lib/models';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { ListContentSuspense } from '@/components/list-content-suspense';
+import { StatusBadge } from '@/components/status-badge';
+
+function rowKey(row: DeveloperAssignedWork) {
+  return `${row.entity_type}:${row.entity_id}`;
+}
+
+function requestLabel(row: DeveloperAssignedWork) {
+  if (row.issued) return 'Issued';
+  if (row.request_status === 'pending') return 'Requested';
+  if (row.reserved) return 'Reserved';
+  return 'Assigned';
+}
+
+export function MyAssignmentsPanel() {
+  const [rows, setRows] = useState<DeveloperAssignedWork[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.inventory.listMyAssignments();
+      setRows(res.data ?? []);
+    } catch {
+      toast.error('Failed to load assigned items');
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const selectedRows = useMemo(
+    () => rows.filter((row) => selected[rowKey(row)]),
+    [rows, selected]
+  );
+  const requestable = rows.filter((row) => row.can_request);
+  const reservedCount = rows.filter((row) => row.reserved && !row.issued).length;
+
+  async function requestBulk(
+    mode: 'all' | 'reserved' | 'selected',
+    items?: Array<{ entity_type: string; entity_id: number }>
+  ) {
+    setSubmitting(true);
+    try {
+      const res = await api.inventory.createItemRequestsBulk({ mode, items });
+      const created = res.data.created?.length ?? 0;
+      const skipped = res.data.skipped?.length ?? 0;
+      if (created === 0 && skipped === 0) {
+        toast.message('No items were ready to request');
+      } else {
+        toast.success(
+          `Requested ${created} item${created === 1 ? '' : 's'}${
+            skipped ? ` · ${skipped} skipped` : ''
+          }`
+        );
+      }
+      setSelected({});
+      await refresh();
+    } catch (error: unknown) {
+      const detail =
+        (error as { response?: { data?: { detail?: string } } })?.response?.data
+          ?.detail || 'Request failed';
+      toast.error(typeof detail === 'string' ? detail : 'Request failed');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function requestOne(row: DeveloperAssignedWork) {
+    setSubmitting(true);
+    try {
+      await api.inventory.createItemRequest({
+        entity_type: row.entity_type,
+        entity_id: row.entity_id,
+      });
+      toast.success('Handover requested from Inventory Manager');
+      await refresh();
+    } catch (error: unknown) {
+      const detail =
+        (error as { response?: { data?: { detail?: string } } })?.response?.data
+          ?.detail || 'Request failed';
+      toast.error(typeof detail === 'string' ? detail : 'Request failed');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const allRequestableSelected =
+    requestable.length > 0 && requestable.every((row) => selected[rowKey(row)]);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={submitting || selectedRows.length === 0}
+          onClick={() =>
+            void requestBulk(
+              'selected',
+              selectedRows.map((row) => ({
+                entity_type: row.entity_type,
+                entity_id: row.entity_id,
+              }))
+            )
+          }
+        >
+          Request selected
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={submitting || reservedCount === 0}
+          onClick={() => void requestBulk('reserved')}
+        >
+          Request reserved only
+        </Button>
+        <Button
+          size="sm"
+          disabled={submitting || requestable.length === 0}
+          onClick={() => void requestBulk('all')}
+        >
+          Request all
+        </Button>
+      </div>
+      <ListContentSuspense loading={loading && rows.length === 0}>
+        {rows.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            No hierarchy items have been assigned to you yet.
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={allRequestableSelected}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        const next: Record<string, boolean> = {};
+                        for (const row of requestable) next[rowKey(row)] = true;
+                        setSelected(next);
+                      } else {
+                        setSelected({});
+                      }
+                    }}
+                    aria-label="Select all requestable items"
+                  />
+                </TableHead>
+                <TableHead>Item</TableHead>
+                <TableHead>Project</TableHead>
+                <TableHead>Serial</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => {
+                const key = rowKey(row);
+                return (
+                  <TableRow key={key}>
+                    <TableCell>
+                      <Checkbox
+                        checked={Boolean(selected[key])}
+                        disabled={!row.can_request}
+                        onCheckedChange={(checked) =>
+                          setSelected((prev) => ({ ...prev, [key]: Boolean(checked) }))
+                        }
+                        aria-label={`Select ${row.name || row.entity_type}`}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{row.name || `${row.entity_type} #${row.entity_id}`}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {row.entity_type}
+                        {row.part_number ? ` · ${row.part_number}` : ''}
+                      </div>
+                    </TableCell>
+                    <TableCell>{row.project_name || '—'}</TableCell>
+                    <TableCell>{row.serial_number || '—'}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {row.issued ? (
+                          <StatusBadge status="ISSUED" />
+                        ) : (
+                          <StatusBadge status="Assigned" />
+                        )}
+                        {row.reserved && !row.issued ? (
+                          <Badge variant="secondary">Reserved</Badge>
+                        ) : null}
+                        {row.request_status === 'pending' ? (
+                          <Badge variant="outline">Requested</Badge>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {row.can_request ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={submitting}
+                          onClick={() => void requestOne(row)}
+                        >
+                          Request handover
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">{requestLabel(row)}</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </ListContentSuspense>
+    </div>
+  );
+}

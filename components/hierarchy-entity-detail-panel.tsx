@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/status-badge';
@@ -14,7 +15,11 @@ import type { HierarchyDossierMode } from '@/lib/hierarchy-dossier-mode';
 import { inventoryPartNumber } from '@/lib/inventory-entity-fields';
 import { formatUserRef } from '@/lib/user-display';
 import { useDataStore } from '@/lib/data-store';
+import { useAuth } from '@/lib/auth-context';
 import * as api from '@/lib/api';
+import { WorkflowCan } from '@/components/auth';
+import { P } from '@/lib/permission-codes';
+import { AssignDeveloperDialog } from '@/components/hierarchy/assign-developer-dialog';
 import type {
   Component,
   Inventory,
@@ -120,8 +125,12 @@ export function HierarchyEntityDetailPanel({
   dossierMode = 'bhd',
 }: HierarchyEntityDetailPanelProps) {
   const { entityLabel } = useAppDefinitions();
-  const { users } = useDataStore();
+  const { users, patchHierarchyEntity } = useDataStore();
+  const { user } = useAuth();
   const [linkedInventory, setLinkedInventory] = useState<Inventory[]>([]);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [requesting, setRequesting] = useState(false);
+  const [assignmentIssued, setAssignmentIssued] = useState(false);
 
   const entity = selection
     ? findEntity(selection, systems, subsystems, modules, units, components)
@@ -152,6 +161,26 @@ export function HierarchyEntityDetailPanel({
     void loadLinkedInventory();
   }, [open, entity, loadLinkedInventory]);
 
+  useEffect(() => {
+    if (!open || !selection) {
+      setAssignmentIssued(false);
+      return;
+    }
+    let cancelled = false;
+    api.hierarchyWorkflow
+      .assignmentStatus(selection.type, [selection.entityId])
+      .then((res) => {
+        if (cancelled) return;
+        setAssignmentIssued(Boolean(res.data?.[0]?.issued));
+      })
+      .catch(() => {
+        if (!cancelled) setAssignmentIssued(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, selection]);
+
   const inventoryMatch = useMemo(
     () => findInventoryForOriginalPart(linkedInventory, originalBuild?.partNumber),
     [linkedInventory, originalBuild?.partNumber]
@@ -160,9 +189,34 @@ export function HierarchyEntityDetailPanel({
   const statusName = entity ? getEntityStatusName(entity, statuses) : undefined;
   const installerLabel = useMemo(() => {
     if (!entity?.installed_by_id) return undefined;
-    const user = users.find((item) => item.id === entity.installed_by_id);
-    return user ? formatUserRef(user) : `User #${entity.installed_by_id}`;
+    const found = users.find((item) => item.id === entity.installed_by_id);
+    return found ? formatUserRef(found) : `User #${entity.installed_by_id}`;
   }, [entity?.installed_by_id, users]);
+
+  const developerLabel = useMemo(() => {
+    if (!entity?.assigned_developer_id) return undefined;
+    const found = users.find((item) => item.id === entity.assigned_developer_id);
+    return found ? formatUserRef(found) : `User #${entity.assigned_developer_id}`;
+  }, [entity?.assigned_developer_id, users]);
+
+  async function handleRequestItem() {
+    if (!selection) return;
+    setRequesting(true);
+    try {
+      await api.inventory.createItemRequest({
+        entity_type: selection.type,
+        entity_id: selection.entityId,
+      });
+      toast.success('Item requested from Inventory Manager');
+    } catch (error: unknown) {
+      const detail =
+        (error as { response?: { data?: { detail?: string } } })?.response?.data
+          ?.detail || 'Request failed';
+      toast.error(typeof detail === 'string' ? detail : 'Request failed');
+    } finally {
+      setRequesting(false);
+    }
+  }
 
   const typeLabel = selection ? entityLabel(selection.type) : '';
   const detailPath = selection ? DETAIL_PATH[selection.type](selection.entityId) : '';
@@ -204,8 +258,18 @@ export function HierarchyEntityDetailPanel({
           ) : isBhdMode ? (
             <div className="py-2">
               {statusName ? (
-                <div className="mb-2">
+                <div className="mb-2 flex flex-wrap gap-1">
+                  {entity.assigned_developer_id && !assignmentIssued ? (
+                    <StatusBadge status="Assigned" />
+                  ) : null}
+                  {assignmentIssued && statusName.toUpperCase() !== 'ISSUED' ? (
+                    <StatusBadge status="ISSUED" />
+                  ) : null}
                   <StatusBadge status={statusName} />
+                </div>
+              ) : entity.assigned_developer_id && !assignmentIssued ? (
+                <div className="mb-2">
+                  <StatusBadge status="Assigned" />
                 </div>
               ) : null}
 
@@ -237,6 +301,7 @@ export function HierarchyEntityDetailPanel({
               {selection.type === 'system' && project ? (
                 <DetailRow label="Project" value={project.name} />
               ) : null}
+              <DetailRow label="Assigned developer" value={developerLabel} />
               <DetailRow
                 label="Created"
                 value={entity.created_at ? new Date(entity.created_at).toLocaleString() : undefined}
@@ -245,8 +310,18 @@ export function HierarchyEntityDetailPanel({
           ) : (
             <div className="py-2">
               {statusName ? (
-                <div className="mb-2">
+                <div className="mb-2 flex flex-wrap gap-1">
+                  {entity.assigned_developer_id && !assignmentIssued ? (
+                    <StatusBadge status="Assigned" />
+                  ) : null}
+                  {assignmentIssued && statusName.toUpperCase() !== 'ISSUED' ? (
+                    <StatusBadge status="ISSUED" />
+                  ) : null}
                   <StatusBadge status={statusName} />
+                </div>
+              ) : entity.assigned_developer_id && !assignmentIssued ? (
+                <div className="mb-2">
+                  <StatusBadge status="Assigned" />
                 </div>
               ) : null}
 
@@ -270,6 +345,7 @@ export function HierarchyEntityDetailPanel({
               {selection.type === 'system' && project ? (
                 <DetailRow label="Project" value={project.name} />
               ) : null}
+              <DetailRow label="Assigned developer" value={developerLabel} />
               <DetailRow
                 label="Created"
                 value={entity.created_at ? new Date(entity.created_at).toLocaleString() : undefined}
@@ -279,13 +355,53 @@ export function HierarchyEntityDetailPanel({
         </div>
 
         {selection && entity ? (
-          <div className="border-t p-4">
+          <div className="space-y-2 border-t p-4">
+            <WorkflowCan role={['HM', 'ADMIN']} permission={P.hierarchy_assign_developer}>
+              <Button
+                className="w-full"
+                variant="secondary"
+                onClick={() => setAssignOpen(true)}
+                disabled={assignmentIssued}
+              >
+                {assignmentIssued
+                  ? 'Issued — assignment locked'
+                  : entity.assigned_developer_id
+                    ? 'Reassign developer'
+                    : 'Assign developer'}
+              </Button>
+            </WorkflowCan>
+            <WorkflowCan role="DEV" permission={P.item_request}>
+              {entity.assigned_developer_id && entity.assigned_developer_id === user?.id ? (
+                <Button
+                  className="w-full"
+                  onClick={() => void handleRequestItem()}
+                  disabled={requesting}
+                >
+                  {requesting ? 'Requesting…' : 'Request item'}
+                </Button>
+              ) : null}
+            </WorkflowCan>
             <Link href={detailPath}>
               <Button variant="outline" className="w-full gap-2">
                 Open full page
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
+            <AssignDeveloperDialog
+              open={assignOpen}
+              onOpenChange={setAssignOpen}
+              entityType={selection.type}
+              entityId={selection.entityId}
+              entityName={'name' in entity ? entity.name : null}
+              users={users}
+              currentDeveloperId={entity.assigned_developer_id}
+              issued={assignmentIssued}
+              onAssigned={(developerId) => {
+                patchHierarchyEntity(selection.type, selection.entityId, {
+                  assigned_developer_id: developerId,
+                });
+              }}
+            />
           </div>
         ) : null}
       </div>

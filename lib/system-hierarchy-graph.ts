@@ -33,6 +33,10 @@ export interface HierarchyTreeNode {
   replacementSequence?: number;
   replacementDate?: string;
   isCurrentInstall?: boolean;
+  assigned?: boolean;
+  reserved?: boolean;
+  shortage?: boolean;
+  issued?: boolean;
 }
 
 export interface HierarchyNodeFieldVisibility {
@@ -72,6 +76,10 @@ export interface HierarchyNodeData extends Record<string, unknown> {
   isCurrentInstall?: boolean;
   isReplacedEntity?: boolean;
   dossierMode?: 'bhd' | 'mmhd';
+  assigned?: boolean;
+  reserved?: boolean;
+  shortage?: boolean;
+  issued?: boolean;
 }
 
 const DETAIL_PATH: Record<HierarchyEntityType, (id: number) => string> = {
@@ -83,9 +91,9 @@ const DETAIL_PATH: Record<HierarchyEntityType, (id: number) => string> = {
 };
 
 const NODE_WIDTH = 220;
-const NODE_HEIGHT = 118;
+const NODE_HEIGHT = 142;
 const HORIZONTAL_GAP = 48;
-const VERTICAL_GAP = 120;
+const VERTICAL_GAP = 128;
 
 export function makeNodeId(type: HierarchyEntityType, id: number) {
   return `${type}-${id}`;
@@ -108,6 +116,7 @@ export function mapEntityFields(
     is_current_install?: boolean;
     replaced_at?: string | null;
     installation_date?: string;
+    assigned_developer_id?: number | null;
   },
   statuses: Status[] = [],
   options?: { preferOriginalBuild?: boolean }
@@ -136,6 +145,7 @@ export function mapEntityFields(
     replacementSequence: entity.replacement_sequence,
     replacementDate: getReplacementDateForDisplay(entity),
     isCurrentInstall: entity.is_current_install !== false,
+    assigned: Boolean(entity.assigned_developer_id),
   };
 }
 
@@ -309,6 +319,10 @@ export function hierarchyTreeToFlow(
           replacementSequence: node.replacementSequence,
           replacementDate: node.replacementDate,
           isCurrentInstall: node.isCurrentInstall,
+          assigned: node.assigned,
+          reserved: node.reserved,
+          shortage: node.shortage,
+          issued: node.issued,
         },
       });
 
@@ -328,4 +342,25 @@ export function hierarchyTreeToFlow(
 
 export function countHierarchyNodes(root: HierarchyTreeNode): number {
   return 1 + root.children.reduce((sum, child) => sum + countHierarchyNodes(child), 0);
+}
+
+export function inventoryFlagKey(type: string, entityId: number) {
+  return `${type}:${entityId}`;
+}
+
+export function applyInventoryFlagsToNodes(
+  nodes: Node<HierarchyNodeData>[],
+  flags: { reserved: Set<string>; shortage: Set<string> }
+): Node<HierarchyNodeData>[] {
+  return nodes.map((node) => {
+    const key = inventoryFlagKey(node.data.type, node.data.entityId);
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        reserved: flags.reserved.has(key),
+        shortage: flags.shortage.has(key),
+      },
+    };
+  });
 }

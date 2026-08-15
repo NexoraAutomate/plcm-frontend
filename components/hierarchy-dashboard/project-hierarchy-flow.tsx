@@ -22,6 +22,7 @@ import {
 } from '@/lib/project-hierarchy-dashboard';
 import {
   DEFAULT_NODE_FIELD_VISIBILITY,
+  applyInventoryFlagsToNodes,
   type HierarchyEntityType,
   type HierarchyNodeFieldVisibility,
 } from '@/lib/system-hierarchy-graph';
@@ -65,6 +66,7 @@ import type {
   System,
   Unit,
 } from '@/lib/models';
+import { useProjectInventoryFlags } from '@/hooks/use-project-inventory-flags';
 
 interface ProjectHierarchyFlowProps {
   selection: HierarchyDashboardSelection;
@@ -140,6 +142,7 @@ export function ProjectHierarchyFlow({
   );
   const [expandFullHierarchy, setExpandFullHierarchy] = useState(false);
   const [resolutionDeliveries, setResolutionDeliveries] = useState<MaintenanceDelivery[]>([]);
+  const inventoryFlags = useProjectInventoryFlags(selection.projectId ?? project?.id);
 
   const {
     records: projectResolutionRecords,
@@ -335,7 +338,8 @@ export function ProjectHierarchyFlow({
     );
 
     return {
-      nodes: flow.nodes.map((node) => {
+      nodes: applyInventoryFlagsToNodes(
+        flow.nodes.map((node) => {
         const entityKey = makeEntityKey(node.data.type, node.data.entityId);
         const isReplacedEntity =
           isMmhdMode &&
@@ -359,6 +363,8 @@ export function ProjectHierarchyFlow({
           },
         };
       }),
+        inventoryFlags
+      ),
       edges: flow.edges,
     };
   }, [
@@ -376,6 +382,7 @@ export function ProjectHierarchyFlow({
     replacedEntityKeys,
     dossierMode,
     replacementDateByEntityKey,
+    inventoryFlags,
   ]);
 
   const fitViewKey = useMemo(

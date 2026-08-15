@@ -426,6 +426,7 @@ export interface HierarchyInstallFields {
   replaced_entity_id?: number | null
   replacement_sequence?: number
   replaced_at?: string | null
+  assigned_developer_id?: number | null
 }
 
 export interface EntityAttachment {
@@ -719,6 +720,83 @@ export interface InventoryIssuePayload {
   target_entity_type?: string | null
   target_entity_id?: number | null
   notes?: string | null
+  signature_type: 'DIGITAL' | 'HARD_COPY' | string
+  signature_payload?: string | null
+  item_request_id?: number | null
+}
+
+export interface ItemIssueRequest {
+  id: number
+  project_id: number
+  project_name?: string | null
+  flight_id: number
+  flight_code?: string | null
+  flight_name?: string | null
+  sdls_id: number
+  sdls_code?: string | null
+  sdls_name?: string | null
+  target_entity_type: string
+  target_entity_id: number
+  target_entity_name?: string | null
+  assigned_developer_id: number
+  assigned_developer_name?: string | null
+  requested_by_user_id: number
+  requested_by_name?: string | null
+  inventory_id: number
+  inventory_instance_id?: number | null
+  inventory_name?: string | null
+  part_number?: string | null
+  serial_number?: string | null
+  reservation_id: number
+  status: 'pending' | 'issued' | 'cancelled' | string
+  requested_at: string
+  issued_at?: string | null
+  issued_issuance_id?: number | null
+  notes?: string | null
+}
+
+export interface HierarchyAssignDeveloperResult {
+  entity_type: string
+  id: number
+  name?: string | null
+  assigned_developer_id?: number | null
+  assigned_developer_name?: string | null
+  issued?: boolean | null
+}
+
+export interface HierarchyAssignmentStatus {
+  entity_type: string
+  id: number
+  name?: string | null
+  assigned_developer_id?: number | null
+  assigned_developer_name?: string | null
+  issued: boolean
+}
+
+export interface DeveloperAssignedWork {
+  entity_type: string
+  entity_id: number
+  name?: string | null
+  part_number?: string | null
+  serial_number?: string | null
+  project_id?: number | null
+  project_name?: string | null
+  assigned_developer_id: number
+  reserved: boolean
+  reservation_id?: number | null
+  request_status: 'none' | 'pending' | 'issued' | string
+  issued: boolean
+  can_request: boolean
+  pending_request_id?: number | null
+}
+
+export interface ItemIssueRequestBulkResult {
+  created: ItemIssueRequest[]
+  skipped: Array<{
+    entity_type: string
+    entity_id: number
+    reason: string
+  }>
 }
 
 export interface InventoryConsumeResult {

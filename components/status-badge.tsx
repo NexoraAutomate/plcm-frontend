@@ -15,7 +15,8 @@ import {
 
 /** Dark solid backgrounds with white text (legacy name fallbacks) */
 const statusColors: Record<string, string> = {
-  Available: "bg-emerald-700 text-white border-emerald-800",
+  Assigned: "bg-violet-700 text-white border-violet-800",
+  Shortage: "bg-orange-700 text-white border-orange-800",
   Allocated: "bg-sky-700 text-white border-sky-800",
   Installed: "bg-blue-700 text-white border-blue-800",
   Testing: "bg-amber-700 text-white border-amber-800",
