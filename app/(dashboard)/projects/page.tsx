@@ -3,7 +3,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
-import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Search, BarChart3, GitBranch } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, GitBranch } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { StatusBadge } from '@/components/status-badge';
@@ -36,7 +35,6 @@ import { toDateInputValue } from '@/lib/hierarchy-install-fields';
 import { getSystemCountByProjectId, getCount } from '@/lib/entity-counts';
 import { EntityCountCell } from '@/components/entity-count-cell';
 import { Progress } from '@/components/ui/progress';
-import { ProjectProgressDialog } from '@/components/projects/project-progress-dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
@@ -45,8 +43,6 @@ import type { HierarchyConfigurationSummary } from '@/lib/models';
 
 export default function ProjectsPage(){
   const router = useRouter();
-  const { can } = useAuth();
-  const canEditProjects = can(P.edit_projects);
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({
     open: false,
     id: null,
@@ -73,8 +69,6 @@ export default function ProjectsPage(){
   const [statusFilter, setStatusFilter] = useState<string>(statusFilterParam || 'Total');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isProgressOpen, setIsProgressOpen] = useState(false);
-  const [progressProject, setProgressProject] = useState<Models.Project | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [availableConfigs, setAvailableConfigs] = useState<HierarchyConfigurationSummary[]>([]);
@@ -244,19 +238,6 @@ export default function ProjectsPage(){
     } finally {
       setDeleteConfirm({ open: false, id: null });
     }
-  }
-
-  function openProgressEdit(project: Models.Project) {
-    setProgressProject(project);
-    setIsProgressOpen(true);
-  }
-
-  async function handleProgressSave(
-    projectId: number,
-    data: { progress: number; status_id?: number }
-  ) {
-    await updateProject(projectId, data);
-    pagination.invalidate();
   }
 
   function openEdit(project: typeof projects[0]) {
@@ -594,19 +575,12 @@ export default function ProjectsPage(){
                             label="Total systems"
                           />
                         </TableCell>
-                        <TableCell
-                          className="min-w-[140px]"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (canEditProjects) openProgressEdit(project);
-                          }}
-                        >
-                          <div className={`flex items-center gap-2 rounded-md p-1 ${canEditProjects ? 'cursor-pointer hover:bg-muted/50' : ''}`}>
+                        <TableCell className="min-w-[140px]">
+                          <div className="flex items-center gap-2 rounded-md p-1">
                             <Progress value={project.progress ?? 0} className="h-2 flex-1" />
                             <span className="w-10 text-right text-xs font-medium tabular-nums">
                               {project.progress ?? 0}%
                             </span>
-                            {canEditProjects && <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />}
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
@@ -663,14 +637,6 @@ export default function ProjectsPage(){
           />
         </CardContent>
       </Card>
-
-      <ProjectProgressDialog
-        open={isProgressOpen}
-        onOpenChange={setIsProgressOpen}
-        project={progressProject}
-        statuses={statuses}
-        onSave={handleProgressSave}
-      />
 
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent>

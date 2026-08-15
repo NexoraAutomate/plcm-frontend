@@ -296,6 +296,8 @@ export const projects = {
         }>;
       }>;
     }>(`/projects/${id}/hierarchy-tree/`),
+  progress: (id: number) =>
+    api.get<Models.ProjectProgress>(`/projects/${id}/progress/`),
   listReservations: (id: number, activeOnly = false) =>
     api.get<Models.InventoryReservation[]>(`/projects/${id}/reservations/`, {
       params: { active_only: activeOnly },

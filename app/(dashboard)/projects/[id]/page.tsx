@@ -38,7 +38,9 @@ import { useHierarchyCreateFormOptions } from '@/hooks/use-hierarchy-create-form
 import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
 import { ProjectWorkflowActions } from '@/components/projects/project-workflow-actions';
 import { ProjectReservationsPanel } from '@/components/projects/project-reservations-panel';
+import { ProjectProgressPanel } from '@/components/projects/project-progress-panel';
 import { ShortageListPanel } from '@/components/shortages/shortage-list-panel';
+import { useProjectProgressQuery } from '@/hooks/queries';
 
 export default function ProjectDetailPage() {
   const { entityLabel } = useAppDefinitions();
@@ -69,6 +71,9 @@ export default function ProjectDetailPage() {
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
   const [systemHierarchyNames, setSystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
+  const progressQuery = useProjectProgressQuery(
+    Number.isFinite(Number(projectId)) ? Number(projectId) : null
+  );
 
   const project =
     workflowProject && String(workflowProject.id) === projectId
@@ -83,6 +88,25 @@ export default function ProjectDetailPage() {
       .then((res) => setWorkflowProject(res.data))
       .catch(() => undefined);
   }, [projectId]);
+
+  useEffect(() => {
+    const snap = progressQuery.data;
+    if (!snap) return;
+    setWorkflowProject((prev) => {
+      if (!prev || prev.id !== snap.project_id) return prev;
+      if (
+        prev.progress === snap.progress_pct &&
+        prev.status_name === (snap.project_status ?? prev.status_name)
+      ) {
+        return prev;
+      }
+      return {
+        ...prev,
+        progress: snap.progress_pct,
+        status_name: snap.project_status ?? prev.status_name,
+      };
+    });
+  }, [progressQuery.data]);
   const projectSystems = project
     ? systems.filter((s) => s.project_id === project.id && isCurrentInstallEntity(s))
     : [];
@@ -451,6 +475,8 @@ export default function ProjectDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <ProjectProgressPanel data={progressQuery.data} loading={progressQuery.isLoading} />
 
       {/* Systems Cards */}
       <EntityCards

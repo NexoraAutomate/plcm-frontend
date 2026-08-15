@@ -268,6 +268,63 @@ export interface Project {
   approved_at?: string | null
 }
 
+/** Spec 09 — automatic weighted project progress */
+export interface ProjectProgressSystemNode {
+  entity_type: string
+  entity_id: number
+  name: string
+  weight: number
+  progress_pct: number
+  verified_leaves: number
+  status?: string | null
+}
+
+export interface ProjectProgressSdlsNode {
+  entity_type: string
+  entity_id: number
+  name: string
+  code?: string | null
+  product_type?: string | null
+  weight: number
+  progress_pct: number
+  verified_leaves: number
+  systems: ProjectProgressSystemNode[]
+}
+
+export interface ProjectProgressFlightNode {
+  entity_type: string
+  entity_id: number
+  name: string
+  code?: string | null
+  weight: number
+  progress_pct: number
+  verified_leaves: number
+  sdls: ProjectProgressSdlsNode[]
+}
+
+export interface ProjectProgressBottleneck {
+  entity_type: string
+  entity_id: number
+  name: string
+  path: string
+  status?: string | null
+  defect_pending: boolean
+  weight: number
+  reason: string
+}
+
+export interface ProjectProgress {
+  project_id: number
+  project_status?: string | null
+  progress_pct: number
+  weight: number
+  verified_leaves: number
+  can_complete: boolean
+  stage_policy: string
+  flights: ProjectProgressFlightNode[]
+  bottlenecks: ProjectProgressBottleneck[]
+}
+
 export interface ProjectDraftCreate {
   name: string
   description?: string | null

@@ -14,6 +14,7 @@ import type {
   Module,
   Order,
   Project,
+  ProjectProgress,
   Status,
   Subsystem,
   System,
@@ -43,6 +44,11 @@ export async function fetchProjects(
 ): Promise<Project[]> {
   const res = await api.projects.list(skip, limit, options);
   return unwrapListItems<Project>(res.data);
+}
+
+export async function fetchProjectProgress(id: number): Promise<ProjectProgress> {
+  const res = await api.projects.progress(id);
+  return res.data;
 }
 
 export async function fetchUsers(skip = 0, limit = LIST_PAGE_SIZE): Promise<User[]> {

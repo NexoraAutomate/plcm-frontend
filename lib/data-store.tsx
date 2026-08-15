@@ -728,7 +728,6 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       if (data.owner_id !== undefined && data.owner_id > 0) payload.owner_id = data.owner_id;
       if (data.order_id !== undefined && data.order_id > 0) payload.order_id = data.order_id;
       if (data.status_id !== undefined && data.status_id > 0) payload.status_id = data.status_id;
-      if (data.progress !== undefined) payload.progress = data.progress;
       if (data.start_date) {
         payload.start_date = data.start_date.includes('T')
           ? data.start_date

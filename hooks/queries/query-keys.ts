@@ -31,6 +31,7 @@ export const queryKeys = {
     ['orders', 'page', stableFiltersKey(filters)] as const,
   projectsPage: (filters?: ListFilterParams) =>
     ['projects', 'page', stableFiltersKey(filters)] as const,
+  projectProgress: (id: number) => ['projects', id, 'progress'] as const,
   usersPage: (filters?: ListFilterParams) =>
     ['users', 'page', stableFiltersKey(filters)] as const,
   inventoryPage: (type?: string, filters?: ListFilterParams) =>

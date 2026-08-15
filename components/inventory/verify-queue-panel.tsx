@@ -1,10 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import type { ItemInstallState } from '@/lib/models';
 import { parseApiDate } from '@/lib/parse-api-date';
+import { queryKeys } from '@/hooks/queries/query-keys';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -31,6 +33,7 @@ function formatWhen(value?: string | null) {
 }
 
 export function VerifyQueuePanel() {
+  const queryClient = useQueryClient();
   const [rows, setRows] = useState<ItemInstallState[]>([]);
   const [loading, setLoading] = useState(true);
   const [submittingId, setSubmittingId] = useState<number | null>(null);
@@ -63,6 +66,12 @@ export function VerifyQueuePanel() {
     try {
       await api.inventory.verifyItemInstallation(row.issuance_id);
       toast.success('Installation verified');
+      if (row.project_id) {
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.projectProgress(row.project_id),
+        });
+      }
+      await queryClient.invalidateQueries({ queryKey: ['projects'] });
       await refresh();
     } catch (error: unknown) {
       const detail =

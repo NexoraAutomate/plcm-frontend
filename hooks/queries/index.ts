@@ -13,6 +13,7 @@ import {
   fetchMaintenanceLogs,
   fetchOrders,
   fetchProjects,
+  fetchProjectProgress,
   fetchStatuses,
   fetchUsers,
 } from './fetchers';
@@ -56,6 +57,14 @@ export function useProjectsQuery(skip = 0, limit = LIST_PAGE_SIZE) {
   return useQuery({
     queryKey: queryKeys.projects(skip, limit),
     queryFn: () => fetchProjects(skip, limit),
+  });
+}
+
+export function useProjectProgressQuery(projectId: number | null) {
+  return useQuery({
+    queryKey: queryKeys.projectProgress(projectId ?? 0),
+    queryFn: () => fetchProjectProgress(projectId as number),
+    enabled: Number.isFinite(projectId) && (projectId as number) > 0,
   });
 }
 
