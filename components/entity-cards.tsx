@@ -65,6 +65,8 @@ interface EntityCardsProps {
   editPermission?: string | string[];
   /** Permission code(s) required to delete entities. Omit to always allow (backward compat). */
   deletePermission?: string | string[];
+  /** Hide add/edit/delete/assign/revert — cancelled projects stay view-only. */
+  readOnly?: boolean;
 }
 
 export function EntityCards({
@@ -85,6 +87,7 @@ export function EntityCards({
   createPermission,
   editPermission,
   deletePermission,
+  readOnly = false,
 }: EntityCardsProps) {
   const { can, user, isInventoryManager } = useAuth();
   const { ensureHierarchyLoaded, markLocalInstallReverted, users, patchHierarchyEntity } =
@@ -144,7 +147,7 @@ export function EntityCards({
           <CardTitle>{title}</CardTitle>
           <CardDescription>{description}</CardDescription>
         </div>
-        {onAdd && canCreate ? (
+        {onAdd && canCreate && !readOnly ? (
           <Button onClick={onAdd} className="gap-2">
             <Plus className="h-4 w-4" />
             {addButtonLabel}
@@ -277,7 +280,7 @@ export function EntityCards({
                             <ArrowRight className="h-3 w-3" />
                           </Button>
                         </Link>
-                        {onEdit && canEdit ? (
+                        {onEdit && canEdit && !readOnly ? (
                           <Button
                             variant="outline"
                             size="sm"
@@ -288,7 +291,7 @@ export function EntityCards({
                             Edit
                           </Button>
                         ) : null}
-                        {onReplace && ownsInstall ? (
+                        {onReplace && ownsInstall && !readOnly ? (
                           <Button
                             variant="outline"
                             size="sm"
@@ -299,7 +302,7 @@ export function EntityCards({
                             Replace
                           </Button>
                         ) : null}
-                        {onDelete && canDelete ? (
+                        {onDelete && canDelete && !readOnly ? (
                           <Button
                             variant="outline"
                             size="sm"
@@ -311,7 +314,7 @@ export function EntityCards({
                           </Button>
                         ) : null}
                       </div>
-                      {childEntityType ? (
+                      {!readOnly && childEntityType ? (
                         <WorkflowCan role={['HM', 'ADMIN']} permission={P.hierarchy_assign_developer}>
                           <Button
                             variant="outline"
@@ -336,7 +339,7 @@ export function EntityCards({
                           </Button>
                         </WorkflowCan>
                       ) : null}
-                      {canRevert && childEntityType ? (
+                      {!readOnly && canRevert && childEntityType ? (
                         <RevertToInventoryButton
                           entityType={childEntityType}
                           entityId={entity.id}
@@ -382,7 +385,7 @@ export function EntityCards({
         }
       }}
     />
-    {childEntityType ? (
+    {!readOnly && childEntityType ? (
       <AssignDeveloperDialog
         open={assignTarget !== null}
         onOpenChange={(open) => !open && setAssignTarget(null)}

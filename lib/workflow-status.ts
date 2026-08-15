@@ -32,6 +32,10 @@ export const ProjectWorkflowStatus = {
 export type ProjectWorkflowStatusCode =
   (typeof ProjectWorkflowStatus)[keyof typeof ProjectWorkflowStatus];
 
+export function isProjectCancelled(statusName?: string | null): boolean {
+  return statusName === ProjectWorkflowStatus.CANCELLED;
+}
+
 export const ITEM_STATUS_LABELS: Record<ItemStatusCode, string> = {
   AVAILABLE: 'Available',
   RESERVED: 'Reserved',

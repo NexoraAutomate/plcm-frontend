@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, GitBranch, UserCog } from 'lucide-react';
+import { CheckCircle2, GitBranch, UserCog, Ban } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -32,7 +32,7 @@ import { StatusBadge } from '@/components/status-badge';
 import { Can, WorkflowCan } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
 import * as api from '@/lib/api';
-import type { Project, User } from '@/lib/models';
+import type { Project, ProjectCancelPreview, User } from '@/lib/models';
 import { ProjectWorkflowStatus } from '@/lib/workflow-status';
 
 type Props = {
@@ -48,6 +48,9 @@ type HierarchyTree = Awaited<
 export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelPreview, setCancelPreview] = useState<ProjectCancelPreview | null>(null);
+  const [cancelConfirmed, setCancelConfirmed] = useState(false);
   const [tree, setTree] = useState<HierarchyTree | null>(null);
   const [hmId, setHmId] = useState<string>(
     project.assigned_hm_id ? String(project.assigned_hm_id) : ''
@@ -63,9 +66,15 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
   const isReady =
     status === ProjectWorkflowStatus.READY_FOR_INVENTORY ||
     status === ProjectWorkflowStatus.HIERARCHY_GENERATED;
+  const isCancelled = status === ProjectWorkflowStatus.CANCELLED;
+  const canCancel =
+    Boolean(status) &&
+    !isCancelled &&
+    status !== ProjectWorkflowStatus.COMPLETED &&
+    status !== ProjectWorkflowStatus.READY_TO_DELIVER;
 
   useEffect(() => {
-    if (!isReady) {
+    if (!isReady && !isCancelled) {
       setTree(null);
       return;
     }
@@ -158,7 +167,51 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
     }
   }
 
-  const generateDisabled = !isApproved;
+  async function openCancelDialog() {
+    setCancelConfirmed(false);
+    setCancelPreview(null);
+    setCancelOpen(true);
+    try {
+      const res = await api.projects.cancelPreview(project.id);
+      setCancelPreview(res.data);
+    } catch (error: unknown) {
+      const detail =
+        (error as { response?: { data?: { detail?: string } } })?.response?.data
+          ?.detail || 'Could not load cancel impact';
+      toast.error(typeof detail === 'string' ? detail : 'Could not load cancel impact');
+      setCancelOpen(false);
+    }
+  }
+
+  async function handleCancel() {
+    if (!cancelConfirmed) {
+      toast.error('Confirm cancellation before continuing');
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await api.projects.cancel(project.id, { confirm: true });
+      if (res.data.project) {
+        onUpdated(res.data.project);
+      } else {
+        const refreshed = await api.projects.get(project.id);
+        onUpdated(refreshed.data);
+      }
+      toast.success(
+        `Project cancelled — ${res.data.reserved_released} released, ${res.data.recall_tasks_created} recalled`
+      );
+      setCancelOpen(false);
+    } catch (error: unknown) {
+      const detail =
+        (error as { response?: { data?: { detail?: string } } })?.response?.data
+          ?.detail || 'Cancel failed';
+      toast.error(typeof detail === 'string' ? detail : 'Cancel failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const generateDisabled = !isApproved || isCancelled;
   const generateTooltip = isDraft
     ? 'Approval required before Generate Hierarchy'
     : isApproved
@@ -184,7 +237,7 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
         <div className="flex flex-wrap items-end gap-2">
           <div className="min-w-[220px] space-y-1">
             <Label>Assign Hierarchy Manager</Label>
-            <Select value={hmId} onValueChange={setHmId} disabled={busy}>
+            <Select value={hmId} onValueChange={setHmId} disabled={busy || isCancelled}>
               <SelectTrigger>
                 <SelectValue placeholder="Select HM" />
               </SelectTrigger>
@@ -197,7 +250,7 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
               </SelectContent>
             </Select>
           </div>
-          <Button variant="outline" onClick={() => void handleAssignHm()} disabled={busy}>
+          <Button variant="outline" onClick={() => void handleAssignHm()} disabled={busy || isCancelled}>
             <UserCog className="mr-1.5 h-4 w-4" />
             Assign HM
           </Button>
@@ -206,7 +259,7 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
 
       <div className="flex flex-wrap gap-2">
         <Can permission={P.project_approve}>
-          <Button onClick={() => void handleApprove()} disabled={busy || !isDraft}>
+          <Button onClick={() => void handleApprove()} disabled={busy || !isDraft || isCancelled}>
             <CheckCircle2 className="mr-1.5 h-4 w-4" />
             Approve
           </Button>
@@ -232,6 +285,17 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
           </TooltipProvider>
         </Can>
 
+        <Can permission={P.project_cancel}>
+          <Button
+            variant="destructive"
+            disabled={busy || !canCancel}
+            onClick={() => void openCancelDialog()}
+          >
+            <Ban className="mr-1.5 h-4 w-4" />
+            Cancel project
+          </Button>
+        </Can>
+
         <WorkflowCan role={['HM', 'ADMIN']}>
           {!isApproved && !isReady ? (
             <p className="w-full text-xs text-muted-foreground">
@@ -243,12 +307,19 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
               Hierarchy generated — reserve inventory against Flight → SDLS nodes below.
             </p>
           ) : null}
+          {isCancelled ? (
+            <p className="w-full text-xs text-muted-foreground">
+              Hierarchy is read-only after cancellation.
+            </p>
+          ) : null}
         </WorkflowCan>
       </div>
 
       {tree && tree.flights.length > 0 ? (
         <div className="rounded-md border bg-muted/30 p-3 text-sm">
-          <p className="mb-2 font-medium">Generated hierarchy</p>
+          <p className="mb-2 font-medium">
+            {isCancelled ? 'Generated hierarchy (read-only)' : 'Generated hierarchy'}
+          </p>
           <ul className="space-y-2">
             {tree.flights.map((flight) => (
               <li key={flight.id}>
@@ -309,6 +380,79 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
               }}
             >
               {busy ? 'Generating…' : 'Generate'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={cancelOpen}
+        onOpenChange={(open) => {
+          setCancelOpen(open);
+          if (!open) {
+            setCancelConfirmed(false);
+            setCancelPreview(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel this project?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  This sets the project to CANCELLED, blocks reserve/issue/generate, releases
+                  reserved stock to Available, and recalls issued units for IM inspection.
+                </p>
+                {cancelPreview?.critical_path_unfinished ? (
+                  <p className="font-medium text-destructive">
+                    Critical path is unfinished ({cancelPreview.progress_pct}%). Confirm
+                    anyway to proceed.
+                  </p>
+                ) : null}
+                {cancelPreview ? (
+                  <ul className="list-disc space-y-1 pl-4">
+                    <li>
+                      Reserved (auto-release): <strong>{cancelPreview.reserved_count}</strong>
+                    </li>
+                    <li>
+                      Issued / in progress / testing / verified to recall:{' '}
+                      <strong>{cancelPreview.recall_units_total}</strong>
+                    </li>
+                    <li>
+                      Open shortages: <strong>{cancelPreview.shortage_count}</strong>
+                    </li>
+                    <li>
+                      Pending issue requests: <strong>{cancelPreview.pending_request_count}</strong>
+                    </li>
+                  </ul>
+                ) : (
+                  <p>Loading inventory impact…</p>
+                )}
+                <label className="flex items-start gap-2 text-foreground">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={cancelConfirmed}
+                    onChange={(event) => setCancelConfirmed(event.target.checked)}
+                    disabled={busy}
+                  />
+                  <span>I understand this cannot be undone and confirm cancellation.</span>
+                </label>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Keep project</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={busy || !cancelConfirmed || !cancelPreview}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                void handleCancel();
+              }}
+            >
+              {busy ? 'Cancelling…' : 'Cancel project'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

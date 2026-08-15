@@ -8,6 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Search, ChevronDown, Network, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
+import { P } from '@/lib/permission-codes';
 import { useDataStore } from '@/lib/data-store';
 import { inventoryPartNumber } from '@/lib/inventory-entity-fields';
 import {
@@ -59,6 +61,8 @@ export function EntityInventorySearch({
   onUseInventory,
 }: EntityInventorySearchProps) {
   const { users } = useDataStore();
+  const { can } = useAuth();
+  const canViewInventory = can(P.view_inventory);
   const [inventoryItems, setInventoryItems] = useState<Inventory[]>([]);
   const [filteredItems, setFilteredItems] = useState<Inventory[]>([]);
   const [search, setSearch] = useState('');
@@ -87,7 +91,7 @@ export function EntityInventorySearch({
 
   const fetchInventory = useCallback(
     async (opts?: { silent?: boolean }) => {
-      if (allowedInventoryNames.length === 0) {
+      if (!canViewInventory || allowedInventoryNames.length === 0) {
         setInventoryItems([]);
         setFilteredItems([]);
         setLoading(false);
@@ -128,8 +132,10 @@ export function EntityInventorySearch({
         setInventoryItems(hydrated);
         setFilteredItems(hydrated);
       } catch (err) {
-        console.error('Failed to fetch inventory:', err);
-        toast.error('Failed to load inventory items');
+        if (!api.isForbiddenError(err)) {
+          console.error('Failed to fetch inventory:', err);
+          toast.error('Failed to load inventory items');
+        }
         setInventoryItems([]);
         setFilteredItems([]);
       } finally {
@@ -137,7 +143,7 @@ export function EntityInventorySearch({
         setRefreshing(false);
       }
     },
-    [inventoryType, allowedInventoryNames]
+    [inventoryType, allowedInventoryNames, canViewInventory]
   );
 
   useEffect(() => {
@@ -220,6 +226,10 @@ export function EntityInventorySearch({
     const instances = getSelectableInstances(item);
     const instanceId = instances.length === 1 ? instances[0].id : undefined;
     openHierarchyView(item, instanceId);
+  }
+
+  if (!canViewInventory) {
+    return null;
   }
 
   if (loading) {

@@ -1,3 +1,4 @@
+import type { AxiosResponse } from 'axios';
 import * as api from '@/lib/api';
 import { fetchExecutiveDashboard } from '@/lib/api/dashboard';
 import { fetchPaginatedList, unwrapListItems } from '@/lib/paginated-api';
@@ -84,26 +85,30 @@ export async function fetchHierarchyEntities(): Promise<{
   components: Component[];
 }> {
   // Load sequentially to avoid overwhelming PostgreSQL with 5 concurrent scans.
-  const systems = await fetchCappedPages<System>(api.systems.list, {
-    maxItems: HIERARCHY_TYPE_CAP,
-    pageSize: LIST_BOOTSTRAP_SIZE,
-  });
-  const subsystems = await fetchCappedPages<Subsystem>(api.subsystems.list, {
-    maxItems: HIERARCHY_TYPE_CAP,
-    pageSize: LIST_BOOTSTRAP_SIZE,
-  });
-  const modules = await fetchCappedPages<Module>(api.modules.list, {
-    maxItems: HIERARCHY_TYPE_CAP,
-    pageSize: LIST_BOOTSTRAP_SIZE,
-  });
-  const units = await fetchCappedPages<Unit>(api.units.list, {
-    maxItems: HIERARCHY_TYPE_CAP,
-    pageSize: LIST_BOOTSTRAP_SIZE,
-  });
-  const components = await fetchCappedPages<Component>(api.components.list, {
-    maxItems: HIERARCHY_TYPE_CAP,
-    pageSize: LIST_BOOTSTRAP_SIZE,
-  });
+  // 403 means this role cannot list that type globally — keep the rest of the tree.
+  const loadType = async <T>(
+    listPage: (
+      skip: number,
+      limit: number,
+      options?: { includeTotal?: boolean }
+    ) => Promise<AxiosResponse<unknown>>
+  ): Promise<T[]> => {
+    try {
+      return await fetchCappedPages<T>(listPage, {
+        maxItems: HIERARCHY_TYPE_CAP,
+        pageSize: LIST_BOOTSTRAP_SIZE,
+      });
+    } catch (error) {
+      if (api.isForbiddenError(error)) return [];
+      throw error;
+    }
+  };
+
+  const systems = await loadType<System>(api.systems.list);
+  const subsystems = await loadType<Subsystem>(api.subsystems.list);
+  const modules = await loadType<Module>(api.modules.list);
+  const units = await loadType<Unit>(api.units.list);
+  const components = await loadType<Component>(api.components.list);
   return { systems, subsystems, modules, units, components };
 }
 

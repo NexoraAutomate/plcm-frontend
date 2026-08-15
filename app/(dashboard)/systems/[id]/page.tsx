@@ -14,6 +14,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
 import { P } from '@/lib/permission-codes';
+import { isProjectCancelled } from '@/lib/workflow-status';
 import { EntityForm } from '@/components/entity-form';
 import { EntityInventorySearch } from '@/components/entity-inventory-search';
 import { useState, useEffect, useMemo } from 'react';
@@ -73,6 +74,7 @@ export default function SystemDetailPage() {
 
   const system = useResolvedHardwareEntity(systemId, 'system', systems);
   const project = system ? projects.find((p) => p.id === system.project_id) : null;
+  const hierarchyReadOnly = isProjectCancelled(project?.status_name);
   const systemSubsystems = system
     ? filterChildrenForParentSlot(subsystems, system, systems, (sub) => sub.system_id)
     : [];
@@ -462,15 +464,18 @@ export default function SystemDetailPage() {
         createPermission={P.create_subsystems}
         editPermission={P.edit_subsystems}
         deletePermission={P.delete_subsystems}
+        readOnly={hierarchyReadOnly}
       />
 
       {/* Inventory Items */}
+      {!hierarchyReadOnly ? (
       <EntityInventorySearch
         parentEntityName={system.name}
         inventoryType={getChildInventoryType('system')}
         allowedInventoryNames={subsystemHierarchyNames.map((hierarchy) => hierarchy.name)}
         onUseInventory={handleUseInventory}
       />
+      ) : null}
 
       {/* {`Add ${entityLabel('subsystem')}`} Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>

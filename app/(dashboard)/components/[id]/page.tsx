@@ -20,6 +20,7 @@ import {
   systemHierarchyPath,
 } from '@/lib/entity-replacement';
 import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
+import { isProjectCancelled } from '@/lib/workflow-status';
 
 export default function ComponentDetailPage() {
   const { entityLabel } = useAppDefinitions();
@@ -27,7 +28,7 @@ export default function ComponentDetailPage() {
   const params = useParams();
   const componentId = params.id as string;
   const { pageLoading } = useEntityHierarchyGate();
-  const { components, units, modules, subsystems, systems, updateComponent } = useDataStore();
+  const { components, units, modules, subsystems, systems, projects, updateComponent } = useDataStore();
   
   const component = useResolvedHardwareEntity(componentId, 'component', components);
   const unit = component ? resolveCurrentInstallEntity(component.unit_id, units) : null;
@@ -41,6 +42,9 @@ export default function ComponentDetailPage() {
         components,
       })
     : null;
+  const hierarchyReadOnly = isProjectCancelled(
+    projects.find((p) => p.id === projectId)?.status_name
+  );
   const systemId = component
     ? resolveSystemIdForHardwareEntity('component', component.id, {
         subsystems,
@@ -172,7 +176,7 @@ export default function ComponentDetailPage() {
         entity={component}
         onUpdate={(data) => updateComponent(component.id, data)}
         projectId={projectId ?? undefined}
-        allowReplace
+        allowReplace={!hierarchyReadOnly}
         hierarchyHref={hierarchyHref}
       />
 

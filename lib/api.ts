@@ -39,6 +39,10 @@ const api = axios.create({
   timeout: 45_000,
 });
 
+export function isForbiddenError(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 403;
+}
+
 api.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
     const token = localStorage.getItem("token");
@@ -344,6 +348,10 @@ export const projects = {
     api.post<Models.InventoryShortage>(
       `/projects/${projectId}/shortages/${shortageId}/cancel/`
     ),
+  cancelPreview: (id: number) =>
+    api.get<Models.ProjectCancelPreview>(`/projects/${id}/cancel-preview/`),
+  cancel: (id: number, data: { confirm: boolean; notes?: string | null }) =>
+    api.post<Models.ProjectCancelResult>(`/projects/${id}/cancel/`, data),
   update: (id: number, data: Partial<Models.Project>) => api.put<Models.Project>(`/projects/${id}/`, data),
   delete: (id: number) => api.delete(`/projects/${id}/`),
   getSystems: (id: number) => api.get<Models.System[]>(`/projects/${id}/systems/`),
@@ -553,6 +561,30 @@ export const inventory = {
       notes?: string | null
     }
   ) => api.post<Models.ItemReworkCase>(`/item-rework/${reworkId}/reissue/`, data),
+  listRecallTasks: (params?: {
+    stage?: string
+    status?: string
+    project_id?: number
+    mine?: boolean
+  }) => api.get<Models.InventoryRecallTask[]>('/inventory-recall/', { params }),
+  getRecallTask: (recallId: number) =>
+    api.get<Models.InventoryRecallTask>(`/inventory-recall/${recallId}/`),
+  returnRecallItem: (recallId: number, notes?: string | null) =>
+    api.post<Models.InventoryRecallTask>(`/inventory-recall/${recallId}/return/`, {
+      notes: notes ?? null,
+    }),
+  forceReturnRecallItem: (recallId: number, notes?: string | null) =>
+    api.post<Models.InventoryRecallTask>(`/inventory-recall/${recallId}/force-return/`, {
+      notes: notes ?? null,
+    }),
+  inspectRecallItem: (recallId: number, notes?: string | null) =>
+    api.post<Models.InventoryRecallTask>(`/inventory-recall/${recallId}/inspect/`, {
+      notes: notes ?? null,
+    }),
+  dispositionRecallItem: (
+    recallId: number,
+    data: { outcome: 'repairable' | 'reusable' | 'scrapped' | string; notes?: string | null }
+  ) => api.post<Models.InventoryRecallTask>(`/inventory-recall/${recallId}/disposition/`, data),
   issueItemRequest: (
     requestId: number,
     data: {

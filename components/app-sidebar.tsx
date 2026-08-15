@@ -392,7 +392,7 @@ export function AppSidebar() {
               width={30}
               height={30}
               alt="Backend"
-              className="dark:invert"
+              className="h-auto w-auto dark:invert"
             />
           </div>
           {!collapsed && (

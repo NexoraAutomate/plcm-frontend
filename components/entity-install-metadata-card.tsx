@@ -35,6 +35,7 @@ import { P } from '@/lib/permission-codes';
 import { RevertToInventoryButton } from '@/components/revert-to-inventory-button';
 import { canManageInstall, isOwnInstall } from '@/lib/install-ownership';
 import { cn } from '@/lib/utils';
+import { ProjectWorkflowStatus } from '@/lib/workflow-status';
 
 type HardwareOwnerType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
 
@@ -88,9 +89,12 @@ export function EntityInstallMetadataCard({
   hierarchyHref,
   onReverted,
 }: EntityInstallMetadataCardProps) {
-  const { users } = useDataStore();
+  const { users, projects } = useDataStore();
   const { can, user, isInventoryManager } = useAuth();
   const inventoryManager = isInventoryManager();
+  const cancelled =
+    projectId != null &&
+    projects.find((p) => p.id === projectId)?.status_name === ProjectWorkflowStatus.CANCELLED;
   const ownsInstall = canManageInstall({
     isInventoryManager: inventoryManager,
     currentUserId: user?.id,
@@ -101,7 +105,7 @@ export function EntityInstallMetadataCard({
     installedById: entity.installed_by_id,
   });
   const canEdit =
-    can(EDIT_PERMISSION_BY_OWNER_TYPE[ownerType]) && ownsInstall;
+    can(EDIT_PERMISSION_BY_OWNER_TYPE[ownerType]) && ownsInstall && !cancelled;
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
   const [replaceOpen, setReplaceOpen] = useState(false);
@@ -239,7 +243,7 @@ export function EntityInstallMetadataCard({
   };
 
   const replaceTarget = useMemo<ReplaceFromInventoryTarget | null>(() => {
-    if (!allowReplace || !projectId) return null;
+    if (!allowReplace || !projectId || cancelled) return null;
     return {
       entityType: ownerType as HierarchyEntityType,
       entityId: entity.id,
@@ -248,7 +252,7 @@ export function EntityInstallMetadataCard({
       serialNumber: entity.serial_number,
       replacementSequence: entity.replacement_sequence,
     };
-  }, [allowReplace, projectId, ownerType, entity]);
+  }, [allowReplace, projectId, ownerType, entity, cancelled]);
 
   return (
     <>
@@ -286,7 +290,7 @@ export function EntityInstallMetadataCard({
                 Replace
               </Button>
             ) : null}
-            {entity.part_number ? (
+            {!cancelled && entity.part_number ? (
               <RevertToInventoryButton
                 entityType={ownerType}
                 entityId={entity.id}
@@ -376,10 +380,12 @@ export function EntityInstallMetadataCard({
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-medium">Attachments</p>
+              {!cancelled ? (
               <Button type="button" variant="outline" size="sm" onClick={() => setUploadOpen(true)}>
                 <Upload className="mr-2 h-4 w-4" />
                 Upload
               </Button>
+              ) : null}
             </div>
             {attachments.length === 0 ? (
               <p className="text-sm text-muted-foreground">No attachments yet.</p>
@@ -405,6 +411,8 @@ export function EntityInstallMetadataCard({
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
+                      {!cancelled ? (
+                        <>
                       <Button
                         type="button"
                         variant="ghost"
@@ -423,6 +431,8 @@ export function EntityInstallMetadataCard({
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
+                        </>
+                      ) : null}
                     </div>
                   </li>
                 ))}

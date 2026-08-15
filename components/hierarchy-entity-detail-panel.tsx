@@ -21,6 +21,7 @@ import { WorkflowCan } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
 import { AssignDeveloperDialog } from '@/components/hierarchy/assign-developer-dialog';
 import { ReworkWizardDialog, type ReworkWizardTarget } from '@/components/inventory/rework-wizard-dialog';
+import { ProjectWorkflowStatus } from '@/lib/workflow-status';
 import type {
   Component,
   HierarchyAssignmentStatus,
@@ -145,6 +146,7 @@ export function HierarchyEntityDetailPanel({
 
   const isBhdMode = dossierMode === 'bhd';
   const originalBuild = entity ? getOriginalBuildDisplayFields(entity) : null;
+  const isCancelled = project?.status_name === ProjectWorkflowStatus.CANCELLED;
 
   const loadLinkedInventory = useCallback(async () => {
     if (!entity || !selection) {
@@ -410,6 +412,12 @@ export function HierarchyEntityDetailPanel({
 
         {selection && entity ? (
           <div className="space-y-2 border-t p-4">
+            {isCancelled ? (
+              <p className="text-xs text-muted-foreground">
+                Project is cancelled. Hierarchy is read-only for audit.
+              </p>
+            ) : (
+              <>
             <WorkflowCan role={['HM', 'ADMIN']} permission={P.hierarchy_assign_developer}>
               <Button
                 className="w-full"
@@ -547,12 +555,15 @@ export function HierarchyEntityDetailPanel({
                 </div>
               ) : null}
             </WorkflowCan>
+              </>
+            )}
             <Link href={detailPath}>
               <Button variant="outline" className="w-full gap-2">
                 Open full page
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
+            {!isCancelled ? (
             <AssignDeveloperDialog
               open={assignOpen}
               onOpenChange={setAssignOpen}
@@ -568,6 +579,7 @@ export function HierarchyEntityDetailPanel({
                 });
               }}
             />
+            ) : null}
           </div>
         ) : null}
       </div>

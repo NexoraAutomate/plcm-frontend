@@ -2,6 +2,7 @@
 
 import { ListChecks } from 'lucide-react';
 import { MyAssignmentsPanel } from '@/components/inventory/my-assignments-panel';
+import { RecallQueuePanel } from '@/components/inventory/recall-queue-panel';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function MyAssignmentsPage() {
@@ -27,6 +28,20 @@ export default function MyAssignmentsPage() {
         </CardHeader>
         <CardContent>
           <MyAssignmentsPanel />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ListChecks className="h-4 w-4" />
+            Recall returns
+          </CardTitle>
+          <CardDescription>
+            Confirm physical return of issued units when a project is cancelled.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RecallQueuePanel mine />
         </CardContent>
       </Card>
     </div>

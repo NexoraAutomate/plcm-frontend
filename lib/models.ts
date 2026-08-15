@@ -268,6 +268,37 @@ export interface Project {
   approved_at?: string | null
 }
 
+export interface ProjectCancelPreview {
+  project_id: number
+  project_name?: string | null
+  project_status?: string | null
+  progress_pct: number
+  critical_path_unfinished: boolean
+  reserved_count: number
+  issued_count: number
+  in_progress_count: number
+  testing_count: number
+  verified_count: number
+  returned_pending_count: number
+  shortage_count: number
+  pending_request_count: number
+  open_rework_count: number
+  recall_units_total: number
+}
+
+export interface ProjectCancelResult {
+  project_id: number
+  project_status: string
+  critical_path_unfinished: boolean
+  reserved_released: number
+  shortages_cancelled: number
+  pending_requests_cancelled: number
+  rework_closed: number
+  recall_tasks_created: number
+  preview?: ProjectCancelPreview | null
+  project?: Project | null
+}
+
 /** Spec 09 — automatic weighted project progress */
 export interface ProjectProgressSystemNode {
   entity_type: string
@@ -956,6 +987,39 @@ export interface ItemReworkCase {
   notes?: string | null
   updated_at?: string | null
   events?: ItemReworkEvent[] | null
+}
+
+export interface InventoryRecallTask {
+  id: number
+  project_id: number
+  project_name?: string | null
+  flight_id?: number | null
+  sdls_id?: number | null
+  target_entity_type?: string | null
+  target_entity_id?: number | null
+  target_entity_name?: string | null
+  inventory_id: number
+  inventory_name?: string | null
+  part_number?: string | null
+  serial_number?: string | null
+  inventory_instance_id?: number | null
+  issuance_id?: number | null
+  assigned_developer_id?: number | null
+  assigned_developer_name?: string | null
+  status: string
+  stage: string
+  disposition?: string | null
+  forced_return: boolean
+  item_status?: string | null
+  opened_at?: string | null
+  returned_at?: string | null
+  inspected_at?: string | null
+  closed_at?: string | null
+  notes?: string | null
+  updated_at?: string | null
+  can_return: boolean
+  can_inspect: boolean
+  can_disposition: boolean
 }
 
 export interface ItemIssueRequestBulkResult {

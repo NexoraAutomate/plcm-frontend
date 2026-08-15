@@ -9,7 +9,7 @@ import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, FileText, Calendar, Layers, Pencil, Network } from 'lucide-react';
+import { ArrowLeft, FileText, Calendar, Layers, Pencil, Network, Ban } from 'lucide-react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Edit, Trash2, Search, Clock, AlertTriangle, Zap, Pause, CheckCircle } from 'lucide-react';
@@ -41,6 +41,9 @@ import { ProjectReservationsPanel } from '@/components/projects/project-reservat
 import { ProjectProgressPanel } from '@/components/projects/project-progress-panel';
 import { ShortageListPanel } from '@/components/shortages/shortage-list-panel';
 import { useProjectProgressQuery } from '@/hooks/queries';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ProjectWorkflowStatus } from '@/lib/workflow-status';
+import { isCurrentInstallEntity } from '@/lib/entity-replacement';
 
 export default function ProjectDetailPage() {
   const { entityLabel } = useAppDefinitions();
@@ -374,6 +377,8 @@ export default function ProjectDetailPage() {
     );
   }
 
+  const hierarchyReadOnly = project.status_name === ProjectWorkflowStatus.CANCELLED;
+
   return (
     <div className="space-y-6">
       <Breadcrumb>
@@ -413,6 +418,17 @@ export default function ProjectDetailPage() {
         users={users}
         onUpdated={(next) => setWorkflowProject(next)}
       />
+
+        {project.status_name === ProjectWorkflowStatus.CANCELLED ? (
+        <Alert variant="destructive">
+          <Ban />
+          <AlertTitle>Project cancelled</AlertTitle>
+          <AlertDescription>
+            Reserve, issue, and generate are blocked. Hierarchy is read-only for
+            audit. Issued units follow the recall queue until IM dispositions them.
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       <ProjectReservationsPanel project={project} />
 
@@ -481,7 +497,11 @@ export default function ProjectDetailPage() {
       {/* Systems Cards */}
       <EntityCards
         title="Systems"
-        description={`Manage systems for ${project.name}`}
+        description={
+          hierarchyReadOnly
+            ? `Systems for ${project.name} (read-only)`
+            : `Manage systems for ${project.name}`
+        }
         entities={projectSystems}
         onAdd={() => setIsAddOpen(true)}
         onEdit={openEditSystem}
@@ -489,20 +509,27 @@ export default function ProjectDetailPage() {
         detailPath={(id) => `/systems/${id}`}
         secondaryPath={(id) => `/projects/${projectId}/systems/${id}/hierarchy`}
         addButtonLabel={`Add ${entityLabel('system')}`}
-        emptyMessage={`No ${entityLabel('system', true).toLowerCase()} yet. Click Add ${entityLabel('system')} to create one.`}
+        emptyMessage={
+          hierarchyReadOnly
+            ? `No ${entityLabel('system', true).toLowerCase()} on this cancelled project.`
+            : `No ${entityLabel('system', true).toLowerCase()} yet. Click Add ${entityLabel('system')} to create one.`
+        }
         childEntityType="system"
         createPermission={P.create_systems}
         editPermission={P.edit_systems}
         deletePermission={P.delete_systems}
+        readOnly={hierarchyReadOnly}
       />
 
       {/* Inventory Items */}
+      {!hierarchyReadOnly ? (
       <EntityInventorySearch
         parentEntityName={project.name}
         inventoryType="system"
         allowedInventoryNames={systemHierarchyNames.map((hierarchy) => hierarchy.name)}
         onUseInventory={handleUseInventory}
       />
+      ) : null}
 
       {/* {`Add ${entityLabel('system')}`} Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>

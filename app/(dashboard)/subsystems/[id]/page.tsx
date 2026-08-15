@@ -41,6 +41,7 @@ import {
 import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
 import { useHierarchyCreateFormOptions } from '@/hooks/use-hierarchy-create-form-options';
 import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
+import { isProjectCancelled } from '@/lib/workflow-status';
 
 export default function SubsystemDetailPage() {
   const { entityLabel } = useAppDefinitions();
@@ -52,6 +53,7 @@ export default function SubsystemDetailPage() {
     subsystems,
     systems,
     modules,
+    projects,
     createSystem,
     createSubsystem,
     createModule,
@@ -80,6 +82,9 @@ export default function SubsystemDetailPage() {
         components: [],
       })
     : null;
+  const hierarchyReadOnly = isProjectCancelled(
+    projects.find((p) => p.id === projectId)?.status_name
+  );
   const subsystemModules = subsystem
     ? filterChildrenForParentSlot(modules, subsystem, subsystems, (mod) => mod.subsystem_id)
     : [];
@@ -457,15 +462,18 @@ export default function SubsystemDetailPage() {
         createPermission={P.create_modules}
         editPermission={P.edit_modules}
         deletePermission={P.delete_modules}
+        readOnly={hierarchyReadOnly}
       />
 
       {/* Inventory Items */}
+      {!hierarchyReadOnly ? (
       <EntityInventorySearch
         parentEntityName={subsystem.name}
         inventoryType={getChildInventoryType('subsystem')}
         allowedInventoryNames={moduleHierarchyNames.map((hierarchy) => hierarchy.name)}
         onUseInventory={handleUseInventory}
       />
+      ) : null}
 
       {/* {`Add ${entityLabel('module')}`} Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>

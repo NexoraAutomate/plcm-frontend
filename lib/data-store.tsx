@@ -363,7 +363,9 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
           }
           await loadHierarchyData();
         } catch (err) {
-          console.warn('Failed to load hierarchy data:', err);
+          if (!api.isForbiddenError(err)) {
+            console.warn('Failed to load hierarchy data:', err);
+          }
         } finally {
           setHierarchyAttempted(true);
           setHierarchyLoading(false);
@@ -515,7 +517,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
         if (result.status === 'fulfilled') {
           setter(result.value);
           queryClient.setQueryData(queryKey, result.value);
-        } else {
+        } else if (!api.isForbiddenError(result.reason)) {
           console.warn(`Failed to refresh ${label}:`, result.reason);
         }
       };

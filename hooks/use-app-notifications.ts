@@ -11,6 +11,7 @@ import {
 import { useNotificationState } from '@/hooks/use-notification-state';
 import { useAuth } from '@/lib/auth-context';
 import * as api from '@/lib/api';
+import { P } from '@/lib/permission-codes';
 import type { InventoryInstallerNotice, InventoryReservationExpiryNotice, InventoryReturnNotice, InventoryShortageNotice } from '@/lib/models';
 import {
   readAlertSettings,
@@ -69,8 +70,13 @@ function showDesktopNotification(title: string, body?: string) {
 export function useAppNotifications(options?: { search?: string }) {
   const search = options?.search ?? '';
   const { maintenanceCases, faultyEntities, projects, customers, loading } = useDataStore();
-  const { isInventoryManager } = useAuth();
+  const { isInventoryManager, can, user } = useAuth();
   const inventoryManager = isInventoryManager();
+  const canViewInventory = can(P.view_inventory);
+  const canListAllInstallerNotices = (user?.roles ?? []).some((role) => {
+    const name = role.toLowerCase();
+    return name === 'admin' || name === 'subadmin';
+  });
   const {
     hydrated,
     isRead,
@@ -132,13 +138,13 @@ export function useAppNotifications(options?: { search?: string }) {
   }, [inventoryManager, inAppEnabled]);
 
   const loadInstallerNotices = useCallback(async () => {
-    if (!inAppEnabled) {
+    if (!inAppEnabled || !canViewInventory) {
       setInstallerNotices([]);
       return;
     }
     try {
       const res = await api.inventory.listInstallerNotices({
-        allUsers: inventoryManager,
+        allUsers: canListAllInstallerNotices,
       });
       const rows = res.data ?? [];
       const unread = rows.filter((r) => !r.read_at);
@@ -170,7 +176,7 @@ export function useAppNotifications(options?: { search?: string }) {
     } catch {
       setInstallerNotices([]);
     }
-  }, [inventoryManager, inAppEnabled, announceNewNotice]);
+  }, [inventoryManager, inAppEnabled, announceNewNotice, canViewInventory, canListAllInstallerNotices]);
 
   const loadShortageNotices = useCallback(async () => {
     if (!inAppEnabled) {
