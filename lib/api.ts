@@ -520,6 +520,39 @@ export const inventory = {
     api.post<Models.ItemInstallState>(`/item-verifications/${issuanceId}/verify/`, {
       notes: notes ?? null,
     }),
+  listReworkCases: (params?: { stage?: string; status?: string }) =>
+    api.get<Models.ItemReworkCase[]>('/item-rework/', { params }),
+  getReworkCase: (reworkId: number) =>
+    api.get<Models.ItemReworkCase>(`/item-rework/${reworkId}/`),
+  removeReworkItem: (reworkId: number, notes?: string | null) =>
+    api.post<Models.ItemReworkCase>(`/item-rework/${reworkId}/remove/`, {
+      notes: notes ?? null,
+    }),
+  returnReworkItem: (reworkId: number, notes?: string | null) =>
+    api.post<Models.ItemReworkCase>(`/item-rework/${reworkId}/return/`, {
+      notes: notes ?? null,
+    }),
+  inspectReworkItem: (reworkId: number, notes?: string | null) =>
+    api.post<Models.ItemReworkCase>(`/item-rework/${reworkId}/inspect/`, {
+      notes: notes ?? null,
+    }),
+  dispositionReworkItem: (
+    reworkId: number,
+    data: { outcome: 'repairable' | 'reusable' | 'scrapped' | string; notes?: string | null }
+  ) => api.post<Models.ItemReworkCase>(`/item-rework/${reworkId}/disposition/`, data),
+  repairCompleteReworkItem: (reworkId: number, notes?: string | null) =>
+    api.post<Models.ItemReworkCase>(`/item-rework/${reworkId}/repair-complete/`, {
+      notes: notes ?? null,
+    }),
+  reissueReworkItem: (
+    reworkId: number,
+    data: {
+      signature_type: string
+      signature_payload?: string | null
+      replacement_instance_id?: number | null
+      notes?: string | null
+    }
+  ) => api.post<Models.ItemReworkCase>(`/item-rework/${reworkId}/reissue/`, data),
   issueItemRequest: (
     requestId: number,
     data: {

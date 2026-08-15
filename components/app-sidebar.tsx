@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   ClipboardPen,
   ListChecks,
+  SearchCheck,
   ChevronDown,
   ChevronRight,
   Settings,
@@ -110,6 +111,12 @@ const navItems: NavItem[] = [
     href: "/issue-queue",
     icon: ClipboardPen,
     permission: NAV_PERMISSIONS["/issue-queue"] as PermissionCode,
+  },
+  {
+    label: "Inspect Queue",
+    href: "/inspect-queue",
+    icon: SearchCheck,
+    permission: NAV_PERMISSIONS["/inspect-queue"] as PermissionCode,
   },
   {
     label: "My Assignments",

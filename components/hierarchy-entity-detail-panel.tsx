@@ -20,6 +20,7 @@ import * as api from '@/lib/api';
 import { WorkflowCan } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
 import { AssignDeveloperDialog } from '@/components/hierarchy/assign-developer-dialog';
+import { ReworkWizardDialog, type ReworkWizardTarget } from '@/components/inventory/rework-wizard-dialog';
 import type {
   Component,
   HierarchyAssignmentStatus,
@@ -136,6 +137,7 @@ export function HierarchyEntityDetailPanel({
   const [assignmentProgress, setAssignmentProgress] = useState<HierarchyAssignmentStatus | null>(
     null
   );
+  const [reworkTarget, setReworkTarget] = useState<ReworkWizardTarget | null>(null);
 
   const entity = selection
     ? findEntity(selection, systems, subsystems, modules, units, components)
@@ -259,6 +261,7 @@ export function HierarchyEntityDetailPanel({
   const detailPath = selection ? DETAIL_PATH[selection.type](selection.entityId) : '';
 
   return (
+    <>
     <div
       className={cn(
         'h-full shrink-0 overflow-hidden border-l bg-background transition-[width] duration-300 ease-in-out',
@@ -474,14 +477,18 @@ export function HierarchyEntityDetailPanel({
                         variant="destructive"
                         disabled={installBusy}
                         onClick={() =>
-                          void runInstallAction(
-                            () =>
-                              api.inventory.submitItemTest(selection.type, selection.entityId, {
-                                result: 'fail',
-                              }),
-                            'Test recorded as Fail',
-                            'Could not record test'
-                          )
+                          setReworkTarget({
+                            entityType: selection.type,
+                            entityId: selection.entityId,
+                            name: 'name' in entity ? entity.name : null,
+                            serialNumber: 'serial_number' in entity ? entity.serial_number : null,
+                            reworkId: assignmentProgress?.rework_id,
+                            needsFail: true,
+                            canRemove: Boolean(assignmentProgress?.can_remove),
+                            canReturn: Boolean(assignmentProgress?.can_return),
+                            attemptCount: assignmentProgress?.rework_attempt_count,
+                            stage: assignmentProgress?.rework_stage,
+                          })
                         }
                       >
                         Fail
@@ -507,9 +514,34 @@ export function HierarchyEntityDetailPanel({
                       Report complete
                     </Button>
                   ) : null}
-                  {assignmentProgress?.defect_pending ? (
+                  {assignmentProgress?.can_remove || assignmentProgress?.can_return ? (
+                    <Button
+                      className="w-full"
+                      variant="destructive"
+                      disabled={installBusy}
+                      onClick={() =>
+                        setReworkTarget({
+                          entityType: selection.type,
+                          entityId: selection.entityId,
+                          name: 'name' in entity ? entity.name : null,
+                          serialNumber: 'serial_number' in entity ? entity.serial_number : null,
+                          reworkId: assignmentProgress?.rework_id,
+                          needsFail: false,
+                          canRemove: Boolean(assignmentProgress?.can_remove),
+                          canReturn: Boolean(assignmentProgress?.can_return),
+                          attemptCount: assignmentProgress?.rework_attempt_count,
+                          stage: assignmentProgress?.rework_stage,
+                        })
+                      }
+                    >
+                      Continue rework
+                    </Button>
+                  ) : assignmentProgress?.defect_pending ? (
                     <p className="text-center text-xs text-muted-foreground">
-                      Fail recorded — rework (Spec 10)
+                      Fail recorded — waiting for IM inspect
+                      {assignmentProgress.rework_attempt_count
+                        ? ` (attempt ${assignmentProgress.rework_attempt_count})`
+                        : ''}
                     </p>
                   ) : null}
                 </div>
@@ -540,5 +572,24 @@ export function HierarchyEntityDetailPanel({
         ) : null}
       </div>
     </div>
+    <ReworkWizardDialog
+      target={reworkTarget}
+      open={reworkTarget != null}
+      onOpenChange={(next) => {
+        if (!next) setReworkTarget(null);
+      }}
+      onDone={() => {
+        setReworkTarget(null);
+        if (!selection) return;
+        void api.hierarchyWorkflow
+          .assignmentStatus(selection.type, [selection.entityId])
+          .then((res) => {
+            const row = res.data?.[0] ?? null;
+            setAssignmentProgress(row);
+            setAssignmentIssued(Boolean(row?.issued));
+          });
+      }}
+    />
+    </>
   );
 }

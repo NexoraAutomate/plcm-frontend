@@ -56,6 +56,20 @@ function eventLabel(type: string) {
       return 'Verified';
     case 'defect_pending':
       return 'Defect pending';
+    case 'rework_opened':
+      return 'Rework opened';
+    case 'item_removed':
+      return 'Item removed';
+    case 'item_returned':
+      return 'Returned to IM';
+    case 'inspection_started':
+      return 'Inspection started';
+    case 'dispositioned':
+      return 'Dispositioned';
+    case 'reissued':
+      return 'Re-issued';
+    case 'rework_closed':
+      return 'Rework closed';
     case 'reverted':
       return 'Reverted to stock';
     default:

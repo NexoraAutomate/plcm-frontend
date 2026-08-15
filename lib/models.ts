@@ -837,6 +837,14 @@ export interface HierarchyAssignmentStatus {
   can_install?: boolean
   can_test?: boolean
   can_report_complete?: boolean
+  rework_id?: number | null
+  rework_status?: string | null
+  rework_stage?: string | null
+  rework_attempt_count?: number | null
+  rework_cycle_warning?: boolean
+  rework_disposition?: string | null
+  can_remove?: boolean
+  can_return?: boolean
 }
 
 export interface DeveloperAssignedWork {
@@ -866,6 +874,14 @@ export interface DeveloperAssignedWork {
   can_install?: boolean
   can_test?: boolean
   can_report_complete?: boolean
+  rework_id?: number | null
+  rework_status?: string | null
+  rework_stage?: string | null
+  rework_attempt_count?: number | null
+  rework_cycle_warning?: boolean
+  rework_disposition?: string | null
+  can_remove?: boolean
+  can_return?: boolean
 }
 
 export interface ItemInstallState {
@@ -890,6 +906,56 @@ export interface ItemInstallState {
   can_install: boolean
   can_test: boolean
   can_report_complete: boolean
+  rework_id?: number | null
+  rework_status?: string | null
+  rework_stage?: string | null
+  rework_attempt_count?: number | null
+  rework_cycle_warning?: boolean
+  rework_disposition?: string | null
+  can_remove?: boolean
+  can_return?: boolean
+}
+
+export interface ItemReworkEvent {
+  id: number
+  issuance_id: number
+  event_type: string
+  actor_name?: string | null
+  notes?: string | null
+  serial_number?: string | null
+  created_at?: string | null
+}
+
+export interface ItemReworkCase {
+  id: number
+  project_id: number
+  project_name?: string | null
+  flight_id?: number | null
+  sdls_id?: number | null
+  target_entity_type: string
+  target_entity_id: number
+  target_entity_name?: string | null
+  inventory_id: number
+  inventory_name?: string | null
+  part_number?: string | null
+  serial_number?: string | null
+  original_instance_id?: number | null
+  current_instance_id?: number | null
+  current_issuance_id?: number | null
+  assigned_developer_id?: number | null
+  assigned_developer_name?: string | null
+  status: string
+  stage: string
+  attempt_count: number
+  cycle_warning: boolean
+  disposition?: string | null
+  repaired_at?: string | null
+  item_status?: string | null
+  opened_at?: string | null
+  closed_at?: string | null
+  notes?: string | null
+  updated_at?: string | null
+  events?: ItemReworkEvent[] | null
 }
 
 export interface ItemIssueRequestBulkResult {

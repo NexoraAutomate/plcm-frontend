@@ -19,6 +19,7 @@ import { ListContentSuspense } from '@/components/list-content-suspense';
 import { StatusBadge } from '@/components/status-badge';
 import { WorkflowCan } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
+import { ReworkWizardDialog, type ReworkWizardTarget } from '@/components/inventory/rework-wizard-dialog';
 
 function rowKey(row: DeveloperAssignedWork) {
   return `${row.entity_type}:${row.entity_id}`;
@@ -26,6 +27,7 @@ function rowKey(row: DeveloperAssignedWork) {
 
 function requestLabel(row: DeveloperAssignedWork) {
   if (row.verified) return 'Verified';
+  if (row.rework_stage) return `Rework — ${row.rework_stage}`;
   if (row.defect_pending) return 'Fail — rework';
   if (row.complete_reported) return 'Waiting for HM verify';
   if (row.issued) return 'Issued';
@@ -45,6 +47,7 @@ export function MyAssignmentsPanel() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [reworkTarget, setReworkTarget] = useState<ReworkWizardTarget | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -127,6 +130,21 @@ export function MyAssignmentsPanel() {
   }
 
   async function submitTest(row: DeveloperAssignedWork, result: 'pass' | 'fail') {
+    if (result === 'fail') {
+      setReworkTarget({
+        entityType: row.entity_type,
+        entityId: row.entity_id,
+        name: row.name,
+        serialNumber: row.serial_number,
+        reworkId: row.rework_id,
+        needsFail: true,
+        canRemove: Boolean(row.can_remove),
+        canReturn: Boolean(row.can_return),
+        attemptCount: row.rework_attempt_count,
+        stage: row.rework_stage,
+      });
+      return;
+    }
     setSubmitting(true);
     try {
       await api.inventory.submitItemTest(row.entity_type, row.entity_id, { result });
@@ -156,6 +174,7 @@ export function MyAssignmentsPanel() {
     requestable.length > 0 && requestable.every((row) => selected[rowKey(row)]);
 
   return (
+    <>
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
         <Button
@@ -268,6 +287,11 @@ export function MyAssignmentsPanel() {
                         {row.defect_pending ? (
                           <Badge variant="destructive">Fail</Badge>
                         ) : null}
+                        {row.rework_stage ? (
+                          <Badge variant="outline">
+                            Attempt {row.rework_attempt_count || 1} · {row.rework_stage}
+                          </Badge>
+                        ) : null}
                         {row.complete_reported && !row.verified ? (
                           <Badge variant="secondary">Complete reported</Badge>
                         ) : null}
@@ -331,14 +355,39 @@ export function MyAssignmentsPanel() {
                                 Report complete
                               </Button>
                             ) : null}
-                            {row.defect_pending ? (
+                            {row.can_remove || row.can_return ? (
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                disabled={submitting}
+                                onClick={() =>
+                                  setReworkTarget({
+                                    entityType: row.entity_type,
+                                    entityId: row.entity_id,
+                                    name: row.name,
+                                    serialNumber: row.serial_number,
+                                    reworkId: row.rework_id,
+                                    needsFail: false,
+                                    canRemove: Boolean(row.can_remove),
+                                    canReturn: Boolean(row.can_return),
+                                    attemptCount: row.rework_attempt_count,
+                                    stage: row.rework_stage,
+                                  })
+                                }
+                              >
+                                Continue rework
+                              </Button>
+                            ) : null}
+                            {row.defect_pending && !row.can_remove && !row.can_return && !row.can_install && !row.can_test ? (
                               <span className="text-xs text-muted-foreground">
-                                Rework (Spec 10)
+                                Waiting for IM inspect
                               </span>
                             ) : null}
                             {!row.can_install &&
                             !row.can_test &&
                             !row.can_report_complete &&
+                            !row.can_remove &&
+                            !row.can_return &&
                             !row.defect_pending ? (
                               <span className="text-xs text-muted-foreground">
                                 {requestLabel(row)}
@@ -356,5 +405,17 @@ export function MyAssignmentsPanel() {
         )}
       </ListContentSuspense>
     </div>
+    <ReworkWizardDialog
+      target={reworkTarget}
+      open={reworkTarget != null}
+      onOpenChange={(open) => {
+        if (!open) setReworkTarget(null);
+      }}
+      onDone={() => {
+        setReworkTarget(null);
+        void refresh();
+      }}
+    />
+    </>
   );
 }
