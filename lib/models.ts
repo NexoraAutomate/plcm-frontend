@@ -771,6 +771,15 @@ export interface HierarchyAssignmentStatus {
   assigned_developer_id?: number | null
   assigned_developer_name?: string | null
   issued: boolean
+  issuance_id?: number | null
+  item_status?: string | null
+  test_result?: string | null
+  complete_reported?: boolean
+  defect_pending?: boolean
+  verified?: boolean
+  can_install?: boolean
+  can_test?: boolean
+  can_report_complete?: boolean
 }
 
 export interface DeveloperAssignedWork {
@@ -788,6 +797,42 @@ export interface DeveloperAssignedWork {
   issued: boolean
   can_request: boolean
   pending_request_id?: number | null
+  issuance_id?: number | null
+  item_status?: string | null
+  test_result?: string | null
+  complete_reported?: boolean
+  complete_reported_at?: string | null
+  defect_pending?: boolean
+  verified?: boolean
+  verified_at?: string | null
+  installed_at?: string | null
+  can_install?: boolean
+  can_test?: boolean
+  can_report_complete?: boolean
+}
+
+export interface ItemInstallState {
+  issuance_id: number
+  entity_type: string
+  entity_id: number
+  entity_name?: string | null
+  project_id?: number | null
+  project_name?: string | null
+  serial_number?: string | null
+  part_number?: string | null
+  assigned_developer_id?: number | null
+  assigned_developer_name?: string | null
+  item_status?: string | null
+  test_result?: string | null
+  complete_reported: boolean
+  complete_reported_at?: string | null
+  defect_pending: boolean
+  verified: boolean
+  verified_at?: string | null
+  installed_at?: string | null
+  can_install: boolean
+  can_test: boolean
+  can_report_complete: boolean
 }
 
 export interface ItemIssueRequestBulkResult {

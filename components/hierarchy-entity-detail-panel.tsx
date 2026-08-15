@@ -22,6 +22,7 @@ import { P } from '@/lib/permission-codes';
 import { AssignDeveloperDialog } from '@/components/hierarchy/assign-developer-dialog';
 import type {
   Component,
+  HierarchyAssignmentStatus,
   Inventory,
   Module,
   Project,
@@ -130,7 +131,11 @@ export function HierarchyEntityDetailPanel({
   const [linkedInventory, setLinkedInventory] = useState<Inventory[]>([]);
   const [assignOpen, setAssignOpen] = useState(false);
   const [requesting, setRequesting] = useState(false);
+  const [installBusy, setInstallBusy] = useState(false);
   const [assignmentIssued, setAssignmentIssued] = useState(false);
+  const [assignmentProgress, setAssignmentProgress] = useState<HierarchyAssignmentStatus | null>(
+    null
+  );
 
   const entity = selection
     ? findEntity(selection, systems, subsystems, modules, units, components)
@@ -164,6 +169,7 @@ export function HierarchyEntityDetailPanel({
   useEffect(() => {
     if (!open || !selection) {
       setAssignmentIssued(false);
+      setAssignmentProgress(null);
       return;
     }
     let cancelled = false;
@@ -171,10 +177,15 @@ export function HierarchyEntityDetailPanel({
       .assignmentStatus(selection.type, [selection.entityId])
       .then((res) => {
         if (cancelled) return;
-        setAssignmentIssued(Boolean(res.data?.[0]?.issued));
+        const row = res.data?.[0] ?? null;
+        setAssignmentProgress(row);
+        setAssignmentIssued(Boolean(row?.issued));
       })
       .catch(() => {
-        if (!cancelled) setAssignmentIssued(false);
+        if (!cancelled) {
+          setAssignmentIssued(false);
+          setAssignmentProgress(null);
+        }
       });
     return () => {
       cancelled = true;
@@ -215,6 +226,32 @@ export function HierarchyEntityDetailPanel({
       toast.error(typeof detail === 'string' ? detail : 'Request failed');
     } finally {
       setRequesting(false);
+    }
+  }
+
+  async function runInstallAction(
+    action: () => Promise<unknown>,
+    success: string,
+    fallback: string
+  ) {
+    if (!selection) return;
+    setInstallBusy(true);
+    try {
+      await action();
+      toast.success(success);
+      const res = await api.hierarchyWorkflow.assignmentStatus(selection.type, [
+        selection.entityId,
+      ]);
+      const row = res.data?.[0] ?? null;
+      setAssignmentProgress(row);
+      setAssignmentIssued(Boolean(row?.issued));
+    } catch (error: unknown) {
+      const detail =
+        (error as { response?: { data?: { detail?: string } } })?.response?.data
+          ?.detail || fallback;
+      toast.error(typeof detail === 'string' ? detail : fallback);
+    } finally {
+      setInstallBusy(false);
     }
   }
 
@@ -262,10 +299,17 @@ export function HierarchyEntityDetailPanel({
                   {entity.assigned_developer_id && !assignmentIssued ? (
                     <StatusBadge status="Assigned" />
                   ) : null}
-                  {assignmentIssued && statusName.toUpperCase() !== 'ISSUED' ? (
+                  {assignmentProgress?.item_status ? (
+                    <StatusBadge status={assignmentProgress.item_status} />
+                  ) : assignmentIssued && statusName.toUpperCase() !== 'ISSUED' ? (
                     <StatusBadge status="ISSUED" />
                   ) : null}
-                  <StatusBadge status={statusName} />
+                  {statusName &&
+                  statusName.toUpperCase() !== (assignmentProgress?.item_status || '').toUpperCase() ? (
+                    <StatusBadge status={statusName} />
+                  ) : !assignmentProgress?.item_status ? (
+                    <StatusBadge status={statusName} />
+                  ) : null}
                 </div>
               ) : entity.assigned_developer_id && !assignmentIssued ? (
                 <div className="mb-2">
@@ -314,10 +358,17 @@ export function HierarchyEntityDetailPanel({
                   {entity.assigned_developer_id && !assignmentIssued ? (
                     <StatusBadge status="Assigned" />
                   ) : null}
-                  {assignmentIssued && statusName.toUpperCase() !== 'ISSUED' ? (
+                  {assignmentProgress?.item_status ? (
+                    <StatusBadge status={assignmentProgress.item_status} />
+                  ) : assignmentIssued && statusName.toUpperCase() !== 'ISSUED' ? (
                     <StatusBadge status="ISSUED" />
                   ) : null}
-                  <StatusBadge status={statusName} />
+                  {statusName &&
+                  statusName.toUpperCase() !== (assignmentProgress?.item_status || '').toUpperCase() ? (
+                    <StatusBadge status={statusName} />
+                  ) : !assignmentProgress?.item_status ? (
+                    <StatusBadge status={statusName} />
+                  ) : null}
                 </div>
               ) : entity.assigned_developer_id && !assignmentIssued ? (
                 <div className="mb-2">
@@ -371,14 +422,97 @@ export function HierarchyEntityDetailPanel({
               </Button>
             </WorkflowCan>
             <WorkflowCan role="DEV" permission={P.item_request}>
-              {entity.assigned_developer_id && entity.assigned_developer_id === user?.id ? (
+              {entity.assigned_developer_id && entity.assigned_developer_id === user?.id && !assignmentIssued ? (
                 <Button
                   className="w-full"
                   onClick={() => void handleRequestItem()}
-                  disabled={requesting}
+                  disabled={requesting || assignmentIssued}
                 >
                   {requesting ? 'Requesting…' : 'Request item'}
                 </Button>
+              ) : null}
+            </WorkflowCan>
+            <WorkflowCan role="DEV" permission={P.item_install_test}>
+              {entity.assigned_developer_id === user?.id ? (
+                <div className="space-y-2">
+                  {assignmentProgress?.can_install ? (
+                    <Button
+                      className="w-full"
+                      disabled={installBusy}
+                      onClick={() =>
+                        void runInstallAction(
+                          () =>
+                            api.inventory.startItemInstall(selection.type, selection.entityId),
+                          'Installation started',
+                          'Could not start install'
+                        )
+                      }
+                    >
+                      Start install
+                    </Button>
+                  ) : null}
+                  {assignmentProgress?.can_test ? (
+                    <div className="flex gap-2">
+                      <Button
+                        className="flex-1"
+                        disabled={installBusy}
+                        onClick={() =>
+                          void runInstallAction(
+                            () =>
+                              api.inventory.submitItemTest(selection.type, selection.entityId, {
+                                result: 'pass',
+                              }),
+                            'Test recorded as Pass',
+                            'Could not record test'
+                          )
+                        }
+                      >
+                        Pass
+                      </Button>
+                      <Button
+                        className="flex-1"
+                        variant="destructive"
+                        disabled={installBusy}
+                        onClick={() =>
+                          void runInstallAction(
+                            () =>
+                              api.inventory.submitItemTest(selection.type, selection.entityId, {
+                                result: 'fail',
+                              }),
+                            'Test recorded as Fail',
+                            'Could not record test'
+                          )
+                        }
+                      >
+                        Fail
+                      </Button>
+                    </div>
+                  ) : null}
+                  {assignmentProgress?.can_report_complete ? (
+                    <Button
+                      className="w-full"
+                      disabled={installBusy}
+                      onClick={() =>
+                        void runInstallAction(
+                          () =>
+                            api.inventory.reportItemComplete(
+                              selection.type,
+                              selection.entityId
+                            ),
+                          'Installation complete reported',
+                          'Could not report complete'
+                        )
+                      }
+                    >
+                      Report complete
+                    </Button>
+                  ) : null}
+                  {assignmentProgress?.defect_pending ? (
+                    <p className="text-center text-xs text-muted-foreground">
+                      Fail recorded — rework (Spec 10)
+                    </p>
+                  ) : null}
+                </div>
               ) : null}
             </WorkflowCan>
             <Link href={detailPath}>

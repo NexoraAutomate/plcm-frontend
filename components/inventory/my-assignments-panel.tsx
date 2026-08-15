@@ -17,16 +17,27 @@ import {
 } from '@/components/ui/table';
 import { ListContentSuspense } from '@/components/list-content-suspense';
 import { StatusBadge } from '@/components/status-badge';
+import { WorkflowCan } from '@/components/auth';
+import { P } from '@/lib/permission-codes';
 
 function rowKey(row: DeveloperAssignedWork) {
   return `${row.entity_type}:${row.entity_id}`;
 }
 
 function requestLabel(row: DeveloperAssignedWork) {
+  if (row.verified) return 'Verified';
+  if (row.defect_pending) return 'Fail — rework';
+  if (row.complete_reported) return 'Waiting for HM verify';
   if (row.issued) return 'Issued';
   if (row.request_status === 'pending') return 'Requested';
   if (row.reserved) return 'Reserved';
   return 'Assigned';
+}
+
+function apiError(error: unknown, fallback: string) {
+  const detail =
+    (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || fallback;
+  return typeof detail === 'string' ? detail : fallback;
 }
 
 export function MyAssignmentsPanel() {
@@ -80,10 +91,7 @@ export function MyAssignmentsPanel() {
       setSelected({});
       await refresh();
     } catch (error: unknown) {
-      const detail =
-        (error as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail || 'Request failed';
-      toast.error(typeof detail === 'string' ? detail : 'Request failed');
+      toast.error(apiError(error, 'Request failed'));
     } finally {
       setSubmitting(false);
     }
@@ -99,10 +107,46 @@ export function MyAssignmentsPanel() {
       toast.success('Handover requested from Inventory Manager');
       await refresh();
     } catch (error: unknown) {
-      const detail =
-        (error as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail || 'Request failed';
-      toast.error(typeof detail === 'string' ? detail : 'Request failed');
+      toast.error(apiError(error, 'Request failed'));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function startInstall(row: DeveloperAssignedWork) {
+    setSubmitting(true);
+    try {
+      await api.inventory.startItemInstall(row.entity_type, row.entity_id);
+      toast.success('Installation started');
+      await refresh();
+    } catch (error: unknown) {
+      toast.error(apiError(error, 'Could not start install'));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function submitTest(row: DeveloperAssignedWork, result: 'pass' | 'fail') {
+    setSubmitting(true);
+    try {
+      await api.inventory.submitItemTest(row.entity_type, row.entity_id, { result });
+      toast.success(result === 'pass' ? 'Test recorded as Pass' : 'Test recorded as Fail');
+      await refresh();
+    } catch (error: unknown) {
+      toast.error(apiError(error, 'Could not record test'));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function reportComplete(row: DeveloperAssignedWork) {
+    setSubmitting(true);
+    try {
+      await api.inventory.reportItemComplete(row.entity_type, row.entity_id);
+      toast.success('Installation complete reported — waiting for HM verify');
+      await refresh();
+    } catch (error: unknown) {
+      toast.error(apiError(error, 'Could not report complete'));
     } finally {
       setSubmitting(false);
     }
@@ -193,7 +237,9 @@ export function MyAssignmentsPanel() {
                       />
                     </TableCell>
                     <TableCell>
-                      <div className="font-medium">{row.name || `${row.entity_type} #${row.entity_id}`}</div>
+                      <div className="font-medium">
+                        {row.name || `${row.entity_type} #${row.entity_id}`}
+                      </div>
                       <div className="text-xs text-muted-foreground">
                         {row.entity_type}
                         {row.part_number ? ` · ${row.part_number}` : ''}
@@ -203,7 +249,9 @@ export function MyAssignmentsPanel() {
                     <TableCell>{row.serial_number || '—'}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {row.issued ? (
+                        {row.item_status ? (
+                          <StatusBadge status={row.item_status} />
+                        ) : row.issued ? (
                           <StatusBadge status="ISSUED" />
                         ) : (
                           <StatusBadge status="Assigned" />
@@ -213,6 +261,15 @@ export function MyAssignmentsPanel() {
                         ) : null}
                         {row.request_status === 'pending' ? (
                           <Badge variant="outline">Requested</Badge>
+                        ) : null}
+                        {row.test_result === 'pass' && !row.verified ? (
+                          <Badge variant="outline">Pass</Badge>
+                        ) : null}
+                        {row.defect_pending ? (
+                          <Badge variant="destructive">Fail</Badge>
+                        ) : null}
+                        {row.complete_reported && !row.verified ? (
+                          <Badge variant="secondary">Complete reported</Badge>
                         ) : null}
                       </div>
                     </TableCell>
@@ -227,7 +284,68 @@ export function MyAssignmentsPanel() {
                           Request handover
                         </Button>
                       ) : (
-                        <span className="text-xs text-muted-foreground">{requestLabel(row)}</span>
+                        <WorkflowCan
+                          role="DEV"
+                          permission={P.item_install_test}
+                          fallback={
+                            <span className="text-xs text-muted-foreground">
+                              {requestLabel(row)}
+                            </span>
+                          }
+                        >
+                          <div className="flex flex-wrap justify-end gap-1">
+                            {row.can_install ? (
+                              <Button
+                                size="sm"
+                                disabled={submitting}
+                                onClick={() => void startInstall(row)}
+                              >
+                                Start install
+                              </Button>
+                            ) : null}
+                            {row.can_test ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  disabled={submitting}
+                                  onClick={() => void submitTest(row, 'pass')}
+                                >
+                                  Pass
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  disabled={submitting}
+                                  onClick={() => void submitTest(row, 'fail')}
+                                >
+                                  Fail
+                                </Button>
+                              </>
+                            ) : null}
+                            {row.can_report_complete ? (
+                              <Button
+                                size="sm"
+                                disabled={submitting}
+                                onClick={() => void reportComplete(row)}
+                              >
+                                Report complete
+                              </Button>
+                            ) : null}
+                            {row.defect_pending ? (
+                              <span className="text-xs text-muted-foreground">
+                                Rework (Spec 10)
+                              </span>
+                            ) : null}
+                            {!row.can_install &&
+                            !row.can_test &&
+                            !row.can_report_complete &&
+                            !row.defect_pending ? (
+                              <span className="text-xs text-muted-foreground">
+                                {requestLabel(row)}
+                              </span>
+                            ) : null}
+                          </div>
+                        </WorkflowCan>
                       )}
                     </TableCell>
                   </TableRow>

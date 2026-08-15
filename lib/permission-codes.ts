@@ -226,7 +226,8 @@ export const NAV_PERMISSIONS: Record<string, PermissionCode | PermissionCode[]> 
   '/inventory/issuances': P.view_inventory_issuances,
   '/shortages': [P.view_inventory, P.inventory_receive],
   '/issue-queue': [P.inventory_issue_workflow, P.issue_inventory],
-  '/my-assignments': P.item_request,
+  '/my-assignments': [P.item_request, P.item_install_test],
+  '/verify-queue': P.item_verify,
   '/maintenance': P.view_maintenance_cases,
   '/notifications': P.view_notifications,
   '/hierarchy-dashboard': P.view_hierarchy_dashboard,
@@ -315,6 +316,9 @@ export function routePermissionForPath(pathname: string): PermissionCode | Permi
   }
   if (normalized === '/my-assignments' || normalized.startsWith('/my-assignments/')) {
     return NAV_PERMISSIONS['/my-assignments'];
+  }
+  if (normalized === '/verify-queue' || normalized.startsWith('/verify-queue/')) {
+    return NAV_PERMISSIONS['/verify-queue'];
   }
   if (normalized.startsWith('/inventory/')) return P.view_inventory;
   if (normalized.startsWith('/projects/')) return P.view_projects;

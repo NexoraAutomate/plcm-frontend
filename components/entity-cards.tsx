@@ -241,12 +241,18 @@ export function EntityCards({
                           ) : null}
                           <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
                             {showAssigned ? <StatusBadge status="Assigned" /> : null}
-                            {issued && !['ISSUED', 'Issued'].includes(statusLabel) ? (
+                            {assignment?.item_status ? (
+                              <StatusBadge status={assignment.item_status} />
+                            ) : issued && !['ISSUED', 'Issued'].includes(statusLabel) ? (
                               <StatusBadge status="ISSUED" />
                             ) : null}
-                            {statusLabel !== 'Unknown' && (
+                            {assignment?.defect_pending ? (
+                              <StatusBadge status="Failed" />
+                            ) : null}
+                            {statusLabel !== 'Unknown' &&
+                            statusLabel.toUpperCase() !== (assignment?.item_status || '').toUpperCase() ? (
                               <StatusBadge status={statusLabel} />
-                            )}
+                            ) : null}
                             {childEntityType ? (
                               <div onClick={(event) => event.preventDefault()}>
                                 <EntityStatusHistorySheet

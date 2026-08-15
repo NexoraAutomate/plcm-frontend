@@ -1,16 +1,31 @@
-# Current Feature
+# Current Feature: Installation, Testing & Verification
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Loaded from spec or user description -->
+- Developer records installation activity on an assigned item that is `INSTALLATION_IN_PROGRESS`
+- Developer records test/inspect outcome Pass or Fail
+- While Dev tests/reviews, status is `UNDER_TESTING_REVIEW`
+- Pass path: Dev reports installation complete → HM verifies → `INSTALLED_VERIFIED`
+- `INSTALLED_VERIFIED` only after testing + HM verification (no skip, no force-verify)
+- Fail never reaches `INSTALLED_VERIFIED`; marks defect pending / rework hook for Spec 10
+- Only the assigned Developer (or authorized role) may mark install/test for that item
+- HM cannot verify until Dev has reported complete
+- All transitions come from recorded events (no free-form status editing)
+- UI: Dev workspace (Install / Test Pass-Fail / Report complete), HM verification queue, status badges; Fail deep-link/stub to Spec 10
 
 ## Notes
 
-<!-- Additional context from spec -->
+- Depends on Spec 07 (item at Issued / Installation in Progress)
+- Out of scope: weighted progress math (Spec 09 — emit events only); full defect/repair loop (Spec 10); project completion gate UI polish
+- Status chain (pass): `INSTALLATION_IN_PROGRESS` → `UNDER_TESTING_REVIEW` → (complete reported) → `INSTALLED_VERIFIED`
+- Backend APIs: start/complete install, submit test Pass/Fail, report installation complete, HM verify
+- Permissions: `item.install_test`, `item.verify`
+- Handoff: each `INSTALLED_VERIFIED` (and intermediate lifecycle events) must feed Spec 09 weighted progress
+- Source path: `docs/workflow-specs/08-install-test-verify.md`
 
 ## History
 

@@ -37,6 +37,7 @@ export interface HierarchyTreeNode {
   reserved?: boolean;
   shortage?: boolean;
   issued?: boolean;
+  itemStatus?: string;
 }
 
 export interface HierarchyNodeFieldVisibility {
@@ -80,6 +81,7 @@ export interface HierarchyNodeData extends Record<string, unknown> {
   reserved?: boolean;
   shortage?: boolean;
   issued?: boolean;
+  itemStatus?: string;
 }
 
 const DETAIL_PATH: Record<HierarchyEntityType, (id: number) => string> = {
@@ -323,6 +325,7 @@ export function hierarchyTreeToFlow(
           reserved: node.reserved,
           shortage: node.shortage,
           issued: node.issued,
+          itemStatus: node.itemStatus,
         },
       });
 

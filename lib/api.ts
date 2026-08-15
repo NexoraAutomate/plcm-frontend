@@ -500,6 +500,24 @@ export const inventory = {
     notes?: string | null
   }) => api.post<Models.ItemIssueRequestBulkResult>('/item-requests/bulk/', data),
   listMyAssignments: () => api.get<Models.DeveloperAssignedWork[]>('/item-assignments/mine/'),
+  startItemInstall: (entityType: string, entityId: number, notes?: string | null) =>
+    api.post<Models.ItemInstallState>(`/item-install/${entityType}/${entityId}/start/`, {
+      notes: notes ?? null,
+    }),
+  submitItemTest: (
+    entityType: string,
+    entityId: number,
+    data: { result: 'pass' | 'fail' | string; notes?: string | null }
+  ) => api.post<Models.ItemInstallState>(`/item-install/${entityType}/${entityId}/test/`, data),
+  reportItemComplete: (entityType: string, entityId: number, notes?: string | null) =>
+    api.post<Models.ItemInstallState>(`/item-install/${entityType}/${entityId}/complete/`, {
+      notes: notes ?? null,
+    }),
+  listItemVerifications: () => api.get<Models.ItemInstallState[]>('/item-verifications/'),
+  verifyItemInstallation: (issuanceId: number, notes?: string | null) =>
+    api.post<Models.ItemInstallState>(`/item-verifications/${issuanceId}/verify/`, {
+      notes: notes ?? null,
+    }),
   issueItemRequest: (
     requestId: number,
     data: {

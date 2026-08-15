@@ -44,6 +44,18 @@ function eventLabel(type: string) {
       return 'Return rejected (reissued)';
     case 'installed':
       return 'Installed';
+    case 'install_started':
+      return 'Install started';
+    case 'test_passed':
+      return 'Test passed';
+    case 'test_failed':
+      return 'Test failed';
+    case 'complete_reported':
+      return 'Installation complete reported';
+    case 'verified':
+      return 'Verified';
+    case 'defect_pending':
+      return 'Defect pending';
     case 'reverted':
       return 'Reverted to stock';
     default:

@@ -24,6 +24,7 @@ import {
   Bell,
   FileText,
   AlertTriangle,
+  ShieldCheck,
   ClipboardPen,
   ListChecks,
   ChevronDown,
@@ -115,6 +116,12 @@ const navItems: NavItem[] = [
     href: "/my-assignments",
     icon: ListChecks,
     permission: NAV_PERMISSIONS["/my-assignments"] as PermissionCode,
+  },
+  {
+    label: "Verify Queue",
+    href: "/verify-queue",
+    icon: ShieldCheck,
+    permission: NAV_PERMISSIONS["/verify-queue"] as PermissionCode,
   },
   {
     label: "Maintenance",

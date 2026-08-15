@@ -10,8 +10,8 @@ export default function MyAssignmentsPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">My assignments</h1>
         <p className="text-sm text-muted-foreground">
-          Hierarchy items assigned to you by a Hierarchy Manager. Request Inventory Manager to
-          hand them over one by one, all at once, or reserved items only.
+          Hierarchy items assigned to you by a Hierarchy Manager. Request Inventory Manager
+          handover, then install, test Pass/Fail, and report complete for HM verification.
         </p>
       </div>
       <Card>
