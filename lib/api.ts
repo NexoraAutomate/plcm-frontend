@@ -394,6 +394,47 @@ export const configChanges = {
     ),
 };
 
+export const auditTrail = {
+  list: (
+    skip: number,
+    limit: number,
+    params?: Models.WorkflowAuditListParams,
+    options?: ListRequestOptions
+  ) =>
+    api.get<Models.WorkflowAuditEvent[]>('/audit/', {
+      params: buildQueryParams({
+        skip,
+        limit,
+        include_total: options?.includeTotal === false ? false : true,
+        entity_type: params?.entity_type,
+        entity_id: params?.entity_id,
+        actor_user_id: params?.actor_user_id,
+        actor_role: params?.actor_role,
+        action: params?.action,
+        project_id: params?.project_id,
+        date_from: params?.date_from,
+        date_to: params?.date_to,
+        search: params?.search,
+      }),
+    }),
+  actions: () => api.get<Models.WorkflowAuditActionCatalogItem[]>('/audit/actions'),
+  exportCsv: (params?: Models.WorkflowAuditListParams) =>
+    api.get('/audit/export.csv', {
+      params: buildQueryParams({
+        entity_type: params?.entity_type,
+        entity_id: params?.entity_id,
+        actor_user_id: params?.actor_user_id,
+        actor_role: params?.actor_role,
+        action: params?.action,
+        project_id: params?.project_id,
+        date_from: params?.date_from,
+        date_to: params?.date_to,
+        search: params?.search,
+      }),
+      responseType: 'blob',
+    }),
+};
+
 // Systems
 export const systems = {
   list: (skip = 0, limit = 100, options?: ListRequestOptions, filters?: ListFilterParams) =>

@@ -348,6 +348,121 @@ export interface ConfigChangeCreateProjectResult {
   project?: Project | null
 }
 
+export const WorkflowAuditAction = {
+  RESERVED: 'RESERVED',
+  RELEASED: 'RELEASED',
+  ISSUED: 'ISSUED',
+  INSTALLATION_IN_PROGRESS: 'INSTALLATION_IN_PROGRESS',
+  UNDER_TESTING: 'UNDER_TESTING',
+  INSTALLED_VERIFIED: 'INSTALLED_VERIFIED',
+  RETURNED: 'RETURNED',
+  RE_ISSUED: 'RE_ISSUED',
+  MODIFIED: 'MODIFIED',
+  DELETED: 'DELETED',
+  PROJECT_CREATED: 'PROJECT_CREATED',
+  PROJECT_APPROVED: 'PROJECT_APPROVED',
+  HIERARCHY_GENERATED: 'HIERARCHY_GENERATED',
+  PROJECT_CANCELLED: 'PROJECT_CANCELLED',
+  CONFIG_CHANGE_REQUESTED: 'CONFIG_CHANGE_REQUESTED',
+  CONFIG_CHANGE_INVENTORY_RETURNED: 'CONFIG_CHANGE_INVENTORY_RETURNED',
+  CONFIG_CHANGE_SUBMITTED: 'CONFIG_CHANGE_SUBMITTED',
+  CONFIG_CHANGE_APPROVED: 'CONFIG_CHANGE_APPROVED',
+  CONFIG_CHANGE_NEW_PROJECT: 'CONFIG_CHANGE_NEW_PROJECT',
+  SHORTAGE_CREATED: 'SHORTAGE_CREATED',
+  SHORTAGE_PARTIAL: 'SHORTAGE_PARTIAL',
+  SHORTAGE_FULFILLED: 'SHORTAGE_FULFILLED',
+  AUTO_RESERVE: 'AUTO_RESERVE',
+  AUTO_RELEASE_EXPIRY: 'AUTO_RELEASE_EXPIRY',
+} as const
+
+export type WorkflowAuditActionCode =
+  (typeof WorkflowAuditAction)[keyof typeof WorkflowAuditAction]
+
+export const WORKFLOW_AUDIT_ACTION_LABELS: Record<string, string> = {
+  RESERVED: 'Reserved',
+  RELEASED: 'Released',
+  ISSUED: 'Issued',
+  INSTALLATION_IN_PROGRESS: 'Installation in Progress',
+  UNDER_TESTING: 'Under Testing',
+  INSTALLED_VERIFIED: 'Installed Verified',
+  RETURNED: 'Returned',
+  RE_ISSUED: 'Re-Issued',
+  MODIFIED: 'Modified',
+  DELETED: 'Deleted',
+  PROJECT_CREATED: 'Project Created',
+  PROJECT_APPROVED: 'Project Approved',
+  HIERARCHY_GENERATED: 'Hierarchy Generated',
+  PROJECT_CANCELLED: 'Project Cancelled',
+  CONFIG_CHANGE_REQUESTED: 'Config Change Requested',
+  CONFIG_CHANGE_INVENTORY_RETURNED: 'Config Change Inventory Returned',
+  CONFIG_CHANGE_SUBMITTED: 'Config Change Submitted',
+  CONFIG_CHANGE_APPROVED: 'Config Change Approved',
+  CONFIG_CHANGE_NEW_PROJECT: 'Config Change New Project',
+  SHORTAGE_CREATED: 'Shortage Created',
+  SHORTAGE_PARTIAL: 'Shortage Partial',
+  SHORTAGE_FULFILLED: 'Shortage Fulfilled',
+  AUTO_RESERVE: 'Auto-Reserve',
+  AUTO_RELEASE_EXPIRY: 'Auto-Release (Expiry)',
+}
+
+export const WORKFLOW_AUDIT_ROLE_LABELS: Record<string, string> = {
+  ADMIN: 'Administrator',
+  PD: 'Project Director',
+  HM: 'Hierarchy Manager',
+  IM: 'Inventory Manager',
+  DEV: 'Developer',
+  SYSTEM: 'System',
+}
+
+export interface WorkflowAuditEvent {
+  id: string
+  occurred_at: string
+  actor_user_id: number
+  actor_username?: string | null
+  actor_role: string
+  action: string
+  action_label?: string | null
+  entity_type: string
+  entity_id: string
+  project_id?: number | null
+  old_value?: Record<string, unknown> | null
+  new_value?: Record<string, unknown> | null
+  remarks?: string | null
+  ip_address?: string | null
+  user_agent?: string | null
+  correlation_id?: string | null
+}
+
+export interface WorkflowAuditActionCatalogItem {
+  code: string
+  label: string
+}
+
+export interface WorkflowAuditListParams {
+  entity_type?: string
+  entity_id?: string
+  actor_user_id?: number
+  actor_role?: string
+  action?: string
+  project_id?: number
+  date_from?: string
+  date_to?: string
+  search?: string
+  sort_by?: string
+  sort_order?: string
+}
+
+export const WORKFLOW_AUDIT_ENTITY_TYPES = [
+  { value: 'project', label: 'Project' },
+  { value: 'inventory_reservation', label: 'Reservation' },
+  { value: 'inventory_issuance', label: 'Issuance' },
+  { value: 'inventory_shortage', label: 'Shortage' },
+  { value: 'inventory_rework', label: 'Rework' },
+  { value: 'inventory_recall', label: 'Recall' },
+  { value: 'config_change', label: 'Config change' },
+  { value: 'hierarchy_configuration', label: 'Hierarchy configuration' },
+] as const
+
 /** Spec 09 — automatic weighted project progress */
 export interface ProjectProgressSystemNode {
   entity_type: string

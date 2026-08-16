@@ -1,16 +1,35 @@
-# Current Feature
+# Current Feature: Audit Trail (System-Wide)
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Populated by /feature load -->
+- Record **immutable** audit logs for every meaningful hierarchy and inventory action: who, role, date/time, IP/device, old→new, remarks.
+- Append-only audit store; application APIs cannot update or delete audit rows.
+- Required envelope: id, occurred_at (UTC), actor_user_id, actor_role, action, entity_type, entity_id, optional project_id, old_value/new_value JSON, remarks, ip_address, user_agent/device, correlation_id.
+- Minimum action catalog: RESERVED, RELEASED, ISSUED, INSTALLATION_IN_PROGRESS, UNDER_TESTING, INSTALLED_VERIFIED, RETURNED, RE_ISSUED, MODIFIED, DELETED, PROJECT_CREATED/APPROVED/HIERARCHY_GENERATED/CANCELLED, CONFIG_CHANGE_*, SHORTAGE_*/AUTO_RESERVE, AUTO_RELEASE_EXPIRY.
+- Query filters: entity, user, role, action, date range, project.
+- Backend: audit service + persistence; middleware for IP/user-agent; domain services call writer; Admin listing API; optional CSV export; DB grants INSERT + SELECT only.
+- Frontend: Admin audit trail page; optional entity drawer “History”; human-readable action labels.
+- Permission: `audit.read`.
+- System jobs (24h flip, expiry) log with system actor and role `SYSTEM`.
+- Status-changing ops: prefer writing audit in the same transaction (fail the business op or alert critically if audit write fails).
 
 ## Notes
 
-<!-- Additional context from spec -->
+Spec: `docs/workflow-specs/13-audit-trail.md` (sequence 13 of 13). Loaded from `13-audit-trial.md` (filename typo). Depends on Specs 00–12.
+
+This spec **observes** workflows; it does not change business rules. Completes: (1) central audit writer, (2) backfill hooks on existing services if gaps remain, (3) read UI + `audit.read`.
+
+Actors: System (append-only on each domain action); Admin (query/export); other roles may view audits for entities they own (optional policy).
+
+Out of scope: external SIEM export; changing business workflows.
+
+Acceptance: Spec 04–12 status-changing actions create audit rows with required fields; auto jobs use system actor; API cannot update/delete; Admin can filter by project, actor, action, date; sample E2E leaves reconstructable history.
+
+Handoff: no further workflow specs. Optional later: reporting, notification preferences, external integrations.
 
 ## History
 

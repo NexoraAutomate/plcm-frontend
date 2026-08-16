@@ -228,6 +228,7 @@ export const NAV_PERMISSIONS: Record<string, PermissionCode | PermissionCode[]> 
   '/issue-queue': [P.inventory_issue_workflow, P.issue_inventory],
   '/inspect-queue': P.item_inspect,
   '/config-changes': [P.config_change_approve, P.config_change_request],
+  '/audit': P.audit_read,
   '/my-assignments': [P.item_request, P.item_install_test],
   '/verify-queue': P.item_verify,
   '/maintenance': P.view_maintenance_cases,

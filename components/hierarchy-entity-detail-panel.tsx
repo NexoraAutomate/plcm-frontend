@@ -21,6 +21,7 @@ import { WorkflowCan } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
 import { AssignDeveloperDialog } from '@/components/hierarchy/assign-developer-dialog';
 import { ReworkWizardDialog, type ReworkWizardTarget } from '@/components/inventory/rework-wizard-dialog';
+import { WorkflowAuditHistorySheet } from '@/components/workflow-audit-history-sheet';
 import { isProjectReadOnly } from '@/lib/workflow-status';
 import type {
   Component,
@@ -412,6 +413,14 @@ export function HierarchyEntityDetailPanel({
 
         {selection && entity ? (
           <div className="space-y-2 border-t p-4">
+            <WorkflowAuditHistorySheet
+              entityType={selection.type}
+              entityId={selection.entityId}
+              projectId={
+                project?.id ??
+                ('project_id' in entity ? (entity.project_id as number | undefined) : undefined)
+              }
+            />
             {isCancelled ? (
               <p className="text-xs text-muted-foreground">
                 Project is cancelled or superseded. Hierarchy is read-only for audit.

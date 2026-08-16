@@ -28,6 +28,7 @@ import {
   ClipboardPen,
   ListChecks,
   SearchCheck,
+  ScrollText,
   ChevronDown,
   ChevronRight,
   Settings,
@@ -123,6 +124,12 @@ const navItems: NavItem[] = [
     href: "/config-changes",
     icon: GitBranch,
     permission: NAV_PERMISSIONS["/config-changes"] as PermissionCode,
+  },
+  {
+    label: "Audit Trail",
+    href: "/audit",
+    icon: ScrollText,
+    permission: NAV_PERMISSIONS["/audit"] as PermissionCode,
   },
   {
     label: "My Assignments",
