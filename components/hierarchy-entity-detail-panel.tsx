@@ -21,7 +21,7 @@ import { WorkflowCan } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
 import { AssignDeveloperDialog } from '@/components/hierarchy/assign-developer-dialog';
 import { ReworkWizardDialog, type ReworkWizardTarget } from '@/components/inventory/rework-wizard-dialog';
-import { ProjectWorkflowStatus } from '@/lib/workflow-status';
+import { isProjectReadOnly } from '@/lib/workflow-status';
 import type {
   Component,
   HierarchyAssignmentStatus,
@@ -146,7 +146,7 @@ export function HierarchyEntityDetailPanel({
 
   const isBhdMode = dossierMode === 'bhd';
   const originalBuild = entity ? getOriginalBuildDisplayFields(entity) : null;
-  const isCancelled = project?.status_name === ProjectWorkflowStatus.CANCELLED;
+  const isCancelled = isProjectReadOnly(project?.status_name);
 
   const loadLinkedInventory = useCallback(async () => {
     if (!entity || !selection) {
@@ -414,7 +414,7 @@ export function HierarchyEntityDetailPanel({
           <div className="space-y-2 border-t p-4">
             {isCancelled ? (
               <p className="text-xs text-muted-foreground">
-                Project is cancelled. Hierarchy is read-only for audit.
+                Project is cancelled or superseded. Hierarchy is read-only for audit.
               </p>
             ) : (
               <>

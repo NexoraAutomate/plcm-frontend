@@ -41,7 +41,7 @@ import {
 import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
 import { useHierarchyCreateFormOptions } from '@/hooks/use-hierarchy-create-form-options';
 import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
-import { isProjectCancelled } from '@/lib/workflow-status';
+import { isProjectReadOnly } from '@/lib/workflow-status';
 
 export default function SubsystemDetailPage() {
   const { entityLabel } = useAppDefinitions();
@@ -82,7 +82,7 @@ export default function SubsystemDetailPage() {
         components: [],
       })
     : null;
-  const hierarchyReadOnly = isProjectCancelled(
+  const hierarchyReadOnly = isProjectReadOnly(
     projects.find((p) => p.id === projectId)?.status_name
   );
   const subsystemModules = subsystem

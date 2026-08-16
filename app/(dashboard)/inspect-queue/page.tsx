@@ -11,8 +11,9 @@ export default function InspectQueuePage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Inspect queue</h1>
         <p className="text-sm text-muted-foreground">
-          Returned units from defect rework and cancelled-project recall. Inspect, then
-          disposition reusable, repairable, or scrapped.
+          Returned units from defect rework, cancelled-project recall, and
+          configuration-change returns. Inspect, then disposition reusable,
+          repairable, or scrapped.
         </p>
       </div>
       <Card>
@@ -22,8 +23,9 @@ export default function InspectQueuePage() {
             Project recall
           </CardTitle>
           <CardDescription>
-            Issued inventory recalled because a project was cancelled. Reusable stock
-            returns to Available; scrapped serials stay out of stock.
+            Issued inventory recalled because a project was cancelled or is
+            changing configuration. Reusable stock returns to Available; scrapped
+            serials stay out of stock.
           </CardDescription>
         </CardHeader>
         <CardContent>

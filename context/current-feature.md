@@ -1,16 +1,37 @@
-# Current Feature
+# Current Feature: Configuration Change After Hierarchy / Reservation
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Populated by /feature load -->
+- HM can request a configuration change after hierarchy setup or reservation without editing the existing project configuration in place.
+- Return **all** project inventory to IM (Reserved + Issued + related items); IM inspects and restores stock to Available (or the appropriate status).
+- HM submits a Change Request with source project, target **approved** configuration, and reason remarks.
+- Admin reviews and approves the CR; inventory must be cleared before approve / new project create.
+- After approve, create a **new** Project/Flight prefilled with the target config; generate a new hierarchy ready for independent reservation.
+- Old project stays readable/traceable (recommend `SUPERSEDED` with `successor_project_id` / `predecessor_project_id` link).
+- Block in-place PATCH of `configuration_id` (and structural config edits) on projects past hierarchy generation / first reservation.
+- Config change request state machine: REQUESTED → INVENTORY_RETURNED → SUBMITTED → APPROVED → NEW_PROJECT_CREATED.
+- Permissions: `config_change.request`, `config_change.approve`.
+- Frontend: HM entry on sealed projects, CC-1…CC-6 wizard/checklist, hard-disable in-place config selector + CONTROL RULE banner, post-approve create-new CTA.
 
 ## Notes
 
-<!-- Additional context from spec -->
+Spec: `docs/workflow-specs/12-configuration-change.md` (sequence 12 of 13). Depends on Specs 01–05 and return/inspect from Specs 10–11.
+
+CONTROL RULE: existing project configuration is **not** edited in place after hierarchy setup / reservation. Desired config is applied via a **new approved Project/Flight**.
+
+Actors: HM (request, return inventory, submit CR, create new project after approve); IM (inspect returns, restore inventory); Admin (approve CR); System (enforce no in-place mutate).
+
+Out of scope: mutating unused Admin template configs (Spec 01); soft field edits that do not change hierarchy structure (name, notes).
+
+Inventory return uses Spec 11 mechanical paths (release + recall + inspect) driven by config-change, not PD cancel. New project follows Specs 02–04 afresh (draft/approval/generate/reserve).
+
+Acceptance: cannot change config in place after hierarchy/reservation; full inventory return + IM restore required; Admin must approve CR; new project with new config; old project remains with link; new hierarchy generated independently.
+
+Handoff: Spec 13 (audit trail) must capture all CC actions.
 
 ## History
 

@@ -35,7 +35,7 @@ import { P } from '@/lib/permission-codes';
 import { RevertToInventoryButton } from '@/components/revert-to-inventory-button';
 import { canManageInstall, isOwnInstall } from '@/lib/install-ownership';
 import { cn } from '@/lib/utils';
-import { ProjectWorkflowStatus } from '@/lib/workflow-status';
+import { isProjectReadOnly } from '@/lib/workflow-status';
 
 type HardwareOwnerType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
 
@@ -94,7 +94,7 @@ export function EntityInstallMetadataCard({
   const inventoryManager = isInventoryManager();
   const cancelled =
     projectId != null &&
-    projects.find((p) => p.id === projectId)?.status_name === ProjectWorkflowStatus.CANCELLED;
+    isProjectReadOnly(projects.find((p) => p.id === projectId)?.status_name);
   const ownsInstall = canManageInstall({
     isInventoryManager: inventoryManager,
     currentUserId: user?.id,

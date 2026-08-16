@@ -352,9 +352,46 @@ export const projects = {
     api.get<Models.ProjectCancelPreview>(`/projects/${id}/cancel-preview/`),
   cancel: (id: number, data: { confirm: boolean; notes?: string | null }) =>
     api.post<Models.ProjectCancelResult>(`/projects/${id}/cancel/`, data),
+  getConfigChange: (id: number) =>
+    api.get<Models.ConfigChangeRequest | null>(`/projects/${id}/config-change/`),
+  requestConfigChange: (id: number, data?: { notes?: string | null }) =>
+    api.post<Models.ConfigChangeRequest>(`/projects/${id}/config-change/`, data ?? {}),
   update: (id: number, data: Partial<Models.Project>) => api.put<Models.Project>(`/projects/${id}/`, data),
   delete: (id: number) => api.delete(`/projects/${id}/`),
   getSystems: (id: number) => api.get<Models.System[]>(`/projects/${id}/systems/`),
+};
+
+export const configChanges = {
+  list: (params?: { source_project_id?: number; status?: string }) =>
+    api.get<Models.ConfigChangeRequest[]>('/config-changes/', { params }),
+  get: (id: number) => api.get<Models.ConfigChangeRequest>(`/config-changes/${id}/`),
+  returnInventory: (id: number) =>
+    api.post<Models.ConfigChangeRequest>(`/config-changes/${id}/return-inventory/`),
+  submit: (
+    id: number,
+    data: {
+      target_hierarchy_config_id: number
+      reason_remarks: string
+      product_type?: string | null
+      flight_count?: number | null
+      sdls_per_flight?: number | null
+    }
+  ) => api.post<Models.ConfigChangeRequest>(`/config-changes/${id}/submit/`, data),
+  approve: (id: number) =>
+    api.post<Models.ConfigChangeRequest>(`/config-changes/${id}/approve/`),
+  createProject: (
+    id: number,
+    data?: {
+      name?: string | null
+      product_type?: string | null
+      flight_count?: number | null
+      sdls_per_flight?: number | null
+    }
+  ) =>
+    api.post<Models.ConfigChangeCreateProjectResult>(
+      `/config-changes/${id}/create-project/`,
+      data ?? {}
+    ),
 };
 
 // Systems

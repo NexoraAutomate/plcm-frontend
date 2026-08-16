@@ -62,6 +62,7 @@ function isAutoReleased(row: InventoryReservation): boolean {
 export function ProjectReservationsPanel({ project }: Props) {
   const status = project.status_name ?? '';
   const isReady = status === ProjectWorkflowStatus.READY_FOR_INVENTORY;
+  const [configChangeOpen, setConfigChangeOpen] = useState(false);
   const [tree, setTree] = useState<HierarchyTree | null>(null);
   const [reservations, setReservations] = useState<InventoryReservation[]>([]);
   const [busy, setBusy] = useState(false);
@@ -81,6 +82,25 @@ export function ProjectReservationsPanel({ project }: Props) {
     setTree(treeRes.data);
     setReservations(listRes.data);
   }, [isReady, project.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api.projects
+      .getConfigChange(project.id)
+      .then((res) => {
+        const row = res.data;
+        const open =
+          Boolean(row?.id) &&
+          row?.status !== 'NEW_PROJECT_CREATED';
+        if (!cancelled) setConfigChangeOpen(open);
+      })
+      .catch(() => {
+        if (!cancelled) setConfigChangeOpen(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id, project.status_name]);
 
   useEffect(() => {
     if (!isReady) {
@@ -231,7 +251,7 @@ export function ProjectReservationsPanel({ project }: Props) {
     }
   }
 
-  if (!isReady) return null;
+  if (!isReady || configChangeOpen) return null;
 
   const active = reservations.filter((r) => r.status === 'active');
   const history = reservations.filter((r) => r.status !== 'active');

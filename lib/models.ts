@@ -266,6 +266,8 @@ export interface Project {
   created_by_id?: number | null
   approved_by_id?: number | null
   approved_at?: string | null
+  successor_project_id?: number | null
+  predecessor_project_id?: number | null
 }
 
 export interface ProjectCancelPreview {
@@ -296,6 +298,53 @@ export interface ProjectCancelResult {
   rework_closed: number
   recall_tasks_created: number
   preview?: ProjectCancelPreview | null
+  project?: Project | null
+}
+
+export const ConfigChangeRequestStatus = {
+  REQUESTED: 'REQUESTED',
+  INVENTORY_RETURNED: 'INVENTORY_RETURNED',
+  SUBMITTED: 'SUBMITTED',
+  APPROVED: 'APPROVED',
+  NEW_PROJECT_CREATED: 'NEW_PROJECT_CREATED',
+} as const
+
+export type ConfigChangeRequestStatusCode =
+  (typeof ConfigChangeRequestStatus)[keyof typeof ConfigChangeRequestStatus]
+
+export interface ConfigChangeRequest {
+  id: number
+  source_project_id: number
+  source_project_name?: string | null
+  source_project_status?: string | null
+  target_hierarchy_config_id?: number | null
+  target_hierarchy_config_code?: string | null
+  target_hierarchy_config_name?: string | null
+  target_product_type?: string | null
+  target_flight_count?: number | null
+  target_sdls_per_flight?: number | null
+  reason_remarks?: string | null
+  status: string
+  successor_project_id?: number | null
+  successor_project_name?: string | null
+  requested_by_id?: number | null
+  requested_at?: string | null
+  submitted_by_id?: number | null
+  submitted_at?: string | null
+  approved_by_id?: number | null
+  approved_at?: string | null
+  notes?: string | null
+  created_at?: string | null
+  updated_at?: string | null
+  inventory_cleared?: boolean
+  inventory_preview?: ProjectCancelPreview | null
+  structural_frozen?: boolean
+  project?: Project | null
+  successor_project?: Project | null
+}
+
+export interface ConfigChangeCreateProjectResult {
+  change: ConfigChangeRequest
   project?: Project | null
 }
 

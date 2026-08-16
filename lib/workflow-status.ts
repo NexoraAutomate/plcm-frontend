@@ -27,6 +27,7 @@ export const ProjectWorkflowStatus = {
   CANCELLED: 'CANCELLED',
   COMPLETED: 'COMPLETED',
   READY_TO_DELIVER: 'READY_TO_DELIVER',
+  SUPERSEDED: 'SUPERSEDED',
 } as const;
 
 export type ProjectWorkflowStatusCode =
@@ -34,6 +35,14 @@ export type ProjectWorkflowStatusCode =
 
 export function isProjectCancelled(statusName?: string | null): boolean {
   return statusName === ProjectWorkflowStatus.CANCELLED;
+}
+
+export function isProjectSuperseded(statusName?: string | null): boolean {
+  return statusName === ProjectWorkflowStatus.SUPERSEDED;
+}
+
+export function isProjectReadOnly(statusName?: string | null): boolean {
+  return isProjectCancelled(statusName) || isProjectSuperseded(statusName);
 }
 
 export const ITEM_STATUS_LABELS: Record<ItemStatusCode, string> = {
@@ -58,6 +67,7 @@ export const PROJECT_STATUS_LABELS: Record<ProjectWorkflowStatusCode, string> = 
   CANCELLED: 'Cancelled',
   COMPLETED: 'Completed',
   READY_TO_DELIVER: 'Ready To Deliver',
+  SUPERSEDED: 'Superseded',
 };
 
 export const WORKFLOW_STATUS_LABELS: Record<string, string> = {
@@ -87,6 +97,7 @@ export const PROJECT_STATUS_COLORS: Record<ProjectWorkflowStatusCode, string> = 
   CANCELLED: '#C00000',
   COMPLETED: '#375623',
   READY_TO_DELIVER: '#2F5496',
+  SUPERSEDED: '#7030A0',
 };
 
 export const WORKFLOW_STATUS_COLORS: Record<string, string> = {

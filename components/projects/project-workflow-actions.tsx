@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, GitBranch, UserCog, Ban } from 'lucide-react';
+import { CheckCircle2, GitBranch, UserCog, Ban, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -32,8 +32,15 @@ import { StatusBadge } from '@/components/status-badge';
 import { Can, WorkflowCan } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
 import * as api from '@/lib/api';
-import type { Project, ProjectCancelPreview, User } from '@/lib/models';
-import { ProjectWorkflowStatus } from '@/lib/workflow-status';
+import type {
+  ConfigChangeRequest,
+  Project,
+  ProjectCancelPreview,
+  User,
+} from '@/lib/models';
+import { ProjectWorkflowStatus, isProjectReadOnly } from '@/lib/workflow-status';
+import { ConfigChangeWizard } from '@/components/projects/config-change-wizard';
+import { isConfigSealed, isOpenConfigChange } from '@/lib/config-change';
 
 type Props = {
   project: Project;
@@ -55,6 +62,10 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
   const [hmId, setHmId] = useState<string>(
     project.assigned_hm_id ? String(project.assigned_hm_id) : ''
   );
+  const [configChange, setConfigChange] = useState<ConfigChangeRequest | null>(
+    null
+  );
+  const openConfigChange = isOpenConfigChange(configChange?.status);
 
   useEffect(() => {
     setHmId(project.assigned_hm_id ? String(project.assigned_hm_id) : '');
@@ -66,7 +77,8 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
   const isReady =
     status === ProjectWorkflowStatus.READY_FOR_INVENTORY ||
     status === ProjectWorkflowStatus.HIERARCHY_GENERATED;
-  const isCancelled = status === ProjectWorkflowStatus.CANCELLED;
+  const isCancelled = isProjectReadOnly(status);
+  const configSealed = isConfigSealed(status);
   const canCancel =
     Boolean(status) &&
     !isCancelled &&
@@ -211,14 +223,16 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
     }
   }
 
-  const generateDisabled = !isApproved || isCancelled;
-  const generateTooltip = isDraft
-    ? 'Approval required before Generate Hierarchy'
-    : isApproved
-      ? 'Generate Flight → SDLS → System tree from the selected configuration'
-      : isReady
-        ? 'Hierarchy already generated'
-        : 'Project must be APPROVED before hierarchy generation';
+  const generateDisabled = !isApproved || isCancelled || openConfigChange;
+  const generateTooltip = openConfigChange
+    ? 'Open configuration change blocks hierarchy generation'
+    : isDraft
+      ? 'Approval required before Generate Hierarchy'
+      : isApproved
+        ? 'Generate Flight → SDLS → System tree from the selected configuration'
+        : isReady
+          ? 'Hierarchy already generated'
+          : 'Project must be APPROVED before hierarchy generation';
 
   return (
     <div className="space-y-4 rounded-lg border p-4">
@@ -229,6 +243,16 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
           <span className="text-xs text-muted-foreground">
             {project.product_type} · {project.flight_count ?? '—'} flights ·{' '}
             {project.sdls_per_flight ?? '—'} SDLS/flight
+          </span>
+        ) : null}
+        {project.hierarchy_config_id ? (
+          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+            {configSealed ? <Lock className="h-3 w-3" /> : null}
+            Config #{project.hierarchy_config_id}
+            {project.hierarchy_config_version
+              ? ` v${project.hierarchy_config_version}`
+              : ''}
+            {configSealed ? ' (sealed)' : ''}
           </span>
         ) : null}
       </div>
@@ -307,9 +331,14 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
               Hierarchy generated — reserve inventory against Flight → SDLS nodes below.
             </p>
           ) : null}
+          {isApproved && openConfigChange ? (
+            <p className="w-full text-xs text-muted-foreground">
+              Generate Hierarchy is blocked while a configuration change is open.
+            </p>
+          ) : null}
           {isCancelled ? (
             <p className="w-full text-xs text-muted-foreground">
-              Hierarchy is read-only after cancellation.
+              Hierarchy is read-only after cancellation or configuration change.
             </p>
           ) : null}
         </WorkflowCan>
@@ -457,6 +486,11 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <ConfigChangeWizard
+        project={project}
+        onUpdated={onUpdated}
+        onConfigChange={setConfigChange}
+      />
     </div>
   );
 }

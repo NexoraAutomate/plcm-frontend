@@ -20,7 +20,7 @@ import {
   systemHierarchyPath,
 } from '@/lib/entity-replacement';
 import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
-import { isProjectCancelled } from '@/lib/workflow-status';
+import { isProjectReadOnly } from '@/lib/workflow-status';
 
 export default function ComponentDetailPage() {
   const { entityLabel } = useAppDefinitions();
@@ -42,7 +42,7 @@ export default function ComponentDetailPage() {
         components,
       })
     : null;
-  const hierarchyReadOnly = isProjectCancelled(
+  const hierarchyReadOnly = isProjectReadOnly(
     projects.find((p) => p.id === projectId)?.status_name
   );
   const systemId = component

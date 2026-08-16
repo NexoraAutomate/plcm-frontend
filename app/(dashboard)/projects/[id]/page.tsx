@@ -41,8 +41,9 @@ import { ProjectReservationsPanel } from '@/components/projects/project-reservat
 import { ProjectProgressPanel } from '@/components/projects/project-progress-panel';
 import { ShortageListPanel } from '@/components/shortages/shortage-list-panel';
 import { useProjectProgressQuery } from '@/hooks/queries';
+import { ConfigChangeBanner } from '@/components/projects/config-change-banner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ProjectWorkflowStatus } from '@/lib/workflow-status';
+import { ProjectWorkflowStatus, isProjectReadOnly } from '@/lib/workflow-status';
 import { isCurrentInstallEntity } from '@/lib/entity-replacement';
 
 export default function ProjectDetailPage() {
@@ -377,7 +378,7 @@ export default function ProjectDetailPage() {
     );
   }
 
-  const hierarchyReadOnly = project.status_name === ProjectWorkflowStatus.CANCELLED;
+  const hierarchyReadOnly = isProjectReadOnly(project.status_name);
 
   return (
     <div className="space-y-6">
@@ -418,6 +419,8 @@ export default function ProjectDetailPage() {
         users={users}
         onUpdated={(next) => setWorkflowProject(next)}
       />
+
+      <ConfigChangeBanner project={project} />
 
         {project.status_name === ProjectWorkflowStatus.CANCELLED ? (
         <Alert variant="destructive">

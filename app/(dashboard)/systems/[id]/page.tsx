@@ -14,7 +14,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
 import { P } from '@/lib/permission-codes';
-import { isProjectCancelled } from '@/lib/workflow-status';
+import { isProjectReadOnly } from '@/lib/workflow-status';
 import { EntityForm } from '@/components/entity-form';
 import { EntityInventorySearch } from '@/components/entity-inventory-search';
 import { useState, useEffect, useMemo } from 'react';
@@ -74,7 +74,7 @@ export default function SystemDetailPage() {
 
   const system = useResolvedHardwareEntity(systemId, 'system', systems);
   const project = system ? projects.find((p) => p.id === system.project_id) : null;
-  const hierarchyReadOnly = isProjectCancelled(project?.status_name);
+  const hierarchyReadOnly = isProjectReadOnly(project?.status_name);
   const systemSubsystems = system
     ? filterChildrenForParentSlot(subsystems, system, systems, (sub) => sub.system_id)
     : [];

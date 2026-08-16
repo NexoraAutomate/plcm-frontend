@@ -112,11 +112,17 @@ const navItems: NavItem[] = [
     icon: ClipboardPen,
     permission: NAV_PERMISSIONS["/issue-queue"] as PermissionCode,
   },
-  {
+    {
     label: "Inspect Queue",
     href: "/inspect-queue",
     icon: SearchCheck,
     permission: NAV_PERMISSIONS["/inspect-queue"] as PermissionCode,
+  },
+  {
+    label: "Config Changes",
+    href: "/config-changes",
+    icon: GitBranch,
+    permission: NAV_PERMISSIONS["/config-changes"] as PermissionCode,
   },
   {
     label: "My Assignments",
