@@ -75,13 +75,13 @@ export function MaintenanceCaseSummary({
             <p className="text-xs font-medium uppercase min-w-3/4 tracking-[0.2em] text-muted-foreground">
               Resolution Notes
             </p>
-            <p className="text-sm text-shadow-muted-foreground wrap-break-word">
+            <p className="text-sm text-muted-foreground wrap-break-word">
               {maintenanceCase.resolution_notes || 'No notes yet'}
             </p>
           </div>
           <div className="space-y-1 rounded-lg">
             <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Resolved At</p>
-            <p className="text-sm text-shadow-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {maintenanceCase.resolved_at
                 ? new Date(maintenanceCase.resolved_at).toLocaleDateString()
                 : 'Pending'}

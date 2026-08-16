@@ -161,7 +161,7 @@ export function InventoryHierarchyDialog({
                     nodeStrokeWidth={3}
                     pannable
                     zoomable
-                    className="!bg-background/80"
+                    className="bg-background/80!"
                   />
                 </ReactFlow>
               </ReactFlowProvider>

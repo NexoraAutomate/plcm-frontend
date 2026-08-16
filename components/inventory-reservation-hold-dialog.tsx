@@ -16,7 +16,7 @@ function Row({ label, value }: { label: string; value?: string | number | null }
   return (
     <div className="grid grid-cols-[8rem_1fr] gap-2 border-b border-border/60 py-2 last:border-b-0">
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="text-sm wrap-break-words">{String(value)}</p>
+      <p className="text-sm wrap-break-word">{String(value)}</p>
     </div>
   );
 }

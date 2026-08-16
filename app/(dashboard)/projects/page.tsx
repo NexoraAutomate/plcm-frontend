@@ -212,15 +212,7 @@ export default function ProjectsPage(){
     try {
       await updateProject(editingId, formData);
       pagination.invalidate();
-      setFormData({
-        name: '',
-        description: '',
-        start_date: '',
-        end_date: '',
-        owner_id: 0,
-        order_id: 0,
-        status_id: 0,
-      });
+      resetCreateForm();
       setEditingId(null);
       setIsEditOpen(false);
     } catch {
@@ -250,6 +242,10 @@ export default function ProjectsPage(){
       owner_id: project.owner_id,
       order_id: project.order_id,
       status_id: project.status_id,
+      hierarchy_config_id: project.hierarchy_config_id ?? 0,
+      product_type: project.product_type ?? '',
+      flight_count: project.flight_count ?? 1,
+      sdls_per_flight: project.sdls_per_flight ?? 1,
     });
     setIsEditOpen(true);
   }
@@ -575,7 +571,7 @@ export default function ProjectsPage(){
                             label="Total systems"
                           />
                         </TableCell>
-                        <TableCell className="min-w-[140px]">
+                        <TableCell className="min-w-35">
                           <div className="flex items-center gap-2 rounded-md p-1">
                             <Progress value={project.progress ?? 0} className="h-2 flex-1" />
                             <span className="w-10 text-right text-xs font-medium tabular-nums">

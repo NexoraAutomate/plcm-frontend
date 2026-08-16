@@ -249,7 +249,7 @@ export function EntityLookupFlow({
   }, []);
 
   return (
-    <div className="flex h-[min(65vh,720px)] min-h-[420px] w-full flex-col overflow-hidden rounded-xl border bg-muted/20">
+    <div className="flex h-[min(65vh,720px)] min-h-105 w-full flex-col overflow-hidden rounded-xl border bg-muted/20">
       <div className="border-b bg-background/80 px-4 py-3">
         <p className="text-sm font-medium">Entity Hierarchy Map</p>
         <p className="text-xs text-muted-foreground">

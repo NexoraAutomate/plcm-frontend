@@ -141,7 +141,7 @@ function HierarchyFlowNode({ data }: NodeProps<Node<HierarchyNodeData>>) {
         role={canNavigate ? 'button' : undefined}
         tabIndex={canNavigate ? 0 : undefined}
         className={cn(
-          'nodrag nopan nowheel w-[220px] rounded-lg border px-3 py-2.5 text-left shadow-sm transition-all',
+          'nodrag nopan nowheel w-55 rounded-lg border px-3 py-2.5 text-left shadow-sm transition-all',
           isReplacedEntity
             ? 'border-orange-500 bg-orange-50 dark:border-orange-500 dark:bg-orange-950/60'
             : cn('bg-card', styles.border),

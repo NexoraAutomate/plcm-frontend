@@ -72,7 +72,7 @@ function DetailRow({ label, value }: { label: string; value?: string | null }) {
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p className="text-sm wrap-break-words">{value}</p>
+      <p className="text-sm wrap-break-word">{value}</p>
     </div>
   );
 }
@@ -268,10 +268,10 @@ export function HierarchyEntityDetailPanel({
     <div
       className={cn(
         'h-full shrink-0 overflow-hidden border-l bg-background transition-[width] duration-300 ease-in-out',
-        open ? 'w-[380px]' : 'w-0'
+        open ? 'w-95' : 'w-0'
       )}
     >
-      <div className="flex h-full w-[380px] flex-col">
+      <div className="flex h-full w-95 flex-col">
         <div className="flex items-start justify-between gap-3 border-b p-4">
           <div className="min-w-0">
             <div className="mb-1 flex flex-wrap items-center gap-2">

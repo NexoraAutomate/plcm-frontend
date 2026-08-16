@@ -26,7 +26,7 @@ interface DashboardCardProps {
 
 function InsightBody({ insight, title }: { insight: ExecInsight; title?: string }) {
   return (
-    <div className="max-w-[280px] space-y-2 text-left">
+    <div className="max-w-70 space-y-2 text-left">
       {title ? <p className="text-[12px] font-semibold leading-snug text-white">{title}</p> : null}
       <div>
         <p className="text-[9px] font-semibold uppercase tracking-wider text-[#A78BFA]">Calculation</p>

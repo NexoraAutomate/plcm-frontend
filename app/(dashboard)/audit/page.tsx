@@ -362,10 +362,10 @@ export default function AuditTrailPage() {
                             <div className="text-muted-foreground">Project {row.project_id}</div>
                           ) : null}
                         </TableCell>
-                        <TableCell className="max-w-[280px] break-words text-xs">
+                        <TableCell className="max-w-70 wrap-break-word text-xs">
                           {formatJson(row.old_value)} → {formatJson(row.new_value)}
                         </TableCell>
-                        <TableCell className="max-w-[180px] break-words text-xs">
+                        <TableCell className="max-w-45 wrap-break-word text-xs">
                           {row.remarks || '—'}
                         </TableCell>
                       </TableRow>

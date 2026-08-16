@@ -274,7 +274,7 @@ export function EntityCards({
 
                     <div className="space-y-2 pt-2">
                       <div className="flex gap-2 flex-wrap">
-                        <Link href={detailPath(entity.id)} className="flex-1 min-w-[5.5rem]" onClick={(e) => e.stopPropagation()}>
+                        <Link href={detailPath(entity.id)} className="flex-1 min-w-22" onClick={(e) => e.stopPropagation()}>
                           <Button variant="outline" size="sm" className="w-full gap-1.5">
                             View
                             <ArrowRight className="h-3 w-3" />
@@ -284,7 +284,7 @@ export function EntityCards({
                           <Button
                             variant="outline"
                             size="sm"
-                            className="flex-1 min-w-[5.5rem] gap-1.5"
+                            className="flex-1 min-w-22 gap-1.5"
                             onClick={() => onEdit(entity.id)}
                           >
                             <Pencil className="h-3 w-3" />
@@ -306,7 +306,7 @@ export function EntityCards({
                           <Button
                             variant="outline"
                             size="sm"
-                            className="flex-1 min-w-[5.5rem] gap-1.5 text-destructive hover:text-destructive"
+                            className="flex-1 min-w-22 gap-1.5 text-destructive hover:text-destructive"
                             onClick={() => setDeleteTarget({ id: entity.id, name: entity.name })}
                           >
                             <Trash2 className="h-3 w-3" />

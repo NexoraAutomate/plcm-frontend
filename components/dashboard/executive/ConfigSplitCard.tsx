@@ -356,10 +356,10 @@ export function ConfigSplitCard({ components, rows, className, insight }: Config
                     const st = statusStyle(row.status);
                     return (
                       <tr key={row.id} className="border-t border-[#242424]">
-                        <td className="max-w-[88px] truncate px-1.5 py-1.5 font-medium text-[#F5F5F5]">
+                        <td className="max-w-22 truncate px-1.5 py-1.5 font-medium text-[#F5F5F5]">
                           {row.partNumber}
                         </td>
-                        <td className="max-w-[96px] truncate px-1.5 py-1.5 text-[#9CA3AF]">
+                        <td className="max-w-24 truncate px-1.5 py-1.5 text-[#9CA3AF]">
                           {row.reason}
                         </td>
                         <td className="px-1.5 py-1.5">

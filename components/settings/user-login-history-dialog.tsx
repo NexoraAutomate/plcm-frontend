@@ -215,7 +215,7 @@ export function UserLoginHistoryDialog({ open, onOpenChange, user }: Props) {
                         {row.login_status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="max-w-[160px] truncate text-sm text-muted-foreground">
+                    <TableCell className="max-w-40 truncate text-sm text-muted-foreground">
                       {row.failure_reason || '—'}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-sm">

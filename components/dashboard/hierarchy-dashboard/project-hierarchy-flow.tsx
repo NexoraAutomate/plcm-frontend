@@ -170,7 +170,7 @@ export function ProjectHierarchyFlow({
     return (
       <div
         className={cn(
-          'flex h-full min-h-[420px] items-center justify-center rounded-lg border border-dashed bg-muted/20',
+          'flex h-full min-h-105 items-center justify-center rounded-lg border border-dashed bg-muted/20',
           className
         )}
       >
@@ -185,7 +185,7 @@ export function ProjectHierarchyFlow({
     return (
       <div
         className={cn(
-          'flex h-full min-h-[420px] items-center justify-center rounded-lg border border-dashed bg-muted/20',
+          'flex h-full min-h-105 items-center justify-center rounded-lg border border-dashed bg-muted/20',
           className
         )}
       >
@@ -199,7 +199,7 @@ export function ProjectHierarchyFlow({
   return (
     <div
       className={cn(
-        'flex h-full min-h-[420px] w-full overflow-hidden rounded-lg border bg-muted/10',
+        'flex h-full min-h-105 w-full overflow-hidden rounded-lg border bg-muted/10',
         className
       )}
     >
@@ -231,7 +231,7 @@ export function ProjectHierarchyFlow({
                 nodeStrokeWidth={3}
                 pannable
                 zoomable
-                className="!bg-background/80"
+                className="bg-background/80!"
               />
             </ReactFlow>
           </HierarchyFlowActionsProvider>

@@ -74,7 +74,7 @@ function ColorPalettePicker({
             <ChevronDown className="h-3.5 w-3.5 opacity-60" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-[220px] p-2" sideOffset={6}>
+        <PopoverContent align="start" className="w-55 p-2" sideOffset={6}>
           <div className="space-y-2">
             <p className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               Theme Colors
@@ -438,11 +438,11 @@ export function StatusesPanel({ embedded = false }: StatusesPanelProps) {
                     {items.map((status) => (
                       <div
                         key={status.id}
-                        className="flex min-w-[220px] flex-1 items-start justify-between gap-3 rounded-lg border border-border bg-background p-3"
+                        className="flex min-w-55 flex-1 items-start justify-between gap-3 rounded-lg border border-border bg-background p-3"
                       >
                         <div className="space-y-2">
                           <StatusBadge status={status.status_name} color={status.color} />
-                          <p className="text-xs text-muted-foreground max-w-[200px]">
+                          <p className="text-xs text-muted-foreground max-w-50">
                             {status.description || "No description"}
                           </p>
                         </div>
@@ -488,7 +488,7 @@ export function StatusesPanel({ embedded = false }: StatusesPanelProps) {
                   {otherStatuses.map((status) => (
                     <div
                       key={status.id}
-                      className="flex min-w-[220px] flex-1 items-start justify-between gap-3 rounded-lg border border-border bg-background p-3"
+                      className="flex min-w-55 flex-1 items-start justify-between gap-3 rounded-lg border border-border bg-background p-3"
                     >
                       <div className="space-y-2">
                         <StatusBadge status={status.status_name} color={status.color} />

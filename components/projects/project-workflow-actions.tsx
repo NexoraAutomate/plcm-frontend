@@ -259,7 +259,7 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
 
       <Can permission={P.project_assign_hm}>
         <div className="flex flex-wrap items-end gap-2">
-          <div className="min-w-[220px] space-y-1">
+          <div className="min-w-55 space-y-1">
             <Label>Assign Hierarchy Manager</Label>
             <Select value={hmId} onValueChange={setHmId} disabled={busy || isCancelled}>
               <SelectTrigger>

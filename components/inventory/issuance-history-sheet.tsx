@@ -157,7 +157,7 @@ export function IssuanceHistorySheet({
             <ol className="relative space-y-4 border-l border-border pl-4">
               {events.map((event, index) => (
                 <li key={`${event.issuance_id}-${event.event_type}-${event.created_at}-${index}`} className="relative">
-                  <span className="absolute -left-[21px] top-1.5 size-2.5 rounded-full bg-primary" />
+                  <span className="absolute -left-5.25 top-1.5 size-2.5 rounded-full bg-primary" />
                   <div className="space-y-1.5">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant={eventVariant(event.event_type)}>

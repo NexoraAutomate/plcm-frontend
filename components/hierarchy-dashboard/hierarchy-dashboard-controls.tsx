@@ -93,7 +93,7 @@ export function HierarchyDashboardControls({
         <HierarchyDossierCombobox
           value={dossierMode}
           onChange={onDossierModeChange}
-          className="w-full min-w-[280px] sm:w-80"
+          className="w-full min-w-70 sm:w-80"
         />
 
         <div className="grid min-w-0 flex-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">

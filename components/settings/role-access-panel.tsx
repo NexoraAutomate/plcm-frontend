@@ -459,13 +459,13 @@ export function RoleAccessPanel({ embedded = false }: RoleAccessPanelProps) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[160px]">Resource</TableHead>
+                    <TableHead className="min-w-40">Resource</TableHead>
                     {CRUD_ACTIONS.map(({ action, label }) => (
                       <TableHead key={action} className="w-20 text-center">
                         {label}
                       </TableHead>
                     ))}
-                    <TableHead className="min-w-[200px]">Other options</TableHead>
+                    <TableHead className="min-w-50">Other options</TableHead>
                     <TableHead className="w-24 text-center">All</TableHead>
                   </TableRow>
                 </TableHeader>
