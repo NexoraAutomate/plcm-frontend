@@ -1,6 +1,7 @@
 import type { AppDefinitions } from '@/lib/models';
 
 export type HierarchyEntityLevel =
+  | 'project'
   | 'system'
   | 'subsystem'
   | 'module'
@@ -8,6 +9,7 @@ export type HierarchyEntityLevel =
   | 'component';
 
 export const HIERARCHY_ENTITY_LEVELS: HierarchyEntityLevel[] = [
+  'project',
   'system',
   'subsystem',
   'module',
@@ -16,6 +18,9 @@ export const HIERARCHY_ENTITY_LEVELS: HierarchyEntityLevel[] = [
 ];
 
 const LEVEL_DEFAULTS = {
+  project: {
+    abbrev: 'PROJ',
+  },
   system: {
     abbrev: 'SYS',
     part: 'PN-{levelAbbr}-{entityAbbr}-{year}-{vendor}-{seq:5}',
@@ -48,6 +53,9 @@ export const DEFAULT_APP_DEFINITIONS: Omit<AppDefinitions, 'id' | 'updated_at'> 
   part_number_template: '{project}-{name}{seq}-PN',
   configuration_item_template: '{project}-{name}{seq}-CI',
   sku_template: '{serial}-SKU',
+  label_project: 'Project',
+  label_projects: 'Projects',
+  abbrev_project: LEVEL_DEFAULTS.project.abbrev,
   label_system: 'System',
   label_systems: 'Systems',
   label_subsystem: 'Subsystem',
@@ -170,6 +178,8 @@ export function resolveEntityTypeLabel(level: string, plural = false): string {
 export function getEntityTypeLabel(
   definitions: Pick<
     AppDefinitions,
+    | 'label_project'
+    | 'label_projects'
     | 'label_system'
     | 'label_systems'
     | 'label_subsystem'
@@ -187,6 +197,10 @@ export function getEntityTypeLabel(
   const key = level.trim().toLowerCase() as HierarchyEntityLevel;
   const fallback = DEFAULT_APP_DEFINITIONS;
   const map: Record<HierarchyEntityLevel, { singular: string; plural: string }> = {
+    project: {
+      singular: definitions?.label_project || fallback.label_project,
+      plural: definitions?.label_projects || fallback.label_projects,
+    },
     system: {
       singular: definitions?.label_system || fallback.label_system,
       plural: definitions?.label_systems || fallback.label_systems,
@@ -220,6 +234,7 @@ export function getLevelAbbrev(
   const key = level.trim().toLowerCase() as HierarchyEntityLevel;
   const d = definitions || DEFAULT_APP_DEFINITIONS;
   const map: Record<HierarchyEntityLevel, string> = {
+    project: d.abbrev_project || DEFAULT_APP_DEFINITIONS.abbrev_project,
     system: d.abbrev_system || DEFAULT_APP_DEFINITIONS.abbrev_system,
     subsystem: d.abbrev_subsystem || DEFAULT_APP_DEFINITIONS.abbrev_subsystem,
     module: d.abbrev_module || DEFAULT_APP_DEFINITIONS.abbrev_module,
@@ -236,6 +251,7 @@ export function getLevelPartTemplate(
   const key = level.trim().toLowerCase() as HierarchyEntityLevel;
   const d = (definitions || DEFAULT_APP_DEFINITIONS) as AppDefinitions;
   const map: Record<HierarchyEntityLevel, string | undefined> = {
+    project: undefined,
     system: d.part_template_system,
     subsystem: d.part_template_subsystem,
     module: d.part_template_module,
@@ -256,6 +272,7 @@ export function getLevelSerialTemplate(
   const key = level.trim().toLowerCase() as HierarchyEntityLevel;
   const d = (definitions || DEFAULT_APP_DEFINITIONS) as AppDefinitions;
   const map: Record<HierarchyEntityLevel, string | undefined> = {
+    project: undefined,
     system: d.serial_template_system,
     subsystem: d.serial_template_subsystem,
     module: d.serial_template_module,

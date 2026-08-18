@@ -349,7 +349,7 @@ export function HierarchyEntityDetailPanel({
               ) : null}
               <DetailRow label="Installed By" value={installerLabel} />
               {selection.type === 'system' && project ? (
-                <DetailRow label="Project" value={project.name} />
+                <DetailRow label={entityLabel('project')} value={project.name} />
               ) : null}
               <DetailRow label="Assigned developer" value={developerLabel} />
               <DetailRow
@@ -400,7 +400,7 @@ export function HierarchyEntityDetailPanel({
                 <DetailRow label="Original Serial #" value={entity.original_serial_number} />
               ) : null}
               {selection.type === 'system' && project ? (
-                <DetailRow label="Project" value={project.name} />
+                <DetailRow label={entityLabel('project')} value={project.name} />
               ) : null}
               <DetailRow label="Assigned developer" value={developerLabel} />
               <DetailRow

@@ -32,7 +32,7 @@ import { useAppDefinitions } from "@/lib/app-definitions-context";
 
 function getStatusTypes(entityLabel: (level: string, plural?: boolean) => string) {
   return [
-    { key: "projects", label: "Projects" },
+    { key: "projects", label: entityLabel("project", true) },
     { key: "systems", label: entityLabel("system", true) },
     { key: "subsystems", label: entityLabel("subsystem", true) },
     { key: "modules", label: entityLabel("module", true) },

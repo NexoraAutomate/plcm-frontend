@@ -10,6 +10,7 @@ import {
 import { StatusBadge } from '@/components/status-badge';
 import { ItemStatus } from '@/lib/workflow-status';
 import type { InventoryInstance, InventoryProjectHold } from '@/lib/models';
+import { useAppDefinitions } from '@/lib/app-definitions-context';
 
 function Row({ label, value }: { label: string; value?: string | number | null }) {
   if (value == null || value === '') return null;
@@ -34,6 +35,7 @@ type Props = {
 };
 
 export function InventoryReservationHoldDialog({ instance, open, onOpenChange }: Props) {
+  const { entityLabel } = useAppDefinitions();
   const hold: InventoryProjectHold | null | undefined = instance?.project_reservation;
   const serial =
     instance?.original_serial_number?.trim() ||
@@ -63,7 +65,7 @@ export function InventoryReservationHoldDialog({ instance, open, onOpenChange }:
             <Row label="Serial" value={serial} />
             <Row label="Part number" value={hold.part_number} />
             <Row label="Inventory" value={hold.inventory_name} />
-            <Row label="Project" value={hold.project_name} />
+            <Row label={entityLabel('project')} value={hold.project_name} />
             <Row label="Flight" value={flight} />
             <Row label="SDLS" value={sdls} />
             <Row

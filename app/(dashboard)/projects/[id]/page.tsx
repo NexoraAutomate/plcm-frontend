@@ -153,14 +153,7 @@ export default function ProjectDetailPage() {
     parent: project
       ? {
           fieldName: 'project_id',
-          label: 'Project',
-          id: project.id,
-          name: project.name,
-        }
-      : undefined,
-    extraFields: installFields,
-    enabled: isAddOpen,
-  });
+          label: entityLabel('project'),
 
   const systemEditFormFields = useMemo(
     () => [
@@ -187,7 +180,7 @@ export default function ProjectDetailPage() {
       },
       {
         name: 'project_id',
-        label: 'Project',
+        label: entityLabel('project'),
         type: 'select' as const,
         required: true,
         options: projects.map((p) => ({ label: p.name, value: p.id })),
@@ -386,7 +379,7 @@ export default function ProjectDetailPage() {
         <BreadcrumbList>
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
-              <Link href="/projects">Projects</Link>
+              <Link href="/projects">{entityLabel('project', true)}</Link>
             </BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
@@ -404,7 +397,7 @@ export default function ProjectDetailPage() {
         </Link>
         <div className="flex-1 min-w-0">
           <h1 className="text-3xl font-bold tracking-tight">{project.name}</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage systems and hierarchy</p>
+          <p className="text-sm text-muted-foreground mt-1">Manage {entityLabel('system', true).toLowerCase()} and hierarchy</p>
         </div>
         <Button variant="outline" className="gap-2 shrink-0" asChild>
           <Link href={`/hierarchy-dashboard?project_id=${projectId}`}>
@@ -499,11 +492,11 @@ export default function ProjectDetailPage() {
 
       {/* Systems Cards */}
       <EntityCards
-        title="Systems"
+        title={entityLabel('system', true)}
         description={
           hierarchyReadOnly
-            ? `Systems for ${project.name} (read-only)`
-            : `Manage systems for ${project.name}`
+            ? `${entityLabel('system', true)} for ${project.name} (read-only)`
+            : `Manage ${entityLabel('system', true).toLowerCase()} for ${project.name}`
         }
         entities={projectSystems}
         onAdd={() => setIsAddOpen(true)}

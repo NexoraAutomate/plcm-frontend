@@ -26,6 +26,12 @@ export type DefinitionsPanelProps = {
 
 const ENTITY_ROWS = [
   {
+    key: 'project' as const,
+    singular: 'label_project' as const,
+    plural: 'label_projects' as const,
+    abbrev: 'abbrev_project' as const,
+  },
+  {
     key: 'system' as const,
     singular: 'label_system' as const,
     plural: 'label_systems' as const,
@@ -250,7 +256,7 @@ export function DefinitionsPanel({ embedded = false }: DefinitionsPanelProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {levels.map((level) => (
+                {levels.filter((level) => level !== 'project').map((level) => (
                   <SelectItem key={level} value={level}>
                     {levelLabel(level)} ({draft[`abbrev_${level}` as keyof typeof draft]})
                   </SelectItem>

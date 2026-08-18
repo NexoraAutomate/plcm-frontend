@@ -188,13 +188,13 @@ export function ProjectsMiniDashboard({
 
   const scopeLabel = filteredOrder
     ? `Order ${filteredOrder.order_number}`
-    : 'All projects';
+    : `All ${entityLabel('project', true).toLowerCase()}`;
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiTile
-          label="Total Projects"
+          label={`Total ${entityLabel('project', true)}`}
           value={totalCount ?? projects.length}
           sub={scopeLabel}
           icon={Rocket}
@@ -248,7 +248,7 @@ export function ProjectsMiniDashboard({
           <>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Projects by Status</CardTitle>
+                <CardTitle className="text-sm font-medium">{entityLabel('project', true)} by Status</CardTitle>
                 <CardDescription>Click a segment to filter the table below</CardDescription>
               </CardHeader>
               <CardContent>
@@ -299,8 +299,8 @@ export function ProjectsMiniDashboard({
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Recent Projects</CardTitle>
-                <CardDescription>Quick access to project details</CardDescription>
+                <CardTitle className="text-sm font-medium">Recent {entityLabel('project', true)}</CardTitle>
+                <CardDescription>Quick access to {entityLabel('project').toLowerCase()} details</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
                 {projects.length === 0 ? (
@@ -335,8 +335,8 @@ export function ProjectsMiniDashboard({
           <>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Progress by Project</CardTitle>
-                <CardDescription>Click a bar to open project</CardDescription>
+                <CardTitle className="text-sm font-medium">Progress by {entityLabel('project')}</CardTitle>
+                <CardDescription>Click a bar to open {entityLabel('project').toLowerCase()}</CardDescription>
               </CardHeader>
               <CardContent>
                 {progressData.length === 0 ? (
@@ -408,8 +408,8 @@ export function ProjectsMiniDashboard({
           <>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">{`${entityLabel('system', true)} per Project`}</CardTitle>
-                <CardDescription>Click a bar to open project</CardDescription>
+                <CardTitle className="text-sm font-medium">{`${entityLabel('system', true)} per ${entityLabel('project')}`}</CardTitle>
+                <CardDescription>Click a bar to open {entityLabel('project').toLowerCase()}</CardDescription>
               </CardHeader>
               <CardContent>
                 {systemsData.length === 0 ? (
@@ -442,8 +442,8 @@ export function ProjectsMiniDashboard({
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Project Directory</CardTitle>
-                <CardDescription>Systems count per project</CardDescription>
+                <CardTitle className="text-sm font-medium">{entityLabel('project')} Directory</CardTitle>
+                <CardDescription>{entityLabel('system', true)} count per {entityLabel('project').toLowerCase()}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
                 {projects.length === 0 ? (
@@ -471,8 +471,8 @@ export function ProjectsMiniDashboard({
         {activeChart === 'timeline' && (
           <Card className="lg:col-span-2">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Projects Over Time</CardTitle>
-              <CardDescription>Monthly project starts{filteredOrder ? ` for ${filteredOrder.order_number}` : ''}</CardDescription>
+              <CardTitle className="text-sm font-medium">{entityLabel('project', true)} Over Time</CardTitle>
+              <CardDescription>Monthly {entityLabel('project').toLowerCase()} starts{filteredOrder ? ` for ${filteredOrder.order_number}` : ''}</CardDescription>
             </CardHeader>
             <CardContent>
               {projectsTimeline.length === 0 ? (
@@ -493,7 +493,7 @@ export function ProjectsMiniDashboard({
                     <Area
                       type="monotone"
                       dataKey="value"
-                      name="Projects"
+                      name={entityLabel('project', true)}
                       stroke="oklch(0.65 0.15 165)"
                       fill="url(#projectsPageFill)"
                     >

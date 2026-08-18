@@ -40,9 +40,11 @@ import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
 import * as api from '@/lib/api';
 import type { HierarchyConfigurationSummary } from '@/lib/models';
+import { useAppDefinitions } from '@/lib/app-definitions-context';
 
 export default function ProjectsPage(){
   const router = useRouter();
+  const { entityLabel } = useAppDefinitions();
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({
     open: false,
     id: null,
@@ -267,8 +269,8 @@ export default function ProjectsPage(){
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
-        <p className="text-muted-foreground mt-2 text-sm ">Manage satellite lifecycle projects</p>
+        <h1 className="text-3xl font-bold tracking-tight">{entityLabel('project', true)}</h1>
+        <p className="text-muted-foreground mt-2 text-sm ">Manage satellite lifecycle {entityLabel('project', true).toLowerCase()}</p>
         {filteredOrder ? (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="rounded-full border bg-muted px-3 py-1 text-sm">
@@ -327,13 +329,13 @@ export default function ProjectsPage(){
             <DialogTrigger asChild>
               <Button className="gap-2">
                 <Plus className="h-4 w-4" />
-                New Draft Project
+                New Draft {entityLabel('project')}
               </Button>
             </DialogTrigger>
           </Can>
           <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle>Create Draft Project</DialogTitle>
+              <DialogTitle>Create Draft {entityLabel('project')}</DialogTitle>
               <DialogDescription>
                 Select an available Smart SDLS configuration and product scope. Status starts as
                 DRAFT until Admin approval.
@@ -341,7 +343,7 @@ export default function ProjectsPage(){
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label>Project Name *</Label>
+                <Label>{entityLabel('project')} Name *</Label>
                 <Input
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -508,7 +510,7 @@ export default function ProjectsPage(){
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
           <div>
-            <CardTitle>All Projects</CardTitle>
+            <CardTitle>All {entityLabel('project', true)}</CardTitle>
             <CardDescription>
               Showing {projects.length} on this page · {pagination.total} matching
             </CardDescription>
@@ -637,16 +639,16 @@ export default function ProjectsPage(){
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Project</DialogTitle>
-            <DialogDescription>Update project details</DialogDescription>
+            <DialogTitle>Edit {entityLabel('project')}</DialogTitle>
+            <DialogDescription>Update {entityLabel('project').toLowerCase()} details</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Project Name</Label>
+              <Label>{entityLabel('project')} Name</Label>
               <Input
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Project name"
+                placeholder={`${entityLabel('project')} name`}
               />
             </div>
             <div>

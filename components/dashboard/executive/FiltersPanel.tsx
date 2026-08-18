@@ -10,6 +10,7 @@ import {
 import { CalendarDays, ExternalLink, RefreshCw } from 'lucide-react';
 import { DashboardCard } from './DashboardCard';
 import type { ExecFilterOption, ExecFiltersState, ExecInsight } from './types';
+import { useAppDefinitions } from '@/lib/app-definitions-context';
 
 interface FiltersPanelProps {
   filters: ExecFiltersState;
@@ -97,6 +98,7 @@ export function FiltersPanel({
   className,
   insight,
 }: FiltersPanelProps) {
+  const { entityLabel } = useAppDefinitions();
   return (
     <div className={`flex h-full min-h-0 flex-col gap-2 ${className ?? ''}`}>
       <DashboardCard
@@ -122,7 +124,7 @@ export function FiltersPanel({
             onValueChange={(v) => onChange({ programId: v === 'all' ? undefined : v })}
           />
           <FilterSelect
-            label="Project"
+            label={entityLabel('project')}
             value={filters.projectId}
             options={projects}
             onValueChange={(v) => onChange({ projectId: v === 'all' ? undefined : v })}

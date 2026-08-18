@@ -86,6 +86,9 @@ export interface AppDefinitions {
   part_number_template: string
   configuration_item_template: string
   sku_template: string
+  label_project: string
+  label_projects: string
+  abbrev_project: string
   label_system: string
   label_systems: string
   label_subsystem: string

@@ -236,6 +236,7 @@ const hierarchyItems: NavItem[] = [
 ];
 
 const HIERARCHY_LABEL_BY_HREF: Record<string, string> = {
+  "/projects": "project",
   "/systems": "system",
   "/subsystems": "subsystem",
   "/modules": "module",
@@ -323,8 +324,14 @@ export function AppSidebar() {
   };
 
   const visibleNav = useMemo(
-    () => navItems.filter((item) => !item.permission || can(item.permission)),
-    [can]
+    () =>
+      navItems
+        .filter((item) => !item.permission || can(item.permission))
+        .map((item) => {
+          const level = HIERARCHY_LABEL_BY_HREF[item.href];
+          return level ? { ...item, label: entityLabel(level, true) } : item;
+        }),
+    [can, entityLabel]
   );
   const visibleHierarchy = useMemo(
     () =>
@@ -500,7 +507,7 @@ export function AppSidebar() {
             <div className="mt-6">
               {!collapsed && (
                 <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/40">
-                  Project Hierarchy
+                  {entityLabel('project')} Hierarchy
                 </p>
               )}
               {collapsed && (

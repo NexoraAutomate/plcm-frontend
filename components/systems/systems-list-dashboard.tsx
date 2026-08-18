@@ -343,8 +343,8 @@ export function SystemsListDashboard({
           <>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">{`${entityLabel('system', true)} by Project`}</CardTitle>
-                <CardDescription>Click a bar to filter systems for that project</CardDescription>
+                <CardTitle className="text-sm font-medium">{`${entityLabel('system', true)} by ${entityLabel('project')}`}</CardTitle>
+                <CardDescription>Click a bar to filter {entityLabel('system', true).toLowerCase()} for that {entityLabel('project').toLowerCase()}</CardDescription>
               </CardHeader>
               <CardContent>
                 {projectData.length === 0 ? (
@@ -377,8 +377,8 @@ export function SystemsListDashboard({
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Project Directory</CardTitle>
-                <CardDescription>Open project or its systems</CardDescription>
+                <CardTitle className="text-sm font-medium">{entityLabel('project')} Directory</CardTitle>
+                <CardDescription>Open {entityLabel('project').toLowerCase()} or its {entityLabel('system', true).toLowerCase()}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
                 {projectData.map((row) => (

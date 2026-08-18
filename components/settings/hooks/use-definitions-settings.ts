@@ -275,6 +275,7 @@ export function useDefinitionsSettings() {
 
   const hierarchyByLevel = useMemo(() => {
     const map: Record<HierarchyEntityLevel, Hierarchy[]> = {
+      project: [],
       system: [],
       subsystem: [],
       module: [],
