@@ -7,10 +7,8 @@ import {
   Gauge,
   Bell,
   Lock,
-  GitBranch,
   DatabaseBackup,
   Tags,
-  Network,
 } from 'lucide-react';
 
 export type SettingsTabId =
@@ -21,9 +19,9 @@ export type SettingsTabId =
   | 'alerts'
   | 'security'
   | 'definitions'
-  | 'hierarchy-configs'
-  | 'hierarchy'
   | 'backup';
+
+export type DefinitionsSectionId = 'labels' | 'configurations';
 
 export type SettingsTabConfig = {
   id: SettingsTabId;
@@ -85,23 +83,9 @@ export const SETTINGS_TABS: SettingsTabConfig[] = [
   {
     id: 'definitions',
     label: 'Definitions',
-    description: 'Serial/part number templates and hierarchy entity display names',
+    description: 'Level names, identifier templates, and named hierarchy configurations',
     icon: Tags,
-    permission: P.manage_settings,
-  },
-  {
-    id: 'hierarchy-configs',
-    label: 'SDLS Configurations',
-    description: 'Smart SDLS hierarchy configurations (product types + System→Component template)',
-    icon: Network,
-    permission: P.hierarchy_config_manage,
-  },
-  {
-    id: 'hierarchy',
-    label: 'System Hierarchy',
-    description: 'Configure entity types and parent relationships',
-    icon: GitBranch,
-    permission: P.view_hierarchy,
+    permission: [P.manage_settings, P.hierarchy_config_manage, P.view_hierarchy],
   },
   {
     id: 'backup',
@@ -122,5 +106,20 @@ export const LEGACY_ADMIN_REDIRECTS: Record<string, SettingsTabId> = {
   '/users': 'users',
   '/roles': 'roles',
   '/statuses': 'status',
-  '/hierarchy': 'hierarchy',
+  '/hierarchy': 'definitions',
 };
+
+/** Old Settings tab ids redirected into Definitions sections. */
+export const LEGACY_SETTINGS_TAB_ALIASES: Record<
+  string,
+  { tab: SettingsTabId; section: DefinitionsSectionId }
+> = {
+  hierarchy: { tab: 'definitions', section: 'configurations' },
+  'hierarchy-configs': { tab: 'definitions', section: 'configurations' },
+};
+
+export function isDefinitionsSectionId(
+  value: string | null | undefined
+): value is DefinitionsSectionId {
+  return value === 'labels' || value === 'configurations';
+}

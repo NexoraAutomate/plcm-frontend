@@ -1,5 +1,7 @@
 'use client';
 
+import { useMemo } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,15 +12,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SettingsCard } from '@/components/settings/settings-card';
 import { SettingsSection } from '@/components/settings/settings-section';
 import { PageLoader } from '@/components/page-loader';
+import { AccessRestricted } from '@/components/auth/access-restricted';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
-import { TEMPLATE_PLACEHOLDER_HELP, suggestAbbreviation } from '@/lib/app-definitions';
+import { useAuth } from '@/lib/auth-context';
+import { TEMPLATE_PLACEHOLDER_HELP } from '@/lib/app-definitions';
 import type { HierarchyEntityLevel } from '@/lib/app-definitions';
 import { useDefinitionsSettings } from '@/components/settings/hooks/use-definitions-settings';
-import { HierarchyTreeEditor } from '@/components/settings/hierarchy-tree-editor';
+import { HierarchyConfigPanel } from '@/components/settings/hierarchy-config-panel';
+import {
+  isDefinitionsSectionId,
+  type DefinitionsSectionId,
+} from '@/components/settings/settings-tabs-config';
 
 export type DefinitionsPanelProps = {
   embedded?: boolean;
@@ -64,26 +73,95 @@ const ENTITY_ROWS = [
 ];
 
 export function DefinitionsPanel({ embedded = false }: DefinitionsPanelProps) {
+  const { can } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const canLabels = can(P.manage_settings);
+  const canConfigs = can([P.hierarchy_config_manage, P.view_hierarchy, P.manage_settings]);
+  const configsReadOnly = !can(P.hierarchy_config_manage);
+
+  const requestedSection = searchParams.get('section');
+  const activeSection: DefinitionsSectionId = useMemo(() => {
+    if (isDefinitionsSectionId(requestedSection)) {
+      if (requestedSection === 'labels' && !canLabels) return 'configurations';
+      if (requestedSection === 'configurations' && !canConfigs) return 'labels';
+      return requestedSection;
+    }
+    if (canLabels) return 'labels';
+    return 'configurations';
+  }, [canConfigs, canLabels, requestedSection]);
+
+  function setSection(section: DefinitionsSectionId) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', 'definitions');
+    params.set('section', section);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }
+
+  if (!canLabels && !canConfigs) {
+    return (
+      <AccessRestricted
+        title="Access Restricted"
+        message="You do not have permission to view Definitions."
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {!embedded && (
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Definitions</h1>
+          <p className="mt-2 text-muted-foreground">
+            Level names, identifier templates, and named hierarchy configurations
+          </p>
+        </div>
+      )}
+
+      <Tabs
+        value={activeSection}
+        onValueChange={(value) => {
+          if (isDefinitionsSectionId(value)) setSection(value);
+        }}
+      >
+        <TabsList>
+          {canLabels ? (
+            <TabsTrigger value="labels">Labels & templates</TabsTrigger>
+          ) : null}
+          {canConfigs ? (
+            <TabsTrigger value="configurations">Configurations</TabsTrigger>
+          ) : null}
+        </TabsList>
+
+        {canLabels ? (
+          <TabsContent value="labels" className="mt-6">
+            <DefinitionsLabelsSection />
+          </TabsContent>
+        ) : null}
+
+        {canConfigs ? (
+          <TabsContent value="configurations" className="mt-6">
+            <HierarchyConfigPanel embedded readOnly={configsReadOnly} />
+          </TabsContent>
+        ) : null}
+      </Tabs>
+    </div>
+  );
+}
+
+function DefinitionsLabelsSection() {
   const {
     draft,
     loading,
     saving,
-    savingAbbr,
     updateDraft,
     updateLevelTemplate,
     save,
-    saveAbbreviations,
-    createHierarchyNode,
-    updateHierarchyNode,
-    deleteHierarchyNode,
     resetDefaults,
     preview,
     selectedLevel,
     setSelectedLevel,
-    hierarchies,
-    hierarchyByLevel,
-    abbrDraft,
-    setAbbrDraft,
     levels,
     levelLabel,
   } = useDefinitionsSettings();
@@ -92,15 +170,6 @@ export function DefinitionsPanel({ embedded = false }: DefinitionsPanelProps) {
 
   return (
     <div className="space-y-8">
-      {!embedded && (
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Definitions</h1>
-          <p className="mt-2 text-muted-foreground">
-            Hierarchy abbreviations, per-level SN/PN templates, and entity display names
-          </p>
-        </div>
-      )}
-
       <Can permission={P.manage_settings}>
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" variant="outline" size="sm" onClick={resetDefaults}>
@@ -161,89 +230,8 @@ export function DefinitionsPanel({ embedded = false }: DefinitionsPanelProps) {
       </SettingsSection>
 
       <SettingsSection
-        title="Hierarchy items"
-        description="Interactive hierarchy graph. Click a node to edit; use + on a node to add a child entity, or delete to remove it. Full screen opens a larger graph view."
-        actions={
-          <Can permission={P.manage_settings}>
-            <Button
-              type="button"
-              size="sm"
-              disabled={savingAbbr}
-              onClick={() => void saveAbbreviations()}
-            >
-              {savingAbbr ? 'Saving…' : 'Save abbreviations'}
-            </Button>
-          </Can>
-        }
-      >
-        <div className="grid gap-4 xl:grid-cols-2">
-          <SettingsCard title="Tree view" contentClassName="p-0">
-            <HierarchyTreeEditor
-              hierarchies={hierarchies}
-              abbrDraft={abbrDraft}
-              setAbbrDraft={setAbbrDraft}
-              levelLabel={levelLabel}
-              onCreate={createHierarchyNode}
-              onUpdate={updateHierarchyNode}
-              onDelete={deleteHierarchyNode}
-              previewHeight={420}
-            />
-          </SettingsCard>
-
-          <SettingsCard
-            title="Abbreviations table"
-            description="Editable short codes for each hierarchy item."
-          >
-            <div className="max-h-105 overflow-auto">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-card">
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-2 pr-2 font-medium">Level</th>
-                    <th className="pb-2 pr-2 font-medium">Name</th>
-                    <th className="pb-2 font-medium">Abbrev</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {levels.flatMap((level) =>
-                    hierarchyByLevel[level].map((h) => (
-                      <tr key={h.id} className="border-b border-border/50">
-                        <td className="py-2 pr-2 text-xs text-muted-foreground">
-                          {levelLabel(level)}
-                        </td>
-                        <td className="py-2 pr-2">{h.name}</td>
-                        <td className="py-2">
-                          <Input
-                            className="h-8 font-mono uppercase"
-                            value={abbrDraft[h.id] ?? ''}
-                            onChange={(e) =>
-                              setAbbrDraft((prev) => ({
-                                ...prev,
-                                [h.id]: e.target.value.toUpperCase(),
-                              }))
-                            }
-                            placeholder={suggestAbbreviation(h.name)}
-                          />
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                  {!hierarchies.length ? (
-                    <tr>
-                      <td colSpan={3} className="py-6 text-center text-muted-foreground">
-                        No hierarchy items yet. Use tree full screen to add systems.
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
-          </SettingsCard>
-        </div>
-      </SettingsSection>
-
-      <SettingsSection
         title="Per-level serial & part number templates"
-        description={`Select a hierarchy level and define its templates. ${TEMPLATE_PLACEHOLDER_HELP}`}
+        description={`Select a hierarchy level and define its templates. ${TEMPLATE_PLACEHOLDER_HELP} Preview uses the first node from an available configuration.`}
       >
         <SettingsCard>
           <div className="mb-4 max-w-sm space-y-2">

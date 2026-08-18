@@ -19,6 +19,8 @@ export {
   SETTINGS_TABS,
   SETTINGS_ACCESS_PERMISSIONS,
   LEGACY_ADMIN_REDIRECTS,
+  LEGACY_SETTINGS_TAB_ALIASES,
   isSettingsTabId,
+  isDefinitionsSectionId,
 } from './settings-tabs-config';
-export type { SettingsTabId, SettingsTabConfig } from './settings-tabs-config';
+export type { SettingsTabId, SettingsTabConfig, DefinitionsSectionId } from './settings-tabs-config';

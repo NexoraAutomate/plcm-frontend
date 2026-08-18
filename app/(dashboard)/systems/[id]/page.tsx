@@ -21,6 +21,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import * as api from '@/lib/api';
+import { listTemplateNames } from '@/lib/hierarchy-template-names';
 import { fetchStatusesByType } from '@/lib/api';
 import * as Models from '@/lib/models';
 import type { Inventory } from '@/lib/models';
@@ -80,7 +81,6 @@ export default function SystemDetailPage() {
     : [];
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
-  const [systemHierarchyNames, setSystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
   const [subsystemHierarchyNames, setSubsystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
 
   const nameOptions = useMemo(
@@ -292,36 +292,18 @@ export default function SystemDetailPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statusResult, hierarchyResult] = await Promise.allSettled([
+        const [statusResult, childNames] = await Promise.all([
           fetchStatusesByType('subsystems'),
-          api.hierarchies.list('system'),
+          system
+            ? listTemplateNames({
+                level: 'subsystem',
+                parentName: system.name,
+                configId: project?.hierarchy_config_id,
+              })
+            : Promise.resolve([]),
         ]);
-
-        if (statusResult.status === 'fulfilled') {
-          setStatuses(statusResult.value);
-        }
-
-        if (hierarchyResult.status === 'fulfilled') {
-          setSystemHierarchyNames(hierarchyResult.value.data);
-
-          if (system) {
-            const parentHierarchyId = hierarchyResult.value.data.find(
-              (hierarchy) => hierarchy.name === system.name
-            )?.id;
-
-            if (parentHierarchyId) {
-              try {
-                const childRes = await api.hierarchies.list('subsystem', parentHierarchyId);
-                setSubsystemHierarchyNames(childRes.data);
-              } catch (childError) {
-                console.error('Failed to fetch subsystem hierarchy names', childError);
-                setSubsystemHierarchyNames([]);
-              }
-            } else {
-              setSubsystemHierarchyNames([]);
-            }
-          }
-        }
+        setStatuses(statusResult);
+        setSubsystemHierarchyNames(childNames as Models.Hierarchy[]);
       } catch (err) {
         console.error('Failed to fetch statuses or hierarchy names', err);
       } finally {
@@ -330,7 +312,7 @@ export default function SystemDetailPage() {
     };
 
     fetchData();
-  }, [system]);
+  }, [system, project?.hierarchy_config_id]);
 
   if (pageLoading) return <PageLoader />;
 

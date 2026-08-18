@@ -1,4 +1,5 @@
 import * as api from '@/lib/api';
+import { listTemplateNames } from '@/lib/hierarchy-template-names';
 import {
   getChildInventoryType,
   getInventoryTypeLabel,
@@ -92,15 +93,11 @@ export async function loadAllowedChildHierarchyNames(
   if (parentInventoryType === 'component') return [];
 
   const childType = getChildInventoryType(parentInventoryType);
-  const parentHierarchies = await api.hierarchies.list(parentInventoryType);
-  const parentHierarchyId = parentHierarchies.data?.find(
-    (hierarchy) => hierarchy.name === parentInventoryName
-  )?.id;
-
-  if (!parentHierarchyId) return [];
-
-  const childRes = await api.hierarchies.list(childType, parentHierarchyId);
-  return childRes.data ?? [];
+  const names = await listTemplateNames({
+    level: childType,
+    parentName: parentInventoryName,
+  });
+  return names as Hierarchy[];
 }
 
 export function filterInventoryForChildCategory(

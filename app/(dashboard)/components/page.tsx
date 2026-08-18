@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { StatusBadge } from '@/components/status-badge';
 import Link from 'next/link';
 import * as api from '@/lib/api';
+import { listTemplateNames } from '@/lib/hierarchy-template-names';
 import type { Component, Hierarchy } from '@/lib/models';
 import { getInventoryQuantityByComponentId, getCount } from '@/lib/entity-counts';
 import { EntityCountCell } from '@/components/entity-count-cell';
@@ -112,18 +113,17 @@ export default function ComponentsPage() {
     }
 
     const selectedUnit = units.find((u) => u.id === formData.unit_id);
-    const parentHierarchyId = selectedUnit
-      ? unitHierarchyNames.find((hierarchy) => hierarchy.name === selectedUnit.name)?.id
-      : undefined;
-
-    if (!parentHierarchyId) {
+    if (!selectedUnit) {
       setParentScopedComponentNames(null);
       return;
     }
 
     let cancelled = false;
-    void api.hierarchies.list('component', parentHierarchyId).then((res) => {
-      if (!cancelled) setParentScopedComponentNames(res.data ?? []);
+    void listTemplateNames({
+      level: 'component',
+      parentName: selectedUnit.name,
+    }).then((names) => {
+      if (!cancelled) setParentScopedComponentNames(names as Hierarchy[]);
     }).catch((err) => {
       console.error('Failed to load component hierarchy names', err);
       if (!cancelled) setParentScopedComponentNames(null);
@@ -132,7 +132,7 @@ export default function ComponentsPage() {
     return () => {
       cancelled = true;
     };
-  }, [formData.unit_id, unitHierarchyNames, units]);
+  }, [formData.unit_id, units]);
 
   const componentHierarchyNames =
     formData.unit_id && parentScopedComponentNames

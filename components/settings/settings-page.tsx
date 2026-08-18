@@ -14,12 +14,11 @@ import { StatusesPanel } from '@/components/settings/statuses-panel';
 import { AlertsPanel } from '@/components/settings/alerts-panel';
 import { SecurityPanel } from '@/components/settings/security-panel';
 import { DefinitionsPanel } from '@/components/settings/definitions-panel';
-import { HierarchyPanel } from '@/components/settings/hierarchy-panel';
-import { HierarchyConfigPanel } from '@/components/settings/hierarchy-config-panel';
 import { BackupPanel } from '@/components/settings/backup-panel';
 import {
   SETTINGS_ACCESS_PERMISSIONS,
   SETTINGS_TABS,
+  LEGACY_SETTINGS_TAB_ALIASES,
   isSettingsTabId,
   type SettingsTabConfig,
   type SettingsTabId,
@@ -41,10 +40,6 @@ function SettingsTabContent({ tab }: { tab: SettingsTabId }) {
       return <SecurityPanel embedded />;
     case 'definitions':
       return <DefinitionsPanel embedded />;
-    case 'hierarchy-configs':
-      return <HierarchyConfigPanel embedded />;
-    case 'hierarchy':
-      return <HierarchyPanel embedded />;
     case 'backup':
       return <BackupPanel embedded />;
     default:
@@ -89,7 +84,9 @@ export function SettingsPage() {
 
   const canAccessSettings = can(SETTINGS_ACCESS_PERMISSIONS);
 
-  const requestedTab = searchParams.get('tab');
+  const requestedTabRaw = searchParams.get('tab');
+  const tabAlias = requestedTabRaw ? LEGACY_SETTINGS_TAB_ALIASES[requestedTabRaw] : undefined;
+  const requestedTab = tabAlias ? tabAlias.tab : requestedTabRaw;
   const requestedTabDenied =
     isSettingsTabId(requestedTab) &&
     !visibleTabs.some((t) => t.id === requestedTab);
@@ -104,6 +101,15 @@ export function SettingsPage() {
   }, [requestedTab, requestedTabDenied, visibleTabs]);
 
   useEffect(() => {
+    if (!tabAlias) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', tabAlias.tab);
+    params.set('section', tabAlias.section);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [pathname, router, searchParams, tabAlias]);
+
+  useEffect(() => {
+    if (tabAlias) return;
     if (!canAccessSettings || !activeTab) return;
     if (requestedTab === activeTab) return;
     if (requestedTabDenied) return;
@@ -118,6 +124,7 @@ export function SettingsPage() {
     requestedTabDenied,
     router,
     searchParams,
+    tabAlias,
   ]);
 
   if (!canAccessSettings) {

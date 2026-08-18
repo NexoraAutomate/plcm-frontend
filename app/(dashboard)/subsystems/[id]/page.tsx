@@ -26,6 +26,7 @@ import {
   installEntityFromInventoryWithChildren,
 } from '@/lib/inventory-child-install';
 import * as api from '@/lib/api';
+import { listTemplateNames } from '@/lib/hierarchy-template-names';
 import { EntityStatusHistorySheet } from '@/components/entity-status-history-sheet';
 import { EntityInstallMetadataCard } from '@/components/entity-install-metadata-card';
 import {
@@ -90,7 +91,6 @@ export default function SubsystemDetailPage() {
     : [];
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
-  const [subsystemHierarchyNames, setSubsystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
   const [moduleHierarchyNames, setModuleHierarchyNames] = useState<Models.Hierarchy[]>([]);
 
   const nameOptions = useMemo(
@@ -293,25 +293,19 @@ export default function SubsystemDetailPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statusRes, subsystemHierarchyRes] = await Promise.all([
+        const configId = projects.find((p) => p.id === projectId)?.hierarchy_config_id;
+        const [statusRes, childNames] = await Promise.all([
           api.statuses.list('modules'),
-          api.hierarchies.list('subsystem'),
+          subsystem
+            ? listTemplateNames({
+                level: 'module',
+                parentName: subsystem.name,
+                configId,
+              })
+            : Promise.resolve([]),
         ]);
         setStatuses(statusRes.data);
-        setSubsystemHierarchyNames(subsystemHierarchyRes.data);
-
-        if (subsystem) {
-          const parentHierarchyId = subsystemHierarchyRes.data.find(
-            (hierarchy) => hierarchy.name === subsystem.name
-          )?.id;
-
-          if (parentHierarchyId) {
-            const childRes = await api.hierarchies.list('module', parentHierarchyId);
-            setModuleHierarchyNames(childRes.data);
-          } else {
-            setModuleHierarchyNames([]);
-          }
-        }
+        setModuleHierarchyNames(childNames as Models.Hierarchy[]);
       } catch (err) {
         console.error('Failed to fetch statuses or hierarchy names', err);
       } finally {
@@ -320,7 +314,7 @@ export default function SubsystemDetailPage() {
     };
 
     fetchData();
-  }, [subsystem]);
+  }, [subsystem, projectId, projects]);
 
   if (pageLoading) return <PageLoader />;
 

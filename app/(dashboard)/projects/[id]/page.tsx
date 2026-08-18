@@ -21,6 +21,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import * as Models from '@/lib/models';
+import { listTemplateNames } from '@/lib/hierarchy-template-names';
 import { EntityInventorySearch } from '@/components/entity-inventory-search';
 import { EntityStatusHistorySheet } from '@/components/entity-status-history-sheet';
 import type { Inventory } from '@/lib/models';
@@ -154,6 +155,13 @@ export default function ProjectDetailPage() {
       ? {
           fieldName: 'project_id',
           label: entityLabel('project'),
+          id: project.id,
+          name: project.name,
+        }
+      : undefined,
+    extraFields: installFields,
+    enabled: isAddOpen,
+  });
 
   const systemEditFormFields = useMemo(
     () => [
@@ -342,12 +350,15 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statusRes, hierarchyRes] = await Promise.all([
+        const [statusRes, hierarchyNames] = await Promise.all([
           api.statuses.list('systems'),
-          api.hierarchies.list('system'),
+          listTemplateNames({
+            level: 'system',
+            configId: project?.hierarchy_config_id,
+          }),
         ]);
         setStatuses(statusRes.data);
-        setSystemHierarchyNames(hierarchyRes.data);
+        setSystemHierarchyNames(hierarchyNames as Models.Hierarchy[]);
       } catch (err) {
         console.error('Failed to fetch statuses or hierarchy names', err);
       } finally {
@@ -356,7 +367,7 @@ export default function ProjectDetailPage() {
     };
 
     fetchData();
-  }, []);
+  }, [project?.hierarchy_config_id]);
 
   if (pageLoading) return <PageLoader />;
 

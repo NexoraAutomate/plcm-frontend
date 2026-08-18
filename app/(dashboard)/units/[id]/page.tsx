@@ -19,6 +19,7 @@ import { EntityInventorySearch } from '@/components/entity-inventory-search';
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
+import { listTemplateNames } from '@/lib/hierarchy-template-names';
 import * as Models from '@/lib/models';
 import type { Inventory } from '@/lib/models';
 import { getChildInventoryType } from '@/lib/entity-hierarchy';
@@ -108,7 +109,6 @@ export default function UnitDetailPage() {
 
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
-  const [unitHierarchyNames, setUnitHierarchyNames] = useState<Models.Hierarchy[]>([]);
   const [componentHierarchyNames, setComponentHierarchyNames] = useState<Models.Hierarchy[]>([]);
 
   const nameOptions = useMemo(
@@ -310,25 +310,19 @@ export default function UnitDetailPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statusRes, unitHierarchyRes] = await Promise.all([
+        const configId = projects.find((p) => p.id === projectId)?.hierarchy_config_id;
+        const [statusRes, childNames] = await Promise.all([
           api.statuses.list("components"),
-          api.hierarchies.list("unit"),
+          unit
+            ? listTemplateNames({
+                level: "component",
+                parentName: unit.name,
+                configId,
+              })
+            : Promise.resolve([]),
         ]);
         setStatuses(statusRes.data);
-        setUnitHierarchyNames(unitHierarchyRes.data);
-
-        if (unit) {
-          const parentHierarchyId = unitHierarchyRes.data.find(
-            (hierarchy) => hierarchy.name === unit.name
-          )?.id;
-
-          if (parentHierarchyId) {
-            const childRes = await api.hierarchies.list("component", parentHierarchyId);
-            setComponentHierarchyNames(childRes.data);
-          } else {
-            setComponentHierarchyNames([]);
-          }
-        }
+        setComponentHierarchyNames(childNames as Models.Hierarchy[]);
       } catch (err) {
         console.error("Failed to fetch statuses or hierarchy names", err);
       } finally {
@@ -337,7 +331,7 @@ export default function UnitDetailPage() {
     };
 
     fetchData();
-  }, [unit]);
+  }, [unit, projectId, projects]);
   if (pageLoading) return <PageLoader />;
 
 

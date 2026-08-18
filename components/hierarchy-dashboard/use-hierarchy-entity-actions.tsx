@@ -37,6 +37,7 @@ import {
   patchFormFromPartNumberSelection,
 } from '@/lib/hierarchy-create-form';
 import type { Hierarchy, Inventory, Status, System } from '@/lib/models';
+import { listTemplateNames } from '@/lib/hierarchy-template-names';
 import type { HierarchyEntityType } from '@/lib/system-hierarchy-graph';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -250,9 +251,12 @@ export function useHierarchyEntityActions({
         setStatuses(statusRes);
 
         if (entityType === 'system') {
-          const hierarchyRes = await api.hierarchies.list('system');
-          const names = hierarchyRes.data ?? [];
-          setHierarchyNames(names);
+          const project = projects.find((item) => item.id === parentId);
+          const names = await listTemplateNames({
+            level: 'system',
+            configId: project?.hierarchy_config_id,
+          });
+          setHierarchyNames(names as Hierarchy[]);
           await loadInventoryOptions(
             'system',
             names.map((item) => item.name)
@@ -267,20 +271,13 @@ export function useHierarchyEntityActions({
           return;
         }
 
-        const parentHierarchyRes = await api.hierarchies.list(config.parentHierarchyType);
-        const parentHierarchyId = parentHierarchyRes.data.find(
-          (item) => item.name === parentEntity.name
-        )?.id;
-
-        if (!parentHierarchyId) {
-          setHierarchyNames([]);
-          setInventoryItems([]);
-          return;
-        }
-
-        const childRes = await api.hierarchies.list(config.hierarchyType, parentHierarchyId);
-        const names = childRes.data ?? [];
-        setHierarchyNames(names);
+        const boundProject = projects.find((item) => item.id === selection.projectId);
+        const names = await listTemplateNames({
+          level: config.hierarchyType,
+          parentName: parentEntity.name,
+          configId: boundProject?.hierarchy_config_id,
+        });
+        setHierarchyNames(names as Hierarchy[]);
         await loadInventoryOptions(
           entityType,
           names.map((item) => item.name)
@@ -295,7 +292,7 @@ export function useHierarchyEntityActions({
         setLoadingFormData(false);
       }
     },
-    [getParentEntity, loadInventoryOptions]
+    [getParentEntity, loadInventoryOptions, projects, selection.projectId]
   );
 
   useEffect(() => {

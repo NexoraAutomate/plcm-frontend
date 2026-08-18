@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { StatusBadge } from '@/components/status-badge';
 import Link from 'next/link';
 import * as api from '@/lib/api';
+import { listTemplateNames } from '@/lib/hierarchy-template-names';
 import type { Hierarchy, Unit } from '@/lib/models';
 import { getComponentCountByUnitId, getCount } from '@/lib/entity-counts';
 import { EntityCountCell } from '@/components/entity-count-cell';
@@ -111,8 +112,8 @@ export default function UnitsPage() {
   useEffect(() => {
     const fetchHierarchyNames = async () => {
       try {
-        const modulesRes = await api.hierarchies.list('module');
-        setModuleHierarchyNames(modulesRes.data);
+        const modulesRes = await listTemplateNames({ level: 'module' });
+        setModuleHierarchyNames(modulesRes as Hierarchy[]);
       } catch (err) {
         console.error('Failed to load module hierarchy names', err);
       }
@@ -129,25 +130,24 @@ export default function UnitsPage() {
       }
 
       const selectedModule = modules.find((m) => m.id === formData.module_id);
-      const parentHierarchyId = selectedModule
-        ? moduleHierarchyNames.find((hierarchy) => hierarchy.name === selectedModule.name)?.id
-        : undefined;
-
-      if (!parentHierarchyId) {
+      if (!selectedModule) {
         setUnitHierarchyNames([]);
         return;
       }
 
       try {
-        const res = await api.hierarchies.list('unit', parentHierarchyId);
-        setUnitHierarchyNames(res.data);
+        const names = await listTemplateNames({
+          level: 'unit',
+          parentName: selectedModule.name,
+        });
+        setUnitHierarchyNames(names as Hierarchy[]);
       } catch (err) {
         console.error('Failed to load unit hierarchy names', err);
       }
     };
 
     fetchUnitNames();
-  }, [formData.module_id, moduleHierarchyNames, modules]);
+  }, [formData.module_id, modules]);
 
   const componentCountByUnit = useMemo(
     () => getComponentCountByUnitId(components),

@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { StatusBadge } from '@/components/status-badge';
 import Link from 'next/link';
 import * as api from '@/lib/api';
+import { listTemplateNames } from '@/lib/hierarchy-template-names';
 import type { Hierarchy, Subsystem } from '@/lib/models';
 import { getModuleCountBySubsystemId, getCount } from '@/lib/entity-counts';
 import { EntityCountCell } from '@/components/entity-count-cell';
@@ -121,18 +122,17 @@ export default function SubsystemsPage() {
     }
 
     const selectedSystem = systems.find((s) => s.id === formData.system_id);
-    const parentHierarchyId = selectedSystem
-      ? systemHierarchyNames.find((hierarchy) => hierarchy.name === selectedSystem.name)?.id
-      : undefined;
-
-    if (!parentHierarchyId) {
+    if (!selectedSystem) {
       setParentScopedSubsystemNames(null);
       return;
     }
 
     let cancelled = false;
-    void api.hierarchies.list('subsystem', parentHierarchyId).then((res) => {
-      if (!cancelled) setParentScopedSubsystemNames(res.data ?? []);
+    void listTemplateNames({
+      level: 'subsystem',
+      parentName: selectedSystem.name,
+    }).then((names) => {
+      if (!cancelled) setParentScopedSubsystemNames(names as Hierarchy[]);
     }).catch((err) => {
       console.error('Failed to load subsystem hierarchy names', err);
       if (!cancelled) setParentScopedSubsystemNames(null);
@@ -141,7 +141,7 @@ export default function SubsystemsPage() {
     return () => {
       cancelled = true;
     };
-  }, [formData.system_id, systemHierarchyNames, systems]);
+  }, [formData.system_id, systems]);
 
   const subsystemHierarchyNames =
     formData.system_id && parentScopedSubsystemNames

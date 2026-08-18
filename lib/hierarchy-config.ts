@@ -31,6 +31,24 @@ export const PARENT_TEMPLATE_LEVEL: Record<TemplateNodeLevel, TemplateNodeLevel 
   component: 'unit',
 };
 
+export const CHILD_TEMPLATE_LEVEL: Record<TemplateNodeLevel, TemplateNodeLevel | null> = {
+  system: 'subsystem',
+  subsystem: 'module',
+  module: 'unit',
+  unit: 'component',
+  component: null,
+};
+
+export type TemplateDraftNode = {
+  client_key: string;
+  parent_client_key?: string | null;
+  level: TemplateNodeLevel;
+  name: string;
+  description?: string | null;
+  abbreviation?: string | null;
+  sort_order?: number;
+};
+
 export const DEFAULT_PRODUCT_TYPES = [
   { code: 'SSDLS-1', name: 'High Data Rate', description: 'SSDLS-1 — High Data Rate product type' },
   { code: 'SSDLS-2', name: 'Low Data Rate', description: 'SSDLS-2 — Low Data Rate product type' },
