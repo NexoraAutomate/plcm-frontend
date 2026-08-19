@@ -18,6 +18,18 @@ function nodeNumericId(node: HierarchyConfigNode, fallback: number): number {
   return typeof node.id === 'number' ? node.id : fallback;
 }
 
+/** Map Entity List (hierarchy table) rows to template name items. */
+export function hierarchiesToNameItems(entries: Hierarchy[]): TemplateNameItem[] {
+  return entries.map((entry) => ({
+    id: entry.id,
+    name: entry.name,
+    hierarchy_type: entry.hierarchy_type,
+    parent_id: entry.parent_id ?? null,
+    abbreviation: entry.abbreviation ?? null,
+    parent_name: entry.parent_name ?? null,
+  }));
+}
+
 export function configNodesToNameItems(nodes: HierarchyConfigNode[]): TemplateNameItem[] {
   const idByKey = new Map<string, number>();
   nodes.forEach((node, index) => {
@@ -119,19 +131,39 @@ export async function loadAvailableConfigurations(): Promise<HierarchyConfigurat
   }
 }
 
+/** Load names from the Entity List master catalog (Settings → Definitions → Entity List). */
+export async function listEntityListNames(options?: {
+  level?: string;
+  parentName?: string | null;
+}): Promise<TemplateNameItem[]> {
+  try {
+    const needsParentLookup = options?.parentName != null && options.parentName !== '';
+    const res = await api.hierarchies.list(needsParentLookup ? undefined : options?.level);
+    return filterTemplateNames(
+      hierarchiesToNameItems(res.data ?? []),
+      options?.level,
+      options?.parentName
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** @deprecated Use listEntityListNames — kept for call-site compatibility. */
 export async function listTemplateNames(options?: {
   configId?: number | null;
   level?: string;
   parentName?: string | null;
 }): Promise<TemplateNameItem[]> {
-  const nodes = options?.configId
-    ? await loadProjectConfigNodes(options.configId)
-    : await loadAvailableConfigNodes();
-  return filterTemplateNames(
-    configNodesToNameItems(nodes),
-    options?.level,
-    options?.parentName
-  );
+  if (options?.configId) {
+    const nodes = await loadProjectConfigNodes(options.configId);
+    return filterTemplateNames(
+      configNodesToNameItems(nodes),
+      options?.level,
+      options?.parentName
+    );
+  }
+  return listEntityListNames({ level: options?.level, parentName: options?.parentName });
 }
 
 export function childLevelOf(level: TemplateNodeLevel): TemplateNodeLevel | null {

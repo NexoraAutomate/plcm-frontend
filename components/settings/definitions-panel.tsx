@@ -24,6 +24,7 @@ import { TEMPLATE_PLACEHOLDER_HELP } from '@/lib/app-definitions';
 import type { HierarchyEntityLevel } from '@/lib/app-definitions';
 import { useDefinitionsSettings } from '@/components/settings/hooks/use-definitions-settings';
 import { HierarchyConfigPanel } from '@/components/settings/hierarchy-config-panel';
+import { HierarchyPanel } from '@/components/settings/hierarchy-panel';
 import {
   isDefinitionsSectionId,
   type DefinitionsSectionId,
@@ -78,19 +79,32 @@ export function DefinitionsPanel({ embedded = false }: DefinitionsPanelProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const canLabels = can(P.manage_settings);
+  const canEntityList = can([P.view_hierarchy, P.create_hierarchy, P.manage_settings]);
   const canConfigs = can([P.hierarchy_config_manage, P.view_hierarchy, P.manage_settings]);
   const configsReadOnly = !can(P.hierarchy_config_manage);
+  const entityListReadOnly = !can([P.create_hierarchy, P.edit_hierarchy]);
 
   const requestedSection = searchParams.get('section');
   const activeSection: DefinitionsSectionId = useMemo(() => {
     if (isDefinitionsSectionId(requestedSection)) {
-      if (requestedSection === 'labels' && !canLabels) return 'configurations';
-      if (requestedSection === 'configurations' && !canConfigs) return 'labels';
+      if (requestedSection === 'labels' && !canLabels) {
+        if (canEntityList) return 'entity-list';
+        return 'configurations';
+      }
+      if (requestedSection === 'entity-list' && !canEntityList) {
+        if (canLabels) return 'labels';
+        return 'configurations';
+      }
+      if (requestedSection === 'configurations' && !canConfigs) {
+        if (canEntityList) return 'entity-list';
+        return 'labels';
+      }
       return requestedSection;
     }
     if (canLabels) return 'labels';
+    if (canEntityList) return 'entity-list';
     return 'configurations';
-  }, [canConfigs, canLabels, requestedSection]);
+  }, [canConfigs, canEntityList, canLabels, requestedSection]);
 
   function setSection(section: DefinitionsSectionId) {
     const params = new URLSearchParams(searchParams.toString());
@@ -99,7 +113,7 @@ export function DefinitionsPanel({ embedded = false }: DefinitionsPanelProps) {
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }
 
-  if (!canLabels && !canConfigs) {
+  if (!canLabels && !canEntityList && !canConfigs) {
     return (
       <AccessRestricted
         title="Access Restricted"
@@ -114,7 +128,7 @@ export function DefinitionsPanel({ embedded = false }: DefinitionsPanelProps) {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Definitions</h1>
           <p className="mt-2 text-muted-foreground">
-            Level names, identifier templates, and named hierarchy configurations
+            Level names, identifier templates, entity catalog, and named hierarchy configurations
           </p>
         </div>
       )}
@@ -129,6 +143,9 @@ export function DefinitionsPanel({ embedded = false }: DefinitionsPanelProps) {
           {canLabels ? (
             <TabsTrigger value="labels">Labels & templates</TabsTrigger>
           ) : null}
+          {canEntityList ? (
+            <TabsTrigger value="entity-list">Entity List</TabsTrigger>
+          ) : null}
           {canConfigs ? (
             <TabsTrigger value="configurations">Configurations</TabsTrigger>
           ) : null}
@@ -137,6 +154,12 @@ export function DefinitionsPanel({ embedded = false }: DefinitionsPanelProps) {
         {canLabels ? (
           <TabsContent value="labels" className="mt-6">
             <DefinitionsLabelsSection />
+          </TabsContent>
+        ) : null}
+
+        {canEntityList ? (
+          <TabsContent value="entity-list" className="mt-6">
+            <HierarchyPanel embedded variant="entity-list" readOnly={entityListReadOnly} />
           </TabsContent>
         ) : null}
 
@@ -231,7 +254,7 @@ function DefinitionsLabelsSection() {
 
       <SettingsSection
         title="Per-level serial & part number templates"
-        description={`Select a hierarchy level and define its templates. ${TEMPLATE_PLACEHOLDER_HELP} Preview uses the first node from an available configuration.`}
+        description={`Select a hierarchy level and define its templates. ${TEMPLATE_PLACEHOLDER_HELP} Preview uses the first entity from the Entity List catalog.`}
       >
         <SettingsCard>
           <div className="mb-4 max-w-sm space-y-2">

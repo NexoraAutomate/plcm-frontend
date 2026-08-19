@@ -21,7 +21,7 @@ export type SettingsTabId =
   | 'definitions'
   | 'backup';
 
-export type DefinitionsSectionId = 'labels' | 'configurations';
+export type DefinitionsSectionId = 'labels' | 'entity-list' | 'configurations';
 
 export type SettingsTabConfig = {
   id: SettingsTabId;
@@ -83,7 +83,7 @@ export const SETTINGS_TABS: SettingsTabConfig[] = [
   {
     id: 'definitions',
     label: 'Definitions',
-    description: 'Level names, identifier templates, and named hierarchy configurations',
+    description: 'Level names, identifier templates, entity catalog, and named hierarchy configurations',
     icon: Tags,
     permission: [P.manage_settings, P.hierarchy_config_manage, P.view_hierarchy],
   },
@@ -114,12 +114,13 @@ export const LEGACY_SETTINGS_TAB_ALIASES: Record<
   string,
   { tab: SettingsTabId; section: DefinitionsSectionId }
 > = {
-  hierarchy: { tab: 'definitions', section: 'configurations' },
+  hierarchy: { tab: 'definitions', section: 'entity-list' },
   'hierarchy-configs': { tab: 'definitions', section: 'configurations' },
+  'entity-list': { tab: 'definitions', section: 'entity-list' },
 };
 
 export function isDefinitionsSectionId(
   value: string | null | undefined
 ): value is DefinitionsSectionId {
-  return value === 'labels' || value === 'configurations';
+  return value === 'labels' || value === 'entity-list' || value === 'configurations';
 }

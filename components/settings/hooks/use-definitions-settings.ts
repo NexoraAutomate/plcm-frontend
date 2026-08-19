@@ -17,9 +17,8 @@ import {
 } from '@/lib/app-definitions';
 import { useAppDefinitions } from '@/lib/app-definitions-context';
 import {
-  loadAvailableConfigurations,
+  listEntityListNames,
   type TemplateNameItem,
-  configNodesToNameItems,
   filterTemplateNames,
 } from '@/lib/hierarchy-template-names';
 
@@ -51,11 +50,8 @@ export function useDefinitionsSettings() {
     try {
       const defsRes = await api.auth.getAppDefinitions();
       setDraft(toDraft(defsRes.data));
-      const configs = await loadAvailableConfigurations();
-      const sampleConfig = configs[0];
-      setTemplateNames(
-        sampleConfig ? configNodesToNameItems(sampleConfig.nodes ?? []) : []
-      );
+      const names = await listEntityListNames();
+      setTemplateNames(names);
     } catch {
       toast.error('Failed to load definitions');
       setDraft(DEFAULT_DRAFT);

@@ -1,6 +1,6 @@
 import type { AxiosResponse } from 'axios';
 import * as api from '@/lib/api';
-import { listTemplateNames } from '@/lib/hierarchy-template-names';
+import { listEntityListNames } from '@/lib/hierarchy-template-names';
 import { fetchExecutiveDashboard } from '@/lib/api/dashboard';
 import { fetchPaginatedList, unwrapListItems } from '@/lib/paginated-api';
 import { fetchCappedPages, HIERARCHY_TYPE_CAP, LIST_BOOTSTRAP_SIZE, LIST_PAGE_SIZE } from '@/lib/data-loading';
@@ -120,7 +120,7 @@ export async function fetchExecutiveDashboardData(
 }
 
 export async function fetchHierarchies(hierarchyType?: string) {
-  return listTemplateNames({ level: hierarchyType });
+  return listEntityListNames({ level: hierarchyType });
 }
 
 export async function fetchAllProjects(): Promise<Project[]> {

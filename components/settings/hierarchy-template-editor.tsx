@@ -6,7 +6,6 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -23,9 +22,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { JsonBatchUploadButton } from '@/components/settings/json-batch-upload-button';
 import { useAppDefinitions } from '@/lib/app-definitions-context';
 import { suggestAbbreviation } from '@/lib/app-definitions';
+import { useHierarchiesQuery } from '@/hooks/queries';
+import { filterTemplateNames } from '@/lib/hierarchy-template-names';
 import {
   CHILD_TEMPLATE_LEVEL,
   PARENT_TEMPLATE_LEVEL,
@@ -35,7 +35,6 @@ import {
   type TemplateNodeLevel,
 } from '@/lib/hierarchy-config';
 
-const LEVEL_SET = new Set<string>(TEMPLATE_NODE_LEVELS);
 
 export type HierarchyTemplateEditorProps = {
   nodes: TemplateDraftNode[];
@@ -90,6 +89,7 @@ export function HierarchyTemplateEditor({
   readOnly = false,
 }: HierarchyTemplateEditorProps) {
   const { entityLabel } = useAppDefinitions();
+  const { data: entityListItems = [] } = useHierarchiesQuery(undefined, !readOnly);
   const levelLabel = (level: TemplateNodeLevel) => entityLabel(level);
   const grouped = useMemo(() => groupByLevel(nodes), [nodes]);
 
@@ -120,6 +120,31 @@ export function HierarchyTemplateEditor({
     return grouped[parentLevel];
   }, [grouped, selectedLevel]);
 
+  const currentParentName = useMemo(() => {
+    if (!currentParentKey) return null;
+    const parent = nodes.find((n) => n.client_key === currentParentKey);
+    return parent?.name ?? null;
+  }, [currentParentKey, nodes]);
+
+  const entityNameOptions = useMemo(() => {
+    const alreadyUsed = new Set(
+      nodes
+        .filter((n) => n.level === selectedLevel)
+        .map((n) => `${n.name}:${n.parent_client_key ?? ''}`)
+    );
+    return filterTemplateNames(entityListItems, selectedLevel, currentParentName).filter(
+      (item) => !alreadyUsed.has(`${item.name}:${currentParentKey ?? ''}`)
+    );
+  }, [currentParentKey, currentParentName, entityListItems, nodes, selectedLevel]);
+
+  const editEntityOptions = useMemo(() => {
+    if (!editTarget) return [];
+    const parentName = editTarget.parent_client_key
+      ? nodes.find((n) => n.client_key === editTarget.parent_client_key)?.name ?? null
+      : null;
+    return filterTemplateNames(entityListItems, editTarget.level, parentName);
+  }, [editTarget, entityListItems, nodes]);
+
   function setParentForLevel(level: TemplateNodeLevel, key: string | null) {
     setParentByLevel((prev) => {
       const next = { ...prev, [level]: key };
@@ -139,20 +164,28 @@ export function HierarchyTemplateEditor({
 
   function handleCreate() {
     if (!newName.trim()) {
-      setValidationResult({ valid: false, message: 'Hierarchy name is required.' });
+      setValidationResult({
+        valid: false,
+        message: 'Select an entity name from the Entity List.',
+      });
       return;
     }
     if (selectedLevel !== 'system' && !currentParentKey) {
       const parentLevel = PARENT_TEMPLATE_LEVEL[selectedLevel];
       setValidationResult({
         valid: false,
-        message: `Select a parent ${levelLabel(parentLevel as TemplateNodeLevel)} before creating a ${levelLabel(selectedLevel)}.`,
+        message: `Select a parent ${levelLabel(parentLevel as TemplateNodeLevel)} before adding a ${levelLabel(selectedLevel)}.`,
       });
       return;
     }
 
+    const selectedEntity = entityNameOptions.find((item) => item.name === newName.trim());
     const name = newName.trim();
-    const abbreviation = (newAbbr.trim() || suggestAbbreviation(name)).toUpperCase();
+    const abbreviation = (
+      selectedEntity?.abbreviation ||
+      newAbbr.trim() ||
+      suggestAbbreviation(name)
+    ).toUpperCase();
     onChange([
       ...nodes,
       {
@@ -172,88 +205,6 @@ export function HierarchyTemplateEditor({
     });
   }
 
-  function handleBatchUpload(items: unknown[]) {
-    const existingKeys = new Map(nodes.map((n, index) => [index + 1, n.client_key]));
-    const imported: TemplateDraftNode[] = [];
-    const importIds = new Map<number, string>();
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (!item || typeof item !== 'object') {
-        throw new Error(`Item at index ${i} must be an object.`);
-      }
-      const record = item as Record<string, unknown>;
-      const name = typeof record.name === 'string' ? record.name.trim() : '';
-      const hierarchyType =
-        typeof record.hierarchy_type === 'string'
-          ? record.hierarchy_type.trim().toLowerCase()
-          : typeof record.level === 'string'
-            ? record.level.trim().toLowerCase()
-            : '';
-
-      if (!name) {
-        throw new Error(`Item at index ${i} is missing a valid name.`);
-      }
-      if (!LEVEL_SET.has(hierarchyType)) {
-        throw new Error(
-          `Item at index ${i} has an invalid hierarchy_type. Expected one of: ${TEMPLATE_NODE_LEVELS.join(', ')}.`
-        );
-      }
-
-      const clientKey =
-        typeof record.client_key === 'string' && record.client_key.trim()
-          ? record.client_key.trim()
-          : newClientKey(hierarchyType.slice(0, 3));
-      const seqId = nodes.length + i + 1;
-      importIds.set(seqId, clientKey);
-
-      let parentKey: string | null = null;
-      if (typeof record.parent_client_key === 'string' && record.parent_client_key.trim()) {
-        parentKey = record.parent_client_key.trim();
-      } else if ('parent_id' in record) {
-        if (record.parent_id === null || record.parent_id === undefined) {
-          parentKey = null;
-        } else if (typeof record.parent_id === 'number' && Number.isFinite(record.parent_id)) {
-          parentKey =
-            existingKeys.get(record.parent_id) ??
-            importIds.get(record.parent_id) ??
-            null;
-          if (hierarchyType !== 'system' && !parentKey) {
-            throw new Error(
-              `Item at index ${i} parent_id ${record.parent_id} was not found. Use 1-based indexes of existing nodes then this file.`
-            );
-          }
-        } else {
-          throw new Error(`Item at index ${i} has an invalid parent_id.`);
-        }
-      }
-
-      const expectedParent = PARENT_TEMPLATE_LEVEL[hierarchyType as TemplateNodeLevel];
-      if (expectedParent && !parentKey) {
-        throw new Error(
-          `Item at index ${i} (${hierarchyType}) requires parent_id matching a ${expectedParent}.`
-        );
-      }
-
-      const abbreviation =
-        typeof record.abbreviation === 'string' && record.abbreviation.trim()
-          ? record.abbreviation.trim().toUpperCase()
-          : suggestAbbreviation(name);
-
-      imported.push({
-        client_key: clientKey,
-        parent_client_key: hierarchyType === 'system' ? null : parentKey,
-        level: hierarchyType as TemplateNodeLevel,
-        name,
-        description: typeof record.description === 'string' ? record.description : null,
-        abbreviation,
-        sort_order: nodes.length + i,
-      });
-    }
-
-    onChange([...nodes, ...imported]);
-    toast.success(`Imported ${imported.length} hierarchy item${imported.length === 1 ? '' : 's'}`);
-  }
 
   function confirmDelete() {
     if (!deleteTarget) return;
@@ -447,28 +398,19 @@ export function HierarchyTemplateEditor({
   return (
     <div className="space-y-6">
       {!readOnly ? (
-        <div className="flex justify-end">
-          <JsonBatchUploadButton onUpload={handleBatchUpload} />
-        </div>
-      ) : null}
-
-      {!readOnly ? (
         <div ref={addSectionRef}>
           <Card className="shadow-sm">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold">Add Hierarchy Item</CardTitle>
+              <CardTitle className="text-base font-semibold">Add Configuration Node</CardTitle>
               <p className="text-sm font-normal text-muted-foreground">
-                Or upload a JSON array with <code className="text-xs">name</code>,{' '}
-                <code className="text-xs">hierarchy_type</code>, optional{' '}
-                <code className="text-xs">abbreviation</code>,{' '}
-                <code className="text-xs">description</code>, and <code className="text-xs">parent_id</code>{' '}
-                (1-based index of existing nodes, then items in this file).
+                Pick entities from the Entity List catalog (Settings → Definitions → Entity List).
+                Names not registered there cannot be added to a configuration.
               </p>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Hierarchy Level</Label>
+                  <Label>Category (level)</Label>
                   <Select
                     value={selectedLevel}
                     onValueChange={(value) => {
@@ -521,27 +463,44 @@ export function HierarchyTemplateEditor({
                 ) : null}
 
                 <div className="space-y-2">
-                  <Label>{levelLabel(selectedLevel)} Name</Label>
-                  <Input
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    placeholder={`e.g. Primary ${levelLabel(selectedLevel)}`}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Abbreviation</Label>
-                  <Input
-                    className="font-mono uppercase"
-                    value={newAbbr}
-                    onChange={(e) => setNewAbbr(e.target.value.toUpperCase())}
-                    placeholder={suggestAbbreviation(newName) || 'e.g. ACU'}
-                  />
+                  <Label>Entity name</Label>
+                  <Select
+                    value={newName || '0'}
+                    onValueChange={(value) => {
+                      const name = value === '0' ? '' : value;
+                      setNewName(name);
+                      const match = entityNameOptions.find((item) => item.name === name);
+                      if (match?.abbreviation) {
+                        setNewAbbr(match.abbreviation.toUpperCase());
+                      }
+                    }}
+                    disabled={entityNameOptions.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={
+                          entityNameOptions.length === 0
+                            ? 'No entities in Entity List for this level'
+                            : `Select ${levelLabel(selectedLevel)}`
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Select…</SelectItem>
+                      {entityNameOptions.map((item) => (
+                        <SelectItem key={item.id} value={item.name}>
+                          {item.name}
+                          {item.abbreviation ? ` (${item.abbreviation})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="flex flex-col gap-3 md:col-span-2">
-                  <Button type="button" onClick={handleCreate}>
+                  <Button type="button" onClick={handleCreate} disabled={!newName.trim()}>
                     <Plus className="mr-2 h-4 w-4" />
-                    Create {levelLabel(selectedLevel)}
+                    Add {levelLabel(selectedLevel)}
                   </Button>
                   {validationResult ? (
                     <div
@@ -632,21 +591,39 @@ export function HierarchyTemplateEditor({
       >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Edit Hierarchy Item</DialogTitle>
-            <DialogDescription>Update the name and abbreviation for this template node.</DialogDescription>
+            <DialogTitle>Edit Configuration Node</DialogTitle>
+            <DialogDescription>
+              Choose a different entity name from the Entity List. Abbreviation is taken from the
+              catalog entry.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-2">
-              <Label>Name</Label>
-              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Abbreviation</Label>
-              <Input
-                className="font-mono uppercase"
-                value={editAbbr}
-                onChange={(e) => setEditAbbr(e.target.value.toUpperCase())}
-              />
+              <Label>Entity name</Label>
+              <Select
+                value={editName || '0'}
+                onValueChange={(value) => {
+                  const name = value === '0' ? '' : value;
+                  setEditName(name);
+                  const match = editEntityOptions.find((item) => item.name === name);
+                  if (match?.abbreviation) {
+                    setEditAbbr(match.abbreviation.toUpperCase());
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select entity" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">Select…</SelectItem>
+                  {editEntityOptions.map((item) => (
+                    <SelectItem key={item.id} value={item.name}>
+                      {item.name}
+                      {item.abbreviation ? ` (${item.abbreviation})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setEditTarget(null)}>

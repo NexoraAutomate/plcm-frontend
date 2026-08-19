@@ -788,6 +788,7 @@ export interface Hierarchy {
   name: string
   hierarchy_type: string
   parent_id?: number | null
+  parent_name?: string | null
   description?: string | null
   abbreviation?: string | null
   created_at: string
