@@ -561,6 +561,20 @@ export const inventory = {
   create: (data: Partial<Models.Inventory>) => api.post<Models.Inventory>("/inventory/", data),
   update: (id: number, data: Partial<Models.Inventory>) => api.put<Models.Inventory>(`/inventory/${id}/`, data),
   delete: (id: number) => api.delete(`/inventory/${id}/`),
+  exportCsv: (params?: { inventory_type?: string; search?: string }) =>
+    api.get('/inventory/export-csv/', {
+      params,
+      responseType: 'blob',
+    }),
+  importCsv: (file: File, dryRun = false) => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.post<{ imported?: number; rows?: { row: number; id: number; name: string }[]; dry_run?: boolean; valid_rows?: number; errors: { row: number; errors: string[] }[] }>(
+      `/inventory/import-csv/?dry_run=${dryRun}`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+  },
   consume: (
     id: number,
     instanceId?: number,

@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Edit, Trash2, Search, Layers, Network, Copy, ChevronDown, PackageMinus, ListOrdered, Undo2, RefreshCw } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Layers, Network, Copy, ChevronDown, PackageMinus, ListOrdered, Undo2, RefreshCw, Download, Upload, FileText, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { toastFulfillments } from '@/lib/fcfs-toast';
 import * as api from '@/lib/api';
@@ -319,6 +319,14 @@ export default function InventoryPage() {
   const [returnIssuanceId, setReturnIssuanceId] = useState<number | null>(null);
   const [returnRemarksBusy, setReturnRemarksBusy] = useState(false);
 
+  // CSV import/export state
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<{ valid_rows: number; errors: { row: number; errors: string[] }[] } | null>(null);
+  const [importValidating, setImportValidating] = useState(false);
+  const [importSubmitting, setImportSubmitting] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+
   const [selectedEntityType, setSelectedEntityType] = useState<EntityType>('component');
   const { data: hierarchyCategories = [] } = useHierarchiesQuery(selectedEntityType);
   const [formData, setFormData] = useState({ ...emptyInventoryEntityForm });
@@ -326,6 +334,71 @@ export default function InventoryPage() {
   const [pendingPictureFile, setPendingPictureFile] = useState<File | null>(null);
   const [removePicture, setRemovePicture] = useState(false);
   const [formTab, setFormTab] = useState('general');
+
+  async function handleExportCsv() {
+    setExportBusy(true);
+    try {
+      const res = await api.inventory.exportCsv({
+        inventory_type: entityTypeFilter !== 'all' ? entityTypeFilter : undefined,
+        search: search || undefined,
+      });
+      const url = URL.createObjectURL(res.data as Blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'inventory_export.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Failed to export inventory');
+    } finally {
+      setExportBusy(false);
+    }
+  }
+
+  async function handleImportFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    setImportFile(file);
+    setImportPreview(null);
+    if (!file) return;
+    setImportValidating(true);
+    try {
+      const res = await api.inventory.importCsv(file, true);
+      setImportPreview({ valid_rows: res.data.valid_rows ?? 0, errors: res.data.errors ?? [] });
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: { errors?: { row: number; errors: string[] }[] } } } })?.response?.data?.detail;
+      if (detail && typeof detail === 'object' && detail.errors) {
+        setImportPreview({ valid_rows: 0, errors: detail.errors });
+      } else {
+        toast.error('Failed to validate CSV');
+        setImportPreview(null);
+      }
+    } finally {
+      setImportValidating(false);
+    }
+  }
+
+  async function handleImportConfirm() {
+    if (!importFile) return;
+    setImportSubmitting(true);
+    try {
+      const res = await api.inventory.importCsv(importFile, false);
+      toast.success(`Imported ${res.data.imported ?? 0} inventory items`);
+      setIsImportOpen(false);
+      setImportFile(null);
+      setImportPreview(null);
+      void pagination.invalidate();
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: { errors?: { row: number; errors: string[] }[] } } } })?.response?.data?.detail;
+      if (detail && typeof detail === 'object' && detail.errors) {
+        setImportPreview({ valid_rows: 0, errors: detail.errors });
+        toast.error('CSV import failed with validation errors');
+      } else {
+        toast.error('Failed to import CSV');
+      }
+    } finally {
+      setImportSubmitting(false);
+    }
+  }
 
   function toggleExpandedRow(id: number) {
     setExpandedRows((prev) => {
@@ -1356,6 +1429,31 @@ export default function InventoryPage() {
             <RefreshCw className={`mr-2 h-4 w-4 ${pagination.fetching ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
+          <Can permission={P.view_inventory}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void handleExportCsv()}
+              disabled={exportBusy}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              {exportBusy ? 'Exporting…' : 'Export CSV'}
+            </Button>
+          </Can>
+          {canCreateInventory && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setImportFile(null);
+                setImportPreview(null);
+                setIsImportOpen(true);
+              }}
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Import CSV
+            </Button>
+          )}
           <Can permission={P.view_inventory_issuances}>
             <Button variant="outline" asChild>
               <Link href="/inventory/issuances">
@@ -2177,6 +2275,102 @@ export default function InventoryPage() {
           }
         }}
       />
+
+      {/* CSV Import Dialog */}
+      <Dialog open={isImportOpen} onOpenChange={(open) => { if (!importSubmitting) setIsImportOpen(open); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Import Inventory from CSV</DialogTitle>
+            <DialogDescription>
+              Upload a CSV file to bulk-import inventory items. Required columns:{' '}
+              <code className="text-xs font-mono bg-muted px-1 rounded">name</code>,{' '}
+              <code className="text-xs font-mono bg-muted px-1 rounded">inventory_type</code>.
+              Optional: part_number, serial_number, quantity, description, oem_name,
+              configuration_item, sku, location, shelf_life_expires_at.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="flex items-center gap-3">
+              <Label
+                htmlFor="csv-file-input"
+                className="flex items-center gap-2 cursor-pointer rounded-md border border-dashed px-4 py-3 text-sm text-muted-foreground hover:bg-muted/50 transition-colors flex-1"
+              >
+                <FileText className="h-4 w-4 shrink-0" />
+                {importFile ? importFile.name : 'Choose CSV file…'}
+              </Label>
+              <input
+                id="csv-file-input"
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={handleImportFileChange}
+                disabled={importSubmitting}
+              />
+              {importFile && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => { setImportFile(null); setImportPreview(null); }}
+                  disabled={importSubmitting}
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+
+            {importValidating && (
+              <p className="text-sm text-muted-foreground flex items-center gap-2">
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                Validating…
+              </p>
+            )}
+
+            {importPreview && (
+              <div className="rounded-md border p-3 space-y-2 text-sm">
+                {importPreview.valid_rows > 0 && (
+                  <div className="flex items-center gap-2 text-emerald-600">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    <span>{importPreview.valid_rows} valid row{importPreview.valid_rows !== 1 ? 's' : ''} ready to import</span>
+                  </div>
+                )}
+                {importPreview.errors.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-destructive font-medium">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      <span>{importPreview.errors.length} row{importPreview.errors.length !== 1 ? 's' : ''} with errors</span>
+                    </div>
+                    <ul className="ml-6 list-disc text-destructive/80 space-y-0.5 max-h-36 overflow-y-auto">
+                      {importPreview.errors.map((e) => (
+                        <li key={e.row}>
+                          Row {e.row}: {e.errors.join('; ')}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="outline" onClick={() => setIsImportOpen(false)} disabled={importSubmitting}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleImportConfirm()}
+              disabled={
+                !importFile ||
+                importValidating ||
+                importSubmitting ||
+                (importPreview?.errors.length ?? 0) > 0
+              }
+            >
+              {importSubmitting ? 'Importing…' : 'Import'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
