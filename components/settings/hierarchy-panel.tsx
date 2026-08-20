@@ -31,6 +31,8 @@ import { toast } from "sonner";
 import * as api from "@/lib/api";
 import type { Hierarchy } from "@/lib/models";
 import { JsonBatchUploadButton } from "@/components/settings/json-batch-upload-button";
+import { EntityListImportButton } from "@/components/settings/entity-list-import-button";
+import { EntityListExportButton } from "@/components/settings/entity-list-export-button";
 import { useAppDefinitions } from "@/lib/app-definitions-context";
 import { SortableTableHead } from "@/components/data-table/sortable-table-head";
 import { useTableSorting } from "@/hooks/use-table-sorting";
@@ -441,19 +443,29 @@ export function HierarchyPanel({
               className="pl-9"
             />
           </div>
-          {!readOnly && (
-            <div className="flex items-center gap-2">
-              <Can permission={P.create_hierarchy}>
-                <JsonBatchUploadButton label="Import JSON" onUpload={handleBatchUpload} />
-              </Can>
-              <Can permission={P.create_hierarchy}>
-                <Button onClick={() => { setNewName(""); setNewAbbr(""); setValidationResult(null); setAddOpen(true); }}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Entity
-                </Button>
-              </Can>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <Can role="Admin">
+              <EntityListExportButton />
+            </Can>
+            {!readOnly && (
+              <>
+                <Can permission={P.create_hierarchy}>
+                  <EntityListImportButton
+                    onImported={async () => {
+                      await loadData();
+                      invalidateEntityList();
+                    }}
+                  />
+                </Can>
+                <Can permission={P.create_hierarchy}>
+                  <Button onClick={() => { setNewName(""); setNewAbbr(""); setValidationResult(null); setAddOpen(true); }}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Entity
+                  </Button>
+                </Can>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Table */}
@@ -494,7 +506,7 @@ export function HierarchyPanel({
                     <TableRow>
                       <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                         {hierarchies.length === 0
-                          ? "No entities defined yet. Click \"Add Entity\" to get started, or import via JSON."
+                          ? "No entities defined yet. Click \"Add Entity\" to get started, or import a CSV or Excel file."
                           : "No entities match your search."}
                       </TableCell>
                     </TableRow>

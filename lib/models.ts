@@ -795,6 +795,15 @@ export interface Hierarchy {
   updated_at?: string
 }
 
+export interface EntityListImportResult {
+  imported?: number
+  skipped?: number
+  valid_rows?: number
+  dry_run?: boolean
+  rows?: Array<{ id: number; name: string; hierarchy_type: string }>
+  errors: Array<{ row: number; errors: string[] }>
+}
+
 /** Spec 01 — Smart SDLS hierarchy configuration */
 export interface HierarchyConfigProductType {
   id?: number

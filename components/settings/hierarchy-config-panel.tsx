@@ -15,7 +15,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { SettingsSection } from '@/components/settings/settings-section';
@@ -26,12 +25,10 @@ import { P } from '@/lib/permission-codes';
 import { useAuth } from '@/lib/auth-context';
 import * as api from '@/lib/api';
 import type {
-  HierarchyConfigProductType,
   HierarchyConfiguration,
   HierarchyConfigurationWrite,
 } from '@/lib/models';
 import {
-  DEFAULT_CONFIG_NOTES,
   DEFAULT_PRODUCT_TYPES,
   FIXED_HIERARCHY_LEVELS,
   type TemplateDraftNode,
@@ -50,14 +47,8 @@ function emptyDraft(): Draft {
     code: '',
     name: '',
     description: '',
-    notes: DEFAULT_CONFIG_NOTES,
     is_available: true,
-    product_types: DEFAULT_PRODUCT_TYPES.map((pt, index) => ({
-      code: pt.code,
-      name: pt.name,
-      description: pt.description,
-      sort_order: index,
-    })),
+    product_types: [],
     nodes: [],
   };
 }
@@ -68,14 +59,8 @@ function toDraft(config: HierarchyConfiguration): Draft {
     code: config.code,
     name: config.name,
     description: config.description ?? '',
-    notes: config.notes ?? DEFAULT_CONFIG_NOTES,
     is_available: config.is_available,
-    product_types: config.product_types.map((pt, index) => ({
-      code: pt.code,
-      name: pt.name,
-      description: pt.description,
-      sort_order: pt.sort_order ?? index,
-    })),
+    product_types: [],
     nodes: config.nodes.map((n, index) => ({
       client_key: n.client_key,
       parent_client_key: n.parent_client_key ?? null,
@@ -125,7 +110,10 @@ export function HierarchyConfigPanel({
   }, [load]);
 
   const levelStrip = useMemo(
-    () => FIXED_HIERARCHY_LEVELS.map((l) => l.label).join(' → '),
+    () =>
+      FIXED_HIERARCHY_LEVELS.filter((l) => l.code !== 'product_type')
+        .map((l) => l.label)
+        .join(' → '),
     []
   );
 
@@ -137,15 +125,6 @@ export function HierarchyConfigPanel({
   function openEdit(config: HierarchyConfiguration) {
     setDraft(toDraft(config));
     setEditing(true);
-  }
-
-  function updateProductType(index: number, patch: Partial<HierarchyConfigProductType>) {
-    setDraft((prev) => ({
-      ...prev,
-      product_types: prev.product_types.map((pt, i) =>
-        i === index ? { ...pt, ...patch } : pt
-      ),
-    }));
   }
 
   function setDraftNodes(next: TemplateDraftNode[]) {
@@ -163,10 +142,6 @@ export function HierarchyConfigPanel({
       toast.error('Code and name are required');
       return;
     }
-    if (!draft.product_types.some((pt) => pt.code.trim())) {
-      toast.error('At least one product type is required');
-      return;
-    }
     if (draft.nodes.some((n) => !n.name.trim())) {
       toast.error('Every template node needs a name');
       return;
@@ -176,16 +151,13 @@ export function HierarchyConfigPanel({
       code: draft.code.trim(),
       name: draft.name.trim(),
       description: draft.description?.trim() || null,
-      notes: draft.notes?.trim() || DEFAULT_CONFIG_NOTES,
       is_available: draft.is_available ?? true,
-      product_types: draft.product_types
-        .filter((pt) => pt.code.trim())
-        .map((pt, index) => ({
-          code: pt.code.trim(),
-          name: pt.name.trim() || pt.code.trim(),
-          description: pt.description ?? null,
-          sort_order: index,
-        })),
+      product_types: DEFAULT_PRODUCT_TYPES.map((pt, index) => ({
+        code: pt.code,
+        name: pt.name,
+        description: pt.description,
+        sort_order: index,
+      })),
       nodes: draft.nodes.map((n, index) => ({
         client_key: n.client_key,
         parent_client_key: n.parent_client_key ?? null,
@@ -254,7 +226,7 @@ export function HierarchyConfigPanel({
     return (
       <SettingsSection
         title={draft.id ? 'Edit configuration' : 'New configuration'}
-        description="Product types and the System → Component template shared by every SDLS."
+        description="Code, name, and the System → Component template shared by every SDLS."
       >
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <Button
@@ -309,17 +281,6 @@ export function HierarchyConfigPanel({
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="cfg-notes">Rule notes</Label>
-              <Textarea
-                id="cfg-notes"
-                rows={3}
-                value={draft.notes ?? ''}
-                onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
-                disabled={!canManage}
-              />
-            </div>
-
             <div className="flex items-center gap-2">
               <Switch
                 checked={!!draft.is_available}
@@ -329,28 +290,6 @@ export function HierarchyConfigPanel({
                 disabled={!canManage}
               />
               <Label>Available for HM selection</Label>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Product types</Label>
-              <div className="space-y-2">
-                {draft.product_types.map((pt, index) => (
-                  <div key={`${pt.code}-${index}`} className="grid gap-2 sm:grid-cols-2">
-                    <Input
-                      value={pt.code}
-                      onChange={(e) => updateProductType(index, { code: e.target.value })}
-                      placeholder="SSDLS-1"
-                      disabled={!canManage}
-                    />
-                    <Input
-                      value={pt.name}
-                      onChange={(e) => updateProductType(index, { name: e.target.value })}
-                      placeholder="High Data Rate"
-                      disabled={!canManage}
-                    />
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         </SettingsCard>
@@ -378,7 +317,7 @@ export function HierarchyConfigPanel({
     >
       <SettingsCard
         title="Fixed level model"
-        description="Product Type → Flight → SDLS counts come from the customer order / project. Admin defines the System→Component template once per configuration."
+        description="Flight → SDLS counts come from the customer order / project. Admin defines the System→Component template once per configuration."
       >
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <Layers3 className="h-4 w-4" />
@@ -447,11 +386,6 @@ export function HierarchyConfigPanel({
                 ) : (
                   <Badge variant="outline">Unavailable</Badge>
                 )}
-                {config.product_types.map((pt) => (
-                  <Badge key={pt.code} variant="secondary">
-                    {pt.code}
-                  </Badge>
-                ))}
                 <Badge variant="outline">
                   <GitBranch className="mr-1 h-3 w-3" />
                   {config.nodes.length} template nodes

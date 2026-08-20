@@ -500,6 +500,20 @@ export const hierarchies = {
   batchCreate: (
     items: Array<Partial<Models.Hierarchy> & { description?: string | null }>
   ) => api.post<Models.Hierarchy[]>("/hierarchies/batch/", items),
+  importSpreadsheet: (file: File, dryRun = false) => {
+    const form = new FormData();
+    form.append("file", file);
+    return api.post<Models.EntityListImportResult>(
+      `/hierarchies/import/?dry_run=${dryRun}`,
+      form,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+  },
+  exportSpreadsheet: (format: "csv" | "xlsx" = "csv") =>
+    api.get("/hierarchies/export/", {
+      params: { format },
+      responseType: "blob",
+    }),
   update: (id: number, data: Partial<Models.Hierarchy>) => api.put<Models.Hierarchy>(`/hierarchies/${id}/`, data),
   delete: (id: number) => api.delete(`/hierarchies/${id}/`),
 };
