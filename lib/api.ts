@@ -858,6 +858,15 @@ export const statuses = {
   create: (data: Partial<Models.Status>) => api.post<Models.Status>("/statuses/", data),
   batchCreate: (items: Array<Partial<Models.Status>>) =>
     api.post<Models.Status[]>("/statuses/batch/", items),
+  importSpreadsheet: (file: File, dryRun = false) => {
+    const form = new FormData();
+    form.append("file", file);
+    return api.post<Models.StatusImportResult>(
+      `/statuses/import/?dry_run=${dryRun}`,
+      form,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+  },
   update: (id: number, data: Partial<Models.Status>) => api.put<Models.Status>(`/statuses/${id}/`, data),
   delete: (id: number) => api.delete(`/statuses/${id}/`),
 };

@@ -241,10 +241,10 @@ export default function UnitsPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">{entityLabel('unit', true)}</h1>
-        <p className="text-muted-foreground mt-2">Manage module units and assemblies</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{entityLabel('unit', true)}</h1>
+        <p className="text-sm text-muted-foreground">Manage module units and assemblies</p>
       </div>
 
       <ListContentSuspense loading={pagination.fetching}>

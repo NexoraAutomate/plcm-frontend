@@ -271,10 +271,10 @@ export default function SystemsPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">{entityLabel('system', true)}</h1>
-        <p className="text-muted-foreground mt-2">Manage satellite systems hierarchy</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{entityLabel('system', true)}</h1>
+        <p className="text-sm text-muted-foreground">Manage satellite systems hierarchy</p>
       </div>
 
       <ListContentSuspense loading={pagination.fetching}>

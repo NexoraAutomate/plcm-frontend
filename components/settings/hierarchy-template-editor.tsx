@@ -120,30 +120,27 @@ export function HierarchyTemplateEditor({
     return grouped[parentLevel];
   }, [grouped, selectedLevel]);
 
-  const currentParentName = useMemo(() => {
-    if (!currentParentKey) return null;
-    const parent = nodes.find((n) => n.client_key === currentParentKey);
-    return parent?.name ?? null;
-  }, [currentParentKey, nodes]);
-
   const entityNameOptions = useMemo(() => {
+    // Entity List is a flat catalog by level — parent/child is chosen in this
+    // configuration tree, not pre-bound in the catalog.
     const alreadyUsed = new Set(
       nodes
-        .filter((n) => n.level === selectedLevel)
-        .map((n) => `${n.name}:${n.parent_client_key ?? ''}`)
+        .filter(
+          (n) =>
+            n.level === selectedLevel &&
+            (n.parent_client_key ?? null) === (currentParentKey ?? null)
+        )
+        .map((n) => n.name.trim().toLowerCase())
     );
-    return filterTemplateNames(entityListItems, selectedLevel, currentParentName).filter(
-      (item) => !alreadyUsed.has(`${item.name}:${currentParentKey ?? ''}`)
+    return filterTemplateNames(entityListItems, selectedLevel).filter(
+      (item) => !alreadyUsed.has(item.name.trim().toLowerCase())
     );
-  }, [currentParentKey, currentParentName, entityListItems, nodes, selectedLevel]);
+  }, [currentParentKey, entityListItems, nodes, selectedLevel]);
 
   const editEntityOptions = useMemo(() => {
     if (!editTarget) return [];
-    const parentName = editTarget.parent_client_key
-      ? nodes.find((n) => n.client_key === editTarget.parent_client_key)?.name ?? null
-      : null;
-    return filterTemplateNames(entityListItems, editTarget.level, parentName);
-  }, [editTarget, entityListItems, nodes]);
+    return filterTemplateNames(entityListItems, editTarget.level);
+  }, [editTarget, entityListItems]);
 
   function setParentForLevel(level: TemplateNodeLevel, key: string | null) {
     setParentByLevel((prev) => {
@@ -403,8 +400,8 @@ export function HierarchyTemplateEditor({
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold">Add Configuration Node</CardTitle>
               <p className="text-sm font-normal text-muted-foreground">
-                Pick entities from the Entity List catalog (Settings → Definitions → Entity List).
-                Names not registered there cannot be added to a configuration.
+                Pick any registered name from the Entity List for this level. Parent/child
+                links are defined here in the configuration — not in the Entity List catalog.
               </p>
             </CardHeader>
             <CardContent>

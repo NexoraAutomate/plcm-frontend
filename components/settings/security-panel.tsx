@@ -63,8 +63,8 @@ export function SecurityPanel({ embedded = false }: SecurityPanelProps) {
     <div className="space-y-8">
       {!embedded && (
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Security</h1>
-          <p className="mt-2 text-muted-foreground">
+          <h1 className="text-2xl font-semibold tracking-tight">Security</h1>
+          <p className="text-sm text-muted-foreground">
             Configure password policy, multi-factor authentication, and session controls
           </p>
         </div>

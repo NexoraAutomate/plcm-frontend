@@ -25,7 +25,7 @@ import type {
 } from '@/lib/models';
 
 export async function fetchStatuses(): Promise<Status[]> {
-  const res = await api.statuses.list();
+  const res = await api.statuses.list(0, 5000);
   return res.data ?? [];
 }
 

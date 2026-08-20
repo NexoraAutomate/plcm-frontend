@@ -191,8 +191,8 @@ export function PermissionsPanel({ embedded = false }: PermissionsPanelProps) {
     <div className="space-y-6">
       {!embedded && (
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Permissions</h1>
-          <p className="mt-2 text-muted-foreground">
+          <h1 className="text-2xl font-semibold tracking-tight">Permissions</h1>
+          <p className="text-sm text-muted-foreground">
             Manage permission codes used across modules
           </p>
         </div>

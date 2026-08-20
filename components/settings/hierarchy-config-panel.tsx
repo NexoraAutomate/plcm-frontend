@@ -1,14 +1,20 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   CheckCircle2,
+  Download,
+  Eye,
   GitBranch,
-  Layers3,
   Pencil,
   Plus,
+  RefreshCw,
+  Save,
+  Search,
   Trash2,
+  Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -16,21 +22,31 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { SettingsSection } from '@/components/settings/settings-section';
 import { SettingsCard } from '@/components/settings/settings-card';
 import { HierarchyTemplateEditor } from '@/components/settings/hierarchy-template-editor';
-import { Can, WorkflowCan } from '@/components/auth';
+import { EntityListPagination } from '@/components/entity-list-pagination';
+import { Can } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
 import { useAuth } from '@/lib/auth-context';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as api from '@/lib/api';
 import type {
+  HierarchyConfigNode,
+  HierarchyConfigProductType,
   HierarchyConfiguration,
   HierarchyConfigurationWrite,
 } from '@/lib/models';
 import {
   DEFAULT_PRODUCT_TYPES,
-  FIXED_HIERARCHY_LEVELS,
+  TEMPLATE_NODE_LEVELS,
+  newClientKey,
   type TemplateDraftNode,
   type TemplateNodeLevel,
 } from '@/lib/hierarchy-config';
@@ -42,13 +58,51 @@ export type HierarchyConfigPanelProps = {
 
 type Draft = HierarchyConfigurationWrite & { id?: number };
 
+const TEMPLATE_LEVEL_SET = new Set<string>(TEMPLATE_NODE_LEVELS);
+const CONFIG_PAGE_SIZE = 10;
+
+function slugCodeFromName(name: string): string {
+  const slug = name
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64);
+  return slug || `CONFIG-${Date.now().toString(36).toUpperCase()}`;
+}
+
+/** Stable snapshot for dirty-checking (ignores auto-generated code until save). */
+function draftFingerprint(draft: Draft): string {
+  return JSON.stringify({
+    id: draft.id ?? null,
+    name: (draft.name ?? '').trim(),
+    description: (draft.description ?? '').trim(),
+    is_available: draft.is_available ?? true,
+    nodes: (draft.nodes ?? []).map((n) => ({
+      client_key: n.client_key,
+      parent_client_key: n.parent_client_key ?? null,
+      level: n.level,
+      name: (n.name ?? '').trim(),
+      description: n.description ?? null,
+      abbreviation: n.abbreviation ?? null,
+      sort_order: n.sort_order ?? 0,
+    })),
+  });
+}
+
 function emptyDraft(): Draft {
   return {
     code: '',
     name: '',
     description: '',
+    notes: null,
     is_available: true,
-    product_types: [],
+    product_types: DEFAULT_PRODUCT_TYPES.map((pt, index) => ({
+      code: pt.code,
+      name: pt.name,
+      description: pt.description,
+      sort_order: index,
+    })),
     nodes: [],
   };
 }
@@ -59,8 +113,14 @@ function toDraft(config: HierarchyConfiguration): Draft {
     code: config.code,
     name: config.name,
     description: config.description ?? '',
+    notes: null,
     is_available: config.is_available,
-    product_types: [],
+    product_types: config.product_types.map((pt, index) => ({
+      code: pt.code,
+      name: pt.name,
+      description: pt.description,
+      sort_order: pt.sort_order ?? index,
+    })),
     nodes: config.nodes.map((n, index) => ({
       client_key: n.client_key,
       parent_client_key: n.parent_client_key ?? null,
@@ -73,22 +133,169 @@ function toDraft(config: HierarchyConfiguration): Draft {
   };
 }
 
+function draftToExportPayload(draft: Draft): HierarchyConfigurationWrite {
+  const productTypes = (
+    draft.product_types.some((pt) => pt.code.trim())
+      ? draft.product_types
+      : DEFAULT_PRODUCT_TYPES.map((pt, index) => ({
+          code: pt.code,
+          name: pt.name,
+          description: pt.description,
+          sort_order: index,
+        }))
+  )
+    .filter((pt) => pt.code.trim())
+    .map((pt, index) => ({
+      code: pt.code.trim(),
+      name: pt.name.trim() || pt.code.trim(),
+      description: pt.description ?? null,
+      sort_order: index,
+    }));
+
+  return {
+    code: draft.code.trim() || slugCodeFromName(draft.name),
+    name: draft.name.trim(),
+    description: draft.description?.trim() || null,
+    notes: null,
+    is_available: draft.is_available ?? true,
+    product_types: productTypes,
+    nodes: (draft.nodes ?? []).map((n, index) => ({
+      client_key: n.client_key,
+      parent_client_key: n.parent_client_key ?? null,
+      level: n.level,
+      name: n.name.trim(),
+      description: n.description ?? null,
+      abbreviation: n.abbreviation ?? null,
+      sort_order: index,
+    })),
+  };
+}
+
+function downloadJson(payload: unknown, filename: string) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: 'application/json;charset=utf-8',
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function parseConfigJson(parsed: unknown): HierarchyConfigurationWrite {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('JSON must be a configuration object.');
+  }
+  const raw = parsed as Record<string, unknown>;
+  const name = typeof raw.name === 'string' ? raw.name.trim() : '';
+  if (!name) {
+    throw new Error('JSON must include a non-empty "name".');
+  }
+  const code =
+    typeof raw.code === 'string' && raw.code.trim()
+      ? raw.code.trim()
+      : slugCodeFromName(name);
+
+  const rawNodes = Array.isArray(raw.nodes) ? raw.nodes : [];
+  const nodes: HierarchyConfigNode[] = rawNodes.map((item, index) => {
+    if (!item || typeof item !== 'object') {
+      throw new Error(`Node at index ${index} must be an object.`);
+    }
+    const node = item as Record<string, unknown>;
+    const level = typeof node.level === 'string' ? node.level.trim().toLowerCase() : '';
+    const nodeName = typeof node.name === 'string' ? node.name.trim() : '';
+    if (!TEMPLATE_LEVEL_SET.has(level)) {
+      throw new Error(
+        `Node ${index}: invalid level "${level}". Expected one of: ${TEMPLATE_NODE_LEVELS.join(', ')}.`
+      );
+    }
+    if (!nodeName) {
+      throw new Error(`Node ${index}: name is required.`);
+    }
+    const clientKey =
+      typeof node.client_key === 'string' && node.client_key.trim()
+        ? node.client_key.trim()
+        : newClientKey(level.slice(0, 3));
+    return {
+      client_key: clientKey,
+      parent_client_key:
+        typeof node.parent_client_key === 'string' && node.parent_client_key.trim()
+          ? node.parent_client_key.trim()
+          : null,
+      level,
+      name: nodeName,
+      description: typeof node.description === 'string' ? node.description : null,
+      abbreviation: typeof node.abbreviation === 'string' ? node.abbreviation : null,
+      sort_order: typeof node.sort_order === 'number' ? node.sort_order : index,
+    };
+  });
+
+  let productTypes: HierarchyConfigProductType[] = [];
+  if (Array.isArray(raw.product_types) && raw.product_types.length > 0) {
+    productTypes = raw.product_types.map((item, index) => {
+      if (!item || typeof item !== 'object') {
+        throw new Error(`Product type at index ${index} must be an object.`);
+      }
+      const pt = item as Record<string, unknown>;
+      const ptCode = typeof pt.code === 'string' ? pt.code.trim() : '';
+      if (!ptCode) throw new Error(`Product type ${index}: code is required.`);
+      return {
+        code: ptCode,
+        name: typeof pt.name === 'string' && pt.name.trim() ? pt.name.trim() : ptCode,
+        description: typeof pt.description === 'string' ? pt.description : null,
+        sort_order: typeof pt.sort_order === 'number' ? pt.sort_order : index,
+      };
+    });
+  } else {
+    productTypes = DEFAULT_PRODUCT_TYPES.map((pt, index) => ({
+      code: pt.code,
+      name: pt.name,
+      description: pt.description,
+      sort_order: index,
+    }));
+  }
+
+  return {
+    code,
+    name,
+    description: typeof raw.description === 'string' ? raw.description : null,
+    notes: null,
+    is_available: typeof raw.is_available === 'boolean' ? raw.is_available : true,
+    product_types: productTypes,
+    nodes,
+  };
+}
+
 export function HierarchyConfigPanel({
   embedded: _embedded = false,
   readOnly = false,
 }: HierarchyConfigPanelProps) {
   const { can } = useAuth();
+  const queryClient = useQueryClient();
   const canManage = can(P.hierarchy_config_manage) && !readOnly;
   const canListAll = can(P.hierarchy_config_manage);
   const [configs, setConfigs] = useState<HierarchyConfiguration[]>([]);
   const [loading, setLoading] = useState(true);
+  const [listRefreshing, setListRefreshing] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [draft, setDraft] = useState<Draft>(emptyDraft());
+  const [baselineFingerprint, setBaselineFingerprint] = useState(() =>
+    draftFingerprint(emptyDraft())
+  );
+  const [editorKey, setEditorKey] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<HierarchyConfiguration | null>(null);
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
+  const [page, setPage] = useState(0);
+  const listImportInputRef = useRef<HTMLInputElement | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (options?: { quiet?: boolean }) => {
+    const quiet = options?.quiet === true;
+    if (quiet) setListRefreshing(true);
+    else setLoading(true);
     try {
       const res = canListAll
         ? await api.hierarchyConfigurations.list()
@@ -101,7 +308,8 @@ export function HierarchyConfigPanel({
     } catch {
       toast.error('Failed to load hierarchy configurations');
     } finally {
-      setLoading(false);
+      if (quiet) setListRefreshing(false);
+      else setLoading(false);
     }
   }, [canListAll]);
 
@@ -109,21 +317,53 @@ export function HierarchyConfigPanel({
     void load();
   }, [load]);
 
-  const levelStrip = useMemo(
-    () =>
-      FIXED_HIERARCHY_LEVELS.filter((l) => l.code !== 'product_type')
-        .map((l) => l.label)
-        .join(' → '),
-    []
+  const filteredConfigs = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase();
+    if (!q) return configs;
+    return configs.filter((config) => {
+      const haystack = [
+        config.name,
+        config.code,
+        config.description ?? '',
+        ...(config.product_types ?? []).flatMap((pt) => [pt.code, pt.name]),
+      ]
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [configs, debouncedSearch]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredConfigs.length / CONFIG_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const pagedConfigs = filteredConfigs.slice(
+    safePage * CONFIG_PAGE_SIZE,
+    (safePage + 1) * CONFIG_PAGE_SIZE
   );
+  const rangeStart = filteredConfigs.length === 0 ? 0 : safePage * CONFIG_PAGE_SIZE + 1;
+  const rangeEnd = Math.min((safePage + 1) * CONFIG_PAGE_SIZE, filteredConfigs.length);
+  const rangeLabel = filteredConfigs.length === 0 ? '0' : `${rangeStart}–${rangeEnd}`;
+
+  useEffect(() => {
+    if (page !== safePage) setPage(safePage);
+  }, [page, safePage]);
 
   function openCreate() {
-    setDraft(emptyDraft());
+    const next = emptyDraft();
+    setDraft(next);
+    setBaselineFingerprint(draftFingerprint(next));
+    setEditorKey((k) => k + 1);
     setEditing(true);
   }
 
   function openEdit(config: HierarchyConfiguration) {
-    setDraft(toDraft(config));
+    const next = toDraft(config);
+    setDraft(next);
+    setBaselineFingerprint(draftFingerprint(next));
+    setEditorKey((k) => k + 1);
     setEditing(true);
   }
 
@@ -138,8 +378,8 @@ export function HierarchyConfigPanel({
   }
 
   async function handleSave() {
-    if (!draft.code.trim() || !draft.name.trim()) {
-      toast.error('Code and name are required');
+    if (!draft.name.trim()) {
+      toast.error('Configuration name is required');
       return;
     }
     if (draft.nodes.some((n) => !n.name.trim())) {
@@ -147,38 +387,23 @@ export function HierarchyConfigPanel({
       return;
     }
 
-    const payload: HierarchyConfigurationWrite = {
-      code: draft.code.trim(),
-      name: draft.name.trim(),
-      description: draft.description?.trim() || null,
-      is_available: draft.is_available ?? true,
-      product_types: DEFAULT_PRODUCT_TYPES.map((pt, index) => ({
-        code: pt.code,
-        name: pt.name,
-        description: pt.description,
-        sort_order: index,
-      })),
-      nodes: draft.nodes.map((n, index) => ({
-        client_key: n.client_key,
-        parent_client_key: n.parent_client_key ?? null,
-        level: n.level,
-        name: n.name.trim(),
-        description: n.description ?? null,
-        abbreviation: n.abbreviation ?? null,
-        sort_order: index,
-      })),
-    };
+    const payload = draftToExportPayload(draft);
 
     setSaving(true);
     try {
       if (draft.id) {
-        await api.hierarchyConfigurations.update(draft.id, payload);
-        toast.success('Configuration updated');
+        const res = await api.hierarchyConfigurations.update(draft.id, payload);
+        const next = toDraft(res.data);
+        setDraft(next);
+        setBaselineFingerprint(draftFingerprint(next));
+        toast.success('Configuration saved');
       } else {
-        await api.hierarchyConfigurations.create(payload);
-        toast.success('Configuration created');
+        const res = await api.hierarchyConfigurations.create(payload);
+        const next = toDraft(res.data);
+        setDraft(next);
+        setBaselineFingerprint(draftFingerprint(next));
+        toast.success('Configuration saved');
       }
-      setEditing(false);
       await load();
     } catch (error: unknown) {
       const detail =
@@ -190,11 +415,85 @@ export function HierarchyConfigPanel({
     }
   }
 
+  async function handleRefresh() {
+    setRefreshing(true);
+    try {
+      await queryClient.invalidateQueries({ queryKey: ['hierarchies'] });
+      if (draft.id) {
+        const res = await api.hierarchyConfigurations.get(draft.id);
+        const next = toDraft(res.data);
+        setDraft(next);
+        setBaselineFingerprint(draftFingerprint(next));
+        toast.success('Configuration reloaded');
+      } else {
+        await load({ quiet: true });
+        toast.success('Refreshed');
+      }
+      setEditorKey((k) => k + 1);
+    } catch {
+      toast.error('Failed to refresh');
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  function handleExportJson(source?: Draft | HierarchyConfiguration) {
+    const isSavedConfig =
+      source != null &&
+      'version' in source &&
+      typeof (source as HierarchyConfiguration).version === 'number';
+    const payload = isSavedConfig
+      ? draftToExportPayload(toDraft(source as HierarchyConfiguration))
+      : draftToExportPayload((source as Draft | undefined) ?? draft);
+    const code = payload.code || 'configuration';
+    downloadJson(payload, `${code.replace(/[^\w.-]+/g, '_')}.json`);
+    toast.success('Configuration exported as JSON');
+  }
+
+  function applyImportedPayload(payload: HierarchyConfigurationWrite, keepId?: number) {
+    const next: Draft = {
+      ...(keepId ? { id: keepId } : {}),
+      ...payload,
+    };
+    setBaselineFingerprint(
+      keepId ? draftFingerprint(draft) : draftFingerprint(emptyDraft())
+    );
+    setDraft(next);
+    setEditorKey((k) => k + 1);
+    setEditing(true);
+    toast.success(
+      `Loaded ${payload.nodes.length} node${payload.nodes.length === 1 ? '' : 's'} from JSON`
+    );
+  }
+
+  async function handleImportFile(
+    event: ChangeEvent<HTMLInputElement>,
+    options?: { keepCurrentId?: boolean }
+  ) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      const text = await file.text();
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        toast.error('Invalid JSON file');
+        return;
+      }
+      const payload = parseConfigJson(parsed);
+      applyImportedPayload(payload, options?.keepCurrentId ? draft.id : undefined);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to import JSON');
+    }
+  }
+
   async function toggleAvailable(config: HierarchyConfiguration, next: boolean) {
     try {
       await api.hierarchyConfigurations.setAvailable(config.id, next);
       toast.success(next ? 'Marked available for HM' : 'Marked unavailable');
-      await load();
+      await load({ quiet: true });
     } catch {
       toast.error('Failed to update availability');
     }
@@ -203,12 +502,12 @@ export function HierarchyConfigPanel({
   async function confirmDelete() {
     if (!deleteTarget) return;
     try {
-      await api.hierarchyConfigurations.remove(deleteTarget.id, false);
-      toast.success('Configuration retired (unavailable)');
+      await api.hierarchyConfigurations.remove(deleteTarget.id, true);
+      toast.success('Configuration deleted');
       setDeleteTarget(null);
-      await load();
+      await load({ quiet: true });
     } catch {
-      toast.error('Failed to retire configuration');
+      toast.error('Failed to delete configuration');
     }
   }
 
@@ -222,11 +521,14 @@ export function HierarchyConfigPanel({
     sort_order: n.sort_order ?? index,
   }));
 
+  const isDirty = draftFingerprint(draft) !== baselineFingerprint;
+  const canSave = canManage && isDirty && Boolean(draft.name.trim());
+
   if (editing) {
     return (
       <SettingsSection
         title={draft.id ? 'Edit configuration' : 'New configuration'}
-        description="Code, name, and the System → Component template shared by every SDLS."
+        description="System → Component template shared by every SDLS."
       >
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <Button
@@ -239,36 +541,40 @@ export function HierarchyConfigPanel({
             <ArrowLeft className="mr-1.5 h-4 w-4" />
             Back to list
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void handleRefresh()}
+            disabled={saving || refreshing}
+          >
+            <RefreshCw className={`mr-1.5 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           {canManage ? (
-            <Button type="button" size="sm" onClick={() => void handleSave()} disabled={saving}>
-              {saving ? 'Saving…' : draft.id ? 'Save changes' : 'Create configuration'}
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => void handleSave()}
+              disabled={saving || !canSave}
+            >
+              <Save className="mr-1.5 h-4 w-4" />
+              {saving ? 'Saving…' : 'Save'}
             </Button>
           ) : null}
         </div>
 
         <SettingsCard title="Configuration details">
           <div className="grid gap-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="cfg-code">Code</Label>
-                <Input
-                  id="cfg-code"
-                  value={draft.code}
-                  onChange={(e) => setDraft((d) => ({ ...d, code: e.target.value }))}
-                  placeholder="SSDLS-HDR-STD"
-                  disabled={!canManage}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="cfg-name">Name</Label>
-                <Input
-                  id="cfg-name"
-                  value={draft.name}
-                  onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-                  placeholder="SSDLS-1 High Data Rate Standard"
-                  disabled={!canManage}
-                />
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="cfg-name">Configuration name</Label>
+              <Input
+                id="cfg-name"
+                value={draft.name}
+                onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+                placeholder="e.g. High Data Rate Standard"
+                disabled={!canManage}
+              />
             </div>
 
             <div className="space-y-1.5">
@@ -297,10 +603,11 @@ export function HierarchyConfigPanel({
         <div className="mt-6">
           <h3 className="mb-2 text-sm font-medium">System hierarchy template</h3>
           <p className="mb-4 text-xs text-muted-foreground">
-            Same layout as the former System Hierarchy settings. This tree is cloned under every
-            SDLS when an HM generates a project from this configuration.
+            This tree is cloned under every SDLS when an HM generates a project from this
+            configuration.
           </p>
           <HierarchyTemplateEditor
+            key={editorKey}
             nodes={draftNodes}
             onChange={setDraftNodes}
             readOnly={!canManage}
@@ -311,120 +618,195 @@ export function HierarchyConfigPanel({
   }
 
   return (
-    <SettingsSection
-      title="Named configurations"
-      description="Admin-defined hierarchy templates for project creation. An HM selects one when drafting a new project."
-    >
-      <SettingsCard
-        title="Fixed level model"
-        description="Flight → SDLS counts come from the customer order / project. Admin defines the System→Component template once per configuration."
-      >
-        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          <Layers3 className="h-4 w-4" />
-          <span>{levelStrip}</span>
-        </div>
-      </SettingsCard>
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Flight → SDLS → System → Subsystem → Module → Unit → Component
+      </p>
 
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-medium">Configurations</h3>
-          <p className="text-xs text-muted-foreground">
-            Only available configs appear for HM selection.
-          </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative min-w-0 flex-1">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search configurations by name or description…"
+            className="pl-9"
+          />
         </div>
-        {canManage ? (
-          <Can permission={P.hierarchy_config_manage}>
-            <Button size="sm" onClick={openCreate}>
-              <Plus className="mr-1.5 h-4 w-4" />
-              New configuration
-            </Button>
-          </Can>
-        ) : null}
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void load({ quiet: true })}
+            disabled={loading || listRefreshing}
+          >
+            <RefreshCw
+              className={`mr-1.5 h-4 w-4 ${listRefreshing ? 'animate-spin' : ''}`}
+            />
+            Refresh
+          </Button>
+          {canManage ? (
+            <Can permission={P.hierarchy_config_manage}>
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => listImportInputRef.current?.click()}
+                >
+                  <Upload className="mr-1.5 h-4 w-4" />
+                  Import JSON
+                </Button>
+                <input
+                  ref={listImportInputRef}
+                  type="file"
+                  accept="application/json,.json"
+                  className="hidden"
+                  onChange={(e) => void handleImportFile(e)}
+                />
+                <Button size="sm" onClick={openCreate}>
+                  <Plus className="mr-1.5 h-4 w-4" />
+                  New configuration
+                </Button>
+              </>
+            </Can>
+          ) : null}
+        </div>
       </div>
 
-      <div className="mt-3 space-y-3">
+      <div className="relative space-y-3">
+        {listRefreshing ? (
+          <div className="pointer-events-none absolute inset-0 z-10 rounded-lg bg-background/40" />
+        ) : null}
         {loading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : configs.length === 0 ? (
           <SettingsCard title="No configurations yet">
             <p className="text-sm text-muted-foreground">
-              Create named templates (Config-1, Config-2, …) so Hierarchy Managers can select them
+              Create named templates or import a JSON export so Hierarchy Managers can select them
               when drafting a project.
             </p>
           </SettingsCard>
+        ) : filteredConfigs.length === 0 ? (
+          <SettingsCard title="No matches">
+            <p className="text-sm text-muted-foreground">
+              No configurations match “{debouncedSearch.trim()}”.
+            </p>
+          </SettingsCard>
         ) : (
-          configs.map((config) => (
-            <SettingsCard
-              key={config.id}
-              title={config.name}
-              description={`${config.code} · v${config.version}`}
-              headerAction={
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => openEdit(config)}>
-                    <Pencil className="mr-1 h-3.5 w-3.5" />
-                    {canManage ? 'Edit' : 'View'}
-                  </Button>
-                  {canManage ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setDeleteTarget(config)}
-                    >
-                      <Trash2 className="mr-1 h-3.5 w-3.5" />
-                      Retire
-                    </Button>
-                  ) : null}
-                </div>
-              }
-            >
-              <div className="flex flex-wrap items-center gap-2">
-                {config.is_available ? (
-                  <Badge className="border-emerald-800 bg-emerald-700 text-white">
-                    <CheckCircle2 className="mr-1 h-3 w-3" />
-                    Available
+          <>
+            {pagedConfigs.map((config) => (
+              <SettingsCard
+                key={config.id}
+                title={config.name}
+                description={`v${config.version}`}
+                headerAction={
+                  <div className="flex items-center gap-0.5">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground"
+                          onClick={() => handleExportJson(config)}
+                          aria-label="Export"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Export</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground"
+                          onClick={() => openEdit(config)}
+                          aria-label={canManage ? 'Edit' : 'View'}
+                        >
+                          {canManage ? (
+                            <Pencil className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{canManage ? 'Edit' : 'View'}</TooltipContent>
+                    </Tooltip>
+                    {canManage ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground shadow-none hover:bg-transparent hover:text-destructive"
+                            onClick={() => setDeleteTarget(config)}
+                            aria-label="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Delete</TooltipContent>
+                      </Tooltip>
+                    ) : null}
+                  </div>
+                }
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  {config.is_available ? (
+                    <Badge className="border-emerald-800 bg-emerald-700 text-white">
+                      <CheckCircle2 className="mr-1 h-3 w-3" />
+                      Available
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline">Unavailable</Badge>
+                  )}
+                  <Badge variant="outline">
+                    <GitBranch className="mr-1 h-3 w-3" />
+                    {config.nodes.length} template nodes
                   </Badge>
-                ) : (
-                  <Badge variant="outline">Unavailable</Badge>
-                )}
-                <Badge variant="outline">
-                  <GitBranch className="mr-1 h-3 w-3" />
-                  {config.nodes.length} template nodes
-                </Badge>
-              </div>
-              {canManage ? (
-                <div className="mt-3 flex items-center gap-2">
-                  <Switch
-                    checked={config.is_available}
-                    onCheckedChange={(checked) => void toggleAvailable(config, checked)}
-                  />
-                  <span className="text-sm text-muted-foreground">
-                    Available for HM selection
-                  </span>
                 </div>
-              ) : null}
-              <WorkflowCan role={['HM', 'ADMIN']}>
-                {config.is_available ? (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Selectable when creating a project draft.
-                  </p>
+                {canManage ? (
+                  <div className="mt-3 flex items-center gap-2">
+                    <Switch
+                      checked={config.is_available}
+                      onCheckedChange={(checked) => void toggleAvailable(config, checked)}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      Available for HM selection
+                    </span>
+                  </div>
                 ) : null}
-              </WorkflowCan>
-            </SettingsCard>
-          ))
+              </SettingsCard>
+            ))}
+            <EntityListPagination
+              page={safePage}
+              totalPages={totalPages}
+              total={filteredConfigs.length}
+              rangeLabel={rangeLabel}
+              hasPrev={safePage > 0}
+              hasNext={safePage < totalPages - 1}
+              onPrev={() => setPage((p) => Math.max(0, p - 1))}
+              onNext={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              loading={listRefreshing}
+            />
+          </>
         )}
       </div>
 
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="Retire configuration?"
+        title="Delete configuration?"
         description={
           deleteTarget
-            ? `${deleteTarget.name} will be marked unavailable for HM selection. Hard delete is reserved for unused configs.`
+            ? `${deleteTarget.name} will be permanently removed from the database. Projects that used it will no longer reference this configuration.`
             : ''
         }
         onConfirm={() => void confirmDelete()}
       />
-    </SettingsSection>
+    </div>
   );
 }

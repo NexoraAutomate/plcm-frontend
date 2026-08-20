@@ -230,10 +230,10 @@ export default function ComponentsPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">{entityLabel('component', true)}</h1>
-        <p className="text-muted-foreground mt-2">Manage unit components and parts</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{entityLabel('component', true)}</h1>
+        <p className="text-sm text-muted-foreground">Manage unit components and parts</p>
       </div>
 
       <ListContentSuspense loading={pagination.fetching}>

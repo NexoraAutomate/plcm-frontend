@@ -804,6 +804,15 @@ export interface EntityListImportResult {
   errors: Array<{ row: number; errors: string[] }>
 }
 
+export interface StatusImportResult {
+  imported?: number
+  skipped?: number
+  valid_rows?: number
+  dry_run?: boolean
+  rows?: Array<{ id: number; status_name: string; status_type: string }>
+  errors: Array<{ row: number; errors: string[] }>
+}
+
 /** Spec 01 — Smart SDLS hierarchy configuration */
 export interface HierarchyConfigProductType {
   id?: number

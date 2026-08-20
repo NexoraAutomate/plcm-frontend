@@ -296,8 +296,8 @@ export function RoleAccessPanel({ embedded = false }: RoleAccessPanelProps) {
     <div className="space-y-6">
       {!embedded && (
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Role Access</h1>
-          <p className="mt-2 text-muted-foreground">
+          <h1 className="text-2xl font-semibold tracking-tight">Role Access</h1>
+          <p className="text-sm text-muted-foreground">
             Control what each role can view, create, update, and delete
           </p>
         </div>

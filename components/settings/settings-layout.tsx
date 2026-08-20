@@ -23,12 +23,12 @@ export function SettingsLayout({
   embedded = false,
 }: SettingsLayoutProps) {
   return (
-    <div className={cn('space-y-6', className)}>
+    <div className={cn('space-y-4', className)}>
       {!embedded && title ? (
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
           {description ? (
-            <p className="mt-2 text-muted-foreground">{description}</p>
+            <p className="text-sm text-muted-foreground">{description}</p>
           ) : null}
         </div>
       ) : null}

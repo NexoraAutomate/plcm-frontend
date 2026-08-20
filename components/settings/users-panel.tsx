@@ -343,8 +343,8 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
     <div className="space-y-8">
       {!embedded && (
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Users</h1>
-          <p className="mt-2 text-muted-foreground">Manage system users and permissions</p>
+          <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
+          <p className="text-sm text-muted-foreground">Manage system users and permissions</p>
         </div>
       )}
 

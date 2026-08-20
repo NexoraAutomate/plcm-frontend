@@ -12,11 +12,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import * as api from "@/lib/api";
 import * as Models from "@/lib/models";
 import { Can } from "@/components/auth/can";
 import { P } from "@/lib/permission-codes";
-import { JsonBatchUploadButton } from "@/components/settings/json-batch-upload-button";
+import { StatusImportButton } from "@/components/settings/status-import-button";
 import { StatusBadge } from "@/components/status-badge";
 import {
   STATUS_COLOR_PALETTE,
@@ -167,7 +166,8 @@ export type StatusesPanelProps = {
 export function StatusesPanel({ embedded = false }: StatusesPanelProps) {
   const { entityLabel } = useAppDefinitions();
   const STATUS_TYPES = getStatusTypes(entityLabel);
-  const { statuses: storeStatuses, createStatus, updateStatus, deleteStatus } = useDataStore();
+  const { statuses: storeStatuses, createStatus, updateStatus, deleteStatus, refreshStatuses } =
+    useDataStore();
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -187,8 +187,8 @@ export function StatusesPanel({ embedded = false }: StatusesPanelProps) {
   const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
+    setStatuses(storeStatuses);
     if (storeStatuses.length > 0) {
-      setStatuses(storeStatuses);
       setLoading(false);
       return;
     }
@@ -196,8 +196,7 @@ export function StatusesPanel({ embedded = false }: StatusesPanelProps) {
     (async () => {
       setLoading(true);
       try {
-        const res = await api.statuses.list();
-        if (!cancelled) setStatuses(res.data);
+        await refreshStatuses();
       } catch (err) {
         console.error("Failed to load statuses", err);
         if (!cancelled) toast.error("Failed to load statuses");
@@ -208,42 +207,15 @@ export function StatusesPanel({ embedded = false }: StatusesPanelProps) {
     return () => {
       cancelled = true;
     };
-  }, [storeStatuses]);
+  }, [storeStatuses, refreshStatuses]);
 
-  const refreshStatuses = async () => {
+  const handleImportedStatuses = async () => {
     try {
-      const res = await api.statuses.list();
-      setStatuses(res.data);
+      await refreshStatuses();
     } catch (err) {
-      console.error("Failed to refresh statuses", err);
+      console.error("Failed to refresh statuses after import", err);
+      toast.error("Statuses imported, but the list failed to refresh");
     }
-  };
-
-  const handleBatchUpload = async (items: unknown[]) => {
-    const payloads: Array<Partial<Models.Status>> = [];
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (!item || typeof item !== "object") {
-        throw new Error(`Item at index ${i} must be an object.`);
-      }
-      const record = item as Record<string, unknown>;
-      const statusName = typeof record.status_name === "string" ? record.status_name.trim() : "";
-      if (!statusName) {
-        throw new Error(`Item at index ${i} is missing a valid status_name.`);
-      }
-      const colorRaw = typeof record.color === "string" ? record.color : undefined;
-      payloads.push({
-        status_name: statusName,
-        description: typeof record.description === "string" ? record.description : undefined,
-        status_type: typeof record.status_type === "string" ? record.status_type : undefined,
-        color: normalizeStatusColor(colorRaw) ?? suggestColorForStatusName(statusName),
-      });
-    }
-
-    await api.statuses.batchCreate(payloads);
-    await refreshStatuses();
-    toast.success(`Imported ${payloads.length} status${payloads.length === 1 ? "" : "es"}`);
   };
 
   const handleCreateStatus = async () => {
@@ -371,8 +343,8 @@ export function StatusesPanel({ embedded = false }: StatusesPanelProps) {
       <div className="flex items-center justify-between gap-4">
         {!embedded ? (
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Statuses</h1>
-            <p className="text-muted-foreground mt-2">
+            <h1 className="text-2xl font-semibold tracking-tight">Statuses</h1>
+            <p className="text-sm text-muted-foreground">
               Group statuses by category and assign badge colors used across the app.
             </p>
           </div>
@@ -381,7 +353,7 @@ export function StatusesPanel({ embedded = false }: StatusesPanelProps) {
         )}
         <Can permission={P.create_statuses}>
           <div className="flex flex-wrap items-center gap-2">
-            <JsonBatchUploadButton onUpload={handleBatchUpload} />
+            <StatusImportButton onImported={handleImportedStatuses} />
             <Button onClick={() => setCreateOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Add Status

@@ -136,6 +136,7 @@ interface DataStoreContextType {
   createStatus: (data: Partial<Models.Status>) => Promise<Models.Status>;
   updateStatus: (id: number, data: Partial<Models.Status>) => Promise<Models.Status>;
   deleteStatus: (id: number) => Promise<void>;
+  refreshStatuses: () => Promise<Models.Status[]>;
 
   // maintenanceLogs
   createMaintenanceLog: (data: Partial<Models.MaintenanceLog>) => Promise<Models.MaintenanceLog>;
@@ -1164,10 +1165,20 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   };
 
   // Statuses
+  const refreshStatuses = useCallback(async () => {
+    const res = await api.statuses.list(0, 5000);
+    const next = res.data ?? [];
+    setStatuses(next);
+    queryClient.setQueryData(queryKeys.statuses(), next);
+    return next;
+  }, [queryClient]);
+
   const createStatus = async (data: Partial<Models.Status>) => {
     try {
       const res = await api.statuses.create(data);
-      setStatuses([...statuses, res.data]);
+      const next = [...statusesRef.current, res.data];
+      setStatuses(next);
+      queryClient.setQueryData(queryKeys.statuses(), next);
       toast.success('Status created successfully');
       return res.data;
     } catch (err) {
@@ -1179,7 +1190,9 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const updateStatus = async (id: number, data: Partial<Models.Status>) => {
     try {
       const res = await api.statuses.update(id, data);
-      setStatuses(statuses.map((s) => (s.id === id ? res.data : s)));
+      const next = statusesRef.current.map((s) => (s.id === id ? res.data : s));
+      setStatuses(next);
+      queryClient.setQueryData(queryKeys.statuses(), next);
       toast.success('Status updated successfully');
       return res.data;
     } catch (err) {
@@ -1191,7 +1204,9 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const deleteStatus = async (id: number) => {
     try {
       await api.statuses.delete(id);
-      setStatuses(statuses.filter((s) => s.id !== id));
+      const next = statusesRef.current.filter((s) => s.id !== id);
+      setStatuses(next);
+      queryClient.setQueryData(queryKeys.statuses(), next);
       toast.success('Status deleted successfully');
     } catch (err) {
       toast.error('Failed to delete status');
@@ -1635,6 +1650,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     createStatus,
     updateStatus,
     deleteStatus,
+    refreshStatuses,
     createMaintenanceLog,
     getEntityMaintenanceLogs,
     getEntityStatusHistory,

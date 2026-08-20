@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Settings as SettingsIcon } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AccessRestricted } from '@/components/auth/access-restricted';
 import { useAuth } from '@/lib/auth-context';
@@ -148,17 +147,12 @@ export function SettingsPage() {
   const activeMeta = visibleTabs.find((t) => t.id === activeTab);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start gap-3">
-        <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-muted/40">
-          <SettingsIcon className="h-5 w-5 text-muted-foreground" />
-        </div>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-          <p className="mt-1 text-muted-foreground">
-            Centralized administration for users, access control, and system configuration
-          </p>
-        </div>
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+        <p className="text-sm text-muted-foreground">
+          Centralized administration for users, access control, and system configuration
+        </p>
       </div>
 
       <Tabs

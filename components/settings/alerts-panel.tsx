@@ -20,8 +20,8 @@ export function AlertsPanel({ embedded = false }: AlertsPanelProps) {
     <div className="space-y-8">
       {!embedded && (
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Alerts</h1>
-          <p className="mt-2 text-muted-foreground">
+          <h1 className="text-2xl font-semibold tracking-tight">Alerts</h1>
+          <p className="text-sm text-muted-foreground">
             Configure email, in-app, and future notification channels
           </p>
         </div>

@@ -81,8 +81,8 @@ export function BackupPanel({ embedded = false }: BackupPanelProps) {
     <div className="space-y-8">
       {!embedded && (
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Backup & Restore</h1>
-          <p className="mt-2 text-muted-foreground">
+          <h1 className="text-2xl font-semibold tracking-tight">Backup & Restore</h1>
+          <p className="text-sm text-muted-foreground">
             Download a full copy of application data, or restore from a previous backup
           </p>
         </div>

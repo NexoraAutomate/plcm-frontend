@@ -60,9 +60,15 @@ export function filterTemplateNames(
   if (level) {
     next = next.filter((item) => item.hierarchy_type === level);
   }
+  // Entity List is a flat catalog (no parent). Only enforce parent when the
+  // source item itself carries a parent_name (e.g. configuration-node lookups).
   if (parentName != null && parentName !== '') {
     const needle = parentName.trim().toLowerCase();
-    next = next.filter((item) => (item.parent_name ?? '').trim().toLowerCase() === needle);
+    next = next.filter((item) => {
+      const itemParent = (item.parent_name ?? '').trim().toLowerCase();
+      if (!itemParent) return true;
+      return itemParent === needle;
+    });
   }
   const seen = new Set<string>();
   return next.filter((item) => {
