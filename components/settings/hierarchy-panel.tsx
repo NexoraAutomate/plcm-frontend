@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -128,6 +129,9 @@ export function HierarchyPanel({
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const { sort, cycleSort } = useTableSorting();
   const [page, setPage] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   // ── Add-form state ───────────────────────────────────────────────────────────
   const [selectedLevel, setSelectedLevel] = useState<HierarchyLevel>("system");
@@ -207,14 +211,26 @@ export function HierarchyPanel({
     return items;
   }, [hierarchies, typeFilter, debouncedSearch, sort]);
 
-  // Reset page on filter/search change
-  useEffect(() => { setPage(0); }, [typeFilter, debouncedSearch, sort]);
+  // Reset page + selection on filter/search change
+  useEffect(() => {
+    setPage(0);
+    setSelectedIds(new Set());
+  }, [typeFilter, debouncedSearch, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filteredSorted.length / PAGE_SIZE));
   const pagedItems = filteredSorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const rangeStart = filteredSorted.length === 0 ? 0 : page * PAGE_SIZE + 1;
   const rangeEnd = Math.min((page + 1) * PAGE_SIZE, filteredSorted.length);
   const rangeLabel = filteredSorted.length === 0 ? "0" : `${rangeStart}–${rangeEnd}`;
+
+  const filteredIds = useMemo(
+    () => filteredSorted.map((item) => item.id),
+    [filteredSorted]
+  );
+  const selectedCount = selectedIds.size;
+  const allFilteredSelected =
+    filteredIds.length > 0 && filteredIds.every((id) => selectedIds.has(id));
+  const someFilteredSelected = filteredIds.some((id) => selectedIds.has(id));
 
   // ── Type-badge counts ────────────────────────────────────────────────────────
   const countByType = useMemo(() => {
@@ -308,10 +324,34 @@ export function HierarchyPanel({
 
   const prepareDelete = (item: Hierarchy) => { setDeleteTarget(item); setDeleteConfirmOpen(true); };
 
+  const toggleRowSelected = (id: number, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(new Set(filteredIds));
+      return;
+    }
+    setSelectedIds(new Set());
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     try {
       await api.hierarchies.delete(deleteTarget.id);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(deleteTarget.id);
+        return next;
+      });
       await loadData();
       invalidateEntityList();
       toast.success("Entity deleted");
@@ -320,6 +360,34 @@ export function HierarchyPanel({
     } finally {
       setDeleteConfirmOpen(false);
       setDeleteTarget(null);
+    }
+  };
+
+  const confirmBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setBulkDeleting(true);
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) => api.hierarchies.delete(id))
+      );
+      const failed = results.filter((r) => r.status === "rejected").length;
+      const deleted = ids.length - failed;
+      await loadData();
+      invalidateEntityList();
+      clearSelection();
+      if (failed === 0) {
+        toast.success(`Deleted ${deleted} entit${deleted === 1 ? "y" : "ies"}`);
+      } else if (deleted === 0) {
+        toast.error("Failed to delete selected entities");
+      } else {
+        toast.error(`Deleted ${deleted}, failed ${failed}`);
+      }
+    } catch {
+      toast.error("Failed to delete selected entities");
+    } finally {
+      setBulkDeleting(false);
+      setBulkDeleteOpen(false);
     }
   };
 
@@ -432,7 +500,7 @@ export function HierarchyPanel({
           )}
         </div>
 
-        {/* Search + Add button */}
+        {/* Search + actions */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-48">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -443,7 +511,28 @@ export function HierarchyPanel({
               className="pl-9"
             />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {!readOnly && selectedCount > 0 && (
+              <Can permission={P.delete_hierarchy}>
+                <div className="flex items-center gap-2 mr-1">
+                  <span className="text-sm text-muted-foreground">
+                    {selectedCount} selected
+                  </span>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setBulkDeleteOpen(true)}
+                    disabled={bulkDeleting}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete selected
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={clearSelection}>
+                    Clear
+                  </Button>
+                </div>
+              </Can>
+            )}
             <Can role="Admin">
               <EntityListExportButton />
             </Can>
@@ -454,6 +543,7 @@ export function HierarchyPanel({
                     onImported={async () => {
                       await loadData();
                       invalidateEntityList();
+                      clearSelection();
                     }}
                   />
                 </Can>
@@ -487,7 +577,27 @@ export function HierarchyPanel({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-12 text-center pl-4">#</TableHead>
+                    {!readOnly ? (
+                      <TableHead className="w-10 pl-4">
+                        <Can permission={P.delete_hierarchy}>
+                          <Checkbox
+                            checked={
+                              allFilteredSelected
+                                ? true
+                                : someFilteredSelected
+                                  ? "indeterminate"
+                                  : false
+                            }
+                            onCheckedChange={(checked) =>
+                              toggleSelectAll(checked === true)
+                            }
+                            aria-label="Select all matching entities"
+                            disabled={filteredSorted.length === 0 || loading}
+                          />
+                        </Can>
+                      </TableHead>
+                    ) : null}
+                    <TableHead className="w-12 text-center">#</TableHead>
                     <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Entity Name</SortableTableHead>
                     <SortableTableHead column="abbreviation" sort={sort} onSort={cycleSort}>Acronym</SortableTableHead>
                     <SortableTableHead column="hierarchy_type" sort={sort} onSort={cycleSort}>Entity Type</SortableTableHead>
@@ -498,13 +608,13 @@ export function HierarchyPanel({
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                      <TableCell colSpan={readOnly ? 6 : 7} className="py-10 text-center text-muted-foreground">
                         Loading…
                       </TableCell>
                     </TableRow>
                   ) : pagedItems.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                      <TableCell colSpan={readOnly ? 6 : 7} className="py-10 text-center text-muted-foreground">
                         {hierarchies.length === 0
                           ? "No entities defined yet. Click \"Add Entity\" to get started, or import a CSV or Excel file."
                           : "No entities match your search."}
@@ -515,14 +625,30 @@ export function HierarchyPanel({
                       const isDuplicate = duplicateIds.has(item.id);
                       const globalIdx = page * PAGE_SIZE + idx + 1;
                       const levelKey = item.hierarchy_type as HierarchyLevel;
+                      const isSelected = selectedIds.has(item.id);
                       return (
                         <TableRow
                           key={item.id}
                           className={cn(
-                            isDuplicate && "bg-amber-50 dark:bg-amber-950/30"
+                            isDuplicate && "bg-amber-50 dark:bg-amber-950/30",
+                            isSelected && "bg-muted/50"
                           )}
+                          data-state={isSelected ? "selected" : undefined}
                         >
-                          <TableCell className="text-center pl-4 text-muted-foreground tabular-nums text-xs">
+                          {!readOnly ? (
+                            <TableCell className="pl-4">
+                              <Can permission={P.delete_hierarchy}>
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={(checked) =>
+                                    toggleRowSelected(item.id, checked === true)
+                                  }
+                                  aria-label={`Select ${item.name}`}
+                                />
+                              </Can>
+                            </TableCell>
+                          ) : null}
+                          <TableCell className="text-center text-muted-foreground tabular-nums text-xs">
                             {globalIdx}
                           </TableCell>
                           <TableCell className="font-medium">
@@ -687,6 +813,17 @@ export function HierarchyPanel({
           title="Delete entity"
           description={`Delete "${deleteTarget?.name ?? "item"}" from the Entity List? This may affect configurations and inventory that use this name.`}
           onConfirm={() => void confirmDelete()}
+        />
+
+        <ConfirmDialog
+          open={bulkDeleteOpen}
+          onOpenChange={(open) => {
+            if (bulkDeleting) return;
+            setBulkDeleteOpen(open);
+          }}
+          title="Delete selected entities"
+          description={`Delete ${selectedCount} selected entit${selectedCount === 1 ? "y" : "ies"} from the Entity List? This may affect configurations and inventory that use these names.`}
+          onConfirm={() => void confirmBulkDelete()}
         />
 
         <Dialog open={editOpen} onOpenChange={(open) => { setEditOpen(open); if (!open) { setEditTarget(null); setEditName(""); setEditAbbr(""); } }}>

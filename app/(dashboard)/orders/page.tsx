@@ -31,6 +31,7 @@ import { ListContentSuspense } from '@/components/list-content-suspense';
 import { ListPageError } from '@/components/list-page-error';
 import { useListPageLoader } from '@/hooks/use-list-page-loader';
 import { OrdersMiniDashboard } from '@/components/orders/orders-mini-dashboard';
+import { ProjectManagerSelect } from '@/components/orders/project-manager-select';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
@@ -472,13 +473,12 @@ export default function OrdersPage() {
 
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="project_manager">Project Manager</Label>
-                  <Input
+                  <ProjectManagerSelect
                     id="project_manager"
-                    value={formData.project_manager ?? ""}
-                    onChange={(e) =>
-                      setFormData({ ...formData, project_manager: e.target.value })
+                    value={formData.project_manager}
+                    onChange={(project_manager) =>
+                      setFormData({ ...formData, project_manager })
                     }
-                    className="h-10"
                   />
                 </div>
 
@@ -925,14 +925,10 @@ export default function OrdersPage() {
               {/* Project Manager */}
               <div className="space-y-2 md:col-span-2">
                 <Label>Project Manager</Label>
-
-                <Input
-                  value={formData.project_manager ?? ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      project_manager: e.target.value,
-                    })
+                <ProjectManagerSelect
+                  value={formData.project_manager}
+                  onChange={(project_manager) =>
+                    setFormData({ ...formData, project_manager })
                   }
                 />
               </div>

@@ -21,6 +21,7 @@ import * as api from '@/lib/api';
 import * as Models from '@/lib/models';
 import { Badge } from '@/components/ui/badge';
 import { CustomerMiniDashboard } from '@/components/customers/customer-mini-dashboard';
+import { ProjectManagerSelect } from '@/components/orders/project-manager-select';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
@@ -468,13 +469,12 @@ export default function CustomerDetailPage(){
 
                         <div className="space-y-2 md:col-span-2">
                         <Label htmlFor="project_manager">Project Manager</Label>
-                        <Input
+                        <ProjectManagerSelect
                             id="project_manager"
-                            value={formData.project_manager ?? ""}
-                            onChange={(e) =>
-                            setFormData({ ...formData, project_manager: e.target.value })
+                            value={formData.project_manager}
+                            onChange={(project_manager) =>
+                            setFormData({ ...formData, project_manager })
                             }
-                            className="h-10"
                         />
                         </div>
 
@@ -839,13 +839,12 @@ export default function CustomerDetailPage(){
                     {/* Project Manager */}
                     <div className="space-y-2 md:col-span-2">
                         <Label>Project Manager</Label>
-
-                        <Input
-                        value={formData.project_manager ?? ""}
-                        onChange={(e) =>
+                        <ProjectManagerSelect
+                        value={formData.project_manager}
+                        onChange={(project_manager) =>
                             setFormData({
                             ...formData,
-                            project_manager: e.target.value,
+                            project_manager,
                             })
                         }
                         />
