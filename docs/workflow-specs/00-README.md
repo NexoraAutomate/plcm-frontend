@@ -6,6 +6,8 @@
 
 **Progress:** Specs 00–04 are implemented. Next: Spec 05 (shortage handling).
 
+**Manual testing:** [MANUAL_TESTING_GUIDE.md](./MANUAL_TESTING_GUIDE.md) — demo accounts, seed fixtures, and Specs 00–06 walkthrough.
+
 ---
 
 ## Implementation order
