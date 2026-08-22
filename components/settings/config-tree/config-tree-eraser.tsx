@@ -11,6 +11,10 @@ import {
   useStore,
   type ReactFlowState,
 } from '@xyflow/react';
+import {
+  DEFAULT_NODE_HEIGHT,
+  DEFAULT_NODE_WIDTH,
+} from '@/lib/config-tree-layout';
 
 type Point = { x: number; y: number };
 
@@ -130,10 +134,10 @@ export function ConfigTreeEraser({
         const internal = api.getInternalNode(node.id);
         const w =
           internal?.measured.width ??
-          (typeof node.style?.width === 'number' ? node.style.width : 280);
+          (typeof node.style?.width === 'number' ? node.style.width : DEFAULT_NODE_WIDTH);
         const h =
           internal?.measured.height ??
-          (typeof node.style?.height === 'number' ? node.style.height : 110);
+          (typeof node.style?.height === 'number' ? node.style.height : DEFAULT_NODE_HEIGHT);
         const x = internal?.internals.positionAbsolute.x ?? node.position.x;
         const y = internal?.internals.positionAbsolute.y ?? node.position.y;
         if (pointInRect(flowPoint, { x, y, width: w, height: h })) {
@@ -148,10 +152,10 @@ export function ConfigTreeEraser({
         if (!s || !t) continue;
         const si = api.getInternalNode(s.id);
         const ti = api.getInternalNode(t.id);
-        const sw = si?.measured.width ?? 280;
-        const sh = si?.measured.height ?? 110;
-        const tw = ti?.measured.width ?? 280;
-        const th = ti?.measured.height ?? 110;
+        const sw = si?.measured.width ?? DEFAULT_NODE_WIDTH;
+        const sh = si?.measured.height ?? DEFAULT_NODE_HEIGHT;
+        const tw = ti?.measured.width ?? DEFAULT_NODE_WIDTH;
+        const th = ti?.measured.height ?? DEFAULT_NODE_HEIGHT;
         const sx = si?.internals.positionAbsolute.x ?? s.position.x;
         const sy = si?.internals.positionAbsolute.y ?? s.position.y;
         const tx = ti?.internals.positionAbsolute.x ?? t.position.x;

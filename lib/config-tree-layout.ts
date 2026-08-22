@@ -6,10 +6,10 @@ import {
   type TemplateNodeLevel,
 } from '@/lib/hierarchy-config';
 
-export const DEFAULT_NODE_WIDTH = 280;
-export const DEFAULT_NODE_HEIGHT = 110;
-export const H_GAP = 80;
-export const V_GAP = 36;
+export const DEFAULT_NODE_WIDTH = 168;
+export const DEFAULT_NODE_HEIGHT = 52;
+export const H_GAP = 48;
+export const V_GAP = 24;
 
 export type LayoutDirection = 'LR' | 'TB';
 
@@ -232,6 +232,7 @@ export function buildGraphFromDraft(input: {
       style: {
         width: size?.width ?? DEFAULT_NODE_WIDTH,
         height: size?.height ?? DEFAULT_NODE_HEIGHT,
+        overflow: 'visible',
       },
       data: {
         draft: node,

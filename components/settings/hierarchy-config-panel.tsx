@@ -425,28 +425,42 @@ export function HierarchyConfigPanel({
     }));
   }
 
-  async function handleSave() {
-    if (!draft.name.trim()) {
+  async function handleSave(input?: {
+    name?: string;
+    description?: string;
+  }): Promise<boolean> {
+    const name = (input?.name ?? draft.name).trim();
+    const description =
+      input?.description !== undefined
+        ? input.description.trim()
+        : (draft.description ?? '').trim();
+
+    if (!name) {
       toast.error('Configuration name is required');
-      return;
+      return false;
     }
-    if (isConfigNameTaken(configs, draft.name, draft.id)) {
-      toast.error(`Configuration name “${draft.name.trim()}” already exists`);
-      return;
+    if (isConfigNameTaken(configs, name, draft.id)) {
+      toast.error(`Configuration name “${name}” already exists`);
+      return false;
     }
     if ((draft.nodes ?? []).length === 0) {
       toast.error('Add at least one hierarchy node before saving');
-      return;
+      return false;
     }
     const unassigned = (draft.nodes ?? []).filter((n) => !isEntityAssigned(n));
     if (unassigned.length > 0) {
       toast.error(
         `Assign an entity to every node before saving (${unassigned.length} unassigned)`
       );
-      return;
+      return false;
     }
 
-    const payload = draftToExportPayload(draft);
+    const withMeta: Draft = {
+      ...draft,
+      name,
+      description,
+    };
+    const payload = draftToExportPayload(withMeta);
 
     setSaving(true);
     try {
@@ -464,11 +478,13 @@ export function HierarchyConfigPanel({
         toast.success('Configuration saved');
       }
       await load();
+      return true;
     } catch (error: unknown) {
       const detail =
         (error as { response?: { data?: { detail?: string } } })?.response?.data
           ?.detail || 'Failed to save configuration';
       toast.error(typeof detail === 'string' ? detail : 'Failed to save configuration');
+      return false;
     } finally {
       setSaving(false);
     }
@@ -808,11 +824,14 @@ export function HierarchyConfigPanel({
             readOnly={!canManage}
             openFullscreenSignal={treeFullscreenSignal}
             configId={draft.id}
+            draftName={draft.name}
+            draftDescription={draft.description ?? ''}
             suggestedDuplicateName={uniqueCopyName(
               configs,
               draft.name || 'Configuration'
             )}
-            onSave={canManage ? () => void handleSave() : undefined}
+            isNameTaken={(name) => isConfigNameTaken(configs, name)}
+            onSave={canManage ? handleSave : undefined}
             onDuplicate={canManage ? handleDuplicate : undefined}
             saving={saving}
           />

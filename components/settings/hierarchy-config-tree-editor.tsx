@@ -78,6 +78,8 @@ import {
 import {
   buildGraphFromDraft,
   canLinkLevels,
+  DEFAULT_NODE_HEIGHT,
+  DEFAULT_NODE_WIDTH,
   descendantsOf,
   hasSystemNode,
   isDraftNode,
@@ -102,7 +104,7 @@ import { ConfigEntityTypeTree } from '@/components/settings/config-tree/config-e
 import { ConfigTreeDownloadButton } from '@/components/settings/config-tree/config-tree-download-button';
 import { cn } from '@/lib/utils';
 
-const MIN_PROXIMITY = 180;
+const MIN_PROXIMITY = 120;
 
 type InteractionMode = 'selection' | 'eraser';
 
@@ -279,8 +281,8 @@ function ConfigTreeCanvasInner({
       getNodes().map((n) => [
         n.id,
         {
-          width: typeof n.style?.width === 'number' ? n.style.width : 280,
-          height: typeof n.style?.height === 'number' ? n.style.height : 110,
+          width: typeof n.style?.width === 'number' ? n.style.width : DEFAULT_NODE_WIDTH,
+          height: typeof n.style?.height === 'number' ? n.style.height : DEFAULT_NODE_HEIGHT,
         },
       ])
     );
@@ -508,10 +510,10 @@ function ConfigTreeCanvasInner({
         .filter((n) => n.id !== node.id)
         .filter((n) => {
           const a = node;
-          const aw = typeof a.style?.width === 'number' ? a.style.width : 280;
-          const ah = typeof a.style?.height === 'number' ? a.style.height : 110;
-          const bw = typeof n.style?.width === 'number' ? n.style.width : 280;
-          const bh = typeof n.style?.height === 'number' ? n.style.height : 110;
+          const aw = typeof a.style?.width === 'number' ? a.style.width : DEFAULT_NODE_WIDTH;
+          const ah = typeof a.style?.height === 'number' ? a.style.height : DEFAULT_NODE_HEIGHT;
+          const bw = typeof n.style?.width === 'number' ? n.style.width : DEFAULT_NODE_WIDTH;
+          const bh = typeof n.style?.height === 'number' ? n.style.height : DEFAULT_NODE_HEIGHT;
           return !(
             a.position.x + aw < n.position.x ||
             n.position.x + bw < a.position.x ||
@@ -927,9 +929,22 @@ export type HierarchyConfigTreeEditorProps = {
   openFullscreenSignal?: number;
   /** Existing config id — when set, Save updates in place (no rename). */
   configId?: number;
+  /** Prefill for create/duplicate name dialogs. */
   suggestedDuplicateName?: string;
-  /** Save current draft (create if new, update if editing). */
-  onSave?: () => Promise<void> | void;
+  /** Current draft description (prefill create dialog). */
+  draftDescription?: string;
+  /** Current draft name (prefill create dialog when already typed in the form). */
+  draftName?: string;
+  /** True when the proposed name clashes with another configuration. */
+  isNameTaken?: (name: string) => boolean;
+  /**
+   * Save current draft. For new configs the tree opens a name dialog and
+   * passes `{ name, description }`. For existing configs it is called with no args.
+   */
+  onSave?: (input?: {
+    name: string;
+    description: string;
+  }) => Promise<boolean | void> | boolean | void;
   /** Duplicate as a new named configuration available for HM. */
   onDuplicate?: (input: {
     name: string;
@@ -945,6 +960,9 @@ export function HierarchyConfigTreeEditor({
   openFullscreenSignal = 0,
   configId,
   suggestedDuplicateName = '',
+  draftDescription = '',
+  draftName = '',
+  isNameTaken,
   onSave,
   onDuplicate,
   saving = false,
@@ -965,6 +983,9 @@ export function HierarchyConfigTreeEditor({
   const [form, setForm] = useState<NodeFormState | null>(null);
   const [deleteKey, setDeleteKey] = useState<string | null>(null);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveDialogMode, setSaveDialogMode] = useState<'create' | 'duplicate'>(
+    'create'
+  );
   const [saveName, setSaveName] = useState('');
   const [saveDescription, setSaveDescription] = useState('');
   const pendingPositions = useRef(new Map<string, { x: number; y: number }>());
@@ -1242,26 +1263,56 @@ export function HierarchyConfigTreeEditor({
 
   const handleSaveClick = useCallback(() => {
     if (!ensureEntitiesReady() || !onSave) return;
+    // New configuration: collect name + description before create
+    if (!configId) {
+      setSaveDialogMode('create');
+      setSaveName(draftName.trim());
+      setSaveDescription(draftDescription.trim());
+      setSaveDialogOpen(true);
+      return;
+    }
     void onSave();
-  }, [ensureEntitiesReady, onSave]);
+  }, [configId, draftDescription, draftName, ensureEntitiesReady, onSave]);
 
   const openDuplicateDialog = useCallback(() => {
     if (!ensureEntitiesReady()) return;
+    setSaveDialogMode('duplicate');
     setSaveName(suggestedDuplicateName.trim() || 'Configuration');
     setSaveDescription('');
     setSaveDialogOpen(true);
   }, [ensureEntitiesReady, suggestedDuplicateName]);
 
-  const confirmDuplicate = useCallback(async () => {
+  const saveNameTaken =
+    !!saveName.trim() && (isNameTaken?.(saveName.trim()) ?? false);
+
+  const confirmSaveDialog = useCallback(async () => {
     const name = saveName.trim();
     if (!name) {
       toast.error('Configuration name is required');
       return;
     }
+    if (isNameTaken?.(name)) {
+      toast.error(`Configuration name “${name}” already exists`);
+      return;
+    }
+    const description = saveDescription.trim();
+    if (saveDialogMode === 'create') {
+      if (!onSave) return;
+      const ok = await onSave({ name, description });
+      if (ok !== false) setSaveDialogOpen(false);
+      return;
+    }
     if (!onDuplicate) return;
-    const ok = await onDuplicate({ name, description: saveDescription.trim() });
+    const ok = await onDuplicate({ name, description });
     if (ok !== false) setSaveDialogOpen(false);
-  }, [onDuplicate, saveDescription, saveName]);
+  }, [
+    isNameTaken,
+    onDuplicate,
+    onSave,
+    saveDescription,
+    saveDialogMode,
+    saveName,
+  ]);
 
   const changeDirection = useCallback((d: LayoutDirection) => {
     setDirection(d);
@@ -1449,22 +1500,37 @@ export function HierarchyConfigTreeEditor({
       <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Duplicate configuration</DialogTitle>
+            <DialogTitle>
+              {saveDialogMode === 'create'
+                ? 'Save configuration'
+                : 'Duplicate configuration'}
+            </DialogTitle>
             <DialogDescription>
-              Create a copy of this hierarchy template under a new name. The copy will be marked
-              available for HM selection.
+              {saveDialogMode === 'create'
+                ? 'Enter a unique name and optional description for this hierarchy template.'
+                : 'Create a copy of this hierarchy template under a new name. The copy will be marked available for HM selection.'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="cfg-tree-save-name">New configuration name</Label>
+              <Label htmlFor="cfg-tree-save-name">
+                {saveDialogMode === 'create'
+                  ? 'Configuration name'
+                  : 'New configuration name'}
+              </Label>
               <Input
                 id="cfg-tree-save-name"
                 value={saveName}
                 onChange={(e) => setSaveName(e.target.value)}
-                placeholder="e.g. High Data Rate Standard (copy)"
+                placeholder="e.g. High Data Rate Standard"
                 autoFocus
+                aria-invalid={saveNameTaken}
               />
+              {saveNameTaken ? (
+                <p className="text-xs text-destructive">
+                  Another configuration already uses this name.
+                </p>
+              ) : null}
             </div>
             <div className="space-y-2">
               <Label htmlFor="cfg-tree-save-desc">Description (optional)</Label>
@@ -1486,11 +1552,19 @@ export function HierarchyConfigTreeEditor({
               </Button>
               <Button
                 type="button"
-                onClick={() => void confirmDuplicate()}
-                disabled={saving || !saveName.trim()}
+                onClick={() => void confirmSaveDialog()}
+                disabled={saving || !saveName.trim() || saveNameTaken}
               >
-                <Copy className="mr-1.5 h-4 w-4" />
-                {saving ? 'Saving…' : 'Duplicate'}
+                {saveDialogMode === 'create' ? (
+                  <Save className="mr-1.5 h-4 w-4" />
+                ) : (
+                  <Copy className="mr-1.5 h-4 w-4" />
+                )}
+                {saving
+                  ? 'Saving…'
+                  : saveDialogMode === 'create'
+                    ? 'Save'
+                    : 'Duplicate'}
               </Button>
             </div>
           </div>
