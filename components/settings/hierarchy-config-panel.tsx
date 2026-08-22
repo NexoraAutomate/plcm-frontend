@@ -8,6 +8,7 @@ import {
   Download,
   Eye,
   GitBranch,
+  Maximize2,
   Pencil,
   Plus,
   RefreshCw,
@@ -31,6 +32,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { SettingsSection } from '@/components/settings/settings-section';
 import { SettingsCard } from '@/components/settings/settings-card';
 import { HierarchyTemplateEditor } from '@/components/settings/hierarchy-template-editor';
+import { HierarchyConfigTreeEditor } from '@/components/settings/hierarchy-config-tree-editor';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { Can } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
@@ -286,6 +288,7 @@ export function HierarchyConfigPanel({
     draftFingerprint(emptyDraft())
   );
   const [editorKey, setEditorKey] = useState(0);
+  const [treeFullscreenSignal, setTreeFullscreenSignal] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<HierarchyConfiguration | null>(null);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
@@ -530,38 +533,50 @@ export function HierarchyConfigPanel({
         title={draft.id ? 'Edit configuration' : 'New configuration'}
         description="System → Component template shared by every SDLS."
       >
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setEditing(false)}
-            disabled={saving}
-          >
-            <ArrowLeft className="mr-1.5 h-4 w-4" />
-            Back to list
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => void handleRefresh()}
-            disabled={saving || refreshing}
-          >
-            <RefreshCw className={`mr-1.5 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          {canManage ? (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
+              variant="outline"
               size="sm"
-              onClick={() => void handleSave()}
-              disabled={saving || !canSave}
+              onClick={() => setEditing(false)}
+              disabled={saving}
             >
-              <Save className="mr-1.5 h-4 w-4" />
-              {saving ? 'Saving…' : 'Save'}
+              <ArrowLeft className="mr-1.5 h-4 w-4" />
+              Back to list
             </Button>
-          ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void handleRefresh()}
+              disabled={saving || refreshing}
+            >
+              <RefreshCw className={`mr-1.5 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+            {canManage ? (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void handleSave()}
+                disabled={saving || !canSave}
+              >
+                <Save className="mr-1.5 h-4 w-4" />
+                {saving ? 'Saving…' : 'Save'}
+              </Button>
+            ) : null}
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="ml-auto"
+            onClick={() => setTreeFullscreenSignal((n) => n + 1)}
+          >
+            <Maximize2 className="mr-1.5 h-4 w-4" />
+            Tree builder
+          </Button>
         </div>
 
         <SettingsCard title="Configuration details">
@@ -600,18 +615,34 @@ export function HierarchyConfigPanel({
           </div>
         </SettingsCard>
 
-        <div className="mt-6">
-          <h3 className="mb-2 text-sm font-medium">System hierarchy template</h3>
-          <p className="mb-4 text-xs text-muted-foreground">
-            This tree is cloned under every SDLS when an HM generates a project from this
-            configuration.
-          </p>
-          <HierarchyTemplateEditor
-            key={editorKey}
+        <div className="mt-6 space-y-4">
+          <div>
+            <h3 className="mb-2 text-sm font-medium">System hierarchy template</h3>
+            <p className="mb-4 text-xs text-muted-foreground">
+              Use the indented tree (full screen) to build System → Component. This tree is
+              cloned under every SDLS when a project is generated from this configuration.
+            </p>
+          </div>
+          <HierarchyConfigTreeEditor
+            key={`tree-${editorKey}`}
             nodes={draftNodes}
             onChange={setDraftNodes}
             readOnly={!canManage}
+            openFullscreenSignal={treeFullscreenSignal}
           />
+          <details className="rounded-lg border bg-muted/20 p-3">
+            <summary className="cursor-pointer text-sm font-medium">
+              Classic list editor
+            </summary>
+            <div className="mt-4">
+              <HierarchyTemplateEditor
+                key={editorKey}
+                nodes={draftNodes}
+                onChange={setDraftNodes}
+                readOnly={!canManage}
+              />
+            </div>
+          </details>
         </div>
       </SettingsSection>
     );
