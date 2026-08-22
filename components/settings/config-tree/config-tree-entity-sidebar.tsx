@@ -1,20 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { GripVertical } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { filterTemplateNames, type TemplateNameItem } from '@/lib/hierarchy-template-names';
-import {
-  TEMPLATE_NODE_LEVELS,
-  type TemplateNodeLevel,
-} from '@/lib/hierarchy-config';
+import { ConfigEntityTypeTree } from '@/components/settings/config-tree/config-entity-type-tree';
+import type { TemplateNameItem } from '@/lib/hierarchy-template-names';
+import type { TemplateNodeLevel } from '@/lib/hierarchy-config';
 import { cn } from '@/lib/utils';
 
 export const ENTITY_DND_MIME = 'application/plcm-config-entity';
@@ -28,96 +16,79 @@ export type EntityDragPayload = {
 
 type Props = {
   entities: TemplateNameItem[];
-  usedNamesByLevel: Map<TemplateNodeLevel, Set<string>>;
   levelLabel: (level: string) => string;
   disabled?: boolean;
+  /** Child level to enable when a canvas parent is selected. */
+  focusChildLevel?: TemplateNodeLevel | null;
+  /** Assigned names already used under the selected parent. */
+  usedChildNames?: Set<string>;
+  /** Hide system folder when a system already exists. */
+  hideSystemLevel?: boolean;
+  contextLabel?: string;
 };
 
 export function ConfigTreeEntitySidebar({
   entities,
-  usedNamesByLevel,
   levelLabel,
   disabled,
+  focusChildLevel = null,
+  usedChildNames,
+  hideSystemLevel,
+  contextLabel,
 }: Props) {
-  const [level, setLevel] = useState<TemplateNodeLevel>('system');
-  const [query, setQuery] = useState('');
-
-  const options = useMemo(() => {
-    const used = usedNamesByLevel.get(level) ?? new Set();
-    const q = query.trim().toLowerCase();
-    return filterTemplateNames(entities, level)
-      .filter((item) => !used.has(item.name.trim().toLowerCase()))
-      .filter((item) => !q || item.name.toLowerCase().includes(q));
-  }, [entities, level, query, usedNamesByLevel]);
+  const hiddenLevels = hideSystemLevel ? (['system'] as TemplateNodeLevel[]) : undefined;
 
   return (
     <aside
       className={cn(
-        'flex w-64 shrink-0 flex-col border-r bg-background',
+        'flex w-72 shrink-0 flex-col border-r bg-background',
         disabled && 'pointer-events-none opacity-50'
       )}
     >
-      <div className="space-y-2 border-b p-3">
+      <div className="space-y-1 border-b p-3">
         <p className="text-sm font-medium">Entity list</p>
         <p className="text-[11px] text-muted-foreground">
-          Drag an entity onto the canvas to add a node.
+          {contextLabel ||
+            'Select a node on the canvas to list remaining children, then drag one in.'}
         </p>
-        <Select
-          value={level}
-          onValueChange={(v) => setLevel(v as TemplateNodeLevel)}
-        >
-          <SelectTrigger className="h-8">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {TEMPLATE_NODE_LEVELS.map((l) => (
-              <SelectItem key={l} value={l}>
-                {levelLabel(l)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Input
-          className="h-8"
-          placeholder="Filter…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
       </div>
-      <div className="min-h-0 flex-1 overflow-auto p-2 space-y-1">
-        {options.length === 0 ? (
-          <p className="px-1 py-4 text-xs text-muted-foreground">
-            No unused {levelLabel(level)} entities.
-          </p>
+      <div className="min-h-0 flex-1 p-2">
+        {!focusChildLevel ? (
+          <div className="rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+            {contextLabel ||
+              (hideSystemLevel
+                ? 'Select a System, Subsystem, Module, or Unit on the canvas to see remaining children you can add.'
+                : 'Drag a System onto the canvas to start.')}
+          </div>
         ) : (
-          options.map((item) => (
-            <div
-              key={`${item.id}-${item.name}`}
-              draggable={!disabled}
-              onDragStart={(event) => {
-                const payload: EntityDragPayload = {
-                  level,
-                  name: item.name,
-                  abbreviation: (item.abbreviation || '').toUpperCase(),
-                  entityId: item.id,
-                };
-                event.dataTransfer.setData(ENTITY_DND_MIME, JSON.stringify(payload));
-                event.dataTransfer.setData('text/plain', item.name);
-                event.dataTransfer.effectAllowed = 'copy';
-              }}
-              className="flex cursor-grab items-center gap-1.5 rounded-md border bg-muted/30 px-2 py-1.5 text-xs active:cursor-grabbing"
-            >
-              <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <div className="min-w-0">
-                <div className="truncate font-medium">{item.name}</div>
-                {item.abbreviation ? (
-                  <div className="truncate font-mono text-[10px] text-muted-foreground">
-                    {item.abbreviation}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          ))
+          <ConfigEntityTypeTree
+            className="h-full"
+            entities={entities}
+            levelLabel={levelLabel}
+            selectableLevel={focusChildLevel}
+            usedNames={usedChildNames}
+            hiddenLevels={hiddenLevels}
+            draggable
+            defaultExpandedLevels={[focusChildLevel]}
+            emptyHint={
+              focusChildLevel === 'system'
+                ? 'Add a System first.'
+                : 'No remaining entities for this parent.'
+            }
+            onDragStart={(event, item) => {
+              const payload: EntityDragPayload = {
+                level: item.level,
+                name: item.name,
+                abbreviation: item.abbreviation,
+                entityId: item.entityId,
+              };
+              const json = JSON.stringify(payload);
+              event.dataTransfer.setData(ENTITY_DND_MIME, json);
+              event.dataTransfer.setData('application/json', json);
+              event.dataTransfer.setData('text/plain', item.name);
+              event.dataTransfer.effectAllowed = 'copy';
+            }}
+          />
         )}
       </div>
     </aside>

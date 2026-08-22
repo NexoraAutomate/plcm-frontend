@@ -28,7 +28,6 @@ import {
   Panel,
   ReactFlow,
   ReactFlowProvider,
-  addEdge,
   useEdgesState,
   useNodesState,
   useReactFlow,
@@ -42,12 +41,14 @@ import {
 import '@xyflow/react/dist/style.css';
 import {
   Columns2,
+  Copy,
   Lock,
   LockOpen,
   Maximize2,
   Minimize2,
   Plus,
   Rows2,
+  Save,
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -61,13 +62,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { useAppDefinitions } from '@/lib/app-definitions-context';
 import { suggestAbbreviation } from '@/lib/app-definitions';
@@ -75,6 +69,7 @@ import { useHierarchiesQuery } from '@/hooks/queries';
 import { filterTemplateNames, hierarchiesToNameItems } from '@/lib/hierarchy-template-names';
 import {
   CHILD_TEMPLATE_LEVEL,
+  PARENT_TEMPLATE_LEVEL,
   TEMPLATE_NODE_LEVELS,
   newClientKey,
   type TemplateDraftNode,
@@ -84,23 +79,26 @@ import {
   buildGraphFromDraft,
   canLinkLevels,
   descendantsOf,
+  hasSystemNode,
   isDraftNode,
+  isEntityAssigned,
+  isNameTakenUnderParent,
+  layoutHandleIds,
   siblingsOf,
+  usedAssignedNamesUnderParent,
   type ConfigTreeEdgeData,
   type ConfigTreeNodeData,
   type LayoutDirection,
 } from '@/lib/config-tree-layout';
+import { LEVEL_LEGEND_DOT, LEVEL_NODE_STYLE } from '@/lib/config-tree-level-styles';
 import {
   ConfigTreeFlowNode,
   type ConfigTreeNodeActions,
 } from '@/components/settings/config-tree/config-tree-flow-node';
 import { ConfigAnimatedEdge } from '@/components/settings/config-tree/config-animated-edge';
 import { ConfigTreeEraser } from '@/components/settings/config-tree/config-tree-eraser';
-import {
-  ConfigTreeEntitySidebar,
-  ENTITY_DND_MIME,
-  type EntityDragPayload,
-} from '@/components/settings/config-tree/config-tree-entity-sidebar';
+import { ConfigTreeEntitySidebar, ENTITY_DND_MIME, type EntityDragPayload } from '@/components/settings/config-tree/config-tree-entity-sidebar';
+import { ConfigEntityTypeTree } from '@/components/settings/config-tree/config-entity-type-tree';
 import { ConfigTreeDownloadButton } from '@/components/settings/config-tree/config-tree-download-button';
 import { cn } from '@/lib/utils';
 
@@ -191,7 +189,6 @@ function ConfigTreeCanvasInner({
     useReactFlow();
   const connectingNodeId = useRef<string | null>(null);
   const skipNextSync = useRef(false);
-  const lastLayoutNonce = useRef(layoutNonce);
   const structureKey = useMemo(
     () =>
       draftNodes
@@ -202,6 +199,9 @@ function ConfigTreeCanvasInner({
         .join('|'),
     [draftNodes]
   );
+  const lastLayoutNonce = useRef(layoutNonce);
+  const lastStructureKey = useRef(structureKey);
+  const lastDirection = useRef(direction);
 
   const initial = useMemo(
     () =>
@@ -219,6 +219,7 @@ function ConfigTreeCanvasInner({
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initial.flowNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges);
+  const [selectedParentKey, setSelectedParentKey] = useState<string | null>(null);
 
   const nodesByKey = useMemo(() => {
     const map = new Map<string, TemplateDraftNode>();
@@ -226,15 +227,33 @@ function ConfigTreeCanvasInner({
     return map;
   }, [draftNodes]);
 
-  const usedNamesByLevel = useMemo(() => {
-    const map = new Map<TemplateNodeLevel, Set<string>>();
-    for (const level of TEMPLATE_NODE_LEVELS) map.set(level, new Set());
-    for (const n of draftNodes) {
-      if (!n.name.trim()) continue;
-      map.get(n.level)?.add(n.name.trim().toLowerCase());
+  const systemExists = useMemo(() => hasSystemNode(draftNodes), [draftNodes]);
+
+  const selectedParent = selectedParentKey
+    ? nodesByKey.get(selectedParentKey) ?? null
+    : null;
+
+  const focusChildLevel = selectedParent
+    ? CHILD_TEMPLATE_LEVEL[selectedParent.level]
+    : systemExists
+      ? null
+      : ('system' as TemplateNodeLevel | null);
+
+  const usedChildNames = useMemo(() => {
+    if (!selectedParentKey && focusChildLevel === 'system') {
+      return usedAssignedNamesUnderParent(draftNodes, null);
     }
-    return map;
-  }, [draftNodes]);
+    if (!selectedParentKey) return new Set<string>();
+    return usedAssignedNamesUnderParent(draftNodes, selectedParentKey);
+  }, [draftNodes, focusChildLevel, selectedParentKey]);
+
+  const sidebarContextLabel = selectedParent
+    ? focusChildLevel
+      ? `Adding under “${selectedParent.name || levelLabel(selectedParent.level)}” — remaining ${levelLabel(focusChildLevel)}s`
+      : `“${selectedParent.name || levelLabel(selectedParent.level)}” has no child level`
+    : systemExists
+      ? 'Select a parent node to list remaining children'
+      : 'Drag a System onto the canvas to start';
 
   // Rebuild graph when draft structure / lock / layout direction changes
   useEffect(() => {
@@ -242,15 +261,20 @@ function ConfigTreeCanvasInner({
       skipNextSync.current = false;
       return;
     }
+
+    const structureChanged = lastStructureKey.current !== structureKey;
+    const directionChanged = lastDirection.current !== direction;
+    const layoutChanged = lastLayoutNonce.current !== layoutNonce;
+    lastStructureKey.current = structureKey;
+    lastDirection.current = direction;
+    lastLayoutNonce.current = layoutNonce;
+
+    // Drop freehand pending spots — new nodes always snap into the active layout
+    pendingPositions.current.clear();
+
     const positionById = new Map(
       getNodes().map((n) => [n.id, { x: n.position.x, y: n.position.y }])
     );
-    for (const [id, pos] of pendingPositions.current) {
-      positionById.set(id, pos);
-    }
-    const hadPending = pendingPositions.current.size > 0;
-    pendingPositions.current.clear();
-
     const sizeById = new Map(
       getNodes().map((n) => [
         n.id,
@@ -260,10 +284,15 @@ function ConfigTreeCanvasInner({
         },
       ])
     );
-    const layoutChanged = lastLayoutNonce.current !== layoutNonce;
-    lastLayoutNonce.current = layoutNonce;
+
+    // Re-run Dagre whenever hierarchy or orientation changes so siblings/children
+    // land on the correct parallel rank. Preserve positions only for lock toggles.
     const applyAutoLayout =
-      (layoutChanged || positionById.size === 0) && !hadPending;
+      structureChanged ||
+      directionChanged ||
+      layoutChanged ||
+      positionById.size === 0;
+
     const next = buildGraphFromDraft({
       nodes: draftNodes,
       levelLabel,
@@ -322,12 +351,34 @@ function ConfigTreeCanvasInner({
     () => ({
       onEdit: openNodeForm,
       onDelete: requestDeleteNode,
-      onAddChild: (key) => addChild(key),
-      onAddSiblingAbove: (key) => addSibling(key, 'above'),
-      onAddSiblingBelow: (key) => addSibling(key, 'below'),
-      onAddParentPeer: addParentPeer,
+      onAddChild: (key) => {
+        setSelectedParentKey(key);
+        addChild(key);
+      },
+      onAddSiblingAbove: (key) => {
+        const node = nodesByKey.get(key);
+        if (node?.parent_client_key) setSelectedParentKey(node.parent_client_key);
+        addSibling(key, 'above');
+      },
+      onAddSiblingBelow: (key) => {
+        const node = nodesByKey.get(key);
+        if (node?.parent_client_key) setSelectedParentKey(node.parent_client_key);
+        addSibling(key, 'below');
+      },
+      onAddParentPeer: (key) => {
+        const node = nodesByKey.get(key);
+        const parent = node?.parent_client_key
+          ? nodesByKey.get(node.parent_client_key)
+          : null;
+        if (parent?.parent_client_key) {
+          setSelectedParentKey(parent.parent_client_key);
+        } else if (parent) {
+          setSelectedParentKey(null);
+        }
+        addParentPeer(key);
+      },
     }),
-    [addChild, addParentPeer, addSibling, openNodeForm, requestDeleteNode]
+    [addChild, addParentPeer, addSibling, nodesByKey, openNodeForm, requestDeleteNode]
   );
 
   const tryConnect = useCallback(
@@ -348,7 +399,16 @@ function ConfigTreeCanvasInner({
         toast.error('That connection would create a cycle');
         return false;
       }
-      skipNextSync.current = true;
+      if (
+        isEntityAssigned(target) &&
+        isNameTakenUnderParent(draftNodes, sourceId, target.name, targetId)
+      ) {
+        toast.error(
+          `“${target.name}” is already used under this ${levelLabel(source.level)}`
+        );
+        return false;
+      }
+      // Let structure sync re-run Dagre so the linked nodes sit on the active layout
       onChange(
         draftNodes.map((n) =>
           n.client_key === targetId
@@ -356,23 +416,9 @@ function ConfigTreeCanvasInner({
             : n
         )
       );
-      setEdges((eds) => {
-        const without = eds.filter((e) => e.target !== targetId);
-        return addEdge(
-          {
-            id: `e-${sourceId}-${targetId}`,
-            source: sourceId,
-            target: targetId,
-            type: 'configAnimated',
-            animated: true,
-            markerEnd: { type: MarkerType.ArrowClosed },
-          },
-          without
-        );
-      });
       return true;
     },
-    [draftNodes, levelLabel, nodesByKey, onChange, setEdges]
+    [draftNodes, levelLabel, nodesByKey, onChange]
   );
 
   const onConnect = useCallback(
@@ -408,6 +454,7 @@ function ConfigTreeCanvasInner({
           ? (event as TouchEvent).changedTouches[0]
           : (event as MouseEvent);
       const position = screenToFlowPosition({ x: clientX, y: clientY });
+      setSelectedParentKey(fromId);
       placeNode({
         level: childLevel,
         parentKey: fromId,
@@ -526,28 +573,69 @@ function ConfigTreeCanvasInner({
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
+    event.stopPropagation();
     event.dataTransfer.dropEffect = 'copy';
   }, []);
 
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
-      if (locked || readOnly) return;
-      const raw = event.dataTransfer.getData(ENTITY_DND_MIME);
-      if (!raw) return;
+      event.stopPropagation();
+      if (locked || readOnly || mode === 'eraser') return;
+      const raw =
+        event.dataTransfer.getData(ENTITY_DND_MIME) ||
+        event.dataTransfer.getData('application/json') ||
+        '';
+      if (!raw) {
+        toast.error('Could not read dragged entity');
+        return;
+      }
       let payload: EntityDragPayload;
       try {
         payload = JSON.parse(raw) as EntityDragPayload;
       } catch {
+        toast.error('Invalid drag payload');
         return;
       }
-      const position = screenToFlowPosition({
-        x: event.clientX,
-        y: event.clientY,
-      });
-      // Parent: nearest valid parent by proximity, else null for system
-      let parentKey: string | null = null;
-      if (payload.level !== 'system') {
+      if (!payload.level || !payload.name) {
+        toast.error('Could not read dragged entity');
+        return;
+      }
+
+      if (payload.level === 'system') {
+        if (hasSystemNode(draftNodes)) {
+          toast.error('Only one System is allowed in a configuration');
+          return;
+        }
+        const key = placeNode({
+          level: 'system',
+          parentKey: null,
+          name: payload.name,
+          abbreviation: payload.abbreviation || suggestAbbreviation(payload.name),
+          position: screenToFlowPosition({
+            x: event.clientX,
+            y: event.clientY,
+          }),
+        });
+        if (key) setSelectedParentKey(key);
+        return;
+      }
+
+      let parentKey: string | null = selectedParentKey;
+      if (parentKey) {
+        const parent = nodesByKey.get(parentKey);
+        if (!parent || CHILD_TEMPLATE_LEVEL[parent.level] !== payload.level) {
+          toast.error(
+            `Select a ${levelLabel(PARENT_TEMPLATE_LEVEL[payload.level] || 'parent')} first, then drop this ${levelLabel(payload.level)}`
+          );
+          return;
+        }
+      } else {
+        // Fallback: nearest valid parent by proximity
+        const position = screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        });
         let best: { d: number; id: string } | null = null;
         for (const n of getNodes()) {
           const draft = nodesByKey.get(n.id);
@@ -559,27 +647,45 @@ function ConfigTreeCanvasInner({
           if (!best || d < best.d) best = { d, id: n.id };
         }
         if (!best || best.d > MIN_PROXIMITY * 1.5) {
-          toast.error(`Drop near a valid parent for ${levelLabel(payload.level)}`);
+          toast.error(
+            `Select a parent on the canvas, or drop near a valid parent for ${levelLabel(payload.level)}`
+          );
           return;
         }
         parentKey = best.id;
       }
+
+      if (isNameTakenUnderParent(draftNodes, parentKey, payload.name)) {
+        toast.error(
+          `“${payload.name}” is already used under this ${levelLabel(
+            nodesByKey.get(parentKey!)?.level || 'parent'
+          )}`
+        );
+        return;
+      }
+
       placeNode({
         level: payload.level,
         parentKey,
         name: payload.name,
         abbreviation: payload.abbreviation || suggestAbbreviation(payload.name),
-        position,
+        position: screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        }),
       });
     },
     [
+      draftNodes,
       getNodes,
       levelLabel,
       locked,
+      mode,
       nodesByKey,
       placeNode,
       readOnly,
       screenToFlowPosition,
+      selectedParentKey,
     ]
   );
 
@@ -615,18 +721,37 @@ function ConfigTreeCanvasInner({
 
   const interactive = !locked && !readOnly && mode === 'selection';
 
+  // Clear selection if the node was deleted
+  useEffect(() => {
+    if (selectedParentKey && !nodesByKey.has(selectedParentKey)) {
+      setSelectedParentKey(null);
+    }
+  }, [nodesByKey, selectedParentKey]);
+
   return (
     <div className="flex h-full min-h-0 w-full">
       <ConfigTreeEntitySidebar
         entities={entityListItems}
-        usedNamesByLevel={usedNamesByLevel}
         levelLabel={levelLabel}
         disabled={!interactive}
+        focusChildLevel={
+          selectedParent
+            ? focusChildLevel
+            : systemExists
+              ? null
+              : 'system'
+        }
+        usedChildNames={usedChildNames}
+        hideSystemLevel={systemExists}
+        contextLabel={sidebarContextLabel}
       />
       <div className="relative min-h-0 min-w-0 flex-1">
         <ActionsContext.Provider value={actions}>
           <ReactFlow
-            nodes={nodes}
+            nodes={nodes.map((n) => ({
+              ...n,
+              selected: n.id === selectedParentKey,
+            }))}
             edges={edges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
@@ -639,6 +764,14 @@ function ConfigTreeCanvasInner({
             onNodeDragStop={onNodeDragStop}
             onDragOver={onDragOver}
             onDrop={onDrop}
+            onNodeClick={(_, node) => {
+              if (!interactive) return;
+              setSelectedParentKey(node.id);
+            }}
+            onPaneClick={() => {
+              if (!interactive) return;
+              setSelectedParentKey(null);
+            }}
             nodesDraggable={interactive}
             nodesConnectable={interactive}
             elementsSelectable={mode === 'selection'}
@@ -663,13 +796,29 @@ function ConfigTreeCanvasInner({
               type: 'configAnimated',
               animated: true,
               markerEnd: { type: MarkerType.ArrowClosed },
+              ...(() => {
+                const h = layoutHandleIds(direction);
+                return {
+                  sourceHandle: h.sourceHandle,
+                  targetHandle: h.targetHandle,
+                };
+              })(),
             }}
             connectionLineStyle={{ stroke: '#64748b', strokeWidth: 2 }}
             className={cn(mode === 'eraser' && 'cursor-crosshair')}
           >
             <Background gap={16} size={1} />
             <Controls showInteractive={false} />
-            <MiniMap pannable zoomable className="bg-background/80!" />
+            <MiniMap
+              pannable
+              zoomable
+              className="bg-background/80!"
+              nodeColor={(node) => {
+                const level = (node.data as ConfigTreeNodeData | undefined)?.draft?.level;
+                if (!level) return '#94a3b8';
+                return LEVEL_NODE_STYLE[level].minimap;
+              }}
+            />
             <ConfigTreeDownloadButton />
 
             <Panel position="top-left" className="z-50 flex flex-wrap gap-1.5">
@@ -733,13 +882,16 @@ function ConfigTreeCanvasInner({
                 <Columns2 className="mr-1 h-3.5 w-3.5" />
                 Horizontal
               </Button>
-              {!readOnly && !locked ? (
+              {!readOnly && !locked && !systemExists ? (
                 <Button
                   type="button"
                   size="sm"
                   variant="secondary"
                   className="h-8"
-                  onClick={() => addChild(null)}
+                  onClick={() => {
+                    setSelectedParentKey(null);
+                    addChild(null);
+                  }}
                 >
                   <Plus className="mr-1 h-3.5 w-3.5" />
                   {levelLabel('system')}
@@ -773,6 +925,17 @@ export type HierarchyConfigTreeEditorProps = {
   onChange: (nodes: TemplateDraftNode[]) => void;
   readOnly?: boolean;
   openFullscreenSignal?: number;
+  /** Existing config id — when set, Save updates in place (no rename). */
+  configId?: number;
+  suggestedDuplicateName?: string;
+  /** Save current draft (create if new, update if editing). */
+  onSave?: () => Promise<void> | void;
+  /** Duplicate as a new named configuration available for HM. */
+  onDuplicate?: (input: {
+    name: string;
+    description: string;
+  }) => Promise<boolean | void> | boolean | void;
+  saving?: boolean;
 };
 
 export function HierarchyConfigTreeEditor({
@@ -780,6 +943,11 @@ export function HierarchyConfigTreeEditor({
   onChange,
   readOnly = false,
   openFullscreenSignal = 0,
+  configId,
+  suggestedDuplicateName = '',
+  onSave,
+  onDuplicate,
+  saving = false,
 }: HierarchyConfigTreeEditorProps) {
   const { entityLabel } = useAppDefinitions();
   const levelLabel = useCallback((level: string) => entityLabel(level), [entityLabel]);
@@ -796,7 +964,18 @@ export function HierarchyConfigTreeEditor({
   const [layoutNonce, setLayoutNonce] = useState(1);
   const [form, setForm] = useState<NodeFormState | null>(null);
   const [deleteKey, setDeleteKey] = useState<string | null>(null);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveName, setSaveName] = useState('');
+  const [saveDescription, setSaveDescription] = useState('');
   const pendingPositions = useRef(new Map<string, { x: number; y: number }>());
+
+  const unassignedCount = useMemo(
+    () => nodes.filter((n) => !isEntityAssigned(n)).length,
+    [nodes]
+  );
+  const entitiesReady = nodes.length > 0 && unassignedCount === 0;
+  const canPersist =
+    !readOnly && entitiesReady && !saving && (!!onSave || !!onDuplicate);
 
   const nodesByKey = useMemo(() => {
     const map = new Map<string, TemplateDraftNode>();
@@ -824,13 +1003,13 @@ export function HierarchyConfigTreeEditor({
     if (!overlayOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      if (form || deleteKey) return;
+      if (form || deleteKey || saveDialogOpen) return;
       event.preventDefault();
       closeFullscreen();
     };
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
-  }, [closeFullscreen, deleteKey, form, overlayOpen]);
+  }, [closeFullscreen, deleteKey, form, overlayOpen, saveDialogOpen]);
 
   useEffect(() => {
     if (!overlayOpen) return;
@@ -866,6 +1045,18 @@ export function HierarchyConfigTreeEditor({
       abbreviation?: string;
       position?: { x: number; y: number };
     }) => {
+      if (input.level === 'system' && hasSystemNode(nodes)) {
+        toast.error('Only one System is allowed in a configuration');
+        return '';
+      }
+      if (
+        input.name?.trim() &&
+        isNameTakenUnderParent(nodes, input.parentKey, input.name)
+      ) {
+        toast.error(`“${input.name}” is already used under this parent`);
+        return '';
+      }
+
       const key = newClientKey(input.level.slice(0, 3));
       const siblings = siblingsOf(nodes, input.parentKey);
       let insertAt = siblings.length;
@@ -890,7 +1081,7 @@ export function HierarchyConfigTreeEditor({
       const base = nodes.filter((n) => (n.parent_client_key ?? null) !== input.parentKey);
       const reindexed = nextSiblings.map((s, index) => ({ ...s, sort_order: index }));
       onChange([...base, ...reindexed]);
-      if (input.position) pendingPositions.current.set(key, input.position);
+      // Positions come from Dagre on the next structure sync (active H/V layout).
       if (!input.name) {
         setForm({
           mode: 'create',
@@ -908,6 +1099,10 @@ export function HierarchyConfigTreeEditor({
   const addChild = useCallback(
     (parentKey: string | null) => {
       if (parentKey == null) {
+        if (hasSystemNode(nodes)) {
+          toast.error('Only one System is allowed in a configuration');
+          return;
+        }
         placeNode({ level: 'system', parentKey: null });
         return;
       }
@@ -920,13 +1115,17 @@ export function HierarchyConfigTreeEditor({
       }
       placeNode({ level: childLevel, parentKey });
     },
-    [nodesByKey, placeNode]
+    [nodes, nodesByKey, placeNode]
   );
 
   const addSibling = useCallback(
     (clientKey: string, where: 'above' | 'below') => {
       const node = nodesByKey.get(clientKey);
       if (!node) return;
+      if (node.level === 'system') {
+        toast.error('Only one System is allowed in a configuration');
+        return;
+      }
       placeNode({
         level: node.level,
         parentKey: node.parent_client_key ?? null,
@@ -942,17 +1141,17 @@ export function HierarchyConfigTreeEditor({
       const node = nodesByKey.get(clientKey);
       if (!node) return;
       if (node.level === 'system') {
-        placeNode({
-          level: 'system',
-          parentKey: null,
-          insertAfterKey: clientKey,
-        });
+        toast.error('Only one System is allowed in a configuration');
         return;
       }
       const parentKey = node.parent_client_key ?? null;
       const parent = parentKey ? nodesByKey.get(parentKey) : null;
       if (!parent) {
         toast.error('Parent node not found');
+        return;
+      }
+      if (parent.level === 'system') {
+        toast.error('Only one System is allowed in a configuration');
         return;
       }
       placeNode({
@@ -973,28 +1172,31 @@ export function HierarchyConfigTreeEditor({
     toast.success('Node and children removed');
   }, [deleteKey, nodes, onChange]);
 
+  const usedNamesForForm = useMemo(() => {
+    if (!form) return new Set<string>();
+    const current = nodes.find((n) => n.client_key === form.clientKey);
+    const parentKey = current?.parent_client_key ?? null;
+    return usedAssignedNamesUnderParent(nodes, parentKey, form.clientKey);
+  }, [form, nodes]);
+
   const entityOptions = useMemo(() => {
     if (!form) return [];
-    const used = new Set(
-      nodes
-        .filter(
-          (n) =>
-            n.level === form.level &&
-            n.client_key !== form.clientKey &&
-            n.name.trim()
-        )
-        .map((n) => n.name.trim().toLowerCase())
-    );
     return filterTemplateNames(entityListItems, form.level).filter(
-      (item) => !used.has(item.name.trim().toLowerCase())
+      (item) => !usedNamesForForm.has(item.name.trim().toLowerCase())
     );
-  }, [entityListItems, form, nodes]);
+  }, [entityListItems, form, usedNamesForForm]);
 
   const saveForm = useCallback(() => {
     if (!form) return;
     const name = form.name.trim();
     if (!name) {
       toast.error('Select or enter an entity name');
+      return;
+    }
+    const current = nodesByKey.get(form.clientKey);
+    const parentKey = current?.parent_client_key ?? null;
+    if (isNameTakenUnderParent(nodes, parentKey, name, form.clientKey)) {
+      toast.error(`“${name}” is already used under this parent`);
       return;
     }
     const selected = entityOptions.find((item) => item.name === name);
@@ -1010,7 +1212,7 @@ export function HierarchyConfigTreeEditor({
     );
     setForm(null);
     toast.success(form.mode === 'create' ? 'Node details saved' : 'Node updated');
-  }, [entityOptions, form, nodes, onChange]);
+  }, [entityOptions, form, nodes, nodesByKey, onChange]);
 
   useEffect(() => {
     if (!form) return;
@@ -1023,6 +1225,43 @@ export function HierarchyConfigTreeEditor({
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [form, saveForm]);
+
+  const ensureEntitiesReady = useCallback(() => {
+    if (nodes.length === 0) {
+      toast.error('Add at least one hierarchy node before saving');
+      return false;
+    }
+    if (unassignedCount > 0) {
+      toast.error(
+        `Assign an entity to every node before saving (${unassignedCount} unassigned)`
+      );
+      return false;
+    }
+    return true;
+  }, [nodes.length, unassignedCount]);
+
+  const handleSaveClick = useCallback(() => {
+    if (!ensureEntitiesReady() || !onSave) return;
+    void onSave();
+  }, [ensureEntitiesReady, onSave]);
+
+  const openDuplicateDialog = useCallback(() => {
+    if (!ensureEntitiesReady()) return;
+    setSaveName(suggestedDuplicateName.trim() || 'Configuration');
+    setSaveDescription('');
+    setSaveDialogOpen(true);
+  }, [ensureEntitiesReady, suggestedDuplicateName]);
+
+  const confirmDuplicate = useCallback(async () => {
+    const name = saveName.trim();
+    if (!name) {
+      toast.error('Configuration name is required');
+      return;
+    }
+    if (!onDuplicate) return;
+    const ok = await onDuplicate({ name, description: saveDescription.trim() });
+    if (ok !== false) setSaveDialogOpen(false);
+  }, [onDuplicate, saveDescription, saveName]);
 
   const changeDirection = useCallback((d: LayoutDirection) => {
     setDirection(d);
@@ -1053,6 +1292,47 @@ export function HierarchyConfigTreeEditor({
     pendingPositions,
   };
 
+  const actionButtons =
+    !readOnly && canPersist ? (
+      <>
+        {onSave ? (
+          <Button
+            type="button"
+            size="sm"
+            className="h-8"
+            disabled={!entitiesReady || saving}
+            title={
+              unassignedCount > 0
+                ? `Assign entities to all nodes first (${unassignedCount} left)`
+                : nodes.length === 0
+                  ? 'Add nodes first'
+                  : configId
+                    ? 'Save changes to this configuration'
+                    : 'Save configuration'
+            }
+            onClick={handleSaveClick}
+          >
+            <Save className="mr-1 h-3.5 w-3.5" />
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+        ) : null}
+        {onDuplicate && configId ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="h-8"
+            disabled={!entitiesReady || saving}
+            title="Create a copy under a new name (available for HM)"
+            onClick={openDuplicateDialog}
+          >
+            <Copy className="mr-1 h-3.5 w-3.5" />
+            Duplicate
+          </Button>
+        ) : null}
+      </>
+    ) : null;
+
   const overlay =
     overlayOpen && typeof document !== 'undefined'
       ? createPortal(
@@ -1063,12 +1343,24 @@ export function HierarchyConfigTreeEditor({
             aria-label="Configuration hierarchy tree"
           >
             <div className="flex items-start justify-between gap-3 border-b px-3 py-2">
-              <div className="max-w-2xl text-xs text-muted-foreground">
-                Lock freezes edits · Resize on hover · Drag to move · Connect handles /
-                proximity · Drop connection on pane to add child · Eraser / Selection ·
-                Drag entities from sidebar · Esc exits
+              <div className="max-w-2xl space-y-1">
+                <div className="text-xs text-muted-foreground">
+                  Lock freezes edits · Controls on hover · Assign every node an entity before
+                  save · Esc exits
+                </div>
+                {unassignedCount > 0 ? (
+                  <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                    {unassignedCount} node{unassignedCount === 1 ? '' : 's'} still need an
+                    Entity List assignment
+                  </p>
+                ) : nodes.length > 0 ? (
+                  <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                    All nodes assigned — ready to save
+                  </p>
+                ) : null}
               </div>
               <div className="flex items-center gap-1.5">
+                {actionButtons}
                 <Button
                   type="button"
                   size="icon"
@@ -1106,14 +1398,16 @@ export function HierarchyConfigTreeEditor({
           <div>
             <p className="text-sm font-medium">Hierarchy tree</p>
             <p className="text-xs text-muted-foreground">
-              React Flow builder — open full screen for lock, eraser, DnD, layout, and
-              export.
+              React Flow builder — open full screen to edit and save as a new configuration.
             </p>
           </div>
-          <Button type="button" size="sm" variant="secondary" onClick={openFullscreen}>
-            <Maximize2 className="mr-1.5 h-4 w-4" />
-            Tree builder
-          </Button>
+          <div className="flex items-center gap-1.5">
+            {actionButtons}
+            <Button type="button" size="sm" variant="secondary" onClick={openFullscreen}>
+              <Maximize2 className="mr-1.5 h-4 w-4" />
+              Tree builder
+            </Button>
+          </div>
         </div>
         <div className="space-y-2 p-3">
           <div className="flex flex-wrap gap-2">
@@ -1122,6 +1416,9 @@ export function HierarchyConfigTreeEditor({
                 key={level}
                 className="inline-flex items-center rounded-full border bg-background px-2.5 py-0.5 text-xs"
               >
+                <span
+                  className={cn('mr-1.5 h-2 w-2 rounded-full', LEVEL_LEGEND_DOT[level])}
+                />
                 {levelLabel(level)}
                 <span className="ml-1.5 tabular-nums text-muted-foreground">
                   {nodeCountByLevel[level] ?? 0}
@@ -1129,6 +1426,12 @@ export function HierarchyConfigTreeEditor({
               </span>
             ))}
           </div>
+          {unassignedCount > 0 ? (
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              {unassignedCount} unassigned node{unassignedCount === 1 ? '' : 's'} — assign
+              entities before saving.
+            </p>
+          ) : null}
           <div className="relative h-80 overflow-hidden rounded-md border bg-muted/10">
             {!overlayOpen ? (
               <ConfigTreeCanvas {...canvasProps} />
@@ -1143,73 +1446,108 @@ export function HierarchyConfigTreeEditor({
 
       {overlay}
 
-      <Dialog open={!!form} onOpenChange={(open) => !open && setForm(null)}>
+      <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
+            <DialogTitle>Duplicate configuration</DialogTitle>
+            <DialogDescription>
+              Create a copy of this hierarchy template under a new name. The copy will be marked
+              available for HM selection.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cfg-tree-save-name">New configuration name</Label>
+              <Input
+                id="cfg-tree-save-name"
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+                placeholder="e.g. High Data Rate Standard (copy)"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cfg-tree-save-desc">Description (optional)</Label>
+              <Input
+                id="cfg-tree-save-desc"
+                value={saveDescription}
+                onChange={(e) => setSaveDescription(e.target.value)}
+                placeholder="Short description"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setSaveDialogOpen(false)}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void confirmDuplicate()}
+                disabled={saving || !saveName.trim()}
+              >
+                <Copy className="mr-1.5 h-4 w-4" />
+                {saving ? 'Saving…' : 'Duplicate'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!form} onOpenChange={(open) => !open && setForm(null)}>
+        <DialogContent className="flex max-h-[85vh] max-w-lg flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
+          <DialogHeader className="space-y-1 border-b px-6 py-4">
             <DialogTitle>
               {form?.mode === 'create' ? 'Add hierarchy node' : 'Edit hierarchy node'}
             </DialogTitle>
             <DialogDescription>
               {form
-                ? `Select a ${levelLabel(form.level)} from the Entity List. Press Ctrl+S or Save.`
+                ? `Expand ${levelLabel(form.level)} and pick an entity. Press Ctrl+S or Save.`
                 : null}
             </DialogDescription>
           </DialogHeader>
           {form ? (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Level</Label>
-                <Select value={form.level} disabled>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TEMPLATE_NODE_LEVELS.map((level) => (
-                      <SelectItem key={level} value={level}>
-                        {levelLabel(level)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-6 py-4">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">Level</span>
+                <span className="rounded-full border bg-muted/40 px-2.5 py-0.5 font-medium">
+                  {levelLabel(form.level)}
+                </span>
               </div>
 
-              <div className="space-y-2">
-                <Label>Entity ({levelLabel(form.level)})</Label>
-                <Select
-                  value={form.name || undefined}
-                  onValueChange={(value) => {
-                    const selected = entityOptions.find((item) => item.name === value);
+              <div className="min-h-0 flex-1 space-y-2">
+                <Label>Entity list</Label>
+                <ConfigEntityTypeTree
+                  className="h-72"
+                  entities={entityListItems}
+                  levelLabel={levelLabel}
+                  selectableLevel={form.level}
+                  usedNames={usedNamesForForm}
+                  selectedName={form.name || undefined}
+                  defaultExpandedLevels={[form.level]}
+                  onSelect={(item) => {
                     setForm((prev) =>
                       prev
                         ? {
                             ...prev,
-                            name: value,
+                            name: item.name,
                             abbreviation: (
-                              selected?.abbreviation || suggestAbbreviation(value)
+                              item.abbreviation || suggestAbbreviation(item.name)
                             ).toUpperCase(),
                           }
                         : prev
                     );
                   }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={`Select ${levelLabel(form.level)}`} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {entityOptions.map((item) => (
-                      <SelectItem key={`${item.id}-${item.name}`} value={item.name}>
-                        {item.name}
-                        {item.abbreviation ? ` (${item.abbreviation})` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                />
               </div>
 
               <div className="space-y-2">
                 <Label>Abbreviation</Label>
                 <Input
-                  className="font-mono uppercase"
+                  className="rounded-full font-mono uppercase"
                   value={form.abbreviation}
                   onChange={(e) =>
                     setForm((prev) =>
@@ -1220,7 +1558,7 @@ export function HierarchyConfigTreeEditor({
                 />
               </div>
 
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-end gap-2 border-t pt-4">
                 <Button type="button" variant="outline" onClick={() => setForm(null)}>
                   Cancel
                 </Button>

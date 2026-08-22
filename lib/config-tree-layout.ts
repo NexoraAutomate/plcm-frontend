@@ -13,6 +13,28 @@ export const V_GAP = 36;
 
 export type LayoutDirection = 'LR' | 'TB';
 
+export function layoutHandleIds(direction: LayoutDirection): {
+  sourceHandle: string;
+  targetHandle: string;
+  sourcePosition: Position;
+  targetPosition: Position;
+} {
+  if (direction === 'TB') {
+    return {
+      sourceHandle: 'source-bottom',
+      targetHandle: 'target-top',
+      sourcePosition: Position.Bottom,
+      targetPosition: Position.Top,
+    };
+  }
+  return {
+    sourceHandle: 'source-right',
+    targetHandle: 'target-left',
+    sourcePosition: Position.Right,
+    targetPosition: Position.Left,
+  };
+}
+
 export type ConfigTreeNodeData = {
   draft: TemplateDraftNode;
   label: string;
@@ -21,6 +43,7 @@ export type ConfigTreeNodeData = {
   locked: boolean;
   readOnly: boolean;
   canAddChild: boolean;
+  layoutDirection: LayoutDirection;
   intersecting?: boolean;
   toBeDeleted?: boolean;
 };
@@ -31,6 +54,42 @@ export type ConfigTreeEdgeData = {
 
 export function isDraftNode(node: TemplateDraftNode): boolean {
   return !node.name.trim() || node.name.trim().toLowerCase().startsWith('new ');
+}
+
+/** True when the node has a real Entity List assignment (not a placeholder). */
+export function isEntityAssigned(node: TemplateDraftNode): boolean {
+  return !isDraftNode(node);
+}
+
+export function hasSystemNode(nodes: TemplateDraftNode[]): boolean {
+  return nodes.some((n) => n.level === 'system');
+}
+
+/** Assigned entity names already used as children of the same parent. */
+export function usedAssignedNamesUnderParent(
+  nodes: TemplateDraftNode[],
+  parentKey: string | null,
+  excludeClientKey?: string
+): Set<string> {
+  const used = new Set<string>();
+  for (const n of nodes) {
+    if ((n.parent_client_key ?? null) !== parentKey) continue;
+    if (excludeClientKey && n.client_key === excludeClientKey) continue;
+    if (!isEntityAssigned(n)) continue;
+    used.add(n.name.trim().toLowerCase());
+  }
+  return used;
+}
+
+export function isNameTakenUnderParent(
+  nodes: TemplateDraftNode[],
+  parentKey: string | null,
+  name: string,
+  excludeClientKey?: string
+): boolean {
+  const needle = name.trim().toLowerCase();
+  if (!needle) return false;
+  return usedAssignedNamesUnderParent(nodes, parentKey, excludeClientKey).has(needle);
 }
 
 export function descendantsOf(
@@ -162,7 +221,7 @@ export function buildGraphFromDraft(input: {
           return map;
         })();
 
-  const isHorizontal = direction === 'LR';
+  const handles = layoutHandleIds(direction);
   const flowNodes: Node<ConfigTreeNodeData>[] = nodes.map((node) => {
     const size = sizeById?.get(node.client_key);
     const pos = positions.get(node.client_key) ?? { x: 0, y: 0 };
@@ -182,9 +241,10 @@ export function buildGraphFromDraft(input: {
         locked,
         readOnly,
         canAddChild: !!CHILD_TEMPLATE_LEVEL[node.level],
+        layoutDirection: direction,
       },
-      sourcePosition: isHorizontal ? Position.Right : Position.Bottom,
-      targetPosition: isHorizontal ? Position.Left : Position.Top,
+      sourcePosition: handles.sourcePosition,
+      targetPosition: handles.targetPosition,
       draggable: !locked && !readOnly,
       connectable: !locked && !readOnly,
       deletable: !locked && !readOnly,
@@ -198,6 +258,8 @@ export function buildGraphFromDraft(input: {
       id: `e-${node.parent_client_key}-${node.client_key}`,
       source: node.parent_client_key,
       target: node.client_key,
+      sourceHandle: handles.sourceHandle,
+      targetHandle: handles.targetHandle,
       type: 'configAnimated',
       animated: true,
       deletable: !locked && !readOnly,

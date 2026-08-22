@@ -18,16 +18,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { ConfigTreeNodeData } from '@/lib/config-tree-layout';
-import type { TemplateNodeLevel } from '@/lib/hierarchy-config';
+import { LEVEL_NODE_STYLE } from '@/lib/config-tree-level-styles';
 import { cn } from '@/lib/utils';
-
-const LEVEL_ACCENT: Record<TemplateNodeLevel, string> = {
-  system: 'border-l-blue-500',
-  subsystem: 'border-l-violet-500',
-  module: 'border-l-emerald-500',
-  unit: 'border-l-amber-500',
-  component: 'border-l-slate-400',
-};
 
 export type ConfigTreeNodeActions = {
   onEdit: (clientKey: string) => void;
@@ -48,19 +40,21 @@ export const ConfigTreeFlowNode = memo(function ConfigTreeFlowNode({
   actions,
 }: Props) {
   const [hovered, setHovered] = useState(false);
-  const { draft, label, levelLabel, isDraft, locked, readOnly, canAddChild } = data;
+  const { draft, label, levelLabel, isDraft, locked, readOnly, canAddChild, layoutDirection } =
+    data;
   const interactive = !locked && !readOnly;
   const showResize = interactive && (hovered || selected);
+  const isVertical = layoutDirection === 'TB';
+  const levelStyle = LEVEL_NODE_STYLE[draft.level];
 
   return (
     <div
       className={cn(
-        'group relative h-full w-full rounded-md border border-l-4 bg-background px-2 py-2 shadow-sm transition-colors',
-        LEVEL_ACCENT[draft.level],
-        isDraft && 'border-dashed border-amber-400 bg-amber-50/70 dark:bg-amber-950/20',
-        data.intersecting && 'bg-sky-100 dark:bg-sky-950/50 ring-2 ring-sky-400',
-        data.toBeDeleted &&
-          'bg-red-100/90 opacity-70 ring-2 ring-destructive dark:bg-red-950/60',
+        'group relative h-full w-full rounded-md border-2 border-l-4 px-2 py-2 shadow-sm transition-colors',
+        levelStyle.card,
+        isDraft && 'border-dashed border-amber-500',
+        data.intersecting && 'ring-2 ring-sky-400',
+        data.toBeDeleted && 'opacity-70 ring-2 ring-destructive',
         selected && 'ring-2 ring-primary'
       )}
       onMouseEnter={() => setHovered(true)}
@@ -74,30 +68,35 @@ export const ConfigTreeFlowNode = memo(function ConfigTreeFlowNode({
         maxHeight={240}
       />
 
-      {/* Easy-connect: large handles around the node */}
       <Handle
         type="target"
         position={Position.Left}
         id="target-left"
-        className="!h-3 !w-3 !bg-muted-foreground"
+        className={cn(
+          'h-3! w-3! bg-muted-foreground!',
+          isVertical ? 'opacity-40' : 'opacity-100'
+        )}
       />
       <Handle
         type="target"
         position={Position.Top}
         id="target-top"
-        className="!h-3 !w-3 !bg-muted-foreground"
+        className={cn(
+          'h-3! w-3! bg-muted-foreground!',
+          isVertical ? 'opacity-100' : 'opacity-40'
+        )}
       />
       <Handle
         type="source"
         position={Position.Right}
         id="source-right"
-        className="!h-3 !w-3 !bg-primary"
+        className={cn('h-3! w-3! bg-primary!', isVertical ? 'opacity-40' : 'opacity-100')}
       />
       <Handle
         type="source"
         position={Position.Bottom}
         id="source-bottom"
-        className="!h-3 !w-3 !bg-primary"
+        className={cn('h-3! w-3! bg-primary!', isVertical ? 'opacity-100' : 'opacity-40')}
       />
 
       <button
@@ -111,16 +110,19 @@ export const ConfigTreeFlowNode = memo(function ConfigTreeFlowNode({
         <div className="truncate text-sm font-medium">
           {label}
           {isDraft ? (
-            <span className="ml-1 text-[10px] font-normal text-amber-700">new</span>
+            <span className="ml-1 text-[10px] font-normal text-amber-700 dark:text-amber-300">
+              unassigned
+            </span>
           ) : null}
         </div>
-        <div className="truncate text-[11px] text-muted-foreground">
+        <div className="truncate text-[11px] opacity-70">
           {(draft.abbreviation || '—').toUpperCase()} · {levelLabel}
         </div>
       </button>
 
-      {interactive ? (
-        <div className="mt-1.5 flex items-center gap-0.5 border-t pt-1.5 nodrag nopan">
+      {/* Controls only on hover — overlay so node size stays stable */}
+      {interactive && hovered ? (
+        <div className="absolute inset-x-1 bottom-1 z-10 flex items-center gap-0.5 rounded-md border bg-background/95 p-0.5 shadow-md nodrag nopan">
           <Button
             type="button"
             size="icon"
