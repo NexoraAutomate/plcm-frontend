@@ -3,7 +3,7 @@ import * as api from '@/lib/api';
 import { listEntityListNames } from '@/lib/hierarchy-template-names';
 import { fetchExecutiveDashboard } from '@/lib/api/dashboard';
 import { fetchPaginatedList, unwrapListItems } from '@/lib/paginated-api';
-import { fetchCappedPages, HIERARCHY_TYPE_CAP, LIST_BOOTSTRAP_SIZE, LIST_PAGE_SIZE } from '@/lib/data-loading';
+import { fetchCappedPages, ABSOLUTE_FETCH_CAP, HIERARCHY_TYPE_CAP, LIST_BOOTSTRAP_SIZE, LIST_PAGE_SIZE } from '@/lib/data-loading';
 import type { ListFilterParams } from '@/lib/list-filters';
 import type { ExecutiveDashboardFilters } from '@/lib/types/dashboard';
 import type {
@@ -151,6 +151,36 @@ export const fetchInventoryPage = (
     limit,
     filters
   );
+
+export async function fetchAllMatchingInventoryIds(
+  inventoryType?: string,
+  filters?: ListFilterParams
+): Promise<number[]> {
+  try {
+    const res = await api.inventory.listIds(inventoryType, filters);
+    if (Array.isArray(res.data?.ids)) return res.data.ids;
+  } catch {
+    // Fall back to paging the list when the ids endpoint is unavailable.
+  }
+
+  const ids: number[] = [];
+  const limit = LIST_BOOTSTRAP_SIZE;
+  let skip = 0;
+  let total = Number.POSITIVE_INFINITY;
+  while (skip < total) {
+    const page = await fetchInventoryPage(skip, limit, inventoryType, filters);
+    total = page.total;
+    ids.push(
+      ...page.items
+        .map((item) => item.id)
+        .filter((id): id is number => typeof id === 'number')
+    );
+    if (page.items.length === 0) break;
+    skip += limit;
+    if (ids.length >= ABSOLUTE_FETCH_CAP) break;
+  }
+  return ids;
+}
 
 export const fetchSystemsPage = (skip: number, limit: number, filters?: ListFilterParams) =>
   fetchPaginatedList((s, l, f) => api.systems.list(s, l, undefined, f), skip, limit, filters);

@@ -1,0 +1,3475 @@
+{
+  "version": 1,
+  "format": "One catalog item per part_number. Serial numbers are children in instances[]. Components use quantity only.",
+  "items": [
+    {
+      "name": "SDLS",
+      "inventory_type": "system",
+      "part_number": "PN-0001",
+      "original_part_number": "PN-0001",
+      "quantity": 5,
+      "description": "Stock of SDLS",
+      "oem_name": "Honeywell",
+      "configuration_item": "CI-0001",
+      "sku": "SKU-0001",
+      "location": "WH-A/Rack-01",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0001-001",
+        "SN-0001-002",
+        "SN-0001-003",
+        "SN-0001-004",
+        "SN-0001-005"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0001-001",
+          "original_serial_number": "SN-0001-001",
+          "location": "WH-A/Rack-01",
+          "configuration_item": "CI-0001"
+        },
+        {
+          "serial_number": "SN-0001-002",
+          "original_serial_number": "SN-0001-002",
+          "location": "WH-A/Rack-01",
+          "configuration_item": "CI-0001"
+        },
+        {
+          "serial_number": "SN-0001-003",
+          "original_serial_number": "SN-0001-003",
+          "location": "WH-A/Rack-01",
+          "configuration_item": "CI-0001"
+        },
+        {
+          "serial_number": "SN-0001-004",
+          "original_serial_number": "SN-0001-004",
+          "location": "WH-A/Rack-01",
+          "configuration_item": "CI-0001"
+        },
+        {
+          "serial_number": "SN-0001-005",
+          "original_serial_number": "SN-0001-005",
+          "location": "WH-A/Rack-01",
+          "configuration_item": "CI-0001"
+        }
+      ]
+    },
+    {
+      "name": "System - Antenna Pedestal",
+      "inventory_type": "subsystem",
+      "part_number": "PN-0002",
+      "original_part_number": "PN-0002",
+      "quantity": 6,
+      "description": "Stock of System - Antenna Pedestal",
+      "oem_name": "TE Connectivity",
+      "configuration_item": "CI-0002",
+      "sku": "SKU-0002",
+      "location": "WH-A/Rack-02",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0002-001",
+        "SN-0002-002",
+        "SN-0002-003",
+        "SN-0002-004",
+        "SN-0002-005",
+        "SN-0002-006"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0002-001",
+          "original_serial_number": "SN-0002-001",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0002"
+        },
+        {
+          "serial_number": "SN-0002-002",
+          "original_serial_number": "SN-0002-002",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0002"
+        },
+        {
+          "serial_number": "SN-0002-003",
+          "original_serial_number": "SN-0002-003",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0002"
+        },
+        {
+          "serial_number": "SN-0002-004",
+          "original_serial_number": "SN-0002-004",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0002"
+        },
+        {
+          "serial_number": "SN-0002-005",
+          "original_serial_number": "SN-0002-005",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0002"
+        },
+        {
+          "serial_number": "SN-0002-006",
+          "original_serial_number": "SN-0002-006",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0002"
+        }
+      ]
+    },
+    {
+      "name": "System - DPU",
+      "inventory_type": "subsystem",
+      "part_number": "PN-0003",
+      "original_part_number": "PN-0003",
+      "quantity": 7,
+      "description": "Stock of System - DPU",
+      "oem_name": "Amphenol",
+      "configuration_item": "CI-0003",
+      "sku": "SKU-0003",
+      "location": "WH-A/Rack-03",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0003-001",
+        "SN-0003-002",
+        "SN-0003-003",
+        "SN-0003-004",
+        "SN-0003-005",
+        "SN-0003-006",
+        "SN-0003-007"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0003-001",
+          "original_serial_number": "SN-0003-001",
+          "location": "WH-A/Rack-03",
+          "configuration_item": "CI-0003"
+        },
+        {
+          "serial_number": "SN-0003-002",
+          "original_serial_number": "SN-0003-002",
+          "location": "WH-A/Rack-03",
+          "configuration_item": "CI-0003"
+        },
+        {
+          "serial_number": "SN-0003-003",
+          "original_serial_number": "SN-0003-003",
+          "location": "WH-A/Rack-03",
+          "configuration_item": "CI-0003"
+        },
+        {
+          "serial_number": "SN-0003-004",
+          "original_serial_number": "SN-0003-004",
+          "location": "WH-A/Rack-03",
+          "configuration_item": "CI-0003"
+        },
+        {
+          "serial_number": "SN-0003-005",
+          "original_serial_number": "SN-0003-005",
+          "location": "WH-A/Rack-03",
+          "configuration_item": "CI-0003"
+        },
+        {
+          "serial_number": "SN-0003-006",
+          "original_serial_number": "SN-0003-006",
+          "location": "WH-A/Rack-03",
+          "configuration_item": "CI-0003"
+        },
+        {
+          "serial_number": "SN-0003-007",
+          "original_serial_number": "SN-0003-007",
+          "location": "WH-A/Rack-03",
+          "configuration_item": "CI-0003"
+        }
+      ]
+    },
+    {
+      "name": "System - ACU",
+      "inventory_type": "subsystem",
+      "part_number": "PN-0004",
+      "original_part_number": "PN-0004",
+      "quantity": 8,
+      "description": "Stock of System - ACU",
+      "oem_name": "Molex",
+      "configuration_item": "CI-0004",
+      "sku": "SKU-0004",
+      "location": "WH-A/Rack-04",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0004-001",
+        "SN-0004-002",
+        "SN-0004-003",
+        "SN-0004-004",
+        "SN-0004-005",
+        "SN-0004-006",
+        "SN-0004-007",
+        "SN-0004-008"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0004-001",
+          "original_serial_number": "SN-0004-001",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0004"
+        },
+        {
+          "serial_number": "SN-0004-002",
+          "original_serial_number": "SN-0004-002",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0004"
+        },
+        {
+          "serial_number": "SN-0004-003",
+          "original_serial_number": "SN-0004-003",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0004"
+        },
+        {
+          "serial_number": "SN-0004-004",
+          "original_serial_number": "SN-0004-004",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0004"
+        },
+        {
+          "serial_number": "SN-0004-005",
+          "original_serial_number": "SN-0004-005",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0004"
+        },
+        {
+          "serial_number": "SN-0004-006",
+          "original_serial_number": "SN-0004-006",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0004"
+        },
+        {
+          "serial_number": "SN-0004-007",
+          "original_serial_number": "SN-0004-007",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0004"
+        },
+        {
+          "serial_number": "SN-0004-008",
+          "original_serial_number": "SN-0004-008",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0004"
+        }
+      ]
+    },
+    {
+      "name": "System - Harness OBS",
+      "inventory_type": "subsystem",
+      "part_number": "PN-0005",
+      "original_part_number": "PN-0005",
+      "quantity": 9,
+      "description": "Stock of System - Harness OBS",
+      "oem_name": "Texas Instruments",
+      "configuration_item": "CI-0005",
+      "sku": "SKU-0005",
+      "location": "WH-A/Rack-05",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0005-001",
+        "SN-0005-002",
+        "SN-0005-003",
+        "SN-0005-004",
+        "SN-0005-005",
+        "SN-0005-006",
+        "SN-0005-007",
+        "SN-0005-008",
+        "SN-0005-009"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0005-001",
+          "original_serial_number": "SN-0005-001",
+          "location": "WH-A/Rack-05",
+          "configuration_item": "CI-0005"
+        },
+        {
+          "serial_number": "SN-0005-002",
+          "original_serial_number": "SN-0005-002",
+          "location": "WH-A/Rack-05",
+          "configuration_item": "CI-0005"
+        },
+        {
+          "serial_number": "SN-0005-003",
+          "original_serial_number": "SN-0005-003",
+          "location": "WH-A/Rack-05",
+          "configuration_item": "CI-0005"
+        },
+        {
+          "serial_number": "SN-0005-004",
+          "original_serial_number": "SN-0005-004",
+          "location": "WH-A/Rack-05",
+          "configuration_item": "CI-0005"
+        },
+        {
+          "serial_number": "SN-0005-005",
+          "original_serial_number": "SN-0005-005",
+          "location": "WH-A/Rack-05",
+          "configuration_item": "CI-0005"
+        },
+        {
+          "serial_number": "SN-0005-006",
+          "original_serial_number": "SN-0005-006",
+          "location": "WH-A/Rack-05",
+          "configuration_item": "CI-0005"
+        },
+        {
+          "serial_number": "SN-0005-007",
+          "original_serial_number": "SN-0005-007",
+          "location": "WH-A/Rack-05",
+          "configuration_item": "CI-0005"
+        },
+        {
+          "serial_number": "SN-0005-008",
+          "original_serial_number": "SN-0005-008",
+          "location": "WH-A/Rack-05",
+          "configuration_item": "CI-0005"
+        },
+        {
+          "serial_number": "SN-0005-009",
+          "original_serial_number": "SN-0005-009",
+          "location": "WH-A/Rack-05",
+          "configuration_item": "CI-0005"
+        }
+      ]
+    },
+    {
+      "name": "Ground Station - BPU",
+      "inventory_type": "subsystem",
+      "part_number": "PN-0006",
+      "original_part_number": "PN-0006",
+      "quantity": 10,
+      "description": "Stock of Ground Station - BPU",
+      "oem_name": "Analog Devices",
+      "configuration_item": "CI-0006",
+      "sku": "SKU-0006",
+      "location": "WH-A/Rack-06",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0006-001",
+        "SN-0006-002",
+        "SN-0006-003",
+        "SN-0006-004",
+        "SN-0006-005",
+        "SN-0006-006",
+        "SN-0006-007",
+        "SN-0006-008",
+        "SN-0006-009",
+        "SN-0006-010"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0006-001",
+          "original_serial_number": "SN-0006-001",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0006"
+        },
+        {
+          "serial_number": "SN-0006-002",
+          "original_serial_number": "SN-0006-002",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0006"
+        },
+        {
+          "serial_number": "SN-0006-003",
+          "original_serial_number": "SN-0006-003",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0006"
+        },
+        {
+          "serial_number": "SN-0006-004",
+          "original_serial_number": "SN-0006-004",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0006"
+        },
+        {
+          "serial_number": "SN-0006-005",
+          "original_serial_number": "SN-0006-005",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0006"
+        },
+        {
+          "serial_number": "SN-0006-006",
+          "original_serial_number": "SN-0006-006",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0006"
+        },
+        {
+          "serial_number": "SN-0006-007",
+          "original_serial_number": "SN-0006-007",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0006"
+        },
+        {
+          "serial_number": "SN-0006-008",
+          "original_serial_number": "SN-0006-008",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0006"
+        },
+        {
+          "serial_number": "SN-0006-009",
+          "original_serial_number": "SN-0006-009",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0006"
+        },
+        {
+          "serial_number": "SN-0006-010",
+          "original_serial_number": "SN-0006-010",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0006"
+        }
+      ]
+    },
+    {
+      "name": "Ground Station - Harness GS",
+      "inventory_type": "subsystem",
+      "part_number": "PN-0007",
+      "original_part_number": "PN-0007",
+      "quantity": 5,
+      "description": "Stock of Ground Station - Harness GS",
+      "oem_name": "Cobham",
+      "configuration_item": "CI-0007",
+      "sku": "SKU-0007",
+      "location": "WH-A/Rack-07",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0007-001",
+        "SN-0007-002",
+        "SN-0007-003",
+        "SN-0007-004",
+        "SN-0007-005"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0007-001",
+          "original_serial_number": "SN-0007-001",
+          "location": "WH-A/Rack-07",
+          "configuration_item": "CI-0007"
+        },
+        {
+          "serial_number": "SN-0007-002",
+          "original_serial_number": "SN-0007-002",
+          "location": "WH-A/Rack-07",
+          "configuration_item": "CI-0007"
+        },
+        {
+          "serial_number": "SN-0007-003",
+          "original_serial_number": "SN-0007-003",
+          "location": "WH-A/Rack-07",
+          "configuration_item": "CI-0007"
+        },
+        {
+          "serial_number": "SN-0007-004",
+          "original_serial_number": "SN-0007-004",
+          "location": "WH-A/Rack-07",
+          "configuration_item": "CI-0007"
+        },
+        {
+          "serial_number": "SN-0007-005",
+          "original_serial_number": "SN-0007-005",
+          "location": "WH-A/Rack-07",
+          "configuration_item": "CI-0007"
+        }
+      ]
+    },
+    {
+      "name": "Ground Station - BUC GS",
+      "inventory_type": "subsystem",
+      "part_number": "PN-0008",
+      "original_part_number": "PN-0008",
+      "quantity": 6,
+      "description": "Stock of Ground Station - BUC GS",
+      "oem_name": "Thales",
+      "configuration_item": "CI-0008",
+      "sku": "SKU-0008",
+      "location": "WH-A/Rack-08",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0008-001",
+        "SN-0008-002",
+        "SN-0008-003",
+        "SN-0008-004",
+        "SN-0008-005",
+        "SN-0008-006"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0008-001",
+          "original_serial_number": "SN-0008-001",
+          "location": "WH-A/Rack-08",
+          "configuration_item": "CI-0008"
+        },
+        {
+          "serial_number": "SN-0008-002",
+          "original_serial_number": "SN-0008-002",
+          "location": "WH-A/Rack-08",
+          "configuration_item": "CI-0008"
+        },
+        {
+          "serial_number": "SN-0008-003",
+          "original_serial_number": "SN-0008-003",
+          "location": "WH-A/Rack-08",
+          "configuration_item": "CI-0008"
+        },
+        {
+          "serial_number": "SN-0008-004",
+          "original_serial_number": "SN-0008-004",
+          "location": "WH-A/Rack-08",
+          "configuration_item": "CI-0008"
+        },
+        {
+          "serial_number": "SN-0008-005",
+          "original_serial_number": "SN-0008-005",
+          "location": "WH-A/Rack-08",
+          "configuration_item": "CI-0008"
+        },
+        {
+          "serial_number": "SN-0008-006",
+          "original_serial_number": "SN-0008-006",
+          "location": "WH-A/Rack-08",
+          "configuration_item": "CI-0008"
+        }
+      ]
+    },
+    {
+      "name": "Ground Station - Modem TMTC",
+      "inventory_type": "subsystem",
+      "part_number": "PN-0009",
+      "original_part_number": "PN-0009",
+      "quantity": 7,
+      "description": "Stock of Ground Station - Modem TMTC",
+      "oem_name": "Airbus DS",
+      "configuration_item": "CI-0009",
+      "sku": "SKU-0009",
+      "location": "WH-A/Rack-09",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0009-001",
+        "SN-0009-002",
+        "SN-0009-003",
+        "SN-0009-004",
+        "SN-0009-005",
+        "SN-0009-006",
+        "SN-0009-007"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0009-001",
+          "original_serial_number": "SN-0009-001",
+          "location": "WH-A/Rack-09",
+          "configuration_item": "CI-0009"
+        },
+        {
+          "serial_number": "SN-0009-002",
+          "original_serial_number": "SN-0009-002",
+          "location": "WH-A/Rack-09",
+          "configuration_item": "CI-0009"
+        },
+        {
+          "serial_number": "SN-0009-003",
+          "original_serial_number": "SN-0009-003",
+          "location": "WH-A/Rack-09",
+          "configuration_item": "CI-0009"
+        },
+        {
+          "serial_number": "SN-0009-004",
+          "original_serial_number": "SN-0009-004",
+          "location": "WH-A/Rack-09",
+          "configuration_item": "CI-0009"
+        },
+        {
+          "serial_number": "SN-0009-005",
+          "original_serial_number": "SN-0009-005",
+          "location": "WH-A/Rack-09",
+          "configuration_item": "CI-0009"
+        },
+        {
+          "serial_number": "SN-0009-006",
+          "original_serial_number": "SN-0009-006",
+          "location": "WH-A/Rack-09",
+          "configuration_item": "CI-0009"
+        },
+        {
+          "serial_number": "SN-0009-007",
+          "original_serial_number": "SN-0009-007",
+          "location": "WH-A/Rack-09",
+          "configuration_item": "CI-0009"
+        }
+      ]
+    },
+    {
+      "name": "Ground Station - Modem Beacon",
+      "inventory_type": "subsystem",
+      "part_number": "PN-0010",
+      "original_part_number": "PN-0010",
+      "quantity": 8,
+      "description": "Stock of Ground Station - Modem Beacon",
+      "oem_name": "Lockheed Martin",
+      "configuration_item": "CI-0010",
+      "sku": "SKU-0010",
+      "location": "WH-A/Rack-10",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0010-001",
+        "SN-0010-002",
+        "SN-0010-003",
+        "SN-0010-004",
+        "SN-0010-005",
+        "SN-0010-006",
+        "SN-0010-007",
+        "SN-0010-008"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0010-001",
+          "original_serial_number": "SN-0010-001",
+          "location": "WH-A/Rack-10",
+          "configuration_item": "CI-0010"
+        },
+        {
+          "serial_number": "SN-0010-002",
+          "original_serial_number": "SN-0010-002",
+          "location": "WH-A/Rack-10",
+          "configuration_item": "CI-0010"
+        },
+        {
+          "serial_number": "SN-0010-003",
+          "original_serial_number": "SN-0010-003",
+          "location": "WH-A/Rack-10",
+          "configuration_item": "CI-0010"
+        },
+        {
+          "serial_number": "SN-0010-004",
+          "original_serial_number": "SN-0010-004",
+          "location": "WH-A/Rack-10",
+          "configuration_item": "CI-0010"
+        },
+        {
+          "serial_number": "SN-0010-005",
+          "original_serial_number": "SN-0010-005",
+          "location": "WH-A/Rack-10",
+          "configuration_item": "CI-0010"
+        },
+        {
+          "serial_number": "SN-0010-006",
+          "original_serial_number": "SN-0010-006",
+          "location": "WH-A/Rack-10",
+          "configuration_item": "CI-0010"
+        },
+        {
+          "serial_number": "SN-0010-007",
+          "original_serial_number": "SN-0010-007",
+          "location": "WH-A/Rack-10",
+          "configuration_item": "CI-0010"
+        },
+        {
+          "serial_number": "SN-0010-008",
+          "original_serial_number": "SN-0010-008",
+          "location": "WH-A/Rack-10",
+          "configuration_item": "CI-0010"
+        }
+      ]
+    },
+    {
+      "name": "Ground Station - Antenna GS",
+      "inventory_type": "subsystem",
+      "part_number": "PN-0011",
+      "original_part_number": "PN-0011",
+      "quantity": 9,
+      "description": "Stock of Ground Station - Antenna GS",
+      "oem_name": "L3Harris",
+      "configuration_item": "CI-0011",
+      "sku": "SKU-0011",
+      "location": "WH-B/Bin-01",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0011-001",
+        "SN-0011-002",
+        "SN-0011-003",
+        "SN-0011-004",
+        "SN-0011-005",
+        "SN-0011-006",
+        "SN-0011-007",
+        "SN-0011-008",
+        "SN-0011-009"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0011-001",
+          "original_serial_number": "SN-0011-001",
+          "location": "WH-B/Bin-01",
+          "configuration_item": "CI-0011"
+        },
+        {
+          "serial_number": "SN-0011-002",
+          "original_serial_number": "SN-0011-002",
+          "location": "WH-B/Bin-01",
+          "configuration_item": "CI-0011"
+        },
+        {
+          "serial_number": "SN-0011-003",
+          "original_serial_number": "SN-0011-003",
+          "location": "WH-B/Bin-01",
+          "configuration_item": "CI-0011"
+        },
+        {
+          "serial_number": "SN-0011-004",
+          "original_serial_number": "SN-0011-004",
+          "location": "WH-B/Bin-01",
+          "configuration_item": "CI-0011"
+        },
+        {
+          "serial_number": "SN-0011-005",
+          "original_serial_number": "SN-0011-005",
+          "location": "WH-B/Bin-01",
+          "configuration_item": "CI-0011"
+        },
+        {
+          "serial_number": "SN-0011-006",
+          "original_serial_number": "SN-0011-006",
+          "location": "WH-B/Bin-01",
+          "configuration_item": "CI-0011"
+        },
+        {
+          "serial_number": "SN-0011-007",
+          "original_serial_number": "SN-0011-007",
+          "location": "WH-B/Bin-01",
+          "configuration_item": "CI-0011"
+        },
+        {
+          "serial_number": "SN-0011-008",
+          "original_serial_number": "SN-0011-008",
+          "location": "WH-B/Bin-01",
+          "configuration_item": "CI-0011"
+        },
+        {
+          "serial_number": "SN-0011-009",
+          "original_serial_number": "SN-0011-009",
+          "location": "WH-B/Bin-01",
+          "configuration_item": "CI-0011"
+        }
+      ]
+    },
+    {
+      "name": "Ground Station - LNB GS",
+      "inventory_type": "subsystem",
+      "part_number": "PN-0012",
+      "original_part_number": "PN-0012",
+      "quantity": 10,
+      "description": "Stock of Ground Station - LNB GS",
+      "oem_name": "ViaSat",
+      "configuration_item": "CI-0012",
+      "sku": "SKU-0012",
+      "location": "WH-B/Bin-02",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0012-001",
+        "SN-0012-002",
+        "SN-0012-003",
+        "SN-0012-004",
+        "SN-0012-005",
+        "SN-0012-006",
+        "SN-0012-007",
+        "SN-0012-008",
+        "SN-0012-009",
+        "SN-0012-010"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0012-001",
+          "original_serial_number": "SN-0012-001",
+          "location": "WH-B/Bin-02",
+          "configuration_item": "CI-0012"
+        },
+        {
+          "serial_number": "SN-0012-002",
+          "original_serial_number": "SN-0012-002",
+          "location": "WH-B/Bin-02",
+          "configuration_item": "CI-0012"
+        },
+        {
+          "serial_number": "SN-0012-003",
+          "original_serial_number": "SN-0012-003",
+          "location": "WH-B/Bin-02",
+          "configuration_item": "CI-0012"
+        },
+        {
+          "serial_number": "SN-0012-004",
+          "original_serial_number": "SN-0012-004",
+          "location": "WH-B/Bin-02",
+          "configuration_item": "CI-0012"
+        },
+        {
+          "serial_number": "SN-0012-005",
+          "original_serial_number": "SN-0012-005",
+          "location": "WH-B/Bin-02",
+          "configuration_item": "CI-0012"
+        },
+        {
+          "serial_number": "SN-0012-006",
+          "original_serial_number": "SN-0012-006",
+          "location": "WH-B/Bin-02",
+          "configuration_item": "CI-0012"
+        },
+        {
+          "serial_number": "SN-0012-007",
+          "original_serial_number": "SN-0012-007",
+          "location": "WH-B/Bin-02",
+          "configuration_item": "CI-0012"
+        },
+        {
+          "serial_number": "SN-0012-008",
+          "original_serial_number": "SN-0012-008",
+          "location": "WH-B/Bin-02",
+          "configuration_item": "CI-0012"
+        },
+        {
+          "serial_number": "SN-0012-009",
+          "original_serial_number": "SN-0012-009",
+          "location": "WH-B/Bin-02",
+          "configuration_item": "CI-0012"
+        },
+        {
+          "serial_number": "SN-0012-010",
+          "original_serial_number": "SN-0012-010",
+          "location": "WH-B/Bin-02",
+          "configuration_item": "CI-0012"
+        }
+      ]
+    },
+    {
+      "name": "Ground Station - MOXA Converter",
+      "inventory_type": "subsystem",
+      "part_number": "PN-0013",
+      "original_part_number": "PN-0013",
+      "quantity": 5,
+      "description": "Stock of Ground Station - MOXA Converter",
+      "oem_name": "Comtech",
+      "configuration_item": "CI-0013",
+      "sku": "SKU-0013",
+      "location": "WH-B/Bin-03",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0013-001",
+        "SN-0013-002",
+        "SN-0013-003",
+        "SN-0013-004",
+        "SN-0013-005"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0013-001",
+          "original_serial_number": "SN-0013-001",
+          "location": "WH-B/Bin-03",
+          "configuration_item": "CI-0013"
+        },
+        {
+          "serial_number": "SN-0013-002",
+          "original_serial_number": "SN-0013-002",
+          "location": "WH-B/Bin-03",
+          "configuration_item": "CI-0013"
+        },
+        {
+          "serial_number": "SN-0013-003",
+          "original_serial_number": "SN-0013-003",
+          "location": "WH-B/Bin-03",
+          "configuration_item": "CI-0013"
+        },
+        {
+          "serial_number": "SN-0013-004",
+          "original_serial_number": "SN-0013-004",
+          "location": "WH-B/Bin-03",
+          "configuration_item": "CI-0013"
+        },
+        {
+          "serial_number": "SN-0013-005",
+          "original_serial_number": "SN-0013-005",
+          "location": "WH-B/Bin-03",
+          "configuration_item": "CI-0013"
+        }
+      ]
+    },
+    {
+      "name": "RF Units",
+      "inventory_type": "module",
+      "part_number": "PN-0014",
+      "original_part_number": "PN-0014",
+      "quantity": 6,
+      "description": "Stock of RF Units",
+      "oem_name": "ND SatCom",
+      "configuration_item": "CI-0014",
+      "sku": "SKU-0014",
+      "location": "WH-B/Bin-04",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0014-001",
+        "SN-0014-002",
+        "SN-0014-003",
+        "SN-0014-004",
+        "SN-0014-005",
+        "SN-0014-006"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0014-001",
+          "original_serial_number": "SN-0014-001",
+          "location": "WH-B/Bin-04",
+          "configuration_item": "CI-0014"
+        },
+        {
+          "serial_number": "SN-0014-002",
+          "original_serial_number": "SN-0014-002",
+          "location": "WH-B/Bin-04",
+          "configuration_item": "CI-0014"
+        },
+        {
+          "serial_number": "SN-0014-003",
+          "original_serial_number": "SN-0014-003",
+          "location": "WH-B/Bin-04",
+          "configuration_item": "CI-0014"
+        },
+        {
+          "serial_number": "SN-0014-004",
+          "original_serial_number": "SN-0014-004",
+          "location": "WH-B/Bin-04",
+          "configuration_item": "CI-0014"
+        },
+        {
+          "serial_number": "SN-0014-005",
+          "original_serial_number": "SN-0014-005",
+          "location": "WH-B/Bin-04",
+          "configuration_item": "CI-0014"
+        },
+        {
+          "serial_number": "SN-0014-006",
+          "original_serial_number": "SN-0014-006",
+          "location": "WH-B/Bin-04",
+          "configuration_item": "CI-0014"
+        }
+      ]
+    },
+    {
+      "name": "ASA Mechanical Assembly",
+      "inventory_type": "module",
+      "part_number": "PN-0015",
+      "original_part_number": "PN-0015",
+      "quantity": 7,
+      "description": "Stock of ASA Mechanical Assembly",
+      "oem_name": "Cobham SATCOM",
+      "configuration_item": "CI-0015",
+      "sku": "SKU-0015",
+      "location": "WH-B/Bin-05",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0015-001",
+        "SN-0015-002",
+        "SN-0015-003",
+        "SN-0015-004",
+        "SN-0015-005",
+        "SN-0015-006",
+        "SN-0015-007"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0015-001",
+          "original_serial_number": "SN-0015-001",
+          "location": "WH-B/Bin-05",
+          "configuration_item": "CI-0015"
+        },
+        {
+          "serial_number": "SN-0015-002",
+          "original_serial_number": "SN-0015-002",
+          "location": "WH-B/Bin-05",
+          "configuration_item": "CI-0015"
+        },
+        {
+          "serial_number": "SN-0015-003",
+          "original_serial_number": "SN-0015-003",
+          "location": "WH-B/Bin-05",
+          "configuration_item": "CI-0015"
+        },
+        {
+          "serial_number": "SN-0015-004",
+          "original_serial_number": "SN-0015-004",
+          "location": "WH-B/Bin-05",
+          "configuration_item": "CI-0015"
+        },
+        {
+          "serial_number": "SN-0015-005",
+          "original_serial_number": "SN-0015-005",
+          "location": "WH-B/Bin-05",
+          "configuration_item": "CI-0015"
+        },
+        {
+          "serial_number": "SN-0015-006",
+          "original_serial_number": "SN-0015-006",
+          "location": "WH-B/Bin-05",
+          "configuration_item": "CI-0015"
+        },
+        {
+          "serial_number": "SN-0015-007",
+          "original_serial_number": "SN-0015-007",
+          "location": "WH-B/Bin-05",
+          "configuration_item": "CI-0015"
+        }
+      ]
+    },
+    {
+      "name": "Actuators Sensors",
+      "inventory_type": "module",
+      "part_number": "PN-0016",
+      "original_part_number": "PN-0016",
+      "quantity": 8,
+      "description": "Stock of Actuators Sensors",
+      "oem_name": "Honeywell",
+      "configuration_item": "CI-0016",
+      "sku": "SKU-0016",
+      "location": "WH-B/Bin-06",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0016-001",
+        "SN-0016-002",
+        "SN-0016-003",
+        "SN-0016-004",
+        "SN-0016-005",
+        "SN-0016-006",
+        "SN-0016-007",
+        "SN-0016-008"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0016-001",
+          "original_serial_number": "SN-0016-001",
+          "location": "WH-B/Bin-06",
+          "configuration_item": "CI-0016"
+        },
+        {
+          "serial_number": "SN-0016-002",
+          "original_serial_number": "SN-0016-002",
+          "location": "WH-B/Bin-06",
+          "configuration_item": "CI-0016"
+        },
+        {
+          "serial_number": "SN-0016-003",
+          "original_serial_number": "SN-0016-003",
+          "location": "WH-B/Bin-06",
+          "configuration_item": "CI-0016"
+        },
+        {
+          "serial_number": "SN-0016-004",
+          "original_serial_number": "SN-0016-004",
+          "location": "WH-B/Bin-06",
+          "configuration_item": "CI-0016"
+        },
+        {
+          "serial_number": "SN-0016-005",
+          "original_serial_number": "SN-0016-005",
+          "location": "WH-B/Bin-06",
+          "configuration_item": "CI-0016"
+        },
+        {
+          "serial_number": "SN-0016-006",
+          "original_serial_number": "SN-0016-006",
+          "location": "WH-B/Bin-06",
+          "configuration_item": "CI-0016"
+        },
+        {
+          "serial_number": "SN-0016-007",
+          "original_serial_number": "SN-0016-007",
+          "location": "WH-B/Bin-06",
+          "configuration_item": "CI-0016"
+        },
+        {
+          "serial_number": "SN-0016-008",
+          "original_serial_number": "SN-0016-008",
+          "location": "WH-B/Bin-06",
+          "configuration_item": "CI-0016"
+        }
+      ]
+    },
+    {
+      "name": "Harness Antenna",
+      "inventory_type": "module",
+      "part_number": "PN-0017",
+      "original_part_number": "PN-0017",
+      "quantity": 9,
+      "description": "Stock of Harness Antenna",
+      "oem_name": "TE Connectivity",
+      "configuration_item": "CI-0017",
+      "sku": "SKU-0017",
+      "location": "WH-B/Bin-07",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0017-001",
+        "SN-0017-002",
+        "SN-0017-003",
+        "SN-0017-004",
+        "SN-0017-005",
+        "SN-0017-006",
+        "SN-0017-007",
+        "SN-0017-008",
+        "SN-0017-009"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0017-001",
+          "original_serial_number": "SN-0017-001",
+          "location": "WH-B/Bin-07",
+          "configuration_item": "CI-0017"
+        },
+        {
+          "serial_number": "SN-0017-002",
+          "original_serial_number": "SN-0017-002",
+          "location": "WH-B/Bin-07",
+          "configuration_item": "CI-0017"
+        },
+        {
+          "serial_number": "SN-0017-003",
+          "original_serial_number": "SN-0017-003",
+          "location": "WH-B/Bin-07",
+          "configuration_item": "CI-0017"
+        },
+        {
+          "serial_number": "SN-0017-004",
+          "original_serial_number": "SN-0017-004",
+          "location": "WH-B/Bin-07",
+          "configuration_item": "CI-0017"
+        },
+        {
+          "serial_number": "SN-0017-005",
+          "original_serial_number": "SN-0017-005",
+          "location": "WH-B/Bin-07",
+          "configuration_item": "CI-0017"
+        },
+        {
+          "serial_number": "SN-0017-006",
+          "original_serial_number": "SN-0017-006",
+          "location": "WH-B/Bin-07",
+          "configuration_item": "CI-0017"
+        },
+        {
+          "serial_number": "SN-0017-007",
+          "original_serial_number": "SN-0017-007",
+          "location": "WH-B/Bin-07",
+          "configuration_item": "CI-0017"
+        },
+        {
+          "serial_number": "SN-0017-008",
+          "original_serial_number": "SN-0017-008",
+          "location": "WH-B/Bin-07",
+          "configuration_item": "CI-0017"
+        },
+        {
+          "serial_number": "SN-0017-009",
+          "original_serial_number": "SN-0017-009",
+          "location": "WH-B/Bin-07",
+          "configuration_item": "CI-0017"
+        }
+      ]
+    },
+    {
+      "name": "Video Encoder",
+      "inventory_type": "module",
+      "part_number": "PN-0018",
+      "original_part_number": "PN-0018",
+      "quantity": 10,
+      "description": "Stock of Video Encoder",
+      "oem_name": "Amphenol",
+      "configuration_item": "CI-0018",
+      "sku": "SKU-0018",
+      "location": "WH-B/Bin-08",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0018-001",
+        "SN-0018-002",
+        "SN-0018-003",
+        "SN-0018-004",
+        "SN-0018-005",
+        "SN-0018-006",
+        "SN-0018-007",
+        "SN-0018-008",
+        "SN-0018-009",
+        "SN-0018-010"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0018-001",
+          "original_serial_number": "SN-0018-001",
+          "location": "WH-B/Bin-08",
+          "configuration_item": "CI-0018"
+        },
+        {
+          "serial_number": "SN-0018-002",
+          "original_serial_number": "SN-0018-002",
+          "location": "WH-B/Bin-08",
+          "configuration_item": "CI-0018"
+        },
+        {
+          "serial_number": "SN-0018-003",
+          "original_serial_number": "SN-0018-003",
+          "location": "WH-B/Bin-08",
+          "configuration_item": "CI-0018"
+        },
+        {
+          "serial_number": "SN-0018-004",
+          "original_serial_number": "SN-0018-004",
+          "location": "WH-B/Bin-08",
+          "configuration_item": "CI-0018"
+        },
+        {
+          "serial_number": "SN-0018-005",
+          "original_serial_number": "SN-0018-005",
+          "location": "WH-B/Bin-08",
+          "configuration_item": "CI-0018"
+        },
+        {
+          "serial_number": "SN-0018-006",
+          "original_serial_number": "SN-0018-006",
+          "location": "WH-B/Bin-08",
+          "configuration_item": "CI-0018"
+        },
+        {
+          "serial_number": "SN-0018-007",
+          "original_serial_number": "SN-0018-007",
+          "location": "WH-B/Bin-08",
+          "configuration_item": "CI-0018"
+        },
+        {
+          "serial_number": "SN-0018-008",
+          "original_serial_number": "SN-0018-008",
+          "location": "WH-B/Bin-08",
+          "configuration_item": "CI-0018"
+        },
+        {
+          "serial_number": "SN-0018-009",
+          "original_serial_number": "SN-0018-009",
+          "location": "WH-B/Bin-08",
+          "configuration_item": "CI-0018"
+        },
+        {
+          "serial_number": "SN-0018-010",
+          "original_serial_number": "SN-0018-010",
+          "location": "WH-B/Bin-08",
+          "configuration_item": "CI-0018"
+        }
+      ]
+    },
+    {
+      "name": "Harness DPU",
+      "inventory_type": "module",
+      "part_number": "PN-0019",
+      "original_part_number": "PN-0019",
+      "quantity": 5,
+      "description": "Stock of Harness DPU",
+      "oem_name": "Molex",
+      "configuration_item": "CI-0019",
+      "sku": "SKU-0019",
+      "location": "WH-B/Bin-09",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0019-001",
+        "SN-0019-002",
+        "SN-0019-003",
+        "SN-0019-004",
+        "SN-0019-005"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0019-001",
+          "original_serial_number": "SN-0019-001",
+          "location": "WH-B/Bin-09",
+          "configuration_item": "CI-0019"
+        },
+        {
+          "serial_number": "SN-0019-002",
+          "original_serial_number": "SN-0019-002",
+          "location": "WH-B/Bin-09",
+          "configuration_item": "CI-0019"
+        },
+        {
+          "serial_number": "SN-0019-003",
+          "original_serial_number": "SN-0019-003",
+          "location": "WH-B/Bin-09",
+          "configuration_item": "CI-0019"
+        },
+        {
+          "serial_number": "SN-0019-004",
+          "original_serial_number": "SN-0019-004",
+          "location": "WH-B/Bin-09",
+          "configuration_item": "CI-0019"
+        },
+        {
+          "serial_number": "SN-0019-005",
+          "original_serial_number": "SN-0019-005",
+          "location": "WH-B/Bin-09",
+          "configuration_item": "CI-0019"
+        }
+      ]
+    },
+    {
+      "name": "DPU Box",
+      "inventory_type": "module",
+      "part_number": "PN-0020",
+      "original_part_number": "PN-0020",
+      "quantity": 6,
+      "description": "Stock of DPU Box",
+      "oem_name": "Texas Instruments",
+      "configuration_item": "CI-0020",
+      "sku": "SKU-0020",
+      "location": "WH-B/Bin-10",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0020-001",
+        "SN-0020-002",
+        "SN-0020-003",
+        "SN-0020-004",
+        "SN-0020-005",
+        "SN-0020-006"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0020-001",
+          "original_serial_number": "SN-0020-001",
+          "location": "WH-B/Bin-10",
+          "configuration_item": "CI-0020"
+        },
+        {
+          "serial_number": "SN-0020-002",
+          "original_serial_number": "SN-0020-002",
+          "location": "WH-B/Bin-10",
+          "configuration_item": "CI-0020"
+        },
+        {
+          "serial_number": "SN-0020-003",
+          "original_serial_number": "SN-0020-003",
+          "location": "WH-B/Bin-10",
+          "configuration_item": "CI-0020"
+        },
+        {
+          "serial_number": "SN-0020-004",
+          "original_serial_number": "SN-0020-004",
+          "location": "WH-B/Bin-10",
+          "configuration_item": "CI-0020"
+        },
+        {
+          "serial_number": "SN-0020-005",
+          "original_serial_number": "SN-0020-005",
+          "location": "WH-B/Bin-10",
+          "configuration_item": "CI-0020"
+        },
+        {
+          "serial_number": "SN-0020-006",
+          "original_serial_number": "SN-0020-006",
+          "location": "WH-B/Bin-10",
+          "configuration_item": "CI-0020"
+        }
+      ]
+    },
+    {
+      "name": "UCV Card",
+      "inventory_type": "module",
+      "part_number": "PN-0021",
+      "original_part_number": "PN-0021",
+      "quantity": 7,
+      "description": "Stock of UCV Card",
+      "oem_name": "Analog Devices",
+      "configuration_item": "CI-0021",
+      "sku": "SKU-0021",
+      "location": "WH-A/Rack-01",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0021-001",
+        "SN-0021-002",
+        "SN-0021-003",
+        "SN-0021-004",
+        "SN-0021-005",
+        "SN-0021-006",
+        "SN-0021-007"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0021-001",
+          "original_serial_number": "SN-0021-001",
+          "location": "WH-A/Rack-01",
+          "configuration_item": "CI-0021"
+        },
+        {
+          "serial_number": "SN-0021-002",
+          "original_serial_number": "SN-0021-002",
+          "location": "WH-A/Rack-01",
+          "configuration_item": "CI-0021"
+        },
+        {
+          "serial_number": "SN-0021-003",
+          "original_serial_number": "SN-0021-003",
+          "location": "WH-A/Rack-01",
+          "configuration_item": "CI-0021"
+        },
+        {
+          "serial_number": "SN-0021-004",
+          "original_serial_number": "SN-0021-004",
+          "location": "WH-A/Rack-01",
+          "configuration_item": "CI-0021"
+        },
+        {
+          "serial_number": "SN-0021-005",
+          "original_serial_number": "SN-0021-005",
+          "location": "WH-A/Rack-01",
+          "configuration_item": "CI-0021"
+        },
+        {
+          "serial_number": "SN-0021-006",
+          "original_serial_number": "SN-0021-006",
+          "location": "WH-A/Rack-01",
+          "configuration_item": "CI-0021"
+        },
+        {
+          "serial_number": "SN-0021-007",
+          "original_serial_number": "SN-0021-007",
+          "location": "WH-A/Rack-01",
+          "configuration_item": "CI-0021"
+        }
+      ]
+    },
+    {
+      "name": "DCV Card",
+      "inventory_type": "module",
+      "part_number": "PN-0022",
+      "original_part_number": "PN-0022",
+      "quantity": 8,
+      "description": "Stock of DCV Card",
+      "oem_name": "Cobham",
+      "configuration_item": "CI-0022",
+      "sku": "SKU-0022",
+      "location": "WH-A/Rack-02",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0022-001",
+        "SN-0022-002",
+        "SN-0022-003",
+        "SN-0022-004",
+        "SN-0022-005",
+        "SN-0022-006",
+        "SN-0022-007",
+        "SN-0022-008"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0022-001",
+          "original_serial_number": "SN-0022-001",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0022"
+        },
+        {
+          "serial_number": "SN-0022-002",
+          "original_serial_number": "SN-0022-002",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0022"
+        },
+        {
+          "serial_number": "SN-0022-003",
+          "original_serial_number": "SN-0022-003",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0022"
+        },
+        {
+          "serial_number": "SN-0022-004",
+          "original_serial_number": "SN-0022-004",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0022"
+        },
+        {
+          "serial_number": "SN-0022-005",
+          "original_serial_number": "SN-0022-005",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0022"
+        },
+        {
+          "serial_number": "SN-0022-006",
+          "original_serial_number": "SN-0022-006",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0022"
+        },
+        {
+          "serial_number": "SN-0022-007",
+          "original_serial_number": "SN-0022-007",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0022"
+        },
+        {
+          "serial_number": "SN-0022-008",
+          "original_serial_number": "SN-0022-008",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0022"
+        }
+      ]
+    },
+    {
+      "name": "EMI Filter",
+      "inventory_type": "module",
+      "part_number": "PN-0023",
+      "original_part_number": "PN-0023",
+      "quantity": 9,
+      "description": "Stock of EMI Filter",
+      "oem_name": "Thales",
+      "configuration_item": "CI-0023",
+      "sku": "SKU-0023",
+      "location": "WH-A/Rack-03",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0023-001",
+        "SN-0023-002",
+        "SN-0023-003",
+        "SN-0023-004",
+        "SN-0023-005",
+        "SN-0023-006",
+        "SN-0023-007",
+        "SN-0023-008",
+        "SN-0023-009"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0023-001",
+          "original_serial_number": "SN-0023-001",
+          "location": "WH-A/Rack-03",
+          "configuration_item": "CI-0023"
+        },
+        {
+          "serial_number": "SN-0023-002",
+          "original_serial_number": "SN-0023-002",
+          "location": "WH-A/Rack-03",
+          "configuration_item": "CI-0023"
+        },
+        {
+          "serial_number": "SN-0023-003",
+          "original_serial_number": "SN-0023-003",
+          "location": "WH-A/Rack-03",
+          "configuration_item": "CI-0023"
+        },
+        {
+          "serial_number": "SN-0023-004",
+          "original_serial_number": "SN-0023-004",
+          "location": "WH-A/Rack-03",
+          "configuration_item": "CI-0023"
+        },
+        {
+          "serial_number": "SN-0023-005",
+          "original_serial_number": "SN-0023-005",
+          "location": "WH-A/Rack-03",
+          "configuration_item": "CI-0023"
+        },
+        {
+          "serial_number": "SN-0023-006",
+          "original_serial_number": "SN-0023-006",
+          "location": "WH-A/Rack-03",
+          "configuration_item": "CI-0023"
+        },
+        {
+          "serial_number": "SN-0023-007",
+          "original_serial_number": "SN-0023-007",
+          "location": "WH-A/Rack-03",
+          "configuration_item": "CI-0023"
+        },
+        {
+          "serial_number": "SN-0023-008",
+          "original_serial_number": "SN-0023-008",
+          "location": "WH-A/Rack-03",
+          "configuration_item": "CI-0023"
+        },
+        {
+          "serial_number": "SN-0023-009",
+          "original_serial_number": "SN-0023-009",
+          "location": "WH-A/Rack-03",
+          "configuration_item": "CI-0023"
+        }
+      ]
+    },
+    {
+      "name": "PDC Card",
+      "inventory_type": "module",
+      "part_number": "PN-0024",
+      "original_part_number": "PN-0024",
+      "quantity": 10,
+      "description": "Stock of PDC Card",
+      "oem_name": "Airbus DS",
+      "configuration_item": "CI-0024",
+      "sku": "SKU-0024",
+      "location": "WH-A/Rack-04",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0024-001",
+        "SN-0024-002",
+        "SN-0024-003",
+        "SN-0024-004",
+        "SN-0024-005",
+        "SN-0024-006",
+        "SN-0024-007",
+        "SN-0024-008",
+        "SN-0024-009",
+        "SN-0024-010"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0024-001",
+          "original_serial_number": "SN-0024-001",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0024"
+        },
+        {
+          "serial_number": "SN-0024-002",
+          "original_serial_number": "SN-0024-002",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0024"
+        },
+        {
+          "serial_number": "SN-0024-003",
+          "original_serial_number": "SN-0024-003",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0024"
+        },
+        {
+          "serial_number": "SN-0024-004",
+          "original_serial_number": "SN-0024-004",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0024"
+        },
+        {
+          "serial_number": "SN-0024-005",
+          "original_serial_number": "SN-0024-005",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0024"
+        },
+        {
+          "serial_number": "SN-0024-006",
+          "original_serial_number": "SN-0024-006",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0024"
+        },
+        {
+          "serial_number": "SN-0024-007",
+          "original_serial_number": "SN-0024-007",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0024"
+        },
+        {
+          "serial_number": "SN-0024-008",
+          "original_serial_number": "SN-0024-008",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0024"
+        },
+        {
+          "serial_number": "SN-0024-009",
+          "original_serial_number": "SN-0024-009",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0024"
+        },
+        {
+          "serial_number": "SN-0024-010",
+          "original_serial_number": "SN-0024-010",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0024"
+        }
+      ]
+    },
+    {
+      "name": "APC Card",
+      "inventory_type": "module",
+      "part_number": "PN-0025",
+      "original_part_number": "PN-0025",
+      "quantity": 5,
+      "description": "Stock of APC Card",
+      "oem_name": "Lockheed Martin",
+      "configuration_item": "CI-0025",
+      "sku": "SKU-0025",
+      "location": "WH-A/Rack-05",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0025-001",
+        "SN-0025-002",
+        "SN-0025-003",
+        "SN-0025-004",
+        "SN-0025-005"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0025-001",
+          "original_serial_number": "SN-0025-001",
+          "location": "WH-A/Rack-05",
+          "configuration_item": "CI-0025"
+        },
+        {
+          "serial_number": "SN-0025-002",
+          "original_serial_number": "SN-0025-002",
+          "location": "WH-A/Rack-05",
+          "configuration_item": "CI-0025"
+        },
+        {
+          "serial_number": "SN-0025-003",
+          "original_serial_number": "SN-0025-003",
+          "location": "WH-A/Rack-05",
+          "configuration_item": "CI-0025"
+        },
+        {
+          "serial_number": "SN-0025-004",
+          "original_serial_number": "SN-0025-004",
+          "location": "WH-A/Rack-05",
+          "configuration_item": "CI-0025"
+        },
+        {
+          "serial_number": "SN-0025-005",
+          "original_serial_number": "SN-0025-005",
+          "location": "WH-A/Rack-05",
+          "configuration_item": "CI-0025"
+        }
+      ]
+    },
+    {
+      "name": "OBDH Card",
+      "inventory_type": "module",
+      "part_number": "PN-0026",
+      "original_part_number": "PN-0026",
+      "quantity": 6,
+      "description": "Stock of OBDH Card",
+      "oem_name": "L3Harris",
+      "configuration_item": "CI-0026",
+      "sku": "SKU-0026",
+      "location": "WH-A/Rack-06",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0026-001",
+        "SN-0026-002",
+        "SN-0026-003",
+        "SN-0026-004",
+        "SN-0026-005",
+        "SN-0026-006"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0026-001",
+          "original_serial_number": "SN-0026-001",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0026"
+        },
+        {
+          "serial_number": "SN-0026-002",
+          "original_serial_number": "SN-0026-002",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0026"
+        },
+        {
+          "serial_number": "SN-0026-003",
+          "original_serial_number": "SN-0026-003",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0026"
+        },
+        {
+          "serial_number": "SN-0026-004",
+          "original_serial_number": "SN-0026-004",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0026"
+        },
+        {
+          "serial_number": "SN-0026-005",
+          "original_serial_number": "SN-0026-005",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0026"
+        },
+        {
+          "serial_number": "SN-0026-006",
+          "original_serial_number": "SN-0026-006",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0026"
+        }
+      ]
+    },
+    {
+      "name": "Harness ACU",
+      "inventory_type": "module",
+      "part_number": "PN-0027",
+      "original_part_number": "PN-0027",
+      "quantity": 7,
+      "description": "Stock of Harness ACU",
+      "oem_name": "ViaSat",
+      "configuration_item": "CI-0027",
+      "sku": "SKU-0027",
+      "location": "WH-A/Rack-07",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0027-001",
+        "SN-0027-002",
+        "SN-0027-003",
+        "SN-0027-004",
+        "SN-0027-005",
+        "SN-0027-006",
+        "SN-0027-007"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0027-001",
+          "original_serial_number": "SN-0027-001",
+          "location": "WH-A/Rack-07",
+          "configuration_item": "CI-0027"
+        },
+        {
+          "serial_number": "SN-0027-002",
+          "original_serial_number": "SN-0027-002",
+          "location": "WH-A/Rack-07",
+          "configuration_item": "CI-0027"
+        },
+        {
+          "serial_number": "SN-0027-003",
+          "original_serial_number": "SN-0027-003",
+          "location": "WH-A/Rack-07",
+          "configuration_item": "CI-0027"
+        },
+        {
+          "serial_number": "SN-0027-004",
+          "original_serial_number": "SN-0027-004",
+          "location": "WH-A/Rack-07",
+          "configuration_item": "CI-0027"
+        },
+        {
+          "serial_number": "SN-0027-005",
+          "original_serial_number": "SN-0027-005",
+          "location": "WH-A/Rack-07",
+          "configuration_item": "CI-0027"
+        },
+        {
+          "serial_number": "SN-0027-006",
+          "original_serial_number": "SN-0027-006",
+          "location": "WH-A/Rack-07",
+          "configuration_item": "CI-0027"
+        },
+        {
+          "serial_number": "SN-0027-007",
+          "original_serial_number": "SN-0027-007",
+          "location": "WH-A/Rack-07",
+          "configuration_item": "CI-0027"
+        }
+      ]
+    },
+    {
+      "name": "OBS BUC",
+      "inventory_type": "unit",
+      "part_number": "PN-0028",
+      "original_part_number": "PN-0028",
+      "quantity": 8,
+      "description": "Stock of OBS BUC",
+      "oem_name": "Comtech",
+      "configuration_item": "CI-0028",
+      "sku": "SKU-0028",
+      "location": "WH-A/Rack-08",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0028-001",
+        "SN-0028-002",
+        "SN-0028-003",
+        "SN-0028-004",
+        "SN-0028-005",
+        "SN-0028-006",
+        "SN-0028-007",
+        "SN-0028-008"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0028-001",
+          "original_serial_number": "SN-0028-001",
+          "location": "WH-A/Rack-08",
+          "configuration_item": "CI-0028"
+        },
+        {
+          "serial_number": "SN-0028-002",
+          "original_serial_number": "SN-0028-002",
+          "location": "WH-A/Rack-08",
+          "configuration_item": "CI-0028"
+        },
+        {
+          "serial_number": "SN-0028-003",
+          "original_serial_number": "SN-0028-003",
+          "location": "WH-A/Rack-08",
+          "configuration_item": "CI-0028"
+        },
+        {
+          "serial_number": "SN-0028-004",
+          "original_serial_number": "SN-0028-004",
+          "location": "WH-A/Rack-08",
+          "configuration_item": "CI-0028"
+        },
+        {
+          "serial_number": "SN-0028-005",
+          "original_serial_number": "SN-0028-005",
+          "location": "WH-A/Rack-08",
+          "configuration_item": "CI-0028"
+        },
+        {
+          "serial_number": "SN-0028-006",
+          "original_serial_number": "SN-0028-006",
+          "location": "WH-A/Rack-08",
+          "configuration_item": "CI-0028"
+        },
+        {
+          "serial_number": "SN-0028-007",
+          "original_serial_number": "SN-0028-007",
+          "location": "WH-A/Rack-08",
+          "configuration_item": "CI-0028"
+        },
+        {
+          "serial_number": "SN-0028-008",
+          "original_serial_number": "SN-0028-008",
+          "location": "WH-A/Rack-08",
+          "configuration_item": "CI-0028"
+        }
+      ]
+    },
+    {
+      "name": "Tracking Receiver",
+      "inventory_type": "unit",
+      "part_number": "PN-0029",
+      "original_part_number": "PN-0029",
+      "quantity": 9,
+      "description": "Stock of Tracking Receiver",
+      "oem_name": "ND SatCom",
+      "configuration_item": "CI-0029",
+      "sku": "SKU-0029",
+      "location": "WH-A/Rack-09",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0029-001",
+        "SN-0029-002",
+        "SN-0029-003",
+        "SN-0029-004",
+        "SN-0029-005",
+        "SN-0029-006",
+        "SN-0029-007",
+        "SN-0029-008",
+        "SN-0029-009"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0029-001",
+          "original_serial_number": "SN-0029-001",
+          "location": "WH-A/Rack-09",
+          "configuration_item": "CI-0029"
+        },
+        {
+          "serial_number": "SN-0029-002",
+          "original_serial_number": "SN-0029-002",
+          "location": "WH-A/Rack-09",
+          "configuration_item": "CI-0029"
+        },
+        {
+          "serial_number": "SN-0029-003",
+          "original_serial_number": "SN-0029-003",
+          "location": "WH-A/Rack-09",
+          "configuration_item": "CI-0029"
+        },
+        {
+          "serial_number": "SN-0029-004",
+          "original_serial_number": "SN-0029-004",
+          "location": "WH-A/Rack-09",
+          "configuration_item": "CI-0029"
+        },
+        {
+          "serial_number": "SN-0029-005",
+          "original_serial_number": "SN-0029-005",
+          "location": "WH-A/Rack-09",
+          "configuration_item": "CI-0029"
+        },
+        {
+          "serial_number": "SN-0029-006",
+          "original_serial_number": "SN-0029-006",
+          "location": "WH-A/Rack-09",
+          "configuration_item": "CI-0029"
+        },
+        {
+          "serial_number": "SN-0029-007",
+          "original_serial_number": "SN-0029-007",
+          "location": "WH-A/Rack-09",
+          "configuration_item": "CI-0029"
+        },
+        {
+          "serial_number": "SN-0029-008",
+          "original_serial_number": "SN-0029-008",
+          "location": "WH-A/Rack-09",
+          "configuration_item": "CI-0029"
+        },
+        {
+          "serial_number": "SN-0029-009",
+          "original_serial_number": "SN-0029-009",
+          "location": "WH-A/Rack-09",
+          "configuration_item": "CI-0029"
+        }
+      ]
+    },
+    {
+      "name": "OBS LNBs",
+      "inventory_type": "unit",
+      "part_number": "PN-0030",
+      "original_part_number": "PN-0030",
+      "quantity": 10,
+      "description": "Stock of OBS LNBs",
+      "oem_name": "Cobham SATCOM",
+      "configuration_item": "CI-0030",
+      "sku": "SKU-0030",
+      "location": "WH-A/Rack-10",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0030-001",
+        "SN-0030-002",
+        "SN-0030-003",
+        "SN-0030-004",
+        "SN-0030-005",
+        "SN-0030-006",
+        "SN-0030-007",
+        "SN-0030-008",
+        "SN-0030-009",
+        "SN-0030-010"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0030-001",
+          "original_serial_number": "SN-0030-001",
+          "location": "WH-A/Rack-10",
+          "configuration_item": "CI-0030"
+        },
+        {
+          "serial_number": "SN-0030-002",
+          "original_serial_number": "SN-0030-002",
+          "location": "WH-A/Rack-10",
+          "configuration_item": "CI-0030"
+        },
+        {
+          "serial_number": "SN-0030-003",
+          "original_serial_number": "SN-0030-003",
+          "location": "WH-A/Rack-10",
+          "configuration_item": "CI-0030"
+        },
+        {
+          "serial_number": "SN-0030-004",
+          "original_serial_number": "SN-0030-004",
+          "location": "WH-A/Rack-10",
+          "configuration_item": "CI-0030"
+        },
+        {
+          "serial_number": "SN-0030-005",
+          "original_serial_number": "SN-0030-005",
+          "location": "WH-A/Rack-10",
+          "configuration_item": "CI-0030"
+        },
+        {
+          "serial_number": "SN-0030-006",
+          "original_serial_number": "SN-0030-006",
+          "location": "WH-A/Rack-10",
+          "configuration_item": "CI-0030"
+        },
+        {
+          "serial_number": "SN-0030-007",
+          "original_serial_number": "SN-0030-007",
+          "location": "WH-A/Rack-10",
+          "configuration_item": "CI-0030"
+        },
+        {
+          "serial_number": "SN-0030-008",
+          "original_serial_number": "SN-0030-008",
+          "location": "WH-A/Rack-10",
+          "configuration_item": "CI-0030"
+        },
+        {
+          "serial_number": "SN-0030-009",
+          "original_serial_number": "SN-0030-009",
+          "location": "WH-A/Rack-10",
+          "configuration_item": "CI-0030"
+        },
+        {
+          "serial_number": "SN-0030-010",
+          "original_serial_number": "SN-0030-010",
+          "location": "WH-A/Rack-10",
+          "configuration_item": "CI-0030"
+        }
+      ]
+    },
+    {
+      "name": "Bearings",
+      "inventory_type": "unit",
+      "part_number": "PN-0031",
+      "original_part_number": "PN-0031",
+      "quantity": 5,
+      "description": "Stock of Bearings",
+      "oem_name": "Honeywell",
+      "configuration_item": "CI-0031",
+      "sku": "SKU-0031",
+      "location": "WH-B/Bin-01",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0031-001",
+        "SN-0031-002",
+        "SN-0031-003",
+        "SN-0031-004",
+        "SN-0031-005"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0031-001",
+          "original_serial_number": "SN-0031-001",
+          "location": "WH-B/Bin-01",
+          "configuration_item": "CI-0031"
+        },
+        {
+          "serial_number": "SN-0031-002",
+          "original_serial_number": "SN-0031-002",
+          "location": "WH-B/Bin-01",
+          "configuration_item": "CI-0031"
+        },
+        {
+          "serial_number": "SN-0031-003",
+          "original_serial_number": "SN-0031-003",
+          "location": "WH-B/Bin-01",
+          "configuration_item": "CI-0031"
+        },
+        {
+          "serial_number": "SN-0031-004",
+          "original_serial_number": "SN-0031-004",
+          "location": "WH-B/Bin-01",
+          "configuration_item": "CI-0031"
+        },
+        {
+          "serial_number": "SN-0031-005",
+          "original_serial_number": "SN-0031-005",
+          "location": "WH-B/Bin-01",
+          "configuration_item": "CI-0031"
+        }
+      ]
+    },
+    {
+      "name": "Rotary Joint",
+      "inventory_type": "unit",
+      "part_number": "PN-0032",
+      "original_part_number": "PN-0032",
+      "quantity": 6,
+      "description": "Stock of Rotary Joint",
+      "oem_name": "TE Connectivity",
+      "configuration_item": "CI-0032",
+      "sku": "SKU-0032",
+      "location": "WH-B/Bin-02",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0032-001",
+        "SN-0032-002",
+        "SN-0032-003",
+        "SN-0032-004",
+        "SN-0032-005",
+        "SN-0032-006"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0032-001",
+          "original_serial_number": "SN-0032-001",
+          "location": "WH-B/Bin-02",
+          "configuration_item": "CI-0032"
+        },
+        {
+          "serial_number": "SN-0032-002",
+          "original_serial_number": "SN-0032-002",
+          "location": "WH-B/Bin-02",
+          "configuration_item": "CI-0032"
+        },
+        {
+          "serial_number": "SN-0032-003",
+          "original_serial_number": "SN-0032-003",
+          "location": "WH-B/Bin-02",
+          "configuration_item": "CI-0032"
+        },
+        {
+          "serial_number": "SN-0032-004",
+          "original_serial_number": "SN-0032-004",
+          "location": "WH-B/Bin-02",
+          "configuration_item": "CI-0032"
+        },
+        {
+          "serial_number": "SN-0032-005",
+          "original_serial_number": "SN-0032-005",
+          "location": "WH-B/Bin-02",
+          "configuration_item": "CI-0032"
+        },
+        {
+          "serial_number": "SN-0032-006",
+          "original_serial_number": "SN-0032-006",
+          "location": "WH-B/Bin-02",
+          "configuration_item": "CI-0032"
+        }
+      ]
+    },
+    {
+      "name": "Multifeed Assembly",
+      "inventory_type": "unit",
+      "part_number": "PN-0033",
+      "original_part_number": "PN-0033",
+      "quantity": 7,
+      "description": "Stock of Multifeed Assembly",
+      "oem_name": "Amphenol",
+      "configuration_item": "CI-0033",
+      "sku": "SKU-0033",
+      "location": "WH-B/Bin-03",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0033-001",
+        "SN-0033-002",
+        "SN-0033-003",
+        "SN-0033-004",
+        "SN-0033-005",
+        "SN-0033-006",
+        "SN-0033-007"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0033-001",
+          "original_serial_number": "SN-0033-001",
+          "location": "WH-B/Bin-03",
+          "configuration_item": "CI-0033"
+        },
+        {
+          "serial_number": "SN-0033-002",
+          "original_serial_number": "SN-0033-002",
+          "location": "WH-B/Bin-03",
+          "configuration_item": "CI-0033"
+        },
+        {
+          "serial_number": "SN-0033-003",
+          "original_serial_number": "SN-0033-003",
+          "location": "WH-B/Bin-03",
+          "configuration_item": "CI-0033"
+        },
+        {
+          "serial_number": "SN-0033-004",
+          "original_serial_number": "SN-0033-004",
+          "location": "WH-B/Bin-03",
+          "configuration_item": "CI-0033"
+        },
+        {
+          "serial_number": "SN-0033-005",
+          "original_serial_number": "SN-0033-005",
+          "location": "WH-B/Bin-03",
+          "configuration_item": "CI-0033"
+        },
+        {
+          "serial_number": "SN-0033-006",
+          "original_serial_number": "SN-0033-006",
+          "location": "WH-B/Bin-03",
+          "configuration_item": "CI-0033"
+        },
+        {
+          "serial_number": "SN-0033-007",
+          "original_serial_number": "SN-0033-007",
+          "location": "WH-B/Bin-03",
+          "configuration_item": "CI-0033"
+        }
+      ]
+    },
+    {
+      "name": "Filters",
+      "inventory_type": "unit",
+      "part_number": "PN-0034",
+      "original_part_number": "PN-0034",
+      "quantity": 8,
+      "description": "Stock of Filters",
+      "oem_name": "Molex",
+      "configuration_item": "CI-0034",
+      "sku": "SKU-0034",
+      "location": "WH-B/Bin-04",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0034-001",
+        "SN-0034-002",
+        "SN-0034-003",
+        "SN-0034-004",
+        "SN-0034-005",
+        "SN-0034-006",
+        "SN-0034-007",
+        "SN-0034-008"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0034-001",
+          "original_serial_number": "SN-0034-001",
+          "location": "WH-B/Bin-04",
+          "configuration_item": "CI-0034"
+        },
+        {
+          "serial_number": "SN-0034-002",
+          "original_serial_number": "SN-0034-002",
+          "location": "WH-B/Bin-04",
+          "configuration_item": "CI-0034"
+        },
+        {
+          "serial_number": "SN-0034-003",
+          "original_serial_number": "SN-0034-003",
+          "location": "WH-B/Bin-04",
+          "configuration_item": "CI-0034"
+        },
+        {
+          "serial_number": "SN-0034-004",
+          "original_serial_number": "SN-0034-004",
+          "location": "WH-B/Bin-04",
+          "configuration_item": "CI-0034"
+        },
+        {
+          "serial_number": "SN-0034-005",
+          "original_serial_number": "SN-0034-005",
+          "location": "WH-B/Bin-04",
+          "configuration_item": "CI-0034"
+        },
+        {
+          "serial_number": "SN-0034-006",
+          "original_serial_number": "SN-0034-006",
+          "location": "WH-B/Bin-04",
+          "configuration_item": "CI-0034"
+        },
+        {
+          "serial_number": "SN-0034-007",
+          "original_serial_number": "SN-0034-007",
+          "location": "WH-B/Bin-04",
+          "configuration_item": "CI-0034"
+        },
+        {
+          "serial_number": "SN-0034-008",
+          "original_serial_number": "SN-0034-008",
+          "location": "WH-B/Bin-04",
+          "configuration_item": "CI-0034"
+        }
+      ]
+    },
+    {
+      "name": "BUC Dampers",
+      "inventory_type": "unit",
+      "part_number": "PN-0035",
+      "original_part_number": "PN-0035",
+      "quantity": 9,
+      "description": "Stock of BUC Dampers",
+      "oem_name": "Texas Instruments",
+      "configuration_item": "CI-0035",
+      "sku": "SKU-0035",
+      "location": "WH-B/Bin-05",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0035-001",
+        "SN-0035-002",
+        "SN-0035-003",
+        "SN-0035-004",
+        "SN-0035-005",
+        "SN-0035-006",
+        "SN-0035-007",
+        "SN-0035-008",
+        "SN-0035-009"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0035-001",
+          "original_serial_number": "SN-0035-001",
+          "location": "WH-B/Bin-05",
+          "configuration_item": "CI-0035"
+        },
+        {
+          "serial_number": "SN-0035-002",
+          "original_serial_number": "SN-0035-002",
+          "location": "WH-B/Bin-05",
+          "configuration_item": "CI-0035"
+        },
+        {
+          "serial_number": "SN-0035-003",
+          "original_serial_number": "SN-0035-003",
+          "location": "WH-B/Bin-05",
+          "configuration_item": "CI-0035"
+        },
+        {
+          "serial_number": "SN-0035-004",
+          "original_serial_number": "SN-0035-004",
+          "location": "WH-B/Bin-05",
+          "configuration_item": "CI-0035"
+        },
+        {
+          "serial_number": "SN-0035-005",
+          "original_serial_number": "SN-0035-005",
+          "location": "WH-B/Bin-05",
+          "configuration_item": "CI-0035"
+        },
+        {
+          "serial_number": "SN-0035-006",
+          "original_serial_number": "SN-0035-006",
+          "location": "WH-B/Bin-05",
+          "configuration_item": "CI-0035"
+        },
+        {
+          "serial_number": "SN-0035-007",
+          "original_serial_number": "SN-0035-007",
+          "location": "WH-B/Bin-05",
+          "configuration_item": "CI-0035"
+        },
+        {
+          "serial_number": "SN-0035-008",
+          "original_serial_number": "SN-0035-008",
+          "location": "WH-B/Bin-05",
+          "configuration_item": "CI-0035"
+        },
+        {
+          "serial_number": "SN-0035-009",
+          "original_serial_number": "SN-0035-009",
+          "location": "WH-B/Bin-05",
+          "configuration_item": "CI-0035"
+        }
+      ]
+    },
+    {
+      "name": "Motors",
+      "inventory_type": "unit",
+      "part_number": "PN-0036",
+      "original_part_number": "PN-0036",
+      "quantity": 10,
+      "description": "Stock of Motors",
+      "oem_name": "Analog Devices",
+      "configuration_item": "CI-0036",
+      "sku": "SKU-0036",
+      "location": "WH-B/Bin-06",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0036-001",
+        "SN-0036-002",
+        "SN-0036-003",
+        "SN-0036-004",
+        "SN-0036-005",
+        "SN-0036-006",
+        "SN-0036-007",
+        "SN-0036-008",
+        "SN-0036-009",
+        "SN-0036-010"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0036-001",
+          "original_serial_number": "SN-0036-001",
+          "location": "WH-B/Bin-06",
+          "configuration_item": "CI-0036"
+        },
+        {
+          "serial_number": "SN-0036-002",
+          "original_serial_number": "SN-0036-002",
+          "location": "WH-B/Bin-06",
+          "configuration_item": "CI-0036"
+        },
+        {
+          "serial_number": "SN-0036-003",
+          "original_serial_number": "SN-0036-003",
+          "location": "WH-B/Bin-06",
+          "configuration_item": "CI-0036"
+        },
+        {
+          "serial_number": "SN-0036-004",
+          "original_serial_number": "SN-0036-004",
+          "location": "WH-B/Bin-06",
+          "configuration_item": "CI-0036"
+        },
+        {
+          "serial_number": "SN-0036-005",
+          "original_serial_number": "SN-0036-005",
+          "location": "WH-B/Bin-06",
+          "configuration_item": "CI-0036"
+        },
+        {
+          "serial_number": "SN-0036-006",
+          "original_serial_number": "SN-0036-006",
+          "location": "WH-B/Bin-06",
+          "configuration_item": "CI-0036"
+        },
+        {
+          "serial_number": "SN-0036-007",
+          "original_serial_number": "SN-0036-007",
+          "location": "WH-B/Bin-06",
+          "configuration_item": "CI-0036"
+        },
+        {
+          "serial_number": "SN-0036-008",
+          "original_serial_number": "SN-0036-008",
+          "location": "WH-B/Bin-06",
+          "configuration_item": "CI-0036"
+        },
+        {
+          "serial_number": "SN-0036-009",
+          "original_serial_number": "SN-0036-009",
+          "location": "WH-B/Bin-06",
+          "configuration_item": "CI-0036"
+        },
+        {
+          "serial_number": "SN-0036-010",
+          "original_serial_number": "SN-0036-010",
+          "location": "WH-B/Bin-06",
+          "configuration_item": "CI-0036"
+        }
+      ]
+    },
+    {
+      "name": "Proximity Sensors",
+      "inventory_type": "unit",
+      "part_number": "PN-0037",
+      "original_part_number": "PN-0037",
+      "quantity": 5,
+      "description": "Stock of Proximity Sensors",
+      "oem_name": "Cobham",
+      "configuration_item": "CI-0037",
+      "sku": "SKU-0037",
+      "location": "WH-B/Bin-07",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0037-001",
+        "SN-0037-002",
+        "SN-0037-003",
+        "SN-0037-004",
+        "SN-0037-005"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0037-001",
+          "original_serial_number": "SN-0037-001",
+          "location": "WH-B/Bin-07",
+          "configuration_item": "CI-0037"
+        },
+        {
+          "serial_number": "SN-0037-002",
+          "original_serial_number": "SN-0037-002",
+          "location": "WH-B/Bin-07",
+          "configuration_item": "CI-0037"
+        },
+        {
+          "serial_number": "SN-0037-003",
+          "original_serial_number": "SN-0037-003",
+          "location": "WH-B/Bin-07",
+          "configuration_item": "CI-0037"
+        },
+        {
+          "serial_number": "SN-0037-004",
+          "original_serial_number": "SN-0037-004",
+          "location": "WH-B/Bin-07",
+          "configuration_item": "CI-0037"
+        },
+        {
+          "serial_number": "SN-0037-005",
+          "original_serial_number": "SN-0037-005",
+          "location": "WH-B/Bin-07",
+          "configuration_item": "CI-0037"
+        }
+      ]
+    },
+    {
+      "name": "Motor Controllers",
+      "inventory_type": "unit",
+      "part_number": "PN-0038",
+      "original_part_number": "PN-0038",
+      "quantity": 6,
+      "description": "Stock of Motor Controllers",
+      "oem_name": "Thales",
+      "configuration_item": "CI-0038",
+      "sku": "SKU-0038",
+      "location": "WH-B/Bin-08",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0038-001",
+        "SN-0038-002",
+        "SN-0038-003",
+        "SN-0038-004",
+        "SN-0038-005",
+        "SN-0038-006"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0038-001",
+          "original_serial_number": "SN-0038-001",
+          "location": "WH-B/Bin-08",
+          "configuration_item": "CI-0038"
+        },
+        {
+          "serial_number": "SN-0038-002",
+          "original_serial_number": "SN-0038-002",
+          "location": "WH-B/Bin-08",
+          "configuration_item": "CI-0038"
+        },
+        {
+          "serial_number": "SN-0038-003",
+          "original_serial_number": "SN-0038-003",
+          "location": "WH-B/Bin-08",
+          "configuration_item": "CI-0038"
+        },
+        {
+          "serial_number": "SN-0038-004",
+          "original_serial_number": "SN-0038-004",
+          "location": "WH-B/Bin-08",
+          "configuration_item": "CI-0038"
+        },
+        {
+          "serial_number": "SN-0038-005",
+          "original_serial_number": "SN-0038-005",
+          "location": "WH-B/Bin-08",
+          "configuration_item": "CI-0038"
+        },
+        {
+          "serial_number": "SN-0038-006",
+          "original_serial_number": "SN-0038-006",
+          "location": "WH-B/Bin-08",
+          "configuration_item": "CI-0038"
+        }
+      ]
+    },
+    {
+      "name": "DPU PDC",
+      "inventory_type": "unit",
+      "part_number": "PN-0039",
+      "original_part_number": "PN-0039",
+      "quantity": 7,
+      "description": "Stock of DPU PDC",
+      "oem_name": "Airbus DS",
+      "configuration_item": "CI-0039",
+      "sku": "SKU-0039",
+      "location": "WH-B/Bin-09",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0039-001",
+        "SN-0039-002",
+        "SN-0039-003",
+        "SN-0039-004",
+        "SN-0039-005",
+        "SN-0039-006",
+        "SN-0039-007"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0039-001",
+          "original_serial_number": "SN-0039-001",
+          "location": "WH-B/Bin-09",
+          "configuration_item": "CI-0039"
+        },
+        {
+          "serial_number": "SN-0039-002",
+          "original_serial_number": "SN-0039-002",
+          "location": "WH-B/Bin-09",
+          "configuration_item": "CI-0039"
+        },
+        {
+          "serial_number": "SN-0039-003",
+          "original_serial_number": "SN-0039-003",
+          "location": "WH-B/Bin-09",
+          "configuration_item": "CI-0039"
+        },
+        {
+          "serial_number": "SN-0039-004",
+          "original_serial_number": "SN-0039-004",
+          "location": "WH-B/Bin-09",
+          "configuration_item": "CI-0039"
+        },
+        {
+          "serial_number": "SN-0039-005",
+          "original_serial_number": "SN-0039-005",
+          "location": "WH-B/Bin-09",
+          "configuration_item": "CI-0039"
+        },
+        {
+          "serial_number": "SN-0039-006",
+          "original_serial_number": "SN-0039-006",
+          "location": "WH-B/Bin-09",
+          "configuration_item": "CI-0039"
+        },
+        {
+          "serial_number": "SN-0039-007",
+          "original_serial_number": "SN-0039-007",
+          "location": "WH-B/Bin-09",
+          "configuration_item": "CI-0039"
+        }
+      ]
+    },
+    {
+      "name": "SBRIO Card 1",
+      "inventory_type": "unit",
+      "part_number": "PN-0040",
+      "original_part_number": "PN-0040",
+      "quantity": 8,
+      "description": "Stock of SBRIO Card 1",
+      "oem_name": "Lockheed Martin",
+      "configuration_item": "CI-0040",
+      "sku": "SKU-0040",
+      "location": "WH-B/Bin-10",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0040-001",
+        "SN-0040-002",
+        "SN-0040-003",
+        "SN-0040-004",
+        "SN-0040-005",
+        "SN-0040-006",
+        "SN-0040-007",
+        "SN-0040-008"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0040-001",
+          "original_serial_number": "SN-0040-001",
+          "location": "WH-B/Bin-10",
+          "configuration_item": "CI-0040"
+        },
+        {
+          "serial_number": "SN-0040-002",
+          "original_serial_number": "SN-0040-002",
+          "location": "WH-B/Bin-10",
+          "configuration_item": "CI-0040"
+        },
+        {
+          "serial_number": "SN-0040-003",
+          "original_serial_number": "SN-0040-003",
+          "location": "WH-B/Bin-10",
+          "configuration_item": "CI-0040"
+        },
+        {
+          "serial_number": "SN-0040-004",
+          "original_serial_number": "SN-0040-004",
+          "location": "WH-B/Bin-10",
+          "configuration_item": "CI-0040"
+        },
+        {
+          "serial_number": "SN-0040-005",
+          "original_serial_number": "SN-0040-005",
+          "location": "WH-B/Bin-10",
+          "configuration_item": "CI-0040"
+        },
+        {
+          "serial_number": "SN-0040-006",
+          "original_serial_number": "SN-0040-006",
+          "location": "WH-B/Bin-10",
+          "configuration_item": "CI-0040"
+        },
+        {
+          "serial_number": "SN-0040-007",
+          "original_serial_number": "SN-0040-007",
+          "location": "WH-B/Bin-10",
+          "configuration_item": "CI-0040"
+        },
+        {
+          "serial_number": "SN-0040-008",
+          "original_serial_number": "SN-0040-008",
+          "location": "WH-B/Bin-10",
+          "configuration_item": "CI-0040"
+        }
+      ]
+    },
+    {
+      "name": "SBRIO Card 2",
+      "inventory_type": "unit",
+      "part_number": "PN-0041",
+      "original_part_number": "PN-0041",
+      "quantity": 9,
+      "description": "Stock of SBRIO Card 2",
+      "oem_name": "L3Harris",
+      "configuration_item": "CI-0041",
+      "sku": "SKU-0041",
+      "location": "WH-A/Rack-01",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0041-001",
+        "SN-0041-002",
+        "SN-0041-003",
+        "SN-0041-004",
+        "SN-0041-005",
+        "SN-0041-006",
+        "SN-0041-007",
+        "SN-0041-008",
+        "SN-0041-009"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0041-001",
+          "original_serial_number": "SN-0041-001",
+          "location": "WH-A/Rack-01",
+          "configuration_item": "CI-0041"
+        },
+        {
+          "serial_number": "SN-0041-002",
+          "original_serial_number": "SN-0041-002",
+          "location": "WH-A/Rack-01",
+          "configuration_item": "CI-0041"
+        },
+        {
+          "serial_number": "SN-0041-003",
+          "original_serial_number": "SN-0041-003",
+          "location": "WH-A/Rack-01",
+          "configuration_item": "CI-0041"
+        },
+        {
+          "serial_number": "SN-0041-004",
+          "original_serial_number": "SN-0041-004",
+          "location": "WH-A/Rack-01",
+          "configuration_item": "CI-0041"
+        },
+        {
+          "serial_number": "SN-0041-005",
+          "original_serial_number": "SN-0041-005",
+          "location": "WH-A/Rack-01",
+          "configuration_item": "CI-0041"
+        },
+        {
+          "serial_number": "SN-0041-006",
+          "original_serial_number": "SN-0041-006",
+          "location": "WH-A/Rack-01",
+          "configuration_item": "CI-0041"
+        },
+        {
+          "serial_number": "SN-0041-007",
+          "original_serial_number": "SN-0041-007",
+          "location": "WH-A/Rack-01",
+          "configuration_item": "CI-0041"
+        },
+        {
+          "serial_number": "SN-0041-008",
+          "original_serial_number": "SN-0041-008",
+          "location": "WH-A/Rack-01",
+          "configuration_item": "CI-0041"
+        },
+        {
+          "serial_number": "SN-0041-009",
+          "original_serial_number": "SN-0041-009",
+          "location": "WH-A/Rack-01",
+          "configuration_item": "CI-0041"
+        }
+      ]
+    },
+    {
+      "name": "Daughter FEC Card",
+      "inventory_type": "unit",
+      "part_number": "PN-0042",
+      "original_part_number": "PN-0042",
+      "quantity": 10,
+      "description": "Stock of Daughter FEC Card",
+      "oem_name": "ViaSat",
+      "configuration_item": "CI-0042",
+      "sku": "SKU-0042",
+      "location": "WH-A/Rack-02",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0042-001",
+        "SN-0042-002",
+        "SN-0042-003",
+        "SN-0042-004",
+        "SN-0042-005",
+        "SN-0042-006",
+        "SN-0042-007",
+        "SN-0042-008",
+        "SN-0042-009",
+        "SN-0042-010"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0042-001",
+          "original_serial_number": "SN-0042-001",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0042"
+        },
+        {
+          "serial_number": "SN-0042-002",
+          "original_serial_number": "SN-0042-002",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0042"
+        },
+        {
+          "serial_number": "SN-0042-003",
+          "original_serial_number": "SN-0042-003",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0042"
+        },
+        {
+          "serial_number": "SN-0042-004",
+          "original_serial_number": "SN-0042-004",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0042"
+        },
+        {
+          "serial_number": "SN-0042-005",
+          "original_serial_number": "SN-0042-005",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0042"
+        },
+        {
+          "serial_number": "SN-0042-006",
+          "original_serial_number": "SN-0042-006",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0042"
+        },
+        {
+          "serial_number": "SN-0042-007",
+          "original_serial_number": "SN-0042-007",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0042"
+        },
+        {
+          "serial_number": "SN-0042-008",
+          "original_serial_number": "SN-0042-008",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0042"
+        },
+        {
+          "serial_number": "SN-0042-009",
+          "original_serial_number": "SN-0042-009",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0042"
+        },
+        {
+          "serial_number": "SN-0042-010",
+          "original_serial_number": "SN-0042-010",
+          "location": "WH-A/Rack-02",
+          "configuration_item": "CI-0042"
+        }
+      ]
+    },
+    {
+      "name": "Mini Power",
+      "inventory_type": "unit",
+      "part_number": "PN-0043",
+      "original_part_number": "PN-0043",
+      "quantity": 5,
+      "description": "Stock of Mini Power",
+      "oem_name": "Comtech",
+      "configuration_item": "CI-0043",
+      "sku": "SKU-0043",
+      "location": "WH-A/Rack-03",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0043-001",
+        "SN-0043-002",
+        "SN-0043-003",
+        "SN-0043-004",
+        "SN-0043-005"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0043-001",
+          "original_serial_number": "SN-0043-001",
+          "location": "WH-A/Rack-03",
+          "configuration_item": "CI-0043"
+        },
+        {
+          "serial_number": "SN-0043-002",
+          "original_serial_number": "SN-0043-002",
+          "location": "WH-A/Rack-03",
+          "configuration_item": "CI-0043"
+        },
+        {
+          "serial_number": "SN-0043-003",
+          "original_serial_number": "SN-0043-003",
+          "location": "WH-A/Rack-03",
+          "configuration_item": "CI-0043"
+        },
+        {
+          "serial_number": "SN-0043-004",
+          "original_serial_number": "SN-0043-004",
+          "location": "WH-A/Rack-03",
+          "configuration_item": "CI-0043"
+        },
+        {
+          "serial_number": "SN-0043-005",
+          "original_serial_number": "SN-0043-005",
+          "location": "WH-A/Rack-03",
+          "configuration_item": "CI-0043"
+        }
+      ]
+    },
+    {
+      "name": "EMC EMI Filter",
+      "inventory_type": "unit",
+      "part_number": "PN-0044",
+      "original_part_number": "PN-0044",
+      "quantity": 6,
+      "description": "Stock of EMC EMI Filter",
+      "oem_name": "ND SatCom",
+      "configuration_item": "CI-0044",
+      "sku": "SKU-0044",
+      "location": "WH-A/Rack-04",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0044-001",
+        "SN-0044-002",
+        "SN-0044-003",
+        "SN-0044-004",
+        "SN-0044-005",
+        "SN-0044-006"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0044-001",
+          "original_serial_number": "SN-0044-001",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0044"
+        },
+        {
+          "serial_number": "SN-0044-002",
+          "original_serial_number": "SN-0044-002",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0044"
+        },
+        {
+          "serial_number": "SN-0044-003",
+          "original_serial_number": "SN-0044-003",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0044"
+        },
+        {
+          "serial_number": "SN-0044-004",
+          "original_serial_number": "SN-0044-004",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0044"
+        },
+        {
+          "serial_number": "SN-0044-005",
+          "original_serial_number": "SN-0044-005",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0044"
+        },
+        {
+          "serial_number": "SN-0044-006",
+          "original_serial_number": "SN-0044-006",
+          "location": "WH-A/Rack-04",
+          "configuration_item": "CI-0044"
+        }
+      ]
+    },
+    {
+      "name": "RS422 RS232 Converter",
+      "inventory_type": "unit",
+      "part_number": "PN-0045",
+      "original_part_number": "PN-0045",
+      "quantity": 7,
+      "description": "Stock of RS422 RS232 Converter",
+      "oem_name": "Cobham SATCOM",
+      "configuration_item": "CI-0045",
+      "sku": "SKU-0045",
+      "location": "WH-A/Rack-05",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0045-001",
+        "SN-0045-002",
+        "SN-0045-003",
+        "SN-0045-004",
+        "SN-0045-005",
+        "SN-0045-006",
+        "SN-0045-007"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0045-001",
+          "original_serial_number": "SN-0045-001",
+          "location": "WH-A/Rack-05",
+          "configuration_item": "CI-0045"
+        },
+        {
+          "serial_number": "SN-0045-002",
+          "original_serial_number": "SN-0045-002",
+          "location": "WH-A/Rack-05",
+          "configuration_item": "CI-0045"
+        },
+        {
+          "serial_number": "SN-0045-003",
+          "original_serial_number": "SN-0045-003",
+          "location": "WH-A/Rack-05",
+          "configuration_item": "CI-0045"
+        },
+        {
+          "serial_number": "SN-0045-004",
+          "original_serial_number": "SN-0045-004",
+          "location": "WH-A/Rack-05",
+          "configuration_item": "CI-0045"
+        },
+        {
+          "serial_number": "SN-0045-005",
+          "original_serial_number": "SN-0045-005",
+          "location": "WH-A/Rack-05",
+          "configuration_item": "CI-0045"
+        },
+        {
+          "serial_number": "SN-0045-006",
+          "original_serial_number": "SN-0045-006",
+          "location": "WH-A/Rack-05",
+          "configuration_item": "CI-0045"
+        },
+        {
+          "serial_number": "SN-0045-007",
+          "original_serial_number": "SN-0045-007",
+          "location": "WH-A/Rack-05",
+          "configuration_item": "CI-0045"
+        }
+      ]
+    },
+    {
+      "name": "Az Motor Controller Box",
+      "inventory_type": "unit",
+      "part_number": "PN-0046",
+      "original_part_number": "PN-0046",
+      "quantity": 8,
+      "description": "Stock of Az Motor Controller Box",
+      "oem_name": "Honeywell",
+      "configuration_item": "CI-0046",
+      "sku": "SKU-0046",
+      "location": "WH-A/Rack-06",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [
+        "SN-0046-001",
+        "SN-0046-002",
+        "SN-0046-003",
+        "SN-0046-004",
+        "SN-0046-005",
+        "SN-0046-006",
+        "SN-0046-007",
+        "SN-0046-008"
+      ],
+      "instances": [
+        {
+          "serial_number": "SN-0046-001",
+          "original_serial_number": "SN-0046-001",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0046"
+        },
+        {
+          "serial_number": "SN-0046-002",
+          "original_serial_number": "SN-0046-002",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0046"
+        },
+        {
+          "serial_number": "SN-0046-003",
+          "original_serial_number": "SN-0046-003",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0046"
+        },
+        {
+          "serial_number": "SN-0046-004",
+          "original_serial_number": "SN-0046-004",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0046"
+        },
+        {
+          "serial_number": "SN-0046-005",
+          "original_serial_number": "SN-0046-005",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0046"
+        },
+        {
+          "serial_number": "SN-0046-006",
+          "original_serial_number": "SN-0046-006",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0046"
+        },
+        {
+          "serial_number": "SN-0046-007",
+          "original_serial_number": "SN-0046-007",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0046"
+        },
+        {
+          "serial_number": "SN-0046-008",
+          "original_serial_number": "SN-0046-008",
+          "location": "WH-A/Rack-06",
+          "configuration_item": "CI-0046"
+        }
+      ]
+    },
+    {
+      "name": "SUM Card",
+      "inventory_type": "component",
+      "part_number": "PN-0047",
+      "original_part_number": "PN-0047",
+      "quantity": 9,
+      "description": "Stock of SUM Card",
+      "oem_name": "TE Connectivity",
+      "configuration_item": "CI-0047",
+      "sku": "SKU-0047",
+      "location": "WH-A/Rack-07",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [],
+      "instances": []
+    },
+    {
+      "name": "Difference Card",
+      "inventory_type": "component",
+      "part_number": "PN-0048",
+      "original_part_number": "PN-0048",
+      "quantity": 10,
+      "description": "Stock of Difference Card",
+      "oem_name": "Amphenol",
+      "configuration_item": "CI-0048",
+      "sku": "SKU-0048",
+      "location": "WH-A/Rack-08",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [],
+      "instances": []
+    },
+    {
+      "name": "SUM LNB",
+      "inventory_type": "component",
+      "part_number": "PN-0049",
+      "original_part_number": "PN-0049",
+      "quantity": 5,
+      "description": "Stock of SUM LNB",
+      "oem_name": "Molex",
+      "configuration_item": "CI-0049",
+      "sku": "SKU-0049",
+      "location": "WH-A/Rack-09",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [],
+      "instances": []
+    },
+    {
+      "name": "Az LNB",
+      "inventory_type": "component",
+      "part_number": "PN-0050",
+      "original_part_number": "PN-0050",
+      "quantity": 6,
+      "description": "Stock of Az LNB",
+      "oem_name": "Texas Instruments",
+      "configuration_item": "CI-0050",
+      "sku": "SKU-0050",
+      "location": "WH-A/Rack-10",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [],
+      "instances": []
+    },
+    {
+      "name": "El LNB",
+      "inventory_type": "component",
+      "part_number": "PN-0051",
+      "original_part_number": "PN-0051",
+      "quantity": 7,
+      "description": "Stock of El LNB",
+      "oem_name": "Analog Devices",
+      "configuration_item": "CI-0051",
+      "sku": "SKU-0051",
+      "location": "WH-B/Bin-01",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [],
+      "instances": []
+    },
+    {
+      "name": "LNB 3X Channel",
+      "inventory_type": "component",
+      "part_number": "PN-0052",
+      "original_part_number": "PN-0052",
+      "quantity": 8,
+      "description": "Stock of LNB 3X Channel",
+      "oem_name": "Cobham",
+      "configuration_item": "CI-0052",
+      "sku": "SKU-0052",
+      "location": "WH-B/Bin-02",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [],
+      "instances": []
+    },
+    {
+      "name": "Rotary Joint Pol",
+      "inventory_type": "component",
+      "part_number": "PN-0053",
+      "original_part_number": "PN-0053",
+      "quantity": 9,
+      "description": "Stock of Rotary Joint Pol",
+      "oem_name": "Thales",
+      "configuration_item": "CI-0053",
+      "sku": "SKU-0053",
+      "location": "WH-B/Bin-03",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [],
+      "instances": []
+    },
+    {
+      "name": "Rotary Joint Elevation",
+      "inventory_type": "component",
+      "part_number": "PN-0054",
+      "original_part_number": "PN-0054",
+      "quantity": 10,
+      "description": "Stock of Rotary Joint Elevation",
+      "oem_name": "Airbus DS",
+      "configuration_item": "CI-0054",
+      "sku": "SKU-0054",
+      "location": "WH-B/Bin-04",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [],
+      "instances": []
+    },
+    {
+      "name": "BUC Tx Filter",
+      "inventory_type": "component",
+      "part_number": "PN-0055",
+      "original_part_number": "PN-0055",
+      "quantity": 5,
+      "description": "Stock of BUC Tx Filter",
+      "oem_name": "Lockheed Martin",
+      "configuration_item": "CI-0055",
+      "sku": "SKU-0055",
+      "location": "WH-B/Bin-05",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [],
+      "instances": []
+    },
+    {
+      "name": "Single Filter",
+      "inventory_type": "component",
+      "part_number": "PN-0056",
+      "original_part_number": "PN-0056",
+      "quantity": 6,
+      "description": "Stock of Single Filter",
+      "oem_name": "L3Harris",
+      "configuration_item": "CI-0056",
+      "sku": "SKU-0056",
+      "location": "WH-B/Bin-06",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [],
+      "instances": []
+    },
+    {
+      "name": "Double Filter",
+      "inventory_type": "component",
+      "part_number": "PN-0057",
+      "original_part_number": "PN-0057",
+      "quantity": 7,
+      "description": "Stock of Double Filter",
+      "oem_name": "ViaSat",
+      "configuration_item": "CI-0057",
+      "sku": "SKU-0057",
+      "location": "WH-B/Bin-07",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [],
+      "instances": []
+    },
+    {
+      "name": "Az Motor",
+      "inventory_type": "component",
+      "part_number": "PN-0058",
+      "original_part_number": "PN-0058",
+      "quantity": 8,
+      "description": "Stock of Az Motor",
+      "oem_name": "Comtech",
+      "configuration_item": "CI-0058",
+      "sku": "SKU-0058",
+      "location": "WH-B/Bin-08",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [],
+      "instances": []
+    },
+    {
+      "name": "El Motor",
+      "inventory_type": "component",
+      "part_number": "PN-0059",
+      "original_part_number": "PN-0059",
+      "quantity": 9,
+      "description": "Stock of El Motor",
+      "oem_name": "ND SatCom",
+      "configuration_item": "CI-0059",
+      "sku": "SKU-0059",
+      "location": "WH-B/Bin-09",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [],
+      "instances": []
+    },
+    {
+      "name": "Pol Motor",
+      "inventory_type": "component",
+      "part_number": "PN-0060",
+      "original_part_number": "PN-0060",
+      "quantity": 10,
+      "description": "Stock of Pol Motor",
+      "oem_name": "Cobham SATCOM",
+      "configuration_item": "CI-0060",
+      "sku": "SKU-0060",
+      "location": "WH-B/Bin-10",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [],
+      "instances": []
+    },
+    {
+      "name": "Az Proximity Sensor",
+      "inventory_type": "component",
+      "part_number": "PN-0061",
+      "original_part_number": "PN-0061",
+      "quantity": 5,
+      "description": "Stock of Az Proximity Sensor",
+      "oem_name": "Honeywell",
+      "configuration_item": "CI-0061",
+      "sku": "SKU-0061",
+      "location": "WH-A/Rack-01",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [],
+      "instances": []
+    },
+    {
+      "name": "El Proximity Sensor",
+      "inventory_type": "component",
+      "part_number": "PN-0062",
+      "original_part_number": "PN-0062",
+      "quantity": 6,
+      "description": "Stock of El Proximity Sensor",
+      "oem_name": "TE Connectivity",
+      "configuration_item": "CI-0062",
+      "sku": "SKU-0062",
+      "location": "WH-A/Rack-02",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [],
+      "instances": []
+    },
+    {
+      "name": "Pol Proximity Sensor",
+      "inventory_type": "component",
+      "part_number": "PN-0063",
+      "original_part_number": "PN-0063",
+      "quantity": 7,
+      "description": "Stock of Pol Proximity Sensor",
+      "oem_name": "Amphenol",
+      "configuration_item": "CI-0063",
+      "sku": "SKU-0063",
+      "location": "WH-A/Rack-03",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [],
+      "instances": []
+    },
+    {
+      "name": "Az Motor Controller",
+      "inventory_type": "component",
+      "part_number": "PN-0064",
+      "original_part_number": "PN-0064",
+      "quantity": 8,
+      "description": "Stock of Az Motor Controller",
+      "oem_name": "Molex",
+      "configuration_item": "CI-0064",
+      "sku": "SKU-0064",
+      "location": "WH-A/Rack-04",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [],
+      "instances": []
+    },
+    {
+      "name": "El Motor Controller",
+      "inventory_type": "component",
+      "part_number": "PN-0065",
+      "original_part_number": "PN-0065",
+      "quantity": 9,
+      "description": "Stock of El Motor Controller",
+      "oem_name": "Texas Instruments",
+      "configuration_item": "CI-0065",
+      "sku": "SKU-0065",
+      "location": "WH-A/Rack-05",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [],
+      "instances": []
+    },
+    {
+      "name": "Pol Motor Controller",
+      "inventory_type": "component",
+      "part_number": "PN-0066",
+      "original_part_number": "PN-0066",
+      "quantity": 10,
+      "description": "Stock of Pol Motor Controller",
+      "oem_name": "Analog Devices",
+      "configuration_item": "CI-0066",
+      "sku": "SKU-0066",
+      "location": "WH-A/Rack-06",
+      "shelf_life_expires_at": "2028-12-31T00:00:00+00:00",
+      "serial_numbers": [],
+      "instances": []
+    }
+  ]
+}

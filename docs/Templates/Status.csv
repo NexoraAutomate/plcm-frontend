@@ -1,0 +1,42 @@
+Status,Description,Entity Type
+Active,User is active and can access system,users
+Inactive,User is disabled,users
+Suspended,User temporarily blocked,users
+Pending Approval,User registration awaiting approval,users
+Active,Customer is active,customers
+Inactive,Customer is inactive,customers
+Prospect,Potential customer,customers
+Blacklisted,Restricted customer,customers
+Created,Order created,orders
+Confirmed,Order confirmed,orders
+Processing,Order in processing,orders
+Shipped,Order shipped,orders
+Delivered,Order delivered,orders
+Cancelled,Order cancelled,orders
+Initiation,Project initiated,projects
+Planning,Project planning phase,projects
+Execution,Project execution ongoing,projects
+Monitoring,Project monitoring,projects
+Completed,Project completed,projects
+On Hold,Project paused,projects
+Design,System design phase,systems
+Development,System under development,systems
+Testing,System testing phase,systems
+Operational,System in operation,systems
+Retired,System retired,systems
+Design,Subsystem design phase,subsystems
+Integration,Subsystem integration phase,subsystems
+Testing,Subsystem testing,subsystems
+Operational,Subsystem operational,subsystems
+Design,Module design,modules
+Development,Module development,modules
+Testing,Module testing,modules
+Integrated,Module integrated,modules
+Manufacturing,Unit under manufacturing,units
+Assembled,Unit assembled,units
+Testing,Unit testing,units
+Qualified,Unit qualified,units
+Procured,Component procured,components
+In Inspection,Component under inspection,components
+Approved,Component approved,components
+Rejected,Component rejected,components

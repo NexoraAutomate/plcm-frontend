@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState, useMemo, useEffect } from 'react';
+import { Fragment, useState, useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Plus, Edit, Trash2, Search, Layers, Network, Copy, ChevronDown, PackageMinus, ListOrdered, Undo2, RefreshCw, Download, Upload, FileText, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { toastFulfillments } from '@/lib/fcfs-toast';
 import * as api from '@/lib/api';
@@ -28,7 +36,7 @@ import type { Inventory, InventoryInstance, User } from '@/lib/models';
 import { formatUserRef } from '@/lib/user-display';
 import { useDataStore } from '@/lib/data-store';
 import { useHierarchiesQuery } from '@/hooks/queries';
-import { fetchInventoryPage } from '@/hooks/queries/fetchers';
+import { fetchAllMatchingInventoryIds, fetchInventoryPage } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
 import { usePaginatedList } from '@/hooks/use-paginated-list';
 import { useTableSorting } from '@/hooks/use-table-sorting';
@@ -322,10 +330,20 @@ export default function InventoryPage() {
   // CSV import/export state
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
-  const [importPreview, setImportPreview] = useState<{ valid_rows: number; errors: { row: number; errors: string[] }[] } | null>(null);
+  const [importPreview, setImportPreview] = useState<{
+    valid_rows: number;
+    groups?: number;
+    instances?: number;
+    errors: { row: number; errors: string[] }[];
+  } | null>(null);
   const [importValidating, setImportValidating] = useState(false);
   const [importSubmitting, setImportSubmitting] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [selectingAll, setSelectingAll] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const selectAllRequestId = useRef(0);
 
   const [selectedEntityType, setSelectedEntityType] = useState<EntityType>('component');
   const { data: hierarchyCategories = [] } = useHierarchiesQuery(selectedEntityType);
@@ -335,17 +353,75 @@ export default function InventoryPage() {
   const [removePicture, setRemovePicture] = useState(false);
   const [formTab, setFormTab] = useState('general');
 
-  async function handleExportCsv() {
+  const pageIds = useMemo(() => inventory.map((item) => item.id), [inventory]);
+  const selectedCount = selectedIds.size;
+  const allMatchingSelected =
+    pagination.total > 0 && selectedCount === pagination.total;
+  const someSelected = selectedCount > 0;
+
+  useEffect(() => {
+    selectAllRequestId.current += 1;
+    setSelectingAll(false);
+    setSelectedIds(new Set());
+  }, [debouncedSearch, entityTypeFilter, stockFilter]);
+
+  function toggleRowSelected(id: number, checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    selectAllRequestId.current += 1;
+    setSelectingAll(false);
+    setSelectedIds(new Set());
+  }
+
+  async function selectAllMatching() {
+    const requestId = ++selectAllRequestId.current;
+    if (pagination.total > 0 && pagination.total === pageIds.length) {
+      setSelectedIds(new Set(pageIds));
+      return;
+    }
+    setSelectingAll(true);
+    try {
+      const ids = await fetchAllMatchingInventoryIds(inventoryTypeParam, listFilters);
+      if (requestId !== selectAllRequestId.current) return;
+      setSelectedIds(new Set(ids));
+    } catch {
+      if (requestId !== selectAllRequestId.current) return;
+      toast.error('Failed to select all inventory items');
+    } finally {
+      if (requestId === selectAllRequestId.current) setSelectingAll(false);
+    }
+  }
+
+  function toggleSelectAll(checked: boolean) {
+    if (!checked) {
+      clearSelection();
+      return;
+    }
+    void selectAllMatching();
+  }
+
+  async function handleExport(format: 'csv' | 'json') {
     setExportBusy(true);
     try {
-      const res = await api.inventory.exportCsv({
+      const params = {
         inventory_type: entityTypeFilter !== 'all' ? entityTypeFilter : undefined,
         search: search || undefined,
-      });
+      };
+      const res =
+        format === 'json'
+          ? await api.inventory.exportJson(params)
+          : await api.inventory.exportCsv(params);
       const url = URL.createObjectURL(res.data as Blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'inventory_export.csv';
+      a.download = format === 'json' ? 'inventory_export.json' : 'inventory_export.csv';
       a.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -362,14 +438,19 @@ export default function InventoryPage() {
     if (!file) return;
     setImportValidating(true);
     try {
-      const res = await api.inventory.importCsv(file, true);
-      setImportPreview({ valid_rows: res.data.valid_rows ?? 0, errors: res.data.errors ?? [] });
+      const res = await api.inventory.importFile(file, true);
+      setImportPreview({
+        valid_rows: res.data.valid_rows ?? res.data.groups ?? 0,
+        groups: res.data.groups,
+        instances: res.data.instances,
+        errors: res.data.errors ?? [],
+      });
     } catch (err: unknown) {
       const detail = (err as { response?: { data?: { detail?: { errors?: { row: number; errors: string[] }[] } } } })?.response?.data?.detail;
       if (detail && typeof detail === 'object' && detail.errors) {
         setImportPreview({ valid_rows: 0, errors: detail.errors });
       } else {
-        toast.error('Failed to validate CSV');
+        toast.error('Failed to validate import file');
         setImportPreview(null);
       }
     } finally {
@@ -381,22 +462,60 @@ export default function InventoryPage() {
     if (!importFile) return;
     setImportSubmitting(true);
     try {
-      const res = await api.inventory.importCsv(importFile, false);
-      toast.success(`Imported ${res.data.imported ?? 0} inventory items`);
+      const res = await api.inventory.importFile(importFile, false);
+      const groups = res.data.imported ?? res.data.groups_created ?? 0;
+      const serials = res.data.instances_created ?? 0;
+      toast.success(
+        serials > 0
+          ? `Imported ${groups} part number${groups === 1 ? '' : 's'} with ${serials} serial${serials === 1 ? '' : 's'}`
+          : `Imported ${groups} inventory item${groups === 1 ? '' : 's'}`
+      );
       setIsImportOpen(false);
       setImportFile(null);
       setImportPreview(null);
+      clearSelection();
       void pagination.invalidate();
     } catch (err: unknown) {
       const detail = (err as { response?: { data?: { detail?: { errors?: { row: number; errors: string[] }[] } } } })?.response?.data?.detail;
       if (detail && typeof detail === 'object' && detail.errors) {
         setImportPreview({ valid_rows: 0, errors: detail.errors });
-        toast.error('CSV import failed with validation errors');
+        toast.error('Import failed with validation errors');
       } else {
-        toast.error('Failed to import CSV');
+        toast.error('Failed to import inventory');
       }
     } finally {
       setImportSubmitting(false);
+    }
+  }
+
+  async function handleBulkDelete() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setBulkDeleting(true);
+    try {
+      const chunkSize = 100;
+      let deleted = 0;
+      let failed = 0;
+      for (let i = 0; i < ids.length; i += chunkSize) {
+        const chunk = ids.slice(i, i + chunkSize);
+        const res = await api.inventory.bulkDelete(chunk);
+        deleted += res.data.deleted ?? 0;
+        failed += res.data.not_found?.length ?? 0;
+      }
+      clearSelection();
+      void pagination.invalidate();
+      if (failed === 0) {
+        toast.success(`Deleted ${deleted} inventory item${deleted === 1 ? '' : 's'}`);
+      } else if (deleted === 0) {
+        toast.error('Failed to delete selected inventory items');
+      } else {
+        toast.error(`Deleted ${deleted}, ${failed} not found`);
+      }
+    } catch {
+      toast.error('Failed to delete selected inventory items');
+    } finally {
+      setBulkDeleting(false);
+      setBulkDeleteOpen(false);
     }
   }
 
@@ -720,6 +839,11 @@ export default function InventoryPage() {
   async function handleDeleteAll(inventoryId: number) {
     try {
       await api.inventory.delete(inventoryId);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(inventoryId);
+        return next;
+      });
       toast.success('Inventory item deleted');
       pagination.invalidate();
     } catch (err) {
@@ -1420,6 +1544,36 @@ export default function InventoryPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {inventoryManager && (selectedCount > 0 || selectingAll) ? (
+            <Can permission={P.delete_inventory}>
+              <div className="flex items-center gap-2 mr-1">
+                <span className="text-sm text-muted-foreground">
+                  {selectingAll
+                    ? 'Selecting all…'
+                    : allMatchingSelected
+                      ? `All ${selectedCount} selected`
+                      : `${selectedCount} selected`}
+                </span>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setBulkDeleteOpen(true)}
+                  disabled={bulkDeleting || selectingAll || selectedCount === 0}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete selected
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearSelection}
+                  disabled={bulkDeleting || selectingAll}
+                >
+                  Clear
+                </Button>
+              </div>
+            </Can>
+          ) : null}
           <Button
             variant="outline"
             size="sm"
@@ -1430,15 +1584,23 @@ export default function InventoryPage() {
             Refresh
           </Button>
           <Can permission={P.view_inventory}>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void handleExportCsv()}
-              disabled={exportBusy}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              {exportBusy ? 'Exporting…' : 'Export CSV'}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" disabled={exportBusy}>
+                  <Download className="mr-2 h-4 w-4" />
+                  {exportBusy ? 'Exporting…' : 'Export'}
+                  <ChevronDown className="ml-1 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => void handleExport('csv')}>
+                  Export CSV (one row per part number)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => void handleExport('json')}>
+                  Export JSON (part number + child serials)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </Can>
           {canCreateInventory && (
             <Button
@@ -1451,7 +1613,7 @@ export default function InventoryPage() {
               }}
             >
               <Upload className="mr-2 h-4 w-4" />
-              Import CSV
+              Import
             </Button>
           )}
           <Can permission={P.view_inventory_issuances}>
@@ -1561,6 +1723,15 @@ export default function InventoryPage() {
           <CardDescription>
             Showing {inventory.length} on this page · {pagination.total} total in database
           </CardDescription>
+          {inventoryManager && selectingAll ? (
+            <p className="text-sm text-muted-foreground pt-2">
+              Selecting all {pagination.total} matching items…
+            </p>
+          ) : inventoryManager && allMatchingSelected ? (
+            <p className="text-sm text-muted-foreground pt-2">
+              All {pagination.total} matching items selected across every page
+            </p>
+          ) : null}
         </CardHeader>
         <CardContent>
           <ListContentSuspense loading={pagination.fetching}>
@@ -1568,6 +1739,24 @@ export default function InventoryPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  {inventoryManager ? (
+                    <TableHead className="w-10 pl-2">
+                      <Can permission={P.delete_inventory}>
+                        <Checkbox
+                          checked={
+                            allMatchingSelected
+                              ? true
+                              : someSelected || selectingAll
+                                ? 'indeterminate'
+                                : false
+                          }
+                          onCheckedChange={(checked) => toggleSelectAll(checked === true)}
+                          aria-label="Select all inventory items across all pages"
+                          disabled={inventory.length === 0 || selectingAll}
+                        />
+                      </Can>
+                    </TableHead>
+                  ) : null}
                   <TableHead className="w-10" />
                   <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Category</SortableTableHead>
                   <SortableTableHead column="inventory_type" sort={sort} onSort={cycleSort}>Type</SortableTableHead>
@@ -1584,7 +1773,7 @@ export default function InventoryPage() {
               <TableBody>
                 {inventory.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={inventoryManager ? 10 : 9} className="text-center text-muted-foreground py-8">
                       No inventory items found
                     </TableCell>
                   </TableRow>
@@ -1593,10 +1782,27 @@ export default function InventoryPage() {
                     const serialInstances = getExpandableSerialInstances(item);
                     const isExpandable = serialInstances.length >= 1;
                     const isExpanded = expandedRows.has(item.id);
+                    const isSelected = selectedIds.has(item.id);
 
                     return (
                       <Fragment key={item.id}>
-                        <TableRow className={cn(isExpanded && 'bg-muted/30')}>
+                        <TableRow
+                          className={cn(isExpanded && 'bg-muted/30', isSelected && 'bg-muted/50')}
+                          data-state={isSelected ? 'selected' : undefined}
+                        >
+                          {inventoryManager ? (
+                            <TableCell className="p-2 w-10 pl-2">
+                              <Can permission={P.delete_inventory}>
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={(checked) =>
+                                    toggleRowSelected(item.id, checked === true)
+                                  }
+                                  aria-label={`Select ${item.entityName || item.name}`}
+                                />
+                              </Can>
+                            </TableCell>
+                          ) : null}
                           <TableCell className="p-2 w-10">
                             {isExpandable ? (
                               <Button
@@ -1826,7 +2032,7 @@ export default function InventoryPage() {
                         </TableRow>
                         {isExpanded && isExpandable ? (
                           <TableRow className="bg-muted/20 hover:bg-muted/20">
-                            <TableCell colSpan={10} className="p-0">
+                            <TableCell colSpan={inventoryManager ? 10 : 9} className="p-0">
                               <div className="px-6 py-3">
                                 <p className="mb-2 text-xs font-medium text-muted-foreground">
                                   All serial numbers for part {item.partNumber || item.entityName || '—'}
@@ -2276,33 +2482,36 @@ export default function InventoryPage() {
         }}
       />
 
-      {/* CSV Import Dialog */}
+      {/* Inventory Import Dialog */}
       <Dialog open={isImportOpen} onOpenChange={(open) => { if (!importSubmitting) setIsImportOpen(open); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Import Inventory from CSV</DialogTitle>
+            <DialogTitle>Import Inventory</DialogTitle>
             <DialogDescription>
-              Upload a CSV file to bulk-import inventory items. Required columns:{' '}
+              Upload CSV or JSON. One catalog row is created per part number; extra serials
+              become child units under that part. Required fields:{' '}
               <code className="text-xs font-mono bg-muted px-1 rounded">name</code>,{' '}
-              <code className="text-xs font-mono bg-muted px-1 rounded">inventory_type</code>.
-              Optional: part_number, serial_number, quantity, description, oem_name,
-              configuration_item, sku, location, shelf_life_expires_at.
+              <code className="text-xs font-mono bg-muted px-1 rounded">inventory_type</code>,{' '}
+              <code className="text-xs font-mono bg-muted px-1 rounded">part_number</code>.
+              Serials: <code className="text-xs font-mono bg-muted px-1 rounded">serial_numbers</code>{' '}
+              (CSV, semicolon-separated) or nested <code className="text-xs font-mono bg-muted px-1 rounded">instances[]</code> (JSON).
+              Duplicate rows with the same part number are merged instead of creating new items.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
             <div className="flex items-center gap-3">
               <Label
-                htmlFor="csv-file-input"
+                htmlFor="inventory-import-file-input"
                 className="flex items-center gap-2 cursor-pointer rounded-md border border-dashed px-4 py-3 text-sm text-muted-foreground hover:bg-muted/50 transition-colors flex-1"
               >
                 <FileText className="h-4 w-4 shrink-0" />
-                {importFile ? importFile.name : 'Choose CSV file…'}
+                {importFile ? importFile.name : 'Choose CSV or JSON file…'}
               </Label>
               <input
-                id="csv-file-input"
+                id="inventory-import-file-input"
                 type="file"
-                accept=".csv,text/csv"
+                accept=".csv,.json,text/csv,application/json"
                 className="hidden"
                 onChange={handleImportFileChange}
                 disabled={importSubmitting}
@@ -2331,7 +2540,13 @@ export default function InventoryPage() {
                 {importPreview.valid_rows > 0 && (
                   <div className="flex items-center gap-2 text-emerald-600">
                     <CheckCircle2 className="h-4 w-4 shrink-0" />
-                    <span>{importPreview.valid_rows} valid row{importPreview.valid_rows !== 1 ? 's' : ''} ready to import</span>
+                    <span>
+                      {importPreview.groups ?? importPreview.valid_rows} part number
+                      {(importPreview.groups ?? importPreview.valid_rows) !== 1 ? 's' : ''} ready
+                      {(importPreview.instances ?? 0) > 0
+                        ? ` · ${importPreview.instances} serial${importPreview.instances === 1 ? '' : 's'}`
+                        : ''}
+                    </span>
                   </div>
                 )}
                 {importPreview.errors.length > 0 && (
@@ -2371,6 +2586,17 @@ export default function InventoryPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={(open) => {
+          if (bulkDeleting) return;
+          setBulkDeleteOpen(open);
+        }}
+        title="Delete selected inventory"
+        description={`Delete ${selectedCount} selected inventory item${selectedCount === 1 ? '' : 's'} and all of their serial numbers? This cannot be undone.`}
+        onConfirm={() => void handleBulkDelete()}
+      />
     </div>
   );
 }

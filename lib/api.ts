@@ -569,26 +569,57 @@ export const inventory = {
         inventory_type: inventoryType ?? filters?.inventory_type,
       }),
     }),
+  listIds: (inventoryType?: string, filters?: ListFilterParams) =>
+    api.get<{ ids: number[] }>('/inventory/ids/', {
+      params: buildQueryParams({
+        ...normalizeListFilters({
+          ...filters,
+          inventory_type: inventoryType ?? filters?.inventory_type,
+        }),
+      }),
+    }),
   get: (id: number) => api.get<Models.Inventory>(`/inventory/${id}/`),
   listByEntity: (entityId: number) =>
     api.get<Models.Inventory[]>(`/inventory/by-entity/${entityId}/`),
   create: (data: Partial<Models.Inventory>) => api.post<Models.Inventory>("/inventory/", data),
   update: (id: number, data: Partial<Models.Inventory>) => api.put<Models.Inventory>(`/inventory/${id}/`, data),
   delete: (id: number) => api.delete(`/inventory/${id}/`),
+  bulkDelete: (ids: number[]) =>
+    api.post<{ deleted: number; not_found: number[] }>('/inventory/bulk-delete/', { ids }),
   exportCsv: (params?: { inventory_type?: string; search?: string }) =>
     api.get('/inventory/export-csv/', {
       params,
       responseType: 'blob',
     }),
-  importCsv: (file: File, dryRun = false) => {
+  exportJson: (params?: { inventory_type?: string; search?: string }) =>
+    api.get('/inventory/export-json/', {
+      params,
+      responseType: 'blob',
+    }),
+  importFile: (file: File, dryRun = false) => {
     const form = new FormData();
     form.append('file', file);
-    return api.post<{ imported?: number; rows?: { row: number; id: number; name: string }[]; dry_run?: boolean; valid_rows?: number; errors: { row: number; errors: string[] }[] }>(
-      `/inventory/import-csv/?dry_run=${dryRun}`,
+    return api.post<{
+      imported?: number;
+      groups_created?: number;
+      groups_updated?: number;
+      instances_created?: number;
+      serials_skipped?: number;
+      component_quantity_added?: number;
+      rows?: { id: number; name: string; part_number?: string | null; quantity?: number }[];
+      dry_run?: boolean;
+      valid_rows?: number;
+      groups?: number;
+      instances?: number;
+      component_quantity?: number;
+      errors: { row: number; errors: string[] }[];
+    }>(
+      `/inventory/import/?dry_run=${dryRun}`,
       form,
       { headers: { 'Content-Type': 'multipart/form-data' } },
     );
   },
+  importCsv: (file: File, dryRun = false) => inventory.importFile(file, dryRun),
   consume: (
     id: number,
     instanceId?: number,

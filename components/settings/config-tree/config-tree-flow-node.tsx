@@ -16,7 +16,6 @@ import {
   Pencil,
   Trash2,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import type { ConfigTreeNodeData } from '@/lib/config-tree-layout';
 import { LEVEL_NODE_STYLE } from '@/lib/config-tree-level-styles';
 import { cn } from '@/lib/utils';
@@ -34,8 +33,15 @@ type Props = NodeProps<Node<ConfigTreeNodeData>> & {
   actions: ConfigTreeNodeActions;
 };
 
-const ctrlBtn =
-  'h-5 w-5 shrink-0 rounded-sm p-0 [&_svg]:h-2.5 [&_svg]:w-2.5';
+const iconClass = 'h-2.5 w-2.5 stroke-[1.75]';
+
+const toolBtn = cn(
+  'inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full',
+  'text-muted-foreground/80 transition-colors',
+  'hover:bg-muted hover:text-foreground',
+  'disabled:pointer-events-none disabled:opacity-30',
+  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+);
 
 export const ConfigTreeFlowNode = memo(function ConfigTreeFlowNode({
   data,
@@ -58,12 +64,12 @@ export const ConfigTreeFlowNode = memo(function ConfigTreeFlowNode({
     >
       <div
         className={cn(
-          'relative flex h-full w-full flex-col justify-center overflow-hidden rounded-md border-2 border-l-4 px-2 py-1 shadow-sm transition-colors',
+          'relative flex h-full w-full flex-col justify-center overflow-hidden rounded-md border px-2 py-1 shadow-sm transition-colors',
           levelStyle.card,
           isDraft && 'border-dashed border-amber-500',
-          data.intersecting && 'ring-2 ring-sky-400',
-          data.toBeDeleted && 'opacity-70 ring-2 ring-destructive',
-          selected && 'ring-2 ring-primary'
+          data.intersecting && 'ring-1 ring-sky-400',
+          data.toBeDeleted && 'opacity-70 ring-1 ring-destructive',
+          selected && 'ring-1 ring-primary'
         )}
       >
         <NodeResizer
@@ -72,7 +78,7 @@ export const ConfigTreeFlowNode = memo(function ConfigTreeFlowNode({
           minHeight={40}
           maxWidth={320}
           maxHeight={160}
-          handleStyle={{ width: 6, height: 6 }}
+          handleStyle={{ width: 4, height: 4 }}
           lineStyle={{ borderWidth: 1 }}
         />
 
@@ -81,7 +87,7 @@ export const ConfigTreeFlowNode = memo(function ConfigTreeFlowNode({
           position={Position.Left}
           id="target-left"
           className={cn(
-            'h-2.5! w-2.5! bg-muted-foreground!',
+            'h-2! w-2! bg-muted-foreground!',
             isVertical ? 'opacity-40' : 'opacity-100'
           )}
         />
@@ -90,7 +96,7 @@ export const ConfigTreeFlowNode = memo(function ConfigTreeFlowNode({
           position={Position.Top}
           id="target-top"
           className={cn(
-            'h-2.5! w-2.5! bg-muted-foreground!',
+            'h-2! w-2! bg-muted-foreground!',
             isVertical ? 'opacity-100' : 'opacity-40'
           )}
         />
@@ -99,7 +105,7 @@ export const ConfigTreeFlowNode = memo(function ConfigTreeFlowNode({
           position={Position.Right}
           id="source-right"
           className={cn(
-            'h-2.5! w-2.5! bg-primary!',
+            'h-2! w-2! bg-primary!',
             isVertical ? 'opacity-40' : 'opacity-100'
           )}
         />
@@ -108,7 +114,7 @@ export const ConfigTreeFlowNode = memo(function ConfigTreeFlowNode({
           position={Position.Bottom}
           id="source-bottom"
           className={cn(
-            'h-2.5! w-2.5! bg-primary!',
+            'h-2! w-2! bg-primary!',
             isVertical ? 'opacity-100' : 'opacity-40'
           )}
         />
@@ -135,73 +141,68 @@ export const ConfigTreeFlowNode = memo(function ConfigTreeFlowNode({
         </button>
       </div>
 
-      {/* Sit on the lower boundary so the name stays fully visible */}
       {interactive && hovered ? (
         <div
-          className="absolute left-1/2 top-full z-20 flex -translate-x-1/2 -translate-y-1/2 items-center gap-px rounded border bg-background px-0.5 py-px shadow-md nodrag nopan"
+          className="absolute left-1/2 top-full z-20 flex -translate-x-1/2 -translate-y-1/2 items-center gap-px rounded-full border border-border/80 bg-background/95 px-0.5 py-px shadow-sm backdrop-blur-sm nodrag nopan"
           onMouseDown={(e) => e.stopPropagation()}
+          role="toolbar"
+          aria-label="Node actions"
         >
-          <Button
+          <button
             type="button"
-            size="icon"
-            variant="ghost"
-            className={ctrlBtn}
-            title="Add sibling of parent (left)"
+            className={toolBtn}
+            title="Add sibling of parent"
             onClick={() => actions.onAddParentPeer(draft.client_key)}
           >
-            <ArrowLeft />
-          </Button>
-          <Button
+            <ArrowLeft className={iconClass} aria-hidden />
+          </button>
+          <button
             type="button"
-            size="icon"
-            variant="ghost"
-            className={ctrlBtn}
-            title="Add sibling above (up)"
+            className={toolBtn}
+            title="Add sibling above"
             onClick={() => actions.onAddSiblingAbove(draft.client_key)}
           >
-            <ArrowUp />
-          </Button>
-          <Button
+            <ArrowUp className={iconClass} aria-hidden />
+          </button>
+          <button
             type="button"
-            size="icon"
-            variant="ghost"
-            className={ctrlBtn}
-            title="Add child (right)"
+            className={toolBtn}
+            title="Add child"
             disabled={!canAddChild}
             onClick={() => actions.onAddChild(draft.client_key)}
           >
-            <ArrowRight />
-          </Button>
-          <Button
+            <ArrowRight className={iconClass} aria-hidden />
+          </button>
+          <button
             type="button"
-            size="icon"
-            variant="ghost"
-            className={ctrlBtn}
-            title="Add sibling below (down)"
+            className={toolBtn}
+            title="Add sibling below"
             onClick={() => actions.onAddSiblingBelow(draft.client_key)}
           >
-            <ArrowDown />
-          </Button>
-          <Button
+            <ArrowDown className={iconClass} aria-hidden />
+          </button>
+
+          <span className="mx-0.5 h-3 w-px shrink-0 bg-border" aria-hidden />
+
+          <button
             type="button"
-            size="icon"
-            variant="ghost"
-            className={ctrlBtn}
+            className={toolBtn}
             title="Edit"
             onClick={() => actions.onEdit(draft.client_key)}
           >
-            <Pencil />
-          </Button>
-          <Button
+            <Pencil className={iconClass} aria-hidden />
+          </button>
+          <button
             type="button"
-            size="icon"
-            variant="ghost"
-            className={cn(ctrlBtn, 'text-destructive hover:text-destructive')}
+            className={cn(
+              toolBtn,
+              'hover:bg-destructive/10 hover:text-destructive'
+            )}
             title="Delete node and children"
             onClick={() => actions.onDelete(draft.client_key)}
           >
-            <Trash2 />
-          </Button>
+            <Trash2 className={iconClass} aria-hidden />
+          </button>
         </div>
       ) : null}
     </div>

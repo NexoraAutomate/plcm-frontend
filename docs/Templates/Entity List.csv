@@ -1,0 +1,67 @@
+name,Entity Type
+SDLS,system
+System - Antenna Pedestal,subsystem
+System - DPU,subsystem
+System - ACU,subsystem
+System - Harness OBS,subsystem
+Ground Station - BPU,subsystem
+Ground Station - Harness GS,subsystem
+Ground Station - BUC GS,subsystem
+Ground Station - Modem TMTC,subsystem
+Ground Station - Modem Beacon,subsystem
+Ground Station - Antenna GS,subsystem
+Ground Station - LNB GS,subsystem
+Ground Station - MOXA Converter,subsystem
+RF Units,module
+ASA Mechanical Assembly,module
+Actuators Sensors,module
+Harness Antenna,module
+Video Encoder,module
+Harness DPU,module
+DPU Box,module
+UCV Card,module
+DCV Card,module
+EMI Filter,module
+PDC Card,module
+APC Card,module
+OBDH Card,module
+Harness ACU,module
+OBS BUC,unit
+Tracking Receiver,unit
+OBS LNBs,unit
+Bearings,unit
+Rotary Joint,unit
+Multifeed Assembly,unit
+Filters,unit
+BUC Dampers,unit
+Motors,unit
+Proximity Sensors,unit
+Motor Controllers,unit
+DPU PDC,unit
+SBRIO Card 1,unit
+SBRIO Card 2,unit
+Daughter FEC Card,unit
+Mini Power,unit
+EMC EMI Filter,unit
+RS422 RS232 Converter,unit
+Az Motor Controller Box,unit
+SUM Card,component
+Difference Card,component
+SUM LNB,component
+Az LNB,component
+El LNB,component
+LNB 3X Channel,component
+Rotary Joint Pol,component
+Rotary Joint Elevation,component
+BUC Tx Filter,component
+Single Filter,component
+Double Filter,component
+Az Motor,component
+El Motor,component
+Pol Motor,component
+Az Proximity Sensor,component
+El Proximity Sensor,component
+Pol Proximity Sensor,component
+Az Motor Controller,component
+El Motor Controller,component
+Pol Motor Controller,component
