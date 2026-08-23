@@ -107,8 +107,6 @@ export function HierarchyTemplateEditor({
   const [editTarget, setEditTarget] = useState<TemplateDraftNode | null>(null);
   const [editName, setEditName] = useState('');
   const [editAbbr, setEditAbbr] = useState('');
-  const [validateSystemKey, setValidateSystemKey] = useState<string | null>(null);
-  const [validateSubsystemKey, setValidateSubsystemKey] = useState<string | null>(null);
   const addSectionRef = useRef<HTMLDivElement | null>(null);
 
   const currentParentKey =
@@ -238,24 +236,6 @@ export function HierarchyTemplateEditor({
     setNewAbbr('');
     setParentForLevel(level, parent.client_key);
     addSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-
-  function validateAssignment() {
-    if (!validateSystemKey || !validateSubsystemKey) {
-      setValidationResult({
-        valid: false,
-        message: `Select a ${levelLabel('system')} and ${levelLabel('subsystem')} to validate the relationship.`,
-      });
-      return;
-    }
-    const subsystem = grouped.subsystem.find((item) => item.client_key === validateSubsystemKey);
-    const valid = subsystem?.parent_client_key === validateSystemKey;
-    setValidationResult({
-      valid: !!valid,
-      message: valid
-        ? `This ${levelLabel('subsystem').toLowerCase()} belongs to the selected ${levelLabel('system').toLowerCase()}.`
-        : `This ${levelLabel('subsystem').toLowerCase()} is not connected to that ${levelLabel('system').toLowerCase()}.`,
-    });
   }
 
   function renderActions(node: TemplateDraftNode) {
@@ -516,59 +496,6 @@ export function HierarchyTemplateEditor({
           </Card>
         </div>
       ) : null}
-
-      <Card className="shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold">Hierarchy Validator</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <Label>{levelLabel('system')}</Label>
-              <Select
-                value={validateSystemKey ?? '0'}
-                onValueChange={(value) => setValidateSystemKey(value === '0' ? null : value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={`Select ${levelLabel('system')}`} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">None</SelectItem>
-                  {grouped.system.map((system) => (
-                    <SelectItem key={system.client_key} value={system.client_key}>
-                      {system.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>{levelLabel('subsystem')}</Label>
-              <Select
-                value={validateSubsystemKey ?? '0'}
-                onValueChange={(value) => setValidateSubsystemKey(value === '0' ? null : value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={`Select ${levelLabel('subsystem')}`} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">None</SelectItem>
-                  {grouped.subsystem.map((subsystem) => (
-                    <SelectItem key={subsystem.client_key} value={subsystem.client_key}>
-                      {subsystem.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-end">
-              <Button type="button" onClick={validateAssignment}>
-                Validate
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       <ConfirmDialog
         open={!!deleteTarget}

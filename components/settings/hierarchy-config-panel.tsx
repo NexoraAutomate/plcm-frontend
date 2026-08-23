@@ -8,6 +8,7 @@ import {
   Download,
   Eye,
   GitBranch,
+  Maximize2,
   Pencil,
   Plus,
   RefreshCw,
@@ -15,6 +16,7 @@ import {
   Search,
   Trash2,
   Upload,
+  Copy,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -28,9 +30,17 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { SettingsSection } from '@/components/settings/settings-section';
 import { SettingsCard } from '@/components/settings/settings-card';
 import { HierarchyTemplateEditor } from '@/components/settings/hierarchy-template-editor';
+import { HierarchyConfigTreeEditor } from '@/components/settings/hierarchy-config-tree-editor';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { Can } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
@@ -50,6 +60,7 @@ import {
   type TemplateDraftNode,
   type TemplateNodeLevel,
 } from '@/lib/hierarchy-config';
+import { isEntityAssigned } from '@/lib/config-tree-layout';
 
 export type HierarchyConfigPanelProps = {
   embedded?: boolean;
@@ -60,6 +71,39 @@ type Draft = HierarchyConfigurationWrite & { id?: number };
 
 const TEMPLATE_LEVEL_SET = new Set<string>(TEMPLATE_NODE_LEVELS);
 const CONFIG_PAGE_SIZE = 10;
+
+function normalizeConfigName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+/** True when another saved configuration already uses this name (case-insensitive). */
+function isConfigNameTaken(
+  configs: HierarchyConfiguration[],
+  name: string,
+  excludeId?: number
+): boolean {
+  const needle = normalizeConfigName(name);
+  if (!needle) return false;
+  return configs.some(
+    (c) =>
+      c.id !== excludeId && normalizeConfigName(c.name) === needle
+  );
+}
+
+/** Suggest a unique name like "Foo (copy)", "Foo (copy 2)", … */
+function uniqueCopyName(
+  configs: HierarchyConfiguration[],
+  baseName: string
+): string {
+  const base = baseName.trim() || 'Configuration';
+  let candidate = `${base} (copy)`;
+  let n = 2;
+  while (isConfigNameTaken(configs, candidate)) {
+    candidate = `${base} (copy ${n})`;
+    n += 1;
+  }
+  return candidate;
+}
 
 function slugCodeFromName(name: string): string {
   const slug = name
@@ -286,7 +330,11 @@ export function HierarchyConfigPanel({
     draftFingerprint(emptyDraft())
   );
   const [editorKey, setEditorKey] = useState(0);
+  const [treeFullscreenSignal, setTreeFullscreenSignal] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<HierarchyConfiguration | null>(null);
+  const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
+  const [duplicateName, setDuplicateName] = useState('');
+  const [duplicateDescription, setDuplicateDescription] = useState('');
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
   const [page, setPage] = useState(0);
@@ -377,17 +425,42 @@ export function HierarchyConfigPanel({
     }));
   }
 
-  async function handleSave() {
-    if (!draft.name.trim()) {
+  async function handleSave(input?: {
+    name?: string;
+    description?: string;
+  }): Promise<boolean> {
+    const name = (input?.name ?? draft.name).trim();
+    const description =
+      input?.description !== undefined
+        ? input.description.trim()
+        : (draft.description ?? '').trim();
+
+    if (!name) {
       toast.error('Configuration name is required');
-      return;
+      return false;
     }
-    if (draft.nodes.some((n) => !n.name.trim())) {
-      toast.error('Every template node needs a name');
-      return;
+    if (isConfigNameTaken(configs, name, draft.id)) {
+      toast.error(`Configuration name “${name}” already exists`);
+      return false;
+    }
+    if ((draft.nodes ?? []).length === 0) {
+      toast.error('Add at least one hierarchy node before saving');
+      return false;
+    }
+    const unassigned = (draft.nodes ?? []).filter((n) => !isEntityAssigned(n));
+    if (unassigned.length > 0) {
+      toast.error(
+        `Assign an entity to every node before saving (${unassigned.length} unassigned)`
+      );
+      return false;
     }
 
-    const payload = draftToExportPayload(draft);
+    const withMeta: Draft = {
+      ...draft,
+      name,
+      description,
+    };
+    const payload = draftToExportPayload(withMeta);
 
     setSaving(true);
     try {
@@ -405,14 +478,86 @@ export function HierarchyConfigPanel({
         toast.success('Configuration saved');
       }
       await load();
+      return true;
     } catch (error: unknown) {
       const detail =
         (error as { response?: { data?: { detail?: string } } })?.response?.data
           ?.detail || 'Failed to save configuration';
       toast.error(typeof detail === 'string' ? detail : 'Failed to save configuration');
+      return false;
     } finally {
       setSaving(false);
     }
+  }
+
+  /** Duplicate current tree as a new HM-available configuration under a new name. */
+  async function handleDuplicate(input: {
+    name: string;
+    description: string;
+  }): Promise<boolean> {
+    const name = input.name.trim();
+    if (!name) {
+      toast.error('Configuration name is required');
+      return false;
+    }
+    if (isConfigNameTaken(configs, name)) {
+      toast.error(`Configuration name “${name}” already exists`);
+      return false;
+    }
+    if ((draft.nodes ?? []).length === 0) {
+      toast.error('Add at least one hierarchy node before duplicating');
+      return false;
+    }
+    const unassigned = (draft.nodes ?? []).filter((n) => !isEntityAssigned(n));
+    if (unassigned.length > 0) {
+      toast.error(
+        `Assign an entity to every node before duplicating (${unassigned.length} unassigned)`
+      );
+      return false;
+    }
+
+    const named: Draft = {
+      ...draft,
+      id: undefined,
+      name,
+      description: input.description.trim() || (draft.description ?? ''),
+      code: '',
+      is_available: true,
+    };
+    const payload = draftToExportPayload(named);
+
+    setSaving(true);
+    try {
+      const res = await api.hierarchyConfigurations.create(payload);
+      const next = toDraft(res.data);
+      setDraft(next);
+      setBaselineFingerprint(draftFingerprint(next));
+      setEditorKey((k) => k + 1);
+      toast.success('Configuration duplicated and available for HM');
+      await load({ quiet: true });
+      return true;
+    } catch (error: unknown) {
+      const detail =
+        (error as { response?: { data?: { detail?: string } } })?.response?.data
+          ?.detail || 'Failed to duplicate configuration';
+      toast.error(typeof detail === 'string' ? detail : 'Failed to duplicate configuration');
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDuplicateFromList(config: HierarchyConfiguration) {
+    const next = toDraft(config);
+    next.id = undefined;
+    next.code = '';
+    next.name = uniqueCopyName(configs, config.name);
+    next.is_available = true;
+    setBaselineFingerprint(draftFingerprint(emptyDraft()));
+    setDraft(next);
+    setEditorKey((k) => k + 1);
+    setEditing(true);
+    toast.message('Duplicated draft ready — rename if needed, then Save');
   }
 
   async function handleRefresh() {
@@ -522,46 +667,104 @@ export function HierarchyConfigPanel({
   }));
 
   const isDirty = draftFingerprint(draft) !== baselineFingerprint;
-  const canSave = canManage && isDirty && Boolean(draft.name.trim());
+  const unassignedCount = draftNodes.filter((n) => !isEntityAssigned(n)).length;
+  const allEntitiesAssigned =
+    draftNodes.length > 0 && unassignedCount === 0;
+  const nameTaken = isConfigNameTaken(configs, draft.name, draft.id);
+  const canSave =
+    canManage &&
+    isDirty &&
+    Boolean(draft.name.trim()) &&
+    !nameTaken &&
+    allEntitiesAssigned;
 
   if (editing) {
     return (
+      <>
       <SettingsSection
         title={draft.id ? 'Edit configuration' : 'New configuration'}
         description="System → Component template shared by every SDLS."
       >
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setEditing(false)}
-            disabled={saving}
-          >
-            <ArrowLeft className="mr-1.5 h-4 w-4" />
-            Back to list
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => void handleRefresh()}
-            disabled={saving || refreshing}
-          >
-            <RefreshCw className={`mr-1.5 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          {canManage ? (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
+              variant="outline"
               size="sm"
-              onClick={() => void handleSave()}
-              disabled={saving || !canSave}
+              onClick={() => setEditing(false)}
+              disabled={saving}
             >
-              <Save className="mr-1.5 h-4 w-4" />
-              {saving ? 'Saving…' : 'Save'}
+              <ArrowLeft className="mr-1.5 h-4 w-4" />
+              Back to list
             </Button>
-          ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void handleRefresh()}
+              disabled={saving || refreshing}
+            >
+              <RefreshCw className={`mr-1.5 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+            {canManage ? (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void handleSave()}
+                disabled={saving || !canSave}
+                title={
+                  nameTaken
+                    ? 'Configuration name already exists'
+                    : !allEntitiesAssigned
+                      ? unassignedCount > 0
+                        ? `Assign entities to all nodes (${unassignedCount} left)`
+                        : 'Add hierarchy nodes first'
+                      : !draft.name.trim()
+                        ? 'Enter a configuration name'
+                        : !isDirty
+                          ? 'No changes to save'
+                          : undefined
+                }
+              >
+                <Save className="mr-1.5 h-4 w-4" />
+                {saving ? 'Saving…' : 'Save'}
+              </Button>
+            ) : null}
+            {canManage && draft.id ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={saving || !allEntitiesAssigned}
+                title={
+                  !allEntitiesAssigned
+                    ? 'Assign entities to all nodes before duplicating'
+                    : 'Duplicate as a new configuration'
+                }
+                onClick={() => {
+                  setDuplicateName(
+                    uniqueCopyName(configs, draft.name || 'Configuration')
+                  );
+                  setDuplicateDescription((draft.description ?? '').trim());
+                  setDuplicateDialogOpen(true);
+                }}
+              >
+                <Copy className="mr-1.5 h-4 w-4" />
+                Duplicate
+              </Button>
+            ) : null}
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="ml-auto"
+            onClick={() => setTreeFullscreenSignal((n) => n + 1)}
+          >
+            <Maximize2 className="mr-1.5 h-4 w-4" />
+            Tree builder
+          </Button>
         </div>
 
         <SettingsCard title="Configuration details">
@@ -574,7 +777,13 @@ export function HierarchyConfigPanel({
                 onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
                 placeholder="e.g. High Data Rate Standard"
                 disabled={!canManage}
+                aria-invalid={nameTaken}
               />
+              {nameTaken ? (
+                <p className="text-xs text-destructive">
+                  Another configuration already uses this name.
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-1.5">
@@ -600,20 +809,112 @@ export function HierarchyConfigPanel({
           </div>
         </SettingsCard>
 
-        <div className="mt-6">
-          <h3 className="mb-2 text-sm font-medium">System hierarchy template</h3>
-          <p className="mb-4 text-xs text-muted-foreground">
-            This tree is cloned under every SDLS when an HM generates a project from this
-            configuration.
-          </p>
-          <HierarchyTemplateEditor
-            key={editorKey}
+        <div className="mt-6 space-y-4">
+          <div>
+            <h3 className="mb-2 text-sm font-medium">System hierarchy template</h3>
+            <p className="mb-4 text-xs text-muted-foreground">
+              Use the indented tree (full screen) to build System → Component. This tree is
+              cloned under every SDLS when a project is generated from this configuration.
+            </p>
+          </div>
+          <HierarchyConfigTreeEditor
+            key={`tree-${editorKey}`}
             nodes={draftNodes}
             onChange={setDraftNodes}
             readOnly={!canManage}
+            openFullscreenSignal={treeFullscreenSignal}
+            configId={draft.id}
+            draftName={draft.name}
+            draftDescription={draft.description ?? ''}
+            suggestedDuplicateName={uniqueCopyName(
+              configs,
+              draft.name || 'Configuration'
+            )}
+            isNameTaken={(name) => isConfigNameTaken(configs, name)}
+            onSave={canManage ? handleSave : undefined}
+            onDuplicate={canManage ? handleDuplicate : undefined}
+            saving={saving}
           />
+          <details className="rounded-lg border bg-muted/20 p-3">
+            <summary className="cursor-pointer text-sm font-medium">
+              Classic list editor
+            </summary>
+            <div className="mt-4">
+              <HierarchyTemplateEditor
+                key={editorKey}
+                nodes={draftNodes}
+                onChange={setDraftNodes}
+                readOnly={!canManage}
+              />
+            </div>
+          </details>
         </div>
       </SettingsSection>
+      <Dialog open={duplicateDialogOpen} onOpenChange={setDuplicateDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Duplicate configuration</DialogTitle>
+            <DialogDescription>
+              Create a copy under a new name. It will be marked available for HM selection.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cfg-dup-name">New configuration name</Label>
+              <Input
+                id="cfg-dup-name"
+                value={duplicateName}
+                onChange={(e) => setDuplicateName(e.target.value)}
+                autoFocus
+                aria-invalid={isConfigNameTaken(configs, duplicateName)}
+              />
+              {isConfigNameTaken(configs, duplicateName) ? (
+                <p className="text-xs text-destructive">
+                  Another configuration already uses this name.
+                </p>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cfg-dup-desc">Description (optional)</Label>
+              <Input
+                id="cfg-dup-desc"
+                value={duplicateDescription}
+                onChange={(e) => setDuplicateDescription(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDuplicateDialogOpen(false)}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                disabled={
+                  saving ||
+                  !duplicateName.trim() ||
+                  isConfigNameTaken(configs, duplicateName)
+                }
+                onClick={() => {
+                  void handleDuplicate({
+                    name: duplicateName.trim(),
+                    description: duplicateDescription.trim(),
+                  }).then((ok) => {
+                    if (ok) setDuplicateDialogOpen(false);
+                  });
+                }}
+              >
+                <Copy className="mr-1.5 h-4 w-4" />
+                {saving ? 'Saving…' : 'Duplicate'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      </>
     );
   }
 
@@ -735,6 +1036,22 @@ export function HierarchyConfigPanel({
                       </TooltipTrigger>
                       <TooltipContent>{canManage ? 'Edit' : 'View'}</TooltipContent>
                     </Tooltip>
+                    {canManage ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground"
+                            onClick={() => handleDuplicateFromList(config)}
+                            aria-label="Duplicate"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Duplicate</TooltipContent>
+                      </Tooltip>
+                    ) : null}
                     {canManage ? (
                       <Tooltip>
                         <TooltipTrigger asChild>
