@@ -1,33 +1,20 @@
 'use client';
 
 import Link from 'next/link';
-import { AlertTriangle, GitBranch, Link2 } from 'lucide-react';
+import { GitBranch, Link2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { Project } from '@/lib/models';
-import { CONTROL_RULE, isConfigSealed } from '@/lib/config-change';
-import {
-  ProjectWorkflowStatus,
-  isProjectSuperseded,
-} from '@/lib/workflow-status';
+import { isProjectSuperseded } from '@/lib/workflow-status';
 
 type Props = {
   project: Project;
 };
 
 export function ConfigChangeBanner({ project }: Props) {
-  const sealed = isConfigSealed(project.status_name);
   const superseded = isProjectSuperseded(project.status_name);
 
   return (
     <div className="space-y-3">
-      {sealed && project.status_name !== ProjectWorkflowStatus.DRAFT ? (
-        <Alert>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Configuration control rule</AlertTitle>
-          <AlertDescription>{CONTROL_RULE}</AlertDescription>
-        </Alert>
-      ) : null}
-
       {superseded ? (
         <Alert>
           <GitBranch className="h-4 w-4" />

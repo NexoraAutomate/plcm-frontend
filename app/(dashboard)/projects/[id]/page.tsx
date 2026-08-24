@@ -22,12 +22,9 @@ import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import * as Models from '@/lib/models';
 import { listTemplateNames } from '@/lib/hierarchy-template-names';
-import { EntityInventorySearch } from '@/components/entity-inventory-search';
 import { EntityStatusHistorySheet } from '@/components/entity-status-history-sheet';
-import type { Inventory } from '@/lib/models';
 import {
   buildCreateEntityByType,
-  installEntityFromInventoryWithChildren,
 } from '@/lib/inventory-child-install';
 import {
   hierarchyInstallFormFields,
@@ -307,46 +304,6 @@ export default function ProjectDetailPage() {
     }
   }
 
-  async function handleUseInventory(item: Inventory, instanceId?: number) {
-    if (!project) {
-      throw new Error('Project not found');
-    }
-
-    const defaultStatus = statuses[0];
-    if (!defaultStatus) {
-      throw new Error('No system status available');
-    }
-
-    const result = await runSilentEntityBatch(async () => {
-      const createEntityByType = buildCreateEntityByType({
-        createSystem,
-        createSubsystem,
-        createModule,
-        createUnit,
-        createComponent,
-      }, { silent: true });
-
-      return installEntityFromInventoryWithChildren({
-        inventoryItem: item,
-        instanceId,
-        parentEntityId: project.id,
-        entityType: 'system',
-        existingChildren: projectSystems,
-        defaultStatus,
-        createEntity: (data) => createEntityByType('system', data),
-        createEntityByType,
-      });
-    });
-
-    toast.success(
-      result.childrenInstalled > 0
-        ? `Installed ${item.name} and ${result.childrenInstalled} child entit${result.childrenInstalled === 1 ? 'y' : 'ies'} from inventory`
-        : `Installed ${item.name} from inventory`
-    );
-
-    return result.updatedInventory;
-  }
-  
   useEffect(() => {
     const fetchData = async () => {
       // Load independently — a 403 on statuses must not block config template names.
@@ -530,17 +487,8 @@ export default function ProjectDetailPage() {
         editPermission={P.edit_systems}
         deletePermission={P.delete_systems}
         readOnly={hierarchyReadOnly}
+        projectId={projectId}
       />
-
-      {/* Inventory Items */}
-      {!hierarchyReadOnly ? (
-      <EntityInventorySearch
-        parentEntityName={project.name}
-        inventoryType="system"
-        allowedInventoryNames={systemHierarchyNames.map((hierarchy) => hierarchy.name)}
-        onUseInventory={handleUseInventory}
-      />
-      ) : null}
 
       {/* {`Add ${entityLabel('system')}`} Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>

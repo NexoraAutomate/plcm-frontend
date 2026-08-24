@@ -338,7 +338,7 @@ export default function ProjectsPage(){
               <DialogTitle>Create Draft {entityLabel('project')}</DialogTitle>
               <DialogDescription>
                 Select an available Smart SDLS configuration and product scope. Status starts as
-                DRAFT until Admin approval.
+                DRAFT until Project Director or Admin approval.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -488,7 +488,7 @@ export default function ProjectsPage(){
               </div>
               <p className="text-xs text-muted-foreground">
                 Status will be set to <strong>DRAFT</strong>. Generate Hierarchy stays disabled
-                until Admin approval (Spec 03).
+                until Project Director or Admin approval (Spec 03).
               </p>
               <div className="flex gap-2 justify-end pt-4">
                 <Button

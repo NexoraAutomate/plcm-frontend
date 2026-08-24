@@ -16,7 +16,6 @@ import { EntityCards } from '@/components/entity-cards';
 import { P } from '@/lib/permission-codes';
 import { isProjectReadOnly } from '@/lib/workflow-status';
 import { EntityForm } from '@/components/entity-form';
-import { EntityInventorySearch } from '@/components/entity-inventory-search';
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import axios from 'axios';
@@ -24,14 +23,11 @@ import * as api from '@/lib/api';
 import { listTemplateNames } from '@/lib/hierarchy-template-names';
 import { fetchStatusesByType } from '@/lib/api';
 import * as Models from '@/lib/models';
-import type { Inventory } from '@/lib/models';
-import { getChildInventoryType } from '@/lib/entity-hierarchy';
 import { resolveStatusName } from '@/lib/entity-status';
 import { EntityStatusHistorySheet } from '@/components/entity-status-history-sheet';
 import { EntityInstallMetadataCard } from '@/components/entity-install-metadata-card';
 import {
   buildCreateEntityByType,
-  installEntityFromInventoryWithChildren,
 } from '@/lib/inventory-child-install';
 import {
   ReplaceFromInventoryDialog,
@@ -250,45 +246,6 @@ export default function SystemDetailPage() {
     }
   }
 
-  async function handleUseInventory(item: Inventory, instanceId?: number) {
-    if (!system) {
-      throw new Error(`${entityLabel('system')} not found`);
-    }
-
-    const defaultStatus = statuses[0];
-    if (!defaultStatus) {
-      throw new Error('No subsystem status available');
-    }
-
-    const result = await runSilentEntityBatch(async () => {
-      const createEntityByType = buildCreateEntityByType({
-        createSystem,
-        createSubsystem,
-        createModule,
-        createUnit,
-        createComponent,
-      }, { silent: true });
-
-      return installEntityFromInventoryWithChildren({
-        inventoryItem: item,
-        instanceId,
-        parentEntityId: system.id,
-        entityType: 'subsystem',
-        existingChildren: systemSubsystems,
-        defaultStatus,
-        createEntity: (data) => createEntityByType('subsystem', data),
-        createEntityByType,
-      });
-    });
-
-    toast.success(
-      result.childrenInstalled > 0
-        ? `Installed ${item.name} and ${result.childrenInstalled} child entit${result.childrenInstalled === 1 ? 'y' : 'ies'} from inventory`
-        : `Installed ${item.name} from inventory`
-    );
-
-    return result.updatedInventory;
-  }
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -447,17 +404,8 @@ export default function SystemDetailPage() {
         editPermission={P.edit_subsystems}
         deletePermission={P.delete_subsystems}
         readOnly={hierarchyReadOnly}
+        projectId={project?.id}
       />
-
-      {/* Inventory Items */}
-      {!hierarchyReadOnly ? (
-      <EntityInventorySearch
-        parentEntityName={system.name}
-        inventoryType={getChildInventoryType('system')}
-        allowedInventoryNames={subsystemHierarchyNames.map((hierarchy) => hierarchy.name)}
-        onUseInventory={handleUseInventory}
-      />
-      ) : null}
 
       {/* {`Add ${entityLabel('subsystem')}`} Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>

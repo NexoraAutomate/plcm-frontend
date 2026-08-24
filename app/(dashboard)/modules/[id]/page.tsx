@@ -20,13 +20,9 @@ import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import { listTemplateNames } from '@/lib/hierarchy-template-names';
 import * as Models from '@/lib/models';
-import type { Inventory } from '@/lib/models';
-import { getChildInventoryType } from '@/lib/entity-hierarchy';
 import {
   buildCreateEntityByType,
-  installEntityFromInventoryWithChildren,
 } from '@/lib/inventory-child-install';
-import { EntityInventorySearch } from '@/components/entity-inventory-search';
 import { EntityStatusHistorySheet } from '@/components/entity-status-history-sheet';
 import { EntityInstallMetadataCard } from '@/components/entity-install-metadata-card';
 import {
@@ -267,46 +263,6 @@ export default function ModuleDetailPage() {
     }
   }
 
-  async function handleUseInventory(item: Inventory, instanceId?: number) {
-    if (!module) {
-      throw new Error(`${entityLabel('module')} not found`);
-    }
-
-    const defaultStatus = statuses[0];
-    if (!defaultStatus) {
-      throw new Error('No unit status available');
-    }
-
-    const result = await runSilentEntityBatch(async () => {
-      const createEntityByType = buildCreateEntityByType({
-        createSystem,
-        createSubsystem,
-        createModule,
-        createUnit,
-        createComponent,
-      }, { silent: true });
-
-      return installEntityFromInventoryWithChildren({
-        inventoryItem: item,
-        instanceId,
-        parentEntityId: module.id,
-        entityType: 'unit',
-        existingChildren: moduleUnits,
-        defaultStatus,
-        createEntity: (data) => createEntityByType('unit', data),
-        createEntityByType,
-      });
-    });
-
-    toast.success(
-      result.childrenInstalled > 0
-        ? `Installed ${item.name} and ${result.childrenInstalled} child entit${result.childrenInstalled === 1 ? 'y' : 'ies'} from inventory`
-        : `Installed ${item.name} from inventory`
-    );
-
-    return result.updatedInventory;
-  }
-
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -470,18 +426,9 @@ export default function ModuleDetailPage() {
         editPermission={P.edit_units}
         deletePermission={P.delete_units}
         readOnly={hierarchyReadOnly}
+        projectId={projectId}
       />
 
-      {/* Inventory Items */}
-      {!hierarchyReadOnly ? (
-      <EntityInventorySearch
-        parentEntityName={module.name}
-        inventoryType={getChildInventoryType('module')}
-        allowedInventoryNames={unitHierarchyNames.map((hierarchy) => hierarchy.name)}
-        onUseInventory={handleUseInventory}
-      />
-      ) : null}
-      
       {/* {`Add ${entityLabel('unit')}`} Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
         <DialogContent className="max-w-md">

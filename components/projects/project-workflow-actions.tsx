@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, GitBranch, UserCog, Ban, Lock, Package } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { CheckCircle2, ChevronDown, GitBranch, UserCog, Ban, Lock, Package, FileCog } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -28,6 +28,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { StatusBadge } from '@/components/status-badge';
 import { Can, WorkflowCan } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
@@ -39,10 +44,10 @@ import type {
   User,
 } from '@/lib/models';
 import { ProjectWorkflowStatus, isProjectReadOnly } from '@/lib/workflow-status';
-import { ConfigChangeWizard } from '@/components/projects/config-change-wizard';
 import { isConfigSealed, isOpenConfigChange } from '@/lib/config-change';
 import { useDataStore } from '@/lib/data-store';
 import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 type Props = {
   project: Project;
@@ -54,6 +59,62 @@ type HierarchyTree = Awaited<
   ReturnType<typeof api.projects.hierarchyTree>
 >['data'];
 
+type HierarchySystemNode = HierarchyTree['flights'][number]['sdls'][number]['systems'][number];
+
+function TreeNode({
+  kind,
+  name,
+  children,
+}: {
+  kind: string;
+  name: string;
+  children?: ReactNode;
+}) {
+  return (
+    <li>
+      <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+        <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          {kind}
+        </span>
+        <span className="text-foreground">{name}</span>
+      </div>
+      {children ? (
+        <ul className="ml-3 mt-1 space-y-1 border-l border-border/60 pl-3">{children}</ul>
+      ) : null}
+    </li>
+  );
+}
+
+function renderSystemBranch(system: HierarchySystemNode) {
+  return (
+    <TreeNode key={`system-${system.id}`} kind="System" name={system.name}>
+      {(system.subsystems ?? []).map((subsystem) => (
+        <TreeNode
+          key={`subsystem-${subsystem.id}`}
+          kind="Subsystem"
+          name={subsystem.name}
+        >
+          {(subsystem.modules ?? []).map((module) => (
+            <TreeNode key={`module-${module.id}`} kind="Module" name={module.name}>
+              {(module.units ?? []).map((unit) => (
+                <TreeNode key={`unit-${unit.id}`} kind="Unit" name={unit.name}>
+                  {(unit.components ?? []).map((component) => (
+                    <TreeNode
+                      key={`component-${component.id}`}
+                      kind="Component"
+                      name={component.name}
+                    />
+                  ))}
+                </TreeNode>
+              ))}
+            </TreeNode>
+          ))}
+        </TreeNode>
+      ))}
+    </TreeNode>
+  );
+}
+
 export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
   const router = useRouter();
   const { ensureHierarchyLoaded } = useDataStore();
@@ -63,6 +124,7 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
   const [cancelPreview, setCancelPreview] = useState<ProjectCancelPreview | null>(null);
   const [cancelConfirmed, setCancelConfirmed] = useState(false);
   const [tree, setTree] = useState<HierarchyTree | null>(null);
+  const [treeOpen, setTreeOpen] = useState(false);
   const [hmId, setHmId] = useState<string>(
     project.assigned_hm_id ? String(project.assigned_hm_id) : ''
   );
@@ -75,6 +137,21 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
     setHmId(project.assigned_hm_id ? String(project.assigned_hm_id) : '');
   }, [project.assigned_hm_id]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void api.projects
+      .getConfigChange(project.id)
+      .then((res) => {
+        if (!cancelled) setConfigChange(res.data ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setConfigChange(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id, project.status_name]);
+
   const status = project.status_name ?? '';
   const isDraft = status === ProjectWorkflowStatus.DRAFT;
   const isApproved = status === ProjectWorkflowStatus.APPROVED;
@@ -83,6 +160,16 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
     status === ProjectWorkflowStatus.HIERARCHY_GENERATED;
   const isCancelled = isProjectReadOnly(status);
   const configSealed = isConfigSealed(status);
+  const configChangeDisabled = !isApproved || isReady || isCancelled;
+  const configChangeTooltip = isReady
+    ? 'Configuration change is disabled after hierarchy is generated'
+    : isDraft
+      ? 'Approve the project before starting a configuration change'
+      : isCancelled
+        ? 'Configuration change is unavailable on a cancelled or superseded project'
+        : openConfigChange
+          ? 'Open configuration change workspace'
+          : 'Change configuration before generating hierarchy';
   const canCancel =
     Boolean(status) &&
     !isCancelled &&
@@ -302,6 +389,28 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
           </Button>
         </Can>
 
+        <Can permission={[P.config_change_request, P.config_change_approve]}>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <Button
+                    variant="outline"
+                    disabled={busy || configChangeDisabled}
+                    onClick={() =>
+                      router.push(`/projects/${project.id}/configuration-change`)
+                    }
+                  >
+                    <FileCog className="mr-1.5 h-4 w-4" />
+                    Configuration Change
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{configChangeTooltip}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </Can>
+
         <Can permission={P.hierarchy_generate}>
           <TooltipProvider>
             <Tooltip>
@@ -349,7 +458,7 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
         <WorkflowCan role={['HM', 'ADMIN']}>
           {!isApproved && !isReady ? (
             <p className="w-full text-xs text-muted-foreground">
-              Generate Hierarchy stays disabled until Admin approval.
+              Generate Hierarchy stays disabled until Project Director or Admin approval.
             </p>
           ) : null}
           {isReady ? (
@@ -372,31 +481,50 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
       </div>
 
       {tree && tree.flights.length > 0 ? (
-        <div className="rounded-md border bg-muted/30 p-3 text-sm">
-          <p className="mb-2 font-medium">
-            {isCancelled ? 'Generated hierarchy (read-only)' : 'Generated hierarchy'}
-          </p>
-          <ul className="space-y-2">
-            {tree.flights.map((flight) => (
-              <li key={flight.id}>
-                <span className="font-medium">{flight.name}</span>
-                <ul className="ml-4 mt-1 space-y-1 text-muted-foreground">
-                  {flight.sdls.map((sdls) => (
-                    <li key={sdls.id}>
-                      {sdls.name}
-                      {sdls.systems.length > 0 ? (
-                        <span className="text-xs">
-                          {' '}
-                          · {sdls.systems.map((s) => s.name).join(', ')}
-                        </span>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <Collapsible open={treeOpen} onOpenChange={setTreeOpen}>
+          <div className="rounded-md border bg-muted/30 text-sm">
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left font-medium hover:bg-muted/50"
+              >
+                <span>
+                  {isCancelled ? 'Generated hierarchy (read-only)' : 'Generated hierarchy'}
+                </span>
+                <ChevronDown
+                  className={cn(
+                    'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
+                    treeOpen && 'rotate-180'
+                  )}
+                />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <ul className="space-y-3 border-t px-3 py-3 text-muted-foreground">
+                {tree.flights.map((flight) => (
+                  <li key={flight.id}>
+                    <span className="font-medium text-foreground">{flight.name}</span>
+                    <ul className="ml-3 mt-1 space-y-2 border-l border-border/60 pl-3">
+                      {flight.sdls.map((sdls) => (
+                        <li key={sdls.id}>
+                          <span className="font-medium text-foreground/90">{sdls.name}</span>
+                          {sdls.product_type ? (
+                            <span className="ml-1 text-xs">({sdls.product_type})</span>
+                          ) : null}
+                          {sdls.systems.length > 0 ? (
+                            <ul className="mt-1 space-y-2">
+                              {sdls.systems.map((system) => renderSystemBranch(system))}
+                            </ul>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
+              </ul>
+            </CollapsibleContent>
+          </div>
+        </Collapsible>
       ) : null}
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
@@ -513,11 +641,6 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <ConfigChangeWizard
-        project={project}
-        onUpdated={onUpdated}
-        onConfigChange={setConfigChange}
-      />
     </div>
   );
 }

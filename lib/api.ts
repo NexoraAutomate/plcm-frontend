@@ -296,7 +296,24 @@ export const projects = {
           code?: string;
           sequence: number;
           product_type?: string;
-          systems: Array<{ id: number; name: string; subsystem_count: number }>;
+          systems: Array<{
+            id: number;
+            name: string;
+            subsystem_count: number;
+            subsystems: Array<{
+              id: number;
+              name: string;
+              modules: Array<{
+                id: number;
+                name: string;
+                units: Array<{
+                  id: number;
+                  name: string;
+                  components: Array<{ id: number; name: string }>;
+                }>;
+              }>;
+            }>;
+          }>;
         }>;
       }>;
     }>(`/projects/${id}/hierarchy-tree/`),
@@ -369,6 +386,8 @@ export const configChanges = {
   get: (id: number) => api.get<Models.ConfigChangeRequest>(`/config-changes/${id}/`),
   returnInventory: (id: number) =>
     api.post<Models.ConfigChangeRequest>(`/config-changes/${id}/return-inventory/`),
+  cancel: (id: number, data?: { notes?: string | null }) =>
+    api.post<Models.ConfigChangeRequest>(`/config-changes/${id}/cancel/`, data ?? {}),
   submit: (
     id: number,
     data: {

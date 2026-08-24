@@ -75,13 +75,23 @@ export function isConfigSealed(statusName?: string | null): boolean {
 }
 
 export function canRequestConfigChange(statusName?: string | null): boolean {
-  return (
-    statusName === ProjectWorkflowStatus.APPROVED ||
-    statusName === ProjectWorkflowStatus.HIERARCHY_GENERATED ||
-    statusName === ProjectWorkflowStatus.READY_FOR_INVENTORY
-  );
+  // Entry from the project workflow is only before Generate Hierarchy.
+  return statusName === ProjectWorkflowStatus.APPROVED;
 }
 
 export function isOpenConfigChange(status?: string | null): boolean {
-  return Boolean(status && status !== ConfigChangeRequestStatus.NEW_PROJECT_CREATED);
+  return (
+    status === ConfigChangeRequestStatus.REQUESTED ||
+    status === ConfigChangeRequestStatus.INVENTORY_RETURNED ||
+    status === ConfigChangeRequestStatus.SUBMITTED ||
+    status === ConfigChangeRequestStatus.APPROVED
+  );
+}
+
+export function canCancelConfigChange(status?: string | null): boolean {
+  return (
+    status === ConfigChangeRequestStatus.REQUESTED ||
+    status === ConfigChangeRequestStatus.INVENTORY_RETURNED ||
+    status === ConfigChangeRequestStatus.SUBMITTED
+  );
 }

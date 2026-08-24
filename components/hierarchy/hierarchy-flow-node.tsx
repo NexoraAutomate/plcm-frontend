@@ -11,6 +11,10 @@ import { CHILD_ENTITY_TYPE } from '@/lib/hierarchy-dashboard-entity-config';
 import { useAppDefinitions } from '@/lib/app-definitions-context';
 import type { HierarchyEntityActionHandlers } from '@/components/hierarchy-dashboard/use-hierarchy-entity-actions';
 import type { HierarchyEntityType, HierarchyNodeData } from '@/lib/system-hierarchy-graph';
+import {
+  entityLifecycleCardClass,
+  resolveEntityLifecycleTone,
+} from '@/lib/entity-lifecycle-style';
 
 const LEVEL_STYLES: Record<HierarchyEntityType, { border: string; badge: string }> = {
   system: {
@@ -77,6 +81,19 @@ function HierarchyFlowNode({ data }: NodeProps<Node<HierarchyNodeData>>) {
   const levelLabel = entityLabel(data.type);
   const highlightState = data.highlightState ?? 'normal';
   const canNavigate = Boolean(actions?.onNavigate);
+  const lifecycleTone = resolveEntityLifecycleTone({
+    hasShortage: Boolean(data.shortage),
+    hasActiveReservation: Boolean(data.reserved),
+    assignedDeveloperId: data.assigned ? 1 : null,
+    assignment: {
+      issued: Boolean(data.issued),
+      item_status: data.itemStatus ?? null,
+      defect_pending: false,
+      verified: false,
+      assigned_developer_id: data.assigned ? 1 : null,
+    },
+  });
+  const lifecycleChrome = entityLifecycleCardClass(lifecycleTone);
 
   const handleToggle = (event: React.MouseEvent) => {
     event.preventDefault();
@@ -144,7 +161,7 @@ function HierarchyFlowNode({ data }: NodeProps<Node<HierarchyNodeData>>) {
           'nodrag nopan nowheel w-55 rounded-lg border px-3 py-2.5 text-left shadow-sm transition-all',
           isReplacedEntity
             ? 'border-orange-500 bg-orange-50 dark:border-orange-500 dark:bg-orange-950/60'
-            : cn('bg-card', styles.border),
+            : lifecycleChrome || cn('bg-card', styles.border),
           canNavigate &&
             (isReplacedEntity
               ? 'cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-900/70'

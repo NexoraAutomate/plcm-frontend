@@ -23,6 +23,12 @@ import { AssignDeveloperDialog } from '@/components/hierarchy/assign-developer-d
 import { ReworkWizardDialog, type ReworkWizardTarget } from '@/components/inventory/rework-wizard-dialog';
 import { WorkflowAuditHistorySheet } from '@/components/workflow-audit-history-sheet';
 import { isProjectReadOnly } from '@/lib/workflow-status';
+import { useProjectInventoryFlags } from '@/hooks/use-project-inventory-flags';
+import { inventoryFlagKey } from '@/lib/system-hierarchy-graph';
+import {
+  resolveEntityLifecycleTone,
+} from '@/lib/entity-lifecycle-style';
+import { EntityInventoryHoldDetails } from '@/components/entity-inventory-hold-details';
 import type {
   Component,
   HierarchyAssignmentStatus,
@@ -140,6 +146,7 @@ export function HierarchyEntityDetailPanel({
     null
   );
   const [reworkTarget, setReworkTarget] = useState<ReworkWizardTarget | null>(null);
+  const inventoryFlags = useProjectInventoryFlags(project?.id);
 
   const entity = selection
     ? findEntity(selection, systems, subsystems, modules, units, components)
@@ -147,6 +154,17 @@ export function HierarchyEntityDetailPanel({
 
   const isBhdMode = dossierMode === 'bhd';
   const originalBuild = entity ? getOriginalBuildDisplayFields(entity) : null;
+  const holdKey =
+    selection && entity ? inventoryFlagKey(selection.type, selection.entityId) : '';
+  const reservation = holdKey ? inventoryFlags.reservationsByKey[holdKey] : undefined;
+  const shortage = holdKey ? inventoryFlags.shortagesByKey[holdKey] : undefined;
+  const lifecycleTone = resolveEntityLifecycleTone({
+    hasShortage: Boolean(shortage),
+    hasActiveReservation: Boolean(reservation),
+    assignedDeveloperId: entity?.assigned_developer_id,
+    assignment: assignmentProgress,
+    statusName: entity ? getEntityStatusName(entity, statuses) : null,
+  });
   const isCancelled = isProjectReadOnly(project?.status_name);
 
   const loadLinkedInventory = useCallback(async () => {
@@ -323,6 +341,17 @@ export function HierarchyEntityDetailPanel({
                 </div>
               ) : null}
 
+              {reservation || shortage ? (
+                <div className="mb-3">
+                  <EntityInventoryHoldDetails
+                    tone={lifecycleTone}
+                    reservation={reservation}
+                    shortage={shortage}
+                    entity={entity}
+                  />
+                </div>
+              ) : null}
+
               <DetailRow label="Name" value={entity.name} />
               <DetailRow label="Description" value={entity.description} />
               <DetailRow label="Original Part Number" value={originalBuild?.partNumber} />
@@ -382,10 +411,27 @@ export function HierarchyEntityDetailPanel({
                 </div>
               ) : null}
 
+              {reservation || shortage ? (
+                <div className="mb-3">
+                  <EntityInventoryHoldDetails
+                    tone={lifecycleTone}
+                    reservation={reservation}
+                    shortage={shortage}
+                    entity={entity}
+                  />
+                </div>
+              ) : null}
+
               <DetailRow label="Name" value={entity.name} />
               <DetailRow label="Description" value={entity.description} />
-              <DetailRow label="Part Number" value={entity.part_number} />
-              <DetailRow label="Serial Number" value={entity.serial_number} />
+              <DetailRow
+                label="Part Number"
+                value={entity.part_number || reservation?.part_number}
+              />
+              <DetailRow
+                label="Serial Number"
+                value={entity.serial_number || reservation?.serial_number}
+              />
               <DetailRow label="Configuration Item" value={entity.configuration_item} />
               {entity.installation_date ? (
                 <DetailRow

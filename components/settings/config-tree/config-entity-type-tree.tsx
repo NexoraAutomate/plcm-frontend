@@ -62,8 +62,7 @@ export function ConfigEntityTypeTree({
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Set<TemplateNodeLevel>>(() => {
     if (defaultExpandedLevels?.length) return new Set(defaultExpandedLevels);
-    if (selectableLevel) return new Set([selectableLevel]);
-    return new Set<TemplateNodeLevel>(['system']);
+    return new Set<TemplateNodeLevel>();
   });
 
   useEffect(() => {

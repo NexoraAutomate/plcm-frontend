@@ -15,17 +15,13 @@ import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
 import { P } from '@/lib/permission-codes';
 import { EntityForm } from '@/components/entity-form';
-import { EntityInventorySearch } from '@/components/entity-inventory-search';
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import { listTemplateNames } from '@/lib/hierarchy-template-names';
 import * as Models from '@/lib/models';
-import type { Inventory } from '@/lib/models';
-import { getChildInventoryType } from '@/lib/entity-hierarchy';
 import {
   buildCreateEntityByType,
-  installEntityFromInventoryWithChildren,
 } from '@/lib/inventory-child-install';
 import { EntityStatusHistorySheet } from '@/components/entity-status-history-sheet';
 import { EntityInstallMetadataCard } from '@/components/entity-install-metadata-card';
@@ -268,45 +264,6 @@ export default function UnitDetailPage() {
       setIsSubmitting(false);
     }
   }
-  async function handleUseInventory(item: Inventory, instanceId?: number) {
-    if (!unit) {
-      throw new Error(`${entityLabel('unit')} not found`);
-    }
-
-    const defaultStatus = statuses[0];
-    if (!defaultStatus) {
-      throw new Error('No component status available');
-    }
-
-    const result = await runSilentEntityBatch(async () => {
-      const createEntityByType = buildCreateEntityByType({
-        createSystem,
-        createSubsystem,
-        createModule,
-        createUnit,
-        createComponent,
-      }, { silent: true });
-
-      return installEntityFromInventoryWithChildren({
-        inventoryItem: item,
-        instanceId,
-        parentEntityId: unit.id,
-        entityType: 'component',
-        existingChildren: unitComponents,
-        defaultStatus,
-        createEntity: (data) => createEntityByType('component', data),
-        createEntityByType,
-      });
-    });
-
-    toast.success(
-      result.childrenInstalled > 0
-        ? `Installed ${item.name} and ${result.childrenInstalled} child entit${result.childrenInstalled === 1 ? 'y' : 'ies'} from inventory`
-        : `Installed ${item.name} from inventory`
-    );
-
-    return result.updatedInventory;
-  }
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -471,17 +428,8 @@ export default function UnitDetailPage() {
         editPermission={P.edit_components}
         deletePermission={P.delete_components}
         readOnly={hierarchyReadOnly}
+        projectId={projectId}
       />
-
-      {/* Inventory Items */}
-      {!hierarchyReadOnly ? (
-      <EntityInventorySearch
-        parentEntityName={unit.name}
-        inventoryType={getChildInventoryType('unit')}
-        allowedInventoryNames={componentHierarchyNames.map((hierarchy) => hierarchy.name)}
-        onUseInventory={handleUseInventory}
-      />
-      ) : null}
 
       {/* {`Add ${entityLabel('component')}`} Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>

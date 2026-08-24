@@ -26,6 +26,7 @@ import type {
 import { ConfigChangeRequestStatus } from '@/lib/models';
 import {
   CONFIG_CHANGE_STEPS,
+  canCancelConfigChange,
   canRequestConfigChange,
   configChangeStepIndex,
 } from '@/lib/config-change';
@@ -35,6 +36,8 @@ type Props = {
   project: Project;
   onUpdated: (project: Project) => void;
   onConfigChange?: (change: ConfigChangeRequest | null) => void;
+  /** When true, render without the embedded card chrome (dedicated page). */
+  asPage?: boolean;
 };
 
 function apiError(error: unknown, fallback: string): string {
@@ -43,7 +46,12 @@ function apiError(error: unknown, fallback: string): string {
   return typeof detail === 'string' ? detail : fallback;
 }
 
-export function ConfigChangeWizard({ project, onUpdated, onConfigChange }: Props) {
+export function ConfigChangeWizard({
+  project,
+  onUpdated,
+  onConfigChange,
+  asPage = false,
+}: Props) {
   const router = useRouter();
   const [change, setChange] = useState<ConfigChangeRequest | null>(null);
   const [loading, setLoading] = useState(true);
@@ -140,6 +148,24 @@ export function ConfigChangeWizard({ project, onUpdated, onConfigChange }: Props
     }
   }
 
+  async function handleCancelChange() {
+    if (!change) return;
+    setBusy(true);
+    try {
+      await api.configChanges.cancel(change.id);
+      setChange(null);
+      onConfigChange?.(null);
+      setTargetConfigId('');
+      setProductType('');
+      setReason('');
+      toast.success('Configuration change cancelled — you can reserve inventory again');
+    } catch (error: unknown) {
+      toast.error(apiError(error, 'Cancel failed'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleReturn() {
     if (!change) return;
     setBusy(true);
@@ -218,31 +244,58 @@ export function ConfigChangeWizard({ project, onUpdated, onConfigChange }: Props
     }
   }
 
-  if (!canStart && !change && !loading) return null;
+  if (!canStart && !change && !loading) {
+    if (!asPage) return null;
+    return (
+      <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+        Configuration change is only available while this project is{' '}
+        <strong>Approved</strong> and before hierarchy is generated. After Generate
+        Hierarchy, use a new project flow if the configuration must change.
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-4 rounded-lg border p-4">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-medium">Configuration change</h3>
-          <p className="text-xs text-muted-foreground">
-            CC-1 … CC-6 — new Project/Flight, not an in-place edit.
-          </p>
+    <div className={cn('space-y-4', !asPage && 'rounded-lg border p-4')}>
+      {!asPage ? (
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-medium">Configuration change</h3>
+            <p className="text-xs text-muted-foreground">
+              CC-1 … CC-6 — new Project/Flight, not an in-place edit.
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => void load()}
+            disabled={busy}
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+          </Button>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={() => void load()}
-          disabled={busy}
-        >
-          {loading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4" />
-          )}
-        </Button>
-      </div>
+      ) : (
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void load()}
+            disabled={busy}
+          >
+            {loading ? (
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-1.5 h-4 w-4" />
+            )}
+            Refresh
+          </Button>
+        </div>
+      )}
 
       <ol className="space-y-0">
         {CONFIG_CHANGE_STEPS.map((step, index) => {
@@ -302,6 +355,15 @@ export function ConfigChangeWizard({ project, onUpdated, onConfigChange }: Props
           {status === ConfigChangeRequestStatus.REQUESTED && !cleared ? (
             <Button onClick={() => void handleReturn()} disabled={busy}>
               Return all inventory
+            </Button>
+          ) : null}
+          {canCancelConfigChange(status) ? (
+            <Button
+              variant="outline"
+              onClick={() => void handleCancelChange()}
+              disabled={busy}
+            >
+              Cancel configuration change
             </Button>
           ) : null}
         </Can>

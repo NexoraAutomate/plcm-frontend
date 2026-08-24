@@ -22,6 +22,14 @@ import { P } from '@/lib/permission-codes';
 import { AssignDeveloperDialog } from '@/components/hierarchy/assign-developer-dialog';
 import * as api from '@/lib/api';
 import type { HierarchyAssignmentStatus } from '@/lib/models';
+import { useProjectInventoryFlags } from '@/hooks/use-project-inventory-flags';
+import { inventoryFlagKey } from '@/lib/system-hierarchy-graph';
+import {
+  ENTITY_LIFECYCLE_LABEL,
+  entityLifecycleCardClass,
+  resolveEntityLifecycleTone,
+} from '@/lib/entity-lifecycle-style';
+import { EntityInventoryHoldDetails } from '@/components/entity-inventory-hold-details';
 
 interface EntityCardsProps {
   title: string;
@@ -59,6 +67,8 @@ interface EntityCardsProps {
   addButtonLabel?: string;
   emptyMessage?: string;
   childEntityType?: HardwareEntityType;
+  /** Loads reserved/shortage inventory details for card PN/SN and lifecycle colors. */
+  projectId?: number | null;
   /** Permission code(s) required to add entities. Omit to always allow (backward compat). */
   createPermission?: string | string[];
   /** Permission code(s) required to edit entities. Omit to always allow (backward compat). */
@@ -84,6 +94,7 @@ export function EntityCards({
   emptyMessage = 'No entities found',
   statuses = [],
   childEntityType,
+  projectId,
   createPermission,
   editPermission,
   deletePermission,
@@ -92,6 +103,7 @@ export function EntityCards({
   const { can, user, isInventoryManager } = useAuth();
   const { ensureHierarchyLoaded, markLocalInstallReverted, users, patchHierarchyEntity } =
     useDataStore();
+  const inventoryFlags = useProjectInventoryFlags(projectId);
   const inventoryManager = isInventoryManager();
   const canCreate = !createPermission || can(createPermission);
   const canEditPerm = !editPermission || can(editPermission);
@@ -168,6 +180,23 @@ export function EntityCards({
                 assignment?.assigned_developer_id ?? entity.assigned_developer_id ?? null;
               const issued = Boolean(assignment?.issued);
               const showAssigned = Boolean(assignedId) && !issued;
+              const flagKey = childEntityType
+                ? inventoryFlagKey(childEntityType, entity.id)
+                : '';
+              const reservation = flagKey
+                ? inventoryFlags.reservationsByKey[flagKey]
+                : undefined;
+              const shortage = flagKey ? inventoryFlags.shortagesByKey[flagKey] : undefined;
+              const hasActiveReservation = Boolean(reservation);
+              const hasShortage = Boolean(shortage);
+              const tone = resolveEntityLifecycleTone({
+                hasShortage,
+                hasActiveReservation,
+                assignedDeveloperId: assignedId,
+                assignment,
+                statusName: statusLabel !== 'Unknown' ? statusLabel : null,
+              });
+              const lifecycleLabel = ENTITY_LIFECYCLE_LABEL[tone];
               const ownsInstall = canManageInstall({
                 isInventoryManager: inventoryManager,
                 currentUserId: user?.id,
@@ -189,14 +218,18 @@ export function EntityCards({
                     entity.part_number ||
                     entity.serial_number
                 );
+              const showOwnInstallChrome =
+                tone === 'neutral' &&
+                !inventoryManager &&
+                mine &&
+                entity.is_current_install !== false;
               return (
               <Card
                 key={entity.id}
                 className={cn(
                   'hover:shadow-md transition-shadow',
-                  !inventoryManager &&
-                    mine &&
-                    entity.is_current_install !== false &&
+                  entityLifecycleCardClass(tone),
+                  showOwnInstallChrome &&
                     'border-emerald-500/70 bg-emerald-50/60 ring-1 ring-emerald-500/30 dark:bg-emerald-950/30 dark:border-emerald-500/50'
                 )}
               >
@@ -207,7 +240,7 @@ export function EntityCards({
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-sm truncate">{entity.name}</h3>
-                            {!inventoryManager && mine && entity.is_current_install !== false ? (
+                            {showOwnInstallChrome ? (
                               <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400 mt-0.5">
                                 Installed by you
                               </p>
@@ -215,11 +248,6 @@ export function EntityCards({
                             {(entity.replacement_sequence ?? 0) > 0 ? (
                               <p className="text-xs font-medium text-primary mt-0.5">
                                 Current install · replacement #{entity.replacement_sequence}
-                              </p>
-                            ) : null}
-                            {entity.serial_number?.trim() ? (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Serial # {entity.serial_number}
                               </p>
                             ) : null}
                             {entity.description && (
@@ -232,6 +260,28 @@ export function EntityCards({
                                 Installed {new Date(entity.installation_date).toLocaleDateString()}
                               </p>
                             ) : null}
+                            {reservation || shortage || tone === 'reserved' || tone === 'short' ? (
+                              <EntityInventoryHoldDetails
+                                tone={tone}
+                                reservation={reservation}
+                                shortage={shortage}
+                                entity={entity}
+                                compact
+                              />
+                            ) : entity.part_number?.trim() || entity.serial_number?.trim() ? (
+                              <div className="mt-1.5 space-y-0.5">
+                                {entity.part_number?.trim() ? (
+                                  <p className="text-xs text-muted-foreground">
+                                    Part # {entity.part_number}
+                                  </p>
+                                ) : null}
+                                {entity.serial_number?.trim() ? (
+                                  <p className="text-xs text-muted-foreground">
+                                    Serial # {entity.serial_number}
+                                  </p>
+                                ) : null}
+                              </div>
+                            ) : null}
                           </div>
                           {entity.picture_url ? (
                             <EntityPicture
@@ -243,6 +293,11 @@ export function EntityCards({
                             />
                           ) : null}
                           <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                            {lifecycleLabel &&
+                            !showAssigned &&
+                            lifecycleLabel !== assignment?.item_status ? (
+                              <StatusBadge status={lifecycleLabel} />
+                            ) : null}
                             {showAssigned ? <StatusBadge status="Assigned" /> : null}
                             {assignment?.item_status ? (
                               <StatusBadge status={assignment.item_status} />
@@ -253,7 +308,8 @@ export function EntityCards({
                               <StatusBadge status="Failed" />
                             ) : null}
                             {statusLabel !== 'Unknown' &&
-                            statusLabel.toUpperCase() !== (assignment?.item_status || '').toUpperCase() ? (
+                            statusLabel.toUpperCase() !== (assignment?.item_status || '').toUpperCase() &&
+                            statusLabel.toUpperCase() !== (lifecycleLabel || '').toUpperCase() ? (
                               <StatusBadge status={statusLabel} />
                             ) : null}
                             {childEntityType ? (

@@ -59,7 +59,7 @@ export function ResolutionHistoryPanel({
   components,
 }: ResolutionHistoryPanelProps) {
   const { users } = useDataStore();
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [records, setRecords] = useState<ConfigurationHistory[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
