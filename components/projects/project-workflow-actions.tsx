@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, GitBranch, UserCog, Ban, Lock } from 'lucide-react';
+import { CheckCircle2, GitBranch, UserCog, Ban, Lock, Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -41,6 +41,8 @@ import type {
 import { ProjectWorkflowStatus, isProjectReadOnly } from '@/lib/workflow-status';
 import { ConfigChangeWizard } from '@/components/projects/config-change-wizard';
 import { isConfigSealed, isOpenConfigChange } from '@/lib/config-change';
+import { useDataStore } from '@/lib/data-store';
+import { useRouter } from 'next/navigation';
 
 type Props = {
   project: Project;
@@ -53,6 +55,8 @@ type HierarchyTree = Awaited<
 >['data'];
 
 export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
+  const router = useRouter();
+  const { ensureHierarchyLoaded } = useDataStore();
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -164,11 +168,20 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
         const refreshed = await api.projects.get(project.id);
         onUpdated(refreshed.data);
       }
+      // Spec 03 writes systems via generate API; project cards read the client store.
+      await ensureHierarchyLoaded({ force: true });
+      try {
+        const treeRes = await api.projects.hierarchyTree(project.id);
+        setTree(treeRes.data);
+      } catch {
+        // Tree panel is best-effort; store refresh above is the primary fix.
+      }
       const c = res.data.counts;
       toast.success(
         `Hierarchy ready: ${c.flights} flights · ${c.sdls} SDLS · ${c.systems} systems`
       );
       setConfirmOpen(false);
+      router.push(`/projects/${project.id}/reserve-inventory`);
     } catch (error: unknown) {
       const detail =
         (error as { response?: { data?: { detail?: string } } })?.response?.data
@@ -309,6 +322,19 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
           </TooltipProvider>
         </Can>
 
+        <Can permission={P.inventory_reserve}>
+          {isReady && !isCancelled ? (
+            <Button
+              variant="outline"
+              disabled={busy || openConfigChange}
+              onClick={() => router.push(`/projects/${project.id}/reserve-inventory`)}
+            >
+              <Package className="mr-1.5 h-4 w-4" />
+              Reserve inventory
+            </Button>
+          ) : null}
+        </Can>
+
         <Can permission={P.project_cancel}>
           <Button
             variant="destructive"
@@ -328,7 +354,8 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
           ) : null}
           {isReady ? (
             <p className="w-full text-xs text-muted-foreground">
-              Hierarchy generated — reserve inventory against Flight → SDLS nodes below.
+              Hierarchy generated — open Reserve inventory to match and lock stock for
+              each shell.
             </p>
           ) : null}
           {isApproved && openConfigChange ? (

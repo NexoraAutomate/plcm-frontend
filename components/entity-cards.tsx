@@ -33,7 +33,7 @@ interface EntityCardsProps {
     status_name?: string;
     status?: { status_name: string };
     description?: string;
-    picture_url?: string;
+    picture_url?: string | null;
     installation_date?: string;
     part_number?: string;
     serial_number?: string;

@@ -349,21 +349,25 @@ export default function ProjectDetailPage() {
   
   useEffect(() => {
     const fetchData = async () => {
-      try {
-        const [statusRes, hierarchyNames] = await Promise.all([
-          api.statuses.list('systems'),
-          listTemplateNames({
-            level: 'system',
-            configId: project?.hierarchy_config_id,
-          }),
-        ]);
-        setStatuses(statusRes.data);
-        setSystemHierarchyNames(hierarchyNames as Models.Hierarchy[]);
-      } catch (err) {
-        console.error('Failed to fetch statuses or hierarchy names', err);
-      } finally {
-        setLoadingStatuses(false);
+      // Load independently — a 403 on statuses must not block config template names.
+      const [statusResult, namesResult] = await Promise.allSettled([
+        api.statuses.list('systems'),
+        listTemplateNames({
+          level: 'system',
+          configId: project?.hierarchy_config_id,
+        }),
+      ]);
+      if (statusResult.status === 'fulfilled') {
+        setStatuses(statusResult.value.data);
+      } else if (!api.isForbiddenError(statusResult.reason)) {
+        console.error('Failed to fetch system statuses', statusResult.reason);
       }
+      if (namesResult.status === 'fulfilled') {
+        setSystemHierarchyNames(namesResult.value as Models.Hierarchy[]);
+      } else if (!api.isForbiddenError(namesResult.reason)) {
+        console.error('Failed to fetch hierarchy names', namesResult.reason);
+      }
+      setLoadingStatuses(false);
     };
 
     fetchData();

@@ -318,6 +318,8 @@ export const projects = {
       `/projects/${id}/reservations/availability`,
       { params }
     ),
+  reservationPlan: (id: number) =>
+    api.get<Models.ReservationPlan>(`/projects/${id}/reservations/plan/`),
   createReservation: (
     id: number,
     data: {

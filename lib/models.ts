@@ -581,6 +581,38 @@ export interface InventoryAvailabilityCheck {
   reason?: string | null
 }
 
+/** Spec 04 — hierarchy shell + matched stock for the reserve workspace */
+export interface ReservationPlanItem {
+  target_entity_type: string
+  target_entity_id: number
+  entity_name: string
+  path: string
+  depth: number
+  status: 'available' | 'short' | 'reserved' | string
+  available: boolean
+  reason?: string | null
+  free_quantity?: number | null
+  inventory_id?: number | null
+  inventory_name?: string | null
+  part_number?: string | null
+  serial_numbers?: string[] | null
+  suggested_serial?: string | null
+  reservation_id?: number | null
+  flight_id?: number | null
+  sdls_id?: number | null
+  system_id?: number | null
+}
+
+export interface ReservationPlan {
+  project_id: number
+  project_status?: string | null
+  total: number
+  available_count: number
+  short_count: number
+  reserved_count: number
+  items: ReservationPlanItem[]
+}
+
 /** Spec 05 — waiting demand while stock is short */
 export interface InventoryShortage {
   id: number
@@ -673,7 +705,7 @@ export interface ReserveOutcome {
 export interface HierarchyInstallFields {
   installation_date?: string
   installed_by_id?: number
-  picture_url?: string
+  picture_url?: string | null
   original_part_number?: string
   original_serial_number?: string
   is_current_install?: boolean
