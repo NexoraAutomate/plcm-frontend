@@ -455,7 +455,7 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
           </Button>
         </Can>
 
-        <WorkflowCan role={['HM', 'ADMIN']}>
+        <WorkflowCan role={['HM', 'ADMIN', 'PD']}>
           {!isApproved && !isReady ? (
             <p className="w-full text-xs text-muted-foreground">
               Generate Hierarchy stays disabled until Project Director or Admin approval.

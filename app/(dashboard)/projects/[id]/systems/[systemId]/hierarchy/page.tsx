@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
@@ -13,6 +14,8 @@ import {
   type HierarchyEntityType,
 } from '@/lib/system-hierarchy-graph';
 import { resolveCurrentInstallEntity } from '@/lib/entity-replacement';
+import * as api from '@/lib/api';
+import type { Project, System } from '@/lib/models';
 
 function entityLabel(type: HierarchyEntityType): string {
   return type.charAt(0).toUpperCase() + type.slice(1);
@@ -34,11 +37,63 @@ export default function SystemHierarchyPage() {
   const { pageLoading } = useEntityHierarchyGate();
   const { projects, systems, subsystems, modules, units, components, statuses } =
     useDataStore();
+  const [fetchedProject, setFetchedProject] = useState<Project | null>(null);
+  const [fetchedSystem, setFetchedSystem] = useState<System | null>(null);
+  const [scopedLoading, setScopedLoading] = useState(true);
 
-  const project = projects.find((p) => String(p.id) === projectId);
-  const system = systems.find(
-    (s) => String(s.id) === systemId && s.project_id === project?.id
+  const storeProject = projects.find((p) => String(p.id) === projectId);
+  const storeSystem = systems.find(
+    (s) =>
+      String(s.id) === systemId &&
+      s.project_id === (storeProject?.id ?? Number(projectId))
   );
+  const project = storeProject ?? fetchedProject;
+  const system = storeSystem ?? fetchedSystem;
+
+  useEffect(() => {
+    const pid = Number(projectId);
+    const sid = Number(systemId);
+    if (!Number.isFinite(pid) || !Number.isFinite(sid)) {
+      setScopedLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setScopedLoading(true);
+
+    const load = async () => {
+      try {
+        if (!storeProject) {
+          const res = await api.projects.get(pid);
+          if (!cancelled) setFetchedProject(res.data);
+        }
+        if (!storeSystem) {
+          // Project-scoped list only needs view_projects (works for Project Manager).
+          const res = await api.projects.getSystems(pid);
+          if (!cancelled) {
+            const match = (res.data ?? []).find((row) => row.id === sid) ?? null;
+            setFetchedSystem(match);
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          if (!storeProject) setFetchedProject(null);
+          if (!storeSystem) setFetchedSystem(null);
+        }
+      } finally {
+        if (!cancelled) setScopedLoading(false);
+      }
+    };
+
+    if (storeProject && storeSystem) {
+      setScopedLoading(false);
+      return;
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, systemId, storeProject, storeSystem]);
 
   const resolvedRootId =
     rootType === 'system' || rootEntityId == null || Number.isNaN(rootEntityId)
@@ -60,7 +115,7 @@ export default function SystemHierarchyPage() {
     return resolveCurrentInstallEntity(resolvedRootId, components)?.name ?? null;
   })();
 
-  if (pageLoading) {
+  if (pageLoading || scopedLoading) {
     return <PageLoader />;
   }
 

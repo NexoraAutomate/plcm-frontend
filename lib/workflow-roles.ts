@@ -51,6 +51,8 @@ const ALIASES: Record<string, WorkflowRoleCode> = {
   pd: 'PD',
   'project director': 'PD',
   projectdirector: 'PD',
+  'project manager': 'PD',
+  projectmanager: 'PD',
   hm: 'HM',
   'hierarchy manager': 'HM',
   hierarchymanager: 'HM',

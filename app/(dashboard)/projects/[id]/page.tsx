@@ -63,8 +63,10 @@ export default function ProjectDetailPage() {
     deleteSystem,
     updateSystem,
     runSilentEntityBatch,
+    ensureHierarchyLoaded,
   } = useDataStore();
   const [workflowProject, setWorkflowProject] = useState<Models.Project | null>(null);
+  const [scopedSystems, setScopedSystems] = useState<Models.System[]>([]);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -91,6 +93,37 @@ export default function ProjectDetailPage() {
       .catch(() => undefined);
   }, [projectId]);
 
+  // Project-scoped shells (only needs view_projects) — do not rely solely on the
+  // global /systems dump, which can be empty for some roles or capped catalogs.
+  useEffect(() => {
+    const id = Number(projectId);
+    if (!Number.isFinite(id)) return;
+    let cancelled = false;
+    void api.projects
+      .getSystems(id)
+      .then((res) => {
+        if (!cancelled) {
+          const rows = res.data ?? [];
+          setScopedSystems(rows);
+          // Warm the global hierarchy store so Hierarchy / entity pages work too.
+          if (rows.length > 0) {
+            void ensureHierarchyLoaded({ force: true });
+          }
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setScopedSystems([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    projectId,
+    workflowProject?.status_name,
+    workflowProject?.hierarchy_config_version,
+    ensureHierarchyLoaded,
+  ]);
+
   useEffect(() => {
     const snap = progressQuery.data;
     if (!snap) return;
@@ -109,9 +142,12 @@ export default function ProjectDetailPage() {
       };
     });
   }, [progressQuery.data]);
-  const projectSystems = project
-    ? systems.filter((s) => s.project_id === project.id && isCurrentInstallEntity(s))
-    : [];
+  const projectSystems = useMemo(() => {
+    const scoped = scopedSystems.filter(isCurrentInstallEntity);
+    if (scoped.length > 0) return scoped;
+    if (!project) return [];
+    return systems.filter((s) => s.project_id === project.id && isCurrentInstallEntity(s));
+  }, [scopedSystems, systems, project]);
   const order = project ? orders.find((o) => o.id === project.order_id) : null;
 
 
@@ -487,7 +523,7 @@ export default function ProjectDetailPage() {
         editPermission={P.edit_systems}
         deletePermission={P.delete_systems}
         readOnly={hierarchyReadOnly}
-        projectId={projectId}
+        projectId={Number.isFinite(Number(projectId)) ? Number(projectId) : null}
       />
 
       {/* {`Add ${entityLabel('system')}`} Dialog */}
