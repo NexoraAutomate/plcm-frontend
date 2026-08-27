@@ -231,7 +231,7 @@ function enrichInventoryItems(
 export default function InventoryPage() {
   const { definitions, entityLabel } = useAppDefinitions();
   const router = useRouter();
-  const { can, isInventoryManager } = useAuth();
+  const { user, can, isInventoryManager } = useAuth();
   const inventoryManager = isInventoryManager();
   const canCreateInventory = inventoryManager && can(P.create_inventory);
   const canEditInventory = inventoryManager && can(P.edit_inventory);
@@ -349,7 +349,9 @@ export default function InventoryPage() {
   const selectAllRequestId = useRef(0);
 
   const [selectedEntityType, setSelectedEntityType] = useState<EntityType>('component');
-  const { data: hierarchyCategories = [] } = useHierarchiesQuery(selectedEntityType);
+  const { data: entityListNames = [] } = useHierarchiesQuery(selectedEntityType);
+  const inventoryHolderUserId = user?.id ? String(user.id) : '';
+  const inventoryHolderLabel = user ? formatUserRef(user) : 'Inventory Manager';
   const [formData, setFormData] = useState({ ...emptyInventoryEntityForm });
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachmentUpload[]>([]);
   const [pendingPictureFile, setPendingPictureFile] = useState<File | null>(null);
@@ -697,8 +699,11 @@ export default function InventoryPage() {
     }
   }
 
-  const resetForm = () => {
-    setFormData({ ...emptyInventoryEntityForm });
+  const resetForm = (options?: { forCreate?: boolean }) => {
+    setFormData({
+      ...emptyInventoryEntityForm,
+      holder_user_id: options?.forCreate ? inventoryHolderUserId : '',
+    });
     setPendingAttachments([]);
     setPendingPictureFile(null);
     setRemovePicture(false);
@@ -1015,12 +1020,14 @@ export default function InventoryPage() {
           >
             Holder
           </TabsTrigger>
-          <TabsTrigger
-            value="install"
-            className="rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
-          >
-            Install
-          </TabsTrigger>
+          {mode === 'edit' ? (
+            <TabsTrigger
+              value="install"
+              className="rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
+              Install
+            </TabsTrigger>
+          ) : null}
           <TabsTrigger
             value="picture"
             className="rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
@@ -1082,7 +1089,8 @@ export default function InventoryPage() {
 
         <div>
           <Label>
-            {getEntityDisplayName(selectedEntityType)} Category {mode === 'create' ? '*' : ''}
+            {getEntityDisplayName(selectedEntityType)} Category
+            {mode === 'create' ? ' (Entity List)' : ''} {mode === 'create' ? '*' : ''}
           </Label>
           <Select
             value={formData.name}
@@ -1097,17 +1105,25 @@ export default function InventoryPage() {
             }}
           >
             <SelectTrigger>
-              <SelectValue placeholder={`Select ${selectedEntityType} from hierarchy`} />
+              <SelectValue
+                placeholder={
+                  mode === 'create'
+                    ? `Select from Entity List (${entityLabel(selectedEntityType)})`
+                    : `Select ${selectedEntityType} name`
+                }
+              />
             </SelectTrigger>
             <SelectContent>
-              {hierarchyCategories.length === 0 ? (
+              {entityListNames.length === 0 ? (
                 <SelectItem value="__none__" disabled>
-                  No categories defined in hierarchy
+                  {mode === 'create'
+                    ? `No ${entityLabel(selectedEntityType, true).toLowerCase()} in Entity List — add in Settings → Definitions`
+                    : 'No matching names in Entity List'}
                 </SelectItem>
               ) : (
-                hierarchyCategories.map((hierarchy) => (
-                  <SelectItem key={hierarchy.id} value={hierarchy.name}>
-                    {hierarchy.name}
+                entityListNames.map((entry) => (
+                  <SelectItem key={entry.id} value={entry.name}>
+                    {entry.name}
                   </SelectItem>
                 ))
               )}
@@ -1292,21 +1308,30 @@ export default function InventoryPage() {
         ) : null}
         <div>
           <Label>Inventory Holder</Label>
-          <Select
-            value={formData.holder_user_id || ''}
-            onValueChange={(value) => setFormData({ ...formData, holder_user_id: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select custodian" />
-            </SelectTrigger>
-            <SelectContent>
-              {users.map((user) => (
-                <SelectItem key={user.id} value={String(user.id)}>
-                  {user.full_name || user.username}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {mode === 'create' ? (
+            <>
+              <Input value={inventoryHolderLabel} disabled />
+              <p className="text-xs text-muted-foreground">
+                Warehouse stock is held by the Inventory Manager who adds the item.
+              </p>
+            </>
+          ) : (
+            <Select
+              value={formData.holder_user_id || ''}
+              onValueChange={(value) => setFormData({ ...formData, holder_user_id: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select custodian" />
+              </SelectTrigger>
+              <SelectContent>
+                {users.map((user) => (
+                  <SelectItem key={user.id} value={String(user.id)}>
+                    {user.full_name || user.username}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         <div>
@@ -1339,34 +1364,36 @@ export default function InventoryPage() {
         </div>
       </TabsContent>
 
-      <TabsContent value="install" className={formTabClassName}>
-        <div>
-          <Label>Installation Date</Label>
-          <Input
-            type="date"
-            value={formData.installation_date}
-            onChange={(e) => setFormData({ ...formData, installation_date: e.target.value })}
-          />
-        </div>
-        <div>
-          <Label>Installed By</Label>
-          <Select
-            value={formData.installed_by_id || ''}
-            onValueChange={(value) => setFormData({ ...formData, installed_by_id: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select installer" />
-            </SelectTrigger>
-            <SelectContent>
-              {users.map((user) => (
-                <SelectItem key={user.id} value={String(user.id)}>
-                  {user.full_name || user.username}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </TabsContent>
+      {mode === 'edit' ? (
+        <TabsContent value="install" className={formTabClassName}>
+          <div>
+            <Label>Installation Date</Label>
+            <Input
+              type="date"
+              value={formData.installation_date}
+              onChange={(e) => setFormData({ ...formData, installation_date: e.target.value })}
+            />
+          </div>
+          <div>
+            <Label>Installed By</Label>
+            <Select
+              value={formData.installed_by_id || ''}
+              onValueChange={(value) => setFormData({ ...formData, installed_by_id: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select installer" />
+              </SelectTrigger>
+              <SelectContent>
+                {users.map((user) => (
+                  <SelectItem key={user.id} value={String(user.id)}>
+                    {user.full_name || user.username}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </TabsContent>
+      ) : null}
 
       <TabsContent value="picture" className={formTabClassName}>
         <div>
@@ -1513,12 +1540,12 @@ export default function InventoryPage() {
     prev: typeof formData
   ): typeof formData {
     if (!name.trim()) return prev;
-    const hierarchyHit = hierarchyCategories.find((h) => h.name === name);
+    const entityListHit = entityListNames.find((entry) => entry.name === name);
     const { pnSeq, snSeq } = nextInventorySequences(inventory, type, name);
     const ids = buildEntityIdentifiersFromDefinitions(definitions, {
       name,
       level: type,
-      entityAbbr: hierarchyHit?.abbreviation || suggestAbbreviation(name),
+      entityAbbr: entityListHit?.abbreviation || suggestAbbreviation(name),
       vendor: vendor.trim() || prev.oem_name.trim(),
       seq: snSeq,
       pnSeq,
@@ -1671,7 +1698,7 @@ export default function InventoryPage() {
             open={isCreateOpen}
             onOpenChange={(open) => {
               setIsCreateOpen(open);
-              if (open) setFormTab('general');
+              if (open) resetForm({ forCreate: true });
             }}
           >
             {canCreateInventory ? (
