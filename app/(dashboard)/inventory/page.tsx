@@ -1533,6 +1533,15 @@ export default function InventoryPage() {
 
   const getEntityDisplayName = (entityType: EntityType) => entityLabel(entityType);
 
+  function findExistingStockGroup(type: EntityType, name: string): InventoryItem | undefined {
+    const normalized = name.trim().toLowerCase();
+    return inventory.find(
+      (item) =>
+        item.inventory_type === type &&
+        (item.entityName || item.name || '').trim().toLowerCase() === normalized
+    );
+  }
+
   function applyDefinitionIdentifiers(
     type: EntityType,
     name: string,
@@ -1541,6 +1550,24 @@ export default function InventoryPage() {
   ): typeof formData {
     if (!name.trim()) return prev;
     const entityListHit = entityListNames.find((entry) => entry.name === name);
+    const existing = findExistingStockGroup(type, name);
+
+    if (existing) {
+      const partNumber = inventoryPartNumber(existing) || existing.part_number || '';
+      const relatedEntities = inventoryEntitiesForType(type, entityPools);
+      const serial_number = canSuggestInventorySerial(existing)
+        ? suggestNextInventorySerial(existing, relatedEntities)
+        : prev.serial_number;
+      return {
+        ...prev,
+        name,
+        part_number: partNumber,
+        serial_number,
+        configuration_item: existing.configuration_item || partNumber || prev.configuration_item,
+        sku: type === 'component' ? existing.sku || prev.sku : prev.sku,
+      };
+    }
+
     const { pnSeq, snSeq } = nextInventorySequences(inventory, type, name);
     const ids = buildEntityIdentifiersFromDefinitions(definitions, {
       name,
