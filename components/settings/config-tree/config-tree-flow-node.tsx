@@ -17,8 +17,10 @@ import {
   Trash2,
 } from 'lucide-react';
 import type { ConfigTreeNodeData } from '@/lib/config-tree-layout';
+import { InventorySourceToggle } from '@/components/settings/config-tree/inventory-source-toggle';
 import { LEVEL_NODE_STYLE } from '@/lib/config-tree-level-styles';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 export type ConfigTreeNodeActions = {
   onEdit: (clientKey: string) => void;
@@ -61,6 +63,7 @@ export const ConfigTreeFlowNode = memo(function ConfigTreeFlowNode({
       className="relative h-full w-full"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      title={interactive ? 'Click to select · Double-click to edit' : undefined}
     >
       <div
         className={cn(
@@ -75,7 +78,7 @@ export const ConfigTreeFlowNode = memo(function ConfigTreeFlowNode({
         <NodeResizer
           isVisible={showResize}
           minWidth={120}
-          minHeight={40}
+          minHeight={48}
           maxWidth={320}
           maxHeight={160}
           handleStyle={{ width: 4, height: 4 }}
@@ -119,14 +122,7 @@ export const ConfigTreeFlowNode = memo(function ConfigTreeFlowNode({
           )}
         />
 
-        <button
-          type="button"
-          className="w-full min-w-0 text-left"
-          onClick={() => {
-            if (interactive) actions.onEdit(draft.client_key);
-          }}
-          disabled={!interactive}
-        >
+        <div className="w-full min-w-0">
           <div className="truncate text-xs font-medium leading-tight">
             {label}
             {isDraft ? (
@@ -138,12 +134,16 @@ export const ConfigTreeFlowNode = memo(function ConfigTreeFlowNode({
           <div className="truncate text-[10px] leading-tight opacity-70">
             {(draft.abbreviation || '—').toUpperCase()} · {levelLabel}
           </div>
-          <div className="truncate text-[9px] leading-tight opacity-60">
-            {draft.inventory_source === 'build_from_children'
-              ? 'Build from children'
-              : 'Turnkey'}
-          </div>
-        </button>
+          <InventorySourceToggle
+            size="node"
+            value={draft.inventory_source}
+            canBuild={data.canBuildFromChildren}
+            disabled={!interactive}
+            onDenied={(_, reason) => {
+              if (interactive) toast.error(reason);
+            }}
+          />
+        </div>
       </div>
 
       {interactive && hovered ? (

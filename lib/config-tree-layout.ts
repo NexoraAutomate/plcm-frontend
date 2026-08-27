@@ -6,8 +6,8 @@ import {
   type TemplateNodeLevel,
 } from '@/lib/hierarchy-config';
 
-export const DEFAULT_NODE_WIDTH = 168;
-export const DEFAULT_NODE_HEIGHT = 62;
+export const DEFAULT_NODE_WIDTH = 176;
+export const DEFAULT_NODE_HEIGHT = 74;
 export const H_GAP = 48;
 export const V_GAP = 24;
 
@@ -43,6 +43,7 @@ export type ConfigTreeNodeData = {
   locked: boolean;
   readOnly: boolean;
   canAddChild: boolean;
+  canBuildFromChildren: boolean;
   layoutDirection: LayoutDirection;
   intersecting?: boolean;
   toBeDeleted?: boolean;
@@ -221,6 +222,11 @@ export function buildGraphFromDraft(input: {
           return map;
         })();
 
+  const parentKeysWithChildren = new Set<string>();
+  for (const node of nodes) {
+    if (node.parent_client_key) parentKeysWithChildren.add(node.parent_client_key);
+  }
+
   const handles = layoutHandleIds(direction);
   const flowNodes: Node<ConfigTreeNodeData>[] = nodes.map((node) => {
     const size = sizeById?.get(node.client_key);
@@ -242,6 +248,8 @@ export function buildGraphFromDraft(input: {
         locked,
         readOnly,
         canAddChild: !!CHILD_TEMPLATE_LEVEL[node.level],
+        canBuildFromChildren:
+          node.level !== 'component' && parentKeysWithChildren.has(node.client_key),
         layoutDirection: direction,
       },
       sourcePosition: handles.sourcePosition,

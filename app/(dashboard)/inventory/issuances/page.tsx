@@ -37,6 +37,7 @@ import {
   type IssuanceRemarksAction,
 } from '@/components/inventory/issuance-remarks-dialog';
 import { IssuanceHistorySheet } from '@/components/inventory/issuance-history-sheet';
+import { issuanceCanReturn, issuanceInstallStateLabel } from '@/lib/inventory-issuance';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All (history)' },
@@ -317,7 +318,7 @@ export default function InventoryIssuancesPage() {
                         className="text-right align-top"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {row.status === 'issued' ? (
+                        {issuanceCanReturn(row) ? (
                           <Button
                             variant="outline"
                             size="sm"
@@ -328,6 +329,10 @@ export default function InventoryIssuancesPage() {
                             <Undo2 className="size-3.5" />
                             {inventoryManager ? 'Force return' : 'Return'}
                           </Button>
+                        ) : issuanceInstallStateLabel(row) ? (
+                          <span className="text-xs text-muted-foreground capitalize">
+                            {issuanceInstallStateLabel(row)}
+                          </span>
                         ) : null}
                         {row.status === 'return_pending' && inventoryManager ? (
                           <div className="inline-flex flex-col items-stretch gap-1.5">

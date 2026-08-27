@@ -591,7 +591,7 @@ export interface ReservationPlanItem {
   entity_name: string
   path: string
   depth: number
-  status: 'available' | 'short' | 'reserved' | string
+  status: 'available' | 'short' | 'reserved' | 'assemble' | 'issued' | 'installing' | 'testing' | 'verified' | string
   available: boolean
   reason?: string | null
   free_quantity?: number | null
@@ -601,10 +601,19 @@ export interface ReservationPlanItem {
   serial_numbers?: string[] | null
   suggested_serial?: string | null
   reservation_id?: number | null
+  issuance_id?: number | null
+  item_status?: string | null
   flight_id?: number | null
   sdls_id?: number | null
   system_id?: number | null
   inventory_source?: string | null
+  children_total?: number | null
+  children_complete?: number | null
+  assigned_developer_id?: number | null
+  assigned_developer_name?: string | null
+  can_assign_developer?: boolean
+  assembled?: boolean
+  issued?: boolean
 }
 
 export interface ReservationPlan {
@@ -975,6 +984,7 @@ export interface Inventory extends HierarchyInstallFields {
   quantity: number
   reserved_quantity?: number
   available_quantity?: number
+  total_used?: number
   location?: string
   description?: string
   oem_name?: string
@@ -1023,6 +1033,8 @@ export interface InventoryIssuance {
   issued_by_name?: string | null
   installed_by_name?: string | null
   closed_by_name?: string | null
+  item_lifecycle_status?: string | null
+  verified_at?: string | null
 }
 
 export interface InventoryIssuePayload {

@@ -103,3 +103,47 @@ export const DEFAULT_CONFIG_NOTES =
 export function newClientKey(prefix = 'n'): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 }
+
+/** True when this node may use Build from Children (non-component with at least one child). */
+export function canBuildFromChildren(
+  nodes: TemplateDraftNode[],
+  clientKey: string
+): boolean {
+  const node = nodes.find((n) => n.client_key === clientKey);
+  if (!node || node.level === 'component') return false;
+  return nodes.some((n) => n.parent_client_key === clientKey);
+}
+
+export function parentKeysWithChildren(nodes: TemplateDraftNode[]): Set<string> {
+  const keys = new Set<string>();
+  for (const n of nodes) {
+    if (n.parent_client_key) keys.add(n.parent_client_key);
+  }
+  return keys;
+}
+
+/**
+ * Align inventory source with child presence:
+ * parents (non-component with children) → Build from Children;
+ * everyone else → Turnkey.
+ */
+export function syncInventorySources(
+  nodes: TemplateDraftNode[]
+): TemplateDraftNode[] {
+  const parents = parentKeysWithChildren(nodes);
+  return nodes.map((n) => {
+    const canBuild = n.level !== 'component' && parents.has(n.client_key);
+    const desired = canBuild
+      ? INVENTORY_SOURCE.BUILD_FROM_CHILDREN
+      : INVENTORY_SOURCE.TURNKEY;
+    if (normalizeInventorySource(n.inventory_source) === desired) return n;
+    return { ...n, inventory_source: desired };
+  });
+}
+
+/** @deprecated use syncInventorySources */
+export function coerceInventorySources(
+  nodes: TemplateDraftNode[]
+): TemplateDraftNode[] {
+  return syncInventorySources(nodes);
+}

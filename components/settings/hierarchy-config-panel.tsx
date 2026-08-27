@@ -671,6 +671,7 @@ export function HierarchyConfigPanel({
     description: n.description,
     abbreviation: n.abbreviation,
     sort_order: n.sort_order ?? index,
+    inventory_source: normalizeInventorySource(n.inventory_source),
   }));
 
   const isDirty = draftFingerprint(draft) !== baselineFingerprint;

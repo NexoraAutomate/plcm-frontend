@@ -55,11 +55,11 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -71,9 +71,9 @@ import { filterTemplateNames, hierarchiesToNameItems } from '@/lib/hierarchy-tem
 import {
   CHILD_TEMPLATE_LEVEL,
   INVENTORY_SOURCE,
-  INVENTORY_SOURCE_OPTIONS,
   PARENT_TEMPLATE_LEVEL,
   TEMPLATE_NODE_LEVELS,
+  syncInventorySources,
   newClientKey,
   normalizeInventorySource,
   type InventorySource,
@@ -107,6 +107,7 @@ import { ConfigTreeEraser } from '@/components/settings/config-tree/config-tree-
 import { ConfigTreeEntitySidebar, ENTITY_DND_MIME, type EntityDragPayload } from '@/components/settings/config-tree/config-tree-entity-sidebar';
 import { ConfigEntityTypeTree } from '@/components/settings/config-tree/config-entity-type-tree';
 import { ConfigTreeDownloadButton } from '@/components/settings/config-tree/config-tree-download-button';
+import { InventorySourceToggle } from '@/components/settings/config-tree/inventory-source-toggle';
 import { cn } from '@/lib/utils';
 
 const MIN_PROXIMITY = 120;
@@ -202,7 +203,17 @@ function ConfigTreeCanvasInner({
       draftNodes
         .map(
           (n) =>
-            `${n.client_key}:${n.parent_client_key ?? ''}:${n.name}:${n.level}:${n.sort_order}`
+            `${n.client_key}:${n.parent_client_key ?? ''}:${n.level}:${n.sort_order}`
+        )
+        .join('|'),
+    [draftNodes]
+  );
+  const contentKey = useMemo(
+    () =>
+      draftNodes
+        .map(
+          (n) =>
+            `${n.client_key}:${n.name}:${n.abbreviation ?? ''}:${normalizeInventorySource(n.inventory_source)}`
         )
         .join('|'),
     [draftNodes]
@@ -316,17 +327,18 @@ function ConfigTreeCanvasInner({
     const t = window.setTimeout(() => void fitView({ padding: 0.2, duration: 200 }), 40);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [structureKey, locked, readOnly, direction, layoutNonce]);
+  }, [structureKey, contentKey, locked, readOnly, direction, layoutNonce]);
 
   const deleteEdgeById = useCallback(
     (edgeId: string) => {
       if (locked || readOnly) return;
       const edge = edges.find((e) => e.id === edgeId);
       if (!edge) return;
-      skipNextSync.current = true;
       onChange(
-        draftNodes.map((n) =>
-          n.client_key === edge.target ? { ...n, parent_client_key: null } : n
+        syncInventorySources(
+          draftNodes.map((n) =>
+            n.client_key === edge.target ? { ...n, parent_client_key: null } : n
+          )
         )
       );
       setEdges((eds) => eds.filter((e) => e.id !== edgeId));
@@ -386,7 +398,14 @@ function ConfigTreeCanvasInner({
         addParentPeer(key);
       },
     }),
-    [addChild, addParentPeer, addSibling, nodesByKey, openNodeForm, requestDeleteNode]
+    [
+      addChild,
+      addParentPeer,
+      addSibling,
+      nodesByKey,
+      openNodeForm,
+      requestDeleteNode,
+    ]
   );
 
   const tryConnect = useCallback(
@@ -418,10 +437,12 @@ function ConfigTreeCanvasInner({
       }
       // Let structure sync re-run Dagre so the linked nodes sit on the active layout
       onChange(
-        draftNodes.map((n) =>
-          n.client_key === targetId
-            ? { ...n, parent_client_key: sourceId }
-            : n
+        syncInventorySources(
+          draftNodes.map((n) =>
+            n.client_key === targetId
+              ? { ...n, parent_client_key: sourceId }
+              : n
+          )
         )
       );
       return true;
@@ -704,7 +725,9 @@ function ConfigTreeCanvasInner({
       for (const id of ids) {
         for (const k of descendantsOf(draftNodes, id)) remove.add(k);
       }
-      onChange(draftNodes.filter((n) => !remove.has(n.client_key)));
+      onChange(
+        syncInventorySources(draftNodes.filter((n) => !remove.has(n.client_key)))
+      );
       toast.success(`Erased ${remove.size} node(s)`);
     },
     [draftNodes, locked, onChange, readOnly]
@@ -718,8 +741,10 @@ function ConfigTreeCanvasInner({
       );
       if (!targets.size) return;
       onChange(
-        draftNodes.map((n) =>
-          targets.has(n.client_key) ? { ...n, parent_client_key: null } : n
+        syncInventorySources(
+          draftNodes.map((n) =>
+            targets.has(n.client_key) ? { ...n, parent_client_key: null } : n
+          )
         )
       );
       toast.success(`Erased ${targets.size} edge(s)`);
@@ -775,6 +800,11 @@ function ConfigTreeCanvasInner({
             onNodeClick={(_, node) => {
               if (!interactive) return;
               setSelectedParentKey(node.id);
+            }}
+            onNodeDoubleClick={(_, node) => {
+              if (!interactive) return;
+              setSelectedParentKey(node.id);
+              openNodeForm(node.id);
             }}
             onPaneClick={() => {
               if (!interactive) return;
@@ -1109,7 +1139,7 @@ export function HierarchyConfigTreeEditor({
       nextSiblings.splice(insertAt, 0, draft);
       const base = nodes.filter((n) => (n.parent_client_key ?? null) !== input.parentKey);
       const reindexed = nextSiblings.map((s, index) => ({ ...s, sort_order: index }));
-      onChange([...base, ...reindexed]);
+      onChange(syncInventorySources([...base, ...reindexed]));
       // Positions come from Dagre on the next structure sync (active H/V layout).
       if (!input.name) {
         setForm({
@@ -1196,7 +1226,9 @@ export function HierarchyConfigTreeEditor({
   const confirmDelete = useCallback(() => {
     if (!deleteKey) return;
     const removeKeys = descendantsOf(nodes, deleteKey);
-    onChange(nodes.filter((n) => !removeKeys.has(n.client_key)));
+    onChange(
+      syncInventorySources(nodes.filter((n) => !removeKeys.has(n.client_key)))
+    );
     setForm((f) => (f && removeKeys.has(f.clientKey) ? null : f));
     setDeleteKey(null);
     toast.success('Node and children removed');
@@ -1237,16 +1269,16 @@ export function HierarchyConfigTreeEditor({
     ).toUpperCase();
     const hasChildren = nodes.some((n) => n.parent_client_key === form.clientKey);
     const inventory_source =
-      form.level !== 'component' &&
-      hasChildren &&
-      form.inventory_source === INVENTORY_SOURCE.BUILD_FROM_CHILDREN
+      form.level !== 'component' && hasChildren
         ? INVENTORY_SOURCE.BUILD_FROM_CHILDREN
         : INVENTORY_SOURCE.TURNKEY;
     onChange(
-      nodes.map((n) =>
-        n.client_key === form.clientKey
-          ? { ...n, name, abbreviation, inventory_source }
-          : n
+      syncInventorySources(
+        nodes.map((n) =>
+          n.client_key === form.clientKey
+            ? { ...n, name, abbreviation, inventory_source }
+            : n
+        )
       )
     );
     setForm(null);
@@ -1258,6 +1290,17 @@ export function HierarchyConfigTreeEditor({
       form.level !== 'component' &&
       nodes.some((n) => n.parent_client_key === form.clientKey)
   );
+
+  useEffect(() => {
+    if (!form) return;
+    const node = nodes.find((n) => n.client_key === form.clientKey);
+    if (!node) return;
+    const next = normalizeInventorySource(node.inventory_source);
+    setForm((prev) => {
+      if (!prev || prev.inventory_source === next) return prev;
+      return { ...prev, inventory_source: next };
+    });
+  }, [form?.clientKey, nodes]);
 
   useEffect(() => {
     if (!form) return;
@@ -1420,8 +1463,8 @@ export function HierarchyConfigTreeEditor({
             <div className="flex items-start justify-between gap-3 border-b px-3 py-2">
               <div className="max-w-2xl space-y-1">
                 <div className="text-xs text-muted-foreground">
-                  Lock freezes edits · Controls on hover · Assign every node an entity before
-                  save · Esc exits
+                  Click a node to list remaining children · Double-click (or pencil) to
+                  edit · Turnkey/Build toggle on the node · Lock freezes edits · Esc exits
                 </div>
                 {unassignedCount > 0 ? (
                   <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
@@ -1596,8 +1639,8 @@ export function HierarchyConfigTreeEditor({
       </Dialog>
 
       <Dialog open={!!form} onOpenChange={(open) => !open && setForm(null)}>
-        <DialogContent className="flex max-h-[85vh] max-w-lg flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
-          <DialogHeader className="space-y-1 border-b px-6 py-4">
+        <DialogContent className="flex h-[min(85vh,42rem)] max-h-[85vh] w-full max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
+          <DialogHeader className="shrink-0 space-y-1 border-b px-6 py-4 pr-12">
             <DialogTitle>
               {form?.mode === 'create' ? 'Add hierarchy node' : 'Edit hierarchy node'}
             </DialogTitle>
@@ -1608,111 +1651,84 @@ export function HierarchyConfigTreeEditor({
             </DialogDescription>
           </DialogHeader>
           {form ? (
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-6 py-4">
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-muted-foreground">Level</span>
-                <span className="rounded-full border bg-muted/40 px-2.5 py-0.5 font-medium">
-                  {levelLabel(form.level)}
-                </span>
+            <>
+              <div className="flex shrink-0 flex-col gap-3 border-b px-6 py-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Level</span>
+                  <span className="rounded-full border bg-muted/40 px-2.5 py-0.5 font-medium">
+                    {levelLabel(form.level)}
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Inventory source</Label>
+                  <InventorySourceToggle
+                    size="dialog"
+                    value={
+                      formCanBuild
+                        ? INVENTORY_SOURCE.BUILD_FROM_CHILDREN
+                        : INVENTORY_SOURCE.TURNKEY
+                    }
+                    canBuild={formCanBuild}
+                    onDenied={(_, reason) => toast.error(reason)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {formCanBuild
+                      ? 'This node has children, so it is locked to Build. Remove all children to use Turnkey.'
+                      : 'No children — locked to Turnkey. Adding a child switches this node to Build automatically.'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4">
+                <div className="flex min-h-32 flex-1 flex-col gap-2 overflow-hidden">
+                  <Label className="shrink-0">Entity list</Label>
+                  <ConfigEntityTypeTree
+                    className="min-h-0 flex-1 overflow-hidden"
+                    entities={entityListItems}
+                    levelLabel={levelLabel}
+                    selectableLevel={form.level}
+                    usedNames={usedNamesForForm}
+                    selectedName={form.name || undefined}
+                    defaultExpandedLevels={[form.level]}
+                    onSelect={(item) => {
+                      setForm((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              name: item.name,
+                              abbreviation: (
+                                item.abbreviation || suggestAbbreviation(item.name)
+                              ).toUpperCase(),
+                            }
+                          : prev
+                      );
+                    }}
+                  />
+                </div>
+
+                <div className="shrink-0 space-y-2">
+                  <Label>Abbreviation</Label>
+                  <Input
+                    className="rounded-full font-mono uppercase"
+                    value={form.abbreviation}
+                    onChange={(e) =>
+                      setForm((prev) =>
+                        prev ? { ...prev, abbreviation: e.target.value.toUpperCase() } : prev
+                      )
+                    }
+                    placeholder={suggestAbbreviation(form.name || 'XX')}
+                  />
+                </div>
               </div>
 
-              <div className="min-h-0 flex-1 space-y-2">
-                <Label>Entity list</Label>
-                <ConfigEntityTypeTree
-                  className="h-72"
-                  entities={entityListItems}
-                  levelLabel={levelLabel}
-                  selectableLevel={form.level}
-                  usedNames={usedNamesForForm}
-                  selectedName={form.name || undefined}
-                  defaultExpandedLevels={[form.level]}
-                  onSelect={(item) => {
-                    setForm((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            name: item.name,
-                            abbreviation: (
-                              item.abbreviation || suggestAbbreviation(item.name)
-                            ).toUpperCase(),
-                          }
-                        : prev
-                    );
-                  }}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Abbreviation</Label>
-                <Input
-                  className="rounded-full font-mono uppercase"
-                  value={form.abbreviation}
-                  onChange={(e) =>
-                    setForm((prev) =>
-                      prev ? { ...prev, abbreviation: e.target.value.toUpperCase() } : prev
-                    )
-                  }
-                  placeholder={suggestAbbreviation(form.name || 'XX')}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Inventory Source</Label>
-                <RadioGroup
-                  value={form.inventory_source}
-                  onValueChange={(value) =>
-                    setForm((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            inventory_source: normalizeInventorySource(value),
-                          }
-                        : prev
-                    )
-                  }
-                  className="gap-2"
-                >
-                  {INVENTORY_SOURCE_OPTIONS.map((option) => {
-                    const disabled =
-                      option.value === INVENTORY_SOURCE.BUILD_FROM_CHILDREN &&
-                      !formCanBuild;
-                    return (
-                      <label
-                        key={option.value}
-                        className="flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 text-sm has-disabled:cursor-not-allowed has-disabled:opacity-60"
-                      >
-                        <RadioGroupItem
-                          value={option.value}
-                          id={`inv-src-${option.value}`}
-                          disabled={disabled}
-                          className="mt-0.5"
-                        />
-                        <span>
-                          <span className="font-medium">{option.label}</span>
-                          <span className="mt-0.5 block text-xs text-muted-foreground">
-                            {option.description}
-                          </span>
-                          {disabled ? (
-                            <span className="mt-0.5 block text-xs text-muted-foreground">
-                              Add child nodes before choosing Build from Children.
-                            </span>
-                          ) : null}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </RadioGroup>
-              </div>
-
-              <div className="flex justify-end gap-2 border-t pt-4">
+              <DialogFooter className="shrink-0 border-t px-6 py-4 sm:justify-end">
                 <Button type="button" variant="outline" onClick={() => setForm(null)}>
                   Cancel
                 </Button>
                 <Button type="button" onClick={saveForm} disabled={!form.name.trim()}>
                   Save
                 </Button>
-              </div>
-            </div>
+              </DialogFooter>
+            </>
           ) : null}
         </DialogContent>
       </Dialog>

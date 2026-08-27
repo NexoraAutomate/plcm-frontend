@@ -220,7 +220,10 @@ function enrichInventoryItems(
       partNumber: inventoryPartNumber(item),
       holderName: holder ? formatUserRef(holder) : '—',
       displayLocation: resolveInventoryLocation(item),
-      totalUsed: calculateInventoryTotalUsed(item, relatedEntities),
+      totalUsed: Math.max(
+        item.total_used ?? 0,
+        calculateInventoryTotalUsed(item, relatedEntities)
+      ),
     };
   });
 }

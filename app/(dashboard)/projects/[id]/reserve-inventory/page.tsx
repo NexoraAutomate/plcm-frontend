@@ -26,7 +26,7 @@ import { PageLoader } from '@/components/page-loader';
 import { P } from '@/lib/permission-codes';
 import * as api from '@/lib/api';
 import type { Project, ReservationPlan, ReservationPlanItem, User } from '@/lib/models';
-import { ProjectWorkflowStatus } from '@/lib/workflow-status';
+import { ITEM_STATUS_LABELS, ProjectWorkflowStatus, workflowStatusLabel } from '@/lib/workflow-status';
 import { cn } from '@/lib/utils';
 import { useDataStore } from '@/lib/data-store';
 import { formatUserRef } from '@/lib/user-display';
@@ -44,7 +44,33 @@ function apiError(error: unknown, fallback: string): string {
   return typeof detail === 'string' ? detail : fallback;
 }
 
-function statusBadge(status: string) {
+const COMMITTED_PLAN_STATUSES = new Set([
+  'reserved',
+  'issued',
+  'installing',
+  'testing',
+  'verified',
+  'in_progress',
+  'returned',
+  'inspection',
+  'reusable',
+  'repairable',
+  'scrapped',
+]);
+
+function isCommittedRow(row: ReservationPlanItem): boolean {
+  return COMMITTED_PLAN_STATUSES.has(row.status);
+}
+
+function lifecycleLabel(row: ReservationPlanItem): string {
+  if (row.item_status && row.item_status in ITEM_STATUS_LABELS) {
+    return ITEM_STATUS_LABELS[row.item_status as keyof typeof ITEM_STATUS_LABELS];
+  }
+  return workflowStatusLabel(row.status);
+}
+
+function statusBadge(row: ReservationPlanItem) {
+  const { status } = row;
   if (status === 'available') {
     return (
       <Badge className="bg-emerald-600/15 text-emerald-800 border-emerald-600/30 hover:bg-emerald-600/15">
@@ -52,18 +78,18 @@ function statusBadge(status: string) {
       </Badge>
     );
   }
-  if (status === 'reserved') {
+  if (isCommittedRow(row)) {
     return (
       <Badge variant="secondary" className="gap-1">
         <Lock className="h-3 w-3" />
-        Reserved
+        {lifecycleLabel(row)}
       </Badge>
     );
   }
   if (status === 'assemble') {
     return (
       <Badge variant="outline" className="gap-1">
-        Build from children
+        Waiting for children
       </Badge>
     );
   }
@@ -73,6 +99,15 @@ function statusBadge(status: string) {
       Short
     </Badge>
   );
+}
+
+function committedActionLabel(row: ReservationPlanItem): string {
+  if (row.status === 'verified') return 'Verified';
+  if (row.status === 'testing') return 'Awaiting verification';
+  if (row.status === 'installing') return 'Installing';
+  if (row.status === 'issued') return 'Issued';
+  if (row.status === 'reserved') return 'Reserved';
+  return lifecycleLabel(row);
 }
 
 function defaultSerial(row: ReservationPlanItem): string {
@@ -121,13 +156,18 @@ export default function ReserveInventoryPage() {
       setExtraUsers(usersRes.data ?? []);
 
       const nextSerials: Record<string, string> = {};
+      const nextDevelopers: Record<string, string> = {};
       for (const row of planRes.data.items ?? []) {
-        if (row.status !== 'available') continue;
         const key = rowKey(row);
-        nextSerials[key] = defaultSerial(row);
+        if (row.status === 'available') {
+          nextSerials[key] = defaultSerial(row);
+        }
+        if (row.can_assign_developer && row.assigned_developer_id) {
+          nextDevelopers[key] = String(row.assigned_developer_id);
+        }
       }
       setSerialByKey(nextSerials);
-      setDeveloperByKey({});
+      setDeveloperByKey(nextDevelopers);
     } catch (error: unknown) {
       toast.error(apiError(error, 'Failed to load reservation plan'));
       setPlan(null);
@@ -157,6 +197,29 @@ export default function ReserveInventoryPage() {
     if (!raw || raw === NONE_DEVELOPER) return null;
     const id = Number(raw);
     return Number.isFinite(id) && id > 0 ? id : null;
+  }
+
+  async function assignDeveloperForRow(row: ReservationPlanItem) {
+    const key = rowKey(row);
+    const developerId = selectedDeveloperId(row);
+    if (developerId == null) {
+      toast.message('Select a developer to assign');
+      return;
+    }
+    setBusyKey(key);
+    try {
+      await api.hierarchyWorkflow.assignDeveloper(
+        row.target_entity_type,
+        row.target_entity_id,
+        developerId
+      );
+      toast.success(`Developer assigned to ${row.entity_name}`);
+      await load();
+    } catch (error: unknown) {
+      toast.error(apiError(error, `Assign developer failed for ${row.entity_name}`));
+    } finally {
+      setBusyKey(null);
+    }
   }
 
   async function maybeAssignDeveloper(row: ReservationPlanItem) {
@@ -285,7 +348,8 @@ export default function ReserveInventoryPage() {
   }
 
   const status = project?.status_name ?? plan?.project_status ?? '';
-  const notReady = status !== ProjectWorkflowStatus.READY_FOR_INVENTORY;
+  const canReserve = status === ProjectWorkflowStatus.READY_FOR_INVENTORY;
+  const notReady = !canReserve;
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6 pb-28">
@@ -304,8 +368,8 @@ export default function ReserveInventoryPage() {
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {project?.name
-              ? `${project.name} — matched AVAILABLE stock for each hierarchy shell`
-              : 'Matched AVAILABLE stock for each hierarchy shell'}
+              ? `${project.name} — reserve TURNKEY stock; BUILD nodes wait for installed and verified children`
+              : 'Reserve TURNKEY stock; BUILD nodes wait for installed and verified children'}
           </p>
         </div>
         <Button
@@ -327,7 +391,7 @@ export default function ReserveInventoryPage() {
       ) : null}
 
       {plan ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           <div className="rounded-lg border p-3">
             <p className="text-xs text-muted-foreground">Hierarchy items</p>
             <p className="text-lg font-semibold">{plan.total}</p>
@@ -336,6 +400,12 @@ export default function ReserveInventoryPage() {
             <p className="text-xs text-muted-foreground">Available to reserve</p>
             <p className="text-lg font-semibold text-emerald-800">
               {plan.available_count}
+            </p>
+          </div>
+          <div className="rounded-lg border border-amber-600/30 bg-amber-600/5 p-3">
+            <p className="text-xs text-muted-foreground">Waiting for children</p>
+            <p className="text-lg font-semibold text-amber-900">
+              {plan.assemble_count ?? 0}
             </p>
           </div>
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
@@ -383,7 +453,7 @@ export default function ReserveInventoryPage() {
                       <span className="text-xs uppercase text-muted-foreground">
                         {row.target_entity_type}
                       </span>
-                      {statusBadge(row.status)}
+                      {statusBadge(row)}
                     </div>
                     <p className="truncate text-xs text-muted-foreground">{row.path}</p>
                     {row.status === 'available' ? (
@@ -409,14 +479,36 @@ export default function ReserveInventoryPage() {
                     ) : null}
                     {row.status === 'assemble' ? (
                       <p className="text-xs text-muted-foreground">
+                        {typeof row.children_complete === 'number' &&
+                        typeof row.children_total === 'number' &&
+                        row.children_total > 0
+                          ? `${row.children_complete}/${row.children_total} children installed and verified. `
+                          : ''}
                         {row.reason ||
                           'Automatically created when required child items are installed and verified'}
                       </p>
                     ) : null}
-                    {row.status === 'reserved' ? (
-                      <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        Already reserved to this hierarchy node
+                    {row.can_assign_developer ? (
+                      <p className="text-xs text-muted-foreground">
+                        {row.reason ||
+                          (row.assembled
+                            ? 'Automatically assembled from verified children'
+                            : 'Reserved — assign a developer for IM to issue')}
+                        {row.suggested_serial ? ` · SN ${row.suggested_serial}` : ''}
+                        {row.part_number ? ` · PN ${row.part_number}` : ''}
+                        {row.assigned_developer_name
+                          ? ` · Developer: ${row.assigned_developer_name}`
+                          : ''}
+                      </p>
+                    ) : null}
+                    {isCommittedRow(row) && !row.can_assign_developer ? (
+                      <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                        <CheckCircle2 className="inline h-3.5 w-3.5 shrink-0" />
+                        <span>
+                          {row.reason || `${lifecycleLabel(row)} for this hierarchy node`}
+                          {row.suggested_serial ? ` · SN ${row.suggested_serial}` : ''}
+                          {row.part_number ? ` · PN ${row.part_number}` : ''}
+                        </span>
                       </p>
                     ) : null}
                   </div>
@@ -430,7 +522,7 @@ export default function ReserveInventoryPage() {
                               onValueChange={(value) =>
                                 setSerialByKey((prev) => ({ ...prev, [key]: value }))
                               }
-                              disabled={isBusy || notReady}
+                              disabled={isBusy || !canReserve}
                             >
                               <SelectTrigger size="sm" className="w-[9.5rem]" aria-label="Serial number">
                                 <SelectValue placeholder="Serial #" />
@@ -450,7 +542,7 @@ export default function ReserveInventoryPage() {
                               onValueChange={(value) =>
                                 setDeveloperByKey((prev) => ({ ...prev, [key]: value }))
                               }
-                              disabled={isBusy || notReady}
+                              disabled={isBusy || !canReserve}
                             >
                               <SelectTrigger
                                 size="sm"
@@ -473,23 +565,71 @@ export default function ReserveInventoryPage() {
                           </Can>
                           <Button
                             size="sm"
-                            disabled={isBusy || notReady}
-                            onClick={() => void reserveOne(row)}
+                              disabled={isBusy || !canReserve}
+                              onClick={() => void reserveOne(row)}
                           >
                             {busyKey === key ? 'Reserving…' : 'Reserve'}
                           </Button>
                         </>
+                      ) : row.can_assign_developer ? (
+                        <>
+                          <Can permission={P.hierarchy_assign_developer}>
+                            <Select
+                              value={currentDeveloper}
+                              onValueChange={(value) =>
+                                setDeveloperByKey((prev) => ({ ...prev, [key]: value }))
+                              }
+                              disabled={isBusy}
+                            >
+                              <SelectTrigger
+                                size="sm"
+                                className="w-[10.5rem]"
+                                aria-label="Assign developer"
+                              >
+                                <SelectValue placeholder="Select developer" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={NONE_DEVELOPER}>
+                                  No developer
+                                </SelectItem>
+                                {developers.map((user) => (
+                                  <SelectItem key={user.id} value={String(user.id)}>
+                                    {formatUserRef(user)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </Can>
+                          <Can permission={P.hierarchy_assign_developer}>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={isBusy}
+                              onClick={() => void assignDeveloperForRow(row)}
+                            >
+                              {busyKey === key
+                                ? 'Assigning…'
+                                : row.assigned_developer_id
+                                  ? 'Update developer'
+                                  : 'Assign developer'}
+                            </Button>
+                          </Can>
+                        </>
                       ) : row.status === 'assemble' ? (
                         <Button size="sm" variant="outline" disabled>
-                          Assembled from children
+                          Waiting for children
                         </Button>
                       ) : row.status === 'short' ? (
                         <Button size="sm" variant="outline" disabled>
                           No stock
                         </Button>
+                      ) : isCommittedRow(row) ? (
+                        <Button size="sm" variant="secondary" disabled>
+                          {committedActionLabel(row)}
+                        </Button>
                       ) : (
                         <Button size="sm" variant="secondary" disabled>
-                          Reserved
+                          Unavailable
                         </Button>
                       )}
                     </Can>
@@ -510,6 +650,9 @@ export default function ReserveInventoryPage() {
             {plan && plan.short_count > 0
               ? ` · ${plan.short_count} short (highlighted)`
               : ''}
+            {plan && (plan.assemble_count ?? 0) > 0
+              ? ` · ${plan.assemble_count} waiting for children`
+              : ''}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -521,7 +664,7 @@ export default function ReserveInventoryPage() {
             <Can permission={P.inventory_reserve}>
               <Button
                 disabled={
-                  notReady ||
+                  !canReserve ||
                   reservingAll ||
                   busyKey != null ||
                   availableItems.length === 0

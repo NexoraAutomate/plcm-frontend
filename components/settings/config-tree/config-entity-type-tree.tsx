@@ -104,7 +104,7 @@ export function ConfigEntityTypeTree({
   }
 
   return (
-    <div className={cn('flex min-h-0 flex-col gap-2', className)}>
+    <div className={cn('flex h-full min-h-0 flex-col gap-2', className)}>
       <Input
         className="h-8 rounded-full"
         placeholder="Filter entities…"
