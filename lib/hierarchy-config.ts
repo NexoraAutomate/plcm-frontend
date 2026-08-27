@@ -39,6 +39,46 @@ export const CHILD_TEMPLATE_LEVEL: Record<TemplateNodeLevel, TemplateNodeLevel |
   component: null,
 };
 
+export const INVENTORY_SOURCE = {
+  TURNKEY: 'turnkey',
+  BUILD_FROM_CHILDREN: 'build_from_children',
+} as const;
+
+export type InventorySource =
+  (typeof INVENTORY_SOURCE)[keyof typeof INVENTORY_SOURCE];
+
+export const INVENTORY_SOURCE_OPTIONS: Array<{
+  value: InventorySource;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: INVENTORY_SOURCE.TURNKEY,
+    label: 'Turnkey / Procured',
+    description:
+      'This item is directly received from a vendor and can be added to inventory by the Inventory Manager.',
+  },
+  {
+    value: INVENTORY_SOURCE.BUILD_FROM_CHILDREN,
+    label: 'Build from Children',
+    description:
+      'This item is automatically created in inventory when its required child items are installed and verified.',
+  },
+];
+
+export function normalizeInventorySource(
+  value?: string | null
+): InventorySource {
+  const raw = (value || INVENTORY_SOURCE.TURNKEY)
+    .trim()
+    .toLowerCase()
+    .replace(/[-\s]/g, '_');
+  if (raw === 'build_from_children' || raw === 'build') {
+    return INVENTORY_SOURCE.BUILD_FROM_CHILDREN;
+  }
+  return INVENTORY_SOURCE.TURNKEY;
+}
+
 export type TemplateDraftNode = {
   client_key: string;
   parent_client_key?: string | null;
@@ -47,6 +87,7 @@ export type TemplateDraftNode = {
   description?: string | null;
   abbreviation?: string | null;
   sort_order?: number;
+  inventory_source?: InventorySource;
 };
 
 export const DEFAULT_PRODUCT_TYPES = [

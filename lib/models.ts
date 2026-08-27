@@ -604,6 +604,7 @@ export interface ReservationPlanItem {
   flight_id?: number | null
   sdls_id?: number | null
   system_id?: number | null
+  inventory_source?: string | null
 }
 
 export interface ReservationPlan {
@@ -613,6 +614,7 @@ export interface ReservationPlan {
   available_count: number
   short_count: number
   reserved_count: number
+  assemble_count?: number
   items: ReservationPlanItem[]
 }
 
@@ -867,6 +869,7 @@ export interface HierarchyConfigNode {
   description?: string | null
   abbreviation?: string | null
   sort_order?: number
+  inventory_source?: string
 }
 
 export interface HierarchyConfiguration {

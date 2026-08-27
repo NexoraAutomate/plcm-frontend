@@ -7,7 +7,7 @@ import {
 } from '@/lib/hierarchy-config';
 
 export const DEFAULT_NODE_WIDTH = 168;
-export const DEFAULT_NODE_HEIGHT = 52;
+export const DEFAULT_NODE_HEIGHT = 62;
 export const H_GAP = 48;
 export const V_GAP = 24;
 

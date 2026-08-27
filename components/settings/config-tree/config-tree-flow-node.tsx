@@ -138,6 +138,11 @@ export const ConfigTreeFlowNode = memo(function ConfigTreeFlowNode({
           <div className="truncate text-[10px] leading-tight opacity-70">
             {(draft.abbreviation || '—').toUpperCase()} · {levelLabel}
           </div>
+          <div className="truncate text-[9px] leading-tight opacity-60">
+            {draft.inventory_source === 'build_from_children'
+              ? 'Build from children'
+              : 'Turnkey'}
+          </div>
         </button>
       </div>
 

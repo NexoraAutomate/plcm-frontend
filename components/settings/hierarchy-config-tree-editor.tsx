@@ -55,6 +55,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Dialog,
   DialogContent,
@@ -69,9 +70,13 @@ import { useHierarchiesQuery } from '@/hooks/queries';
 import { filterTemplateNames, hierarchiesToNameItems } from '@/lib/hierarchy-template-names';
 import {
   CHILD_TEMPLATE_LEVEL,
+  INVENTORY_SOURCE,
+  INVENTORY_SOURCE_OPTIONS,
   PARENT_TEMPLATE_LEVEL,
   TEMPLATE_NODE_LEVELS,
   newClientKey,
+  normalizeInventorySource,
+  type InventorySource,
   type TemplateDraftNode,
   type TemplateNodeLevel,
 } from '@/lib/hierarchy-config';
@@ -114,6 +119,7 @@ type NodeFormState = {
   level: TemplateNodeLevel;
   name: string;
   abbreviation: string;
+  inventory_source: InventorySource;
 };
 
 const ActionsContext = createContext<ConfigTreeNodeActions | null>(null);
@@ -1051,6 +1057,7 @@ export function HierarchyConfigTreeEditor({
         level: node.level,
         name: isDraftNode(node) ? '' : node.name,
         abbreviation: node.abbreviation ?? '',
+        inventory_source: normalizeInventorySource(node.inventory_source),
       });
     },
     [nodesByKey]
@@ -1096,6 +1103,7 @@ export function HierarchyConfigTreeEditor({
         name,
         abbreviation: input.abbreviation ?? '',
         sort_order: insertAt,
+        inventory_source: INVENTORY_SOURCE.TURNKEY,
       };
       const nextSiblings = [...siblings];
       nextSiblings.splice(insertAt, 0, draft);
@@ -1110,6 +1118,7 @@ export function HierarchyConfigTreeEditor({
           level: input.level,
           name: '',
           abbreviation: '',
+          inventory_source: INVENTORY_SOURCE.TURNKEY,
         });
       }
       return key;
@@ -1226,14 +1235,29 @@ export function HierarchyConfigTreeEditor({
       selected?.abbreviation ||
       suggestAbbreviation(name)
     ).toUpperCase();
+    const hasChildren = nodes.some((n) => n.parent_client_key === form.clientKey);
+    const inventory_source =
+      form.level !== 'component' &&
+      hasChildren &&
+      form.inventory_source === INVENTORY_SOURCE.BUILD_FROM_CHILDREN
+        ? INVENTORY_SOURCE.BUILD_FROM_CHILDREN
+        : INVENTORY_SOURCE.TURNKEY;
     onChange(
       nodes.map((n) =>
-        n.client_key === form.clientKey ? { ...n, name, abbreviation } : n
+        n.client_key === form.clientKey
+          ? { ...n, name, abbreviation, inventory_source }
+          : n
       )
     );
     setForm(null);
     toast.success(form.mode === 'create' ? 'Node details saved' : 'Node updated');
   }, [entityOptions, form, nodes, nodesByKey, onChange]);
+
+  const formCanBuild = Boolean(
+    form &&
+      form.level !== 'component' &&
+      nodes.some((n) => n.parent_client_key === form.clientKey)
+  );
 
   useEffect(() => {
     if (!form) return;
@@ -1630,6 +1654,54 @@ export function HierarchyConfigTreeEditor({
                   }
                   placeholder={suggestAbbreviation(form.name || 'XX')}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Inventory Source</Label>
+                <RadioGroup
+                  value={form.inventory_source}
+                  onValueChange={(value) =>
+                    setForm((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            inventory_source: normalizeInventorySource(value),
+                          }
+                        : prev
+                    )
+                  }
+                  className="gap-2"
+                >
+                  {INVENTORY_SOURCE_OPTIONS.map((option) => {
+                    const disabled =
+                      option.value === INVENTORY_SOURCE.BUILD_FROM_CHILDREN &&
+                      !formCanBuild;
+                    return (
+                      <label
+                        key={option.value}
+                        className="flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 text-sm has-disabled:cursor-not-allowed has-disabled:opacity-60"
+                      >
+                        <RadioGroupItem
+                          value={option.value}
+                          id={`inv-src-${option.value}`}
+                          disabled={disabled}
+                          className="mt-0.5"
+                        />
+                        <span>
+                          <span className="font-medium">{option.label}</span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            {option.description}
+                          </span>
+                          {disabled ? (
+                            <span className="mt-0.5 block text-xs text-muted-foreground">
+                              Add child nodes before choosing Build from Children.
+                            </span>
+                          ) : null}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </RadioGroup>
               </div>
 
               <div className="flex justify-end gap-2 border-t pt-4">

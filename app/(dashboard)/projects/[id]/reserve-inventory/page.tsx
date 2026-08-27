@@ -60,6 +60,13 @@ function statusBadge(status: string) {
       </Badge>
     );
   }
+  if (status === 'assemble') {
+    return (
+      <Badge variant="outline" className="gap-1">
+        Build from children
+      </Badge>
+    );
+  }
   return (
     <Badge variant="destructive" className="gap-1">
       <AlertTriangle className="h-3 w-3" />
@@ -400,6 +407,12 @@ export default function ReserveInventoryPage() {
                         {row.reason || 'No matching available inventory for this entity'}
                       </p>
                     ) : null}
+                    {row.status === 'assemble' ? (
+                      <p className="text-xs text-muted-foreground">
+                        {row.reason ||
+                          'Automatically created when required child items are installed and verified'}
+                      </p>
+                    ) : null}
                     {row.status === 'reserved' ? (
                       <p className="flex items-center gap-1 text-xs text-muted-foreground">
                         <CheckCircle2 className="h-3.5 w-3.5" />
@@ -466,6 +479,10 @@ export default function ReserveInventoryPage() {
                             {busyKey === key ? 'Reserving…' : 'Reserve'}
                           </Button>
                         </>
+                      ) : row.status === 'assemble' ? (
+                        <Button size="sm" variant="outline" disabled>
+                          Assembled from children
+                        </Button>
                       ) : row.status === 'short' ? (
                         <Button size="sm" variant="outline" disabled>
                           No stock

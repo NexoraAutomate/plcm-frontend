@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select,
   SelectContent,
@@ -28,9 +29,13 @@ import { useHierarchiesQuery } from '@/hooks/queries';
 import { filterTemplateNames } from '@/lib/hierarchy-template-names';
 import {
   CHILD_TEMPLATE_LEVEL,
+  INVENTORY_SOURCE,
+  INVENTORY_SOURCE_OPTIONS,
   PARENT_TEMPLATE_LEVEL,
   TEMPLATE_NODE_LEVELS,
   newClientKey,
+  normalizeInventorySource,
+  type InventorySource,
   type TemplateDraftNode,
   type TemplateNodeLevel,
 } from '@/lib/hierarchy-config';
@@ -107,6 +112,12 @@ export function HierarchyTemplateEditor({
   const [editTarget, setEditTarget] = useState<TemplateDraftNode | null>(null);
   const [editName, setEditName] = useState('');
   const [editAbbr, setEditAbbr] = useState('');
+  const [newInventorySource, setNewInventorySource] = useState<InventorySource>(
+    INVENTORY_SOURCE.TURNKEY
+  );
+  const [editInventorySource, setEditInventorySource] = useState<InventorySource>(
+    INVENTORY_SOURCE.TURNKEY
+  );
   const addSectionRef = useRef<HTMLDivElement | null>(null);
 
   const currentParentKey =
@@ -190,6 +201,7 @@ export function HierarchyTemplateEditor({
         name,
         abbreviation,
         sort_order: nodes.length,
+        inventory_source: INVENTORY_SOURCE.TURNKEY,
       },
     ]);
     setNewName('');
@@ -215,6 +227,15 @@ export function HierarchyTemplateEditor({
       toast.error('Name cannot be empty');
       return;
     }
+    const hasChildren = nodes.some(
+      (n) => n.parent_client_key === editTarget.client_key
+    );
+    const inventory_source =
+      editTarget.level !== 'component' &&
+      hasChildren &&
+      editInventorySource === INVENTORY_SOURCE.BUILD_FROM_CHILDREN
+        ? INVENTORY_SOURCE.BUILD_FROM_CHILDREN
+        : INVENTORY_SOURCE.TURNKEY;
     onChange(
       nodes.map((n) =>
         n.client_key === editTarget.client_key
@@ -222,6 +243,7 @@ export function HierarchyTemplateEditor({
               ...n,
               name: editName.trim(),
               abbreviation: (editAbbr.trim() || suggestAbbreviation(editName)).toUpperCase(),
+              inventory_source,
             }
           : n
       )
@@ -251,6 +273,7 @@ export function HierarchyTemplateEditor({
             setEditTarget(node);
             setEditName(node.name);
             setEditAbbr((node.abbreviation || suggestAbbreviation(node.name)).toUpperCase());
+            setEditInventorySource(normalizeInventorySource(node.inventory_source));
           }}
           aria-label={`Edit ${node.level}`}
         >
@@ -286,6 +309,11 @@ export function HierarchyTemplateEditor({
       ? grouped[childLevel].filter((c) => c.parent_client_key === node.client_key)
       : [];
     const abbr = node.abbreviation ? ` [${node.abbreviation}]` : '';
+    const sourceLabel =
+      normalizeInventorySource(node.inventory_source) ===
+      INVENTORY_SOURCE.BUILD_FROM_CHILDREN
+        ? 'Build'
+        : 'Turnkey';
 
     if (node.level === 'component') {
       return (
@@ -307,6 +335,7 @@ export function HierarchyTemplateEditor({
               {node.name}
               {abbr}
             </div>
+            <div className="text-[11px] text-muted-foreground">{sourceLabel}</div>
             <div className="text-xs text-muted-foreground">{levelLabel(node.level)}</div>
           </div>
           {renderActions(node)}
@@ -474,6 +503,42 @@ export function HierarchyTemplateEditor({
                   </Select>
                 </div>
 
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Inventory Source</Label>
+                  <RadioGroup
+                    value={newInventorySource}
+                    onValueChange={(value) =>
+                      setNewInventorySource(normalizeInventorySource(value))
+                    }
+                    className="gap-2"
+                  >
+                    {INVENTORY_SOURCE_OPTIONS.map((option) => (
+                      <label
+                        key={option.value}
+                        className="flex items-start gap-2 rounded-md border px-3 py-2 text-sm"
+                      >
+                        <RadioGroupItem
+                          value={option.value}
+                          disabled={
+                            option.value === INVENTORY_SOURCE.BUILD_FROM_CHILDREN
+                          }
+                          className="mt-0.5"
+                        />
+                        <span>
+                          <span className="font-medium">{option.label}</span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            {option.description}
+                          </span>
+                        </span>
+                      </label>
+                    ))}
+                  </RadioGroup>
+                  <p className="text-xs text-muted-foreground">
+                    New nodes start as Turnkey. After you add children, edit the node
+                    to switch it to Build from Children.
+                  </p>
+                </div>
+
                 <div className="flex flex-col gap-3 md:col-span-2">
                   <Button type="button" onClick={handleCreate} disabled={!newName.trim()}>
                     <Plus className="mr-2 h-4 w-4" />
@@ -548,6 +613,44 @@ export function HierarchyTemplateEditor({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Inventory Source</Label>
+              <RadioGroup
+                value={editInventorySource}
+                onValueChange={(value) =>
+                  setEditInventorySource(normalizeInventorySource(value))
+                }
+                className="gap-2"
+              >
+                {INVENTORY_SOURCE_OPTIONS.map((option) => {
+                  const hasChildren = Boolean(
+                    editTarget &&
+                      nodes.some((n) => n.parent_client_key === editTarget.client_key)
+                  );
+                  const disabled =
+                    option.value === INVENTORY_SOURCE.BUILD_FROM_CHILDREN &&
+                    (editTarget?.level === 'component' || !hasChildren);
+                  return (
+                    <label
+                      key={option.value}
+                      className="flex items-start gap-2 rounded-md border px-3 py-2 text-sm"
+                    >
+                      <RadioGroupItem
+                        value={option.value}
+                        disabled={disabled}
+                        className="mt-0.5"
+                      />
+                      <span>
+                        <span className="font-medium">{option.label}</span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                          {option.description}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </RadioGroup>
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setEditTarget(null)}>

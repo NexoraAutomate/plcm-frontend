@@ -57,6 +57,7 @@ import {
   DEFAULT_PRODUCT_TYPES,
   TEMPLATE_NODE_LEVELS,
   newClientKey,
+  normalizeInventorySource,
   type TemplateDraftNode,
   type TemplateNodeLevel,
 } from '@/lib/hierarchy-config';
@@ -130,6 +131,7 @@ function draftFingerprint(draft: Draft): string {
       description: n.description ?? null,
       abbreviation: n.abbreviation ?? null,
       sort_order: n.sort_order ?? 0,
+      inventory_source: normalizeInventorySource(n.inventory_source),
     })),
   });
 }
@@ -173,6 +175,7 @@ function toDraft(config: HierarchyConfiguration): Draft {
       description: n.description,
       abbreviation: n.abbreviation,
       sort_order: n.sort_order ?? index,
+      inventory_source: normalizeInventorySource(n.inventory_source),
     })),
   };
 }
@@ -211,6 +214,7 @@ function draftToExportPayload(draft: Draft): HierarchyConfigurationWrite {
       description: n.description ?? null,
       abbreviation: n.abbreviation ?? null,
       sort_order: index,
+      inventory_source: normalizeInventorySource(n.inventory_source),
     })),
   };
 }
@@ -272,6 +276,9 @@ function parseConfigJson(parsed: unknown): HierarchyConfigurationWrite {
       description: typeof node.description === 'string' ? node.description : null,
       abbreviation: typeof node.abbreviation === 'string' ? node.abbreviation : null,
       sort_order: typeof node.sort_order === 'number' ? node.sort_order : index,
+      inventory_source: normalizeInventorySource(
+        typeof node.inventory_source === 'string' ? node.inventory_source : null
+      ),
     };
   });
 
