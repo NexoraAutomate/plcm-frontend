@@ -637,6 +637,8 @@ export interface InventoryShortage {
   target_entity_id: number
   inventory_id?: number | null
   part_number?: string | null
+  suggested_part_number?: string | null
+  suggested_serial_number?: string | null
   qty_short: number
   qty_original: number
   lru_name?: string | null

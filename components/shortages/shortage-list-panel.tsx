@@ -102,8 +102,8 @@ export function ShortageListPanel({
   function openReceive(row: InventoryShortage) {
     setReceiveTarget(row);
     setReceiveQuantity('1');
-    setReceivePartNumber(row.part_number || '');
-    setReceiveSerialNumber('');
+    setReceivePartNumber(row.suggested_part_number || row.part_number || '');
+    setReceiveSerialNumber(row.suggested_serial_number || '');
     setReceiveLocation('');
   }
 
@@ -229,37 +229,35 @@ export function ShortageListPanel({
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="shortage-receive-part-number">Part number</Label>
+              <Label htmlFor="shortage-receive-part-number">Part number (generated)</Label>
               <Input
                 id="shortage-receive-part-number"
                 value={receivePartNumber}
-                onChange={(event) => setReceivePartNumber(event.target.value)}
-                placeholder="Part number"
+                placeholder="Generated from entity"
                 disabled={busyId != null}
+                readOnly
               />
             </div>
             <div>
-              <Label htmlFor="shortage-receive-quantity">Quantity</Label>
+              <Label htmlFor="shortage-receive-quantity">Quantity (new unit)</Label>
               <Input
                 id="shortage-receive-quantity"
                 type="number"
-                min="1"
-                max={receiveTarget?.target_entity_type !== 'component' ? 1 : undefined}
-                value={receiveQuantity}
-                onChange={(event) => setReceiveQuantity(event.target.value)}
+                value="1"
                 disabled={busyId != null}
+                readOnly
               />
             </div>
             {receiveTarget?.target_entity_type !== 'component' ? (
               <>
                 <div>
-                  <Label htmlFor="shortage-receive-serial">Serial number</Label>
+                  <Label htmlFor="shortage-receive-serial">Serial number (generated)</Label>
                   <Input
                     id="shortage-receive-serial"
                     value={receiveSerialNumber}
-                    onChange={(event) => setReceiveSerialNumber(event.target.value)}
-                    placeholder="Serial number"
+                    placeholder="Generated from entity sequence"
                     disabled={busyId != null}
+                    readOnly
                   />
                 </div>
                 <div>
