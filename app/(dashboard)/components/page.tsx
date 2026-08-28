@@ -211,8 +211,8 @@ export default function ComponentsPage() {
   function openEdit(component: typeof components[0]) {
     setEditingId(component.id);
     setFormData({
-      name: component.name,
-      description: component.description,
+      name: component.name ?? '',
+      description: component.description ?? '',
       unit_id: component.unit_id,
     });
     setIsEditOpen(true);
@@ -360,7 +360,7 @@ export default function ComponentsPage() {
               <div>
                 <Label>Description</Label>
                 <Input
-                  value={formData.description}
+                  value={formData.description ?? ''}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Details"
                 />
@@ -562,7 +562,7 @@ export default function ComponentsPage() {
             <div>
               <Label>Description</Label>
               <Input
-                value={formData.description}
+                value={formData.description ?? ''}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               />
             </div>

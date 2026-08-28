@@ -65,9 +65,11 @@ function ProgressRow({
 export function ProjectProgressPanel({
   data,
   loading,
+  configurationLabel,
 }: {
   data?: ProjectProgress;
   loading?: boolean;
+  configurationLabel?: string | null;
 }) {
   if (loading && !data) {
     return (
@@ -128,7 +130,9 @@ export function ProjectProgressPanel({
 
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle className="text-base">Flight → SDLS → System</CardTitle>
+          <CardTitle className="text-base">
+            {configurationLabel || 'Configuration'} → Flight → System
+          </CardTitle>
           <CardDescription>
             Weighted by required leaf count. Uneven trees do not split progress equally.
           </CardDescription>
@@ -155,40 +159,20 @@ export function ProjectProgressPanel({
                   </AccordionTrigger>
                   <AccordionContent className="space-y-3">
                     <Progress value={flight.progress_pct} className="h-2" />
-                    <Accordion type="multiple" className="pl-2">
-                      {flight.sdls.map((sdls) => (
-                        <AccordionItem
-                          key={`sdls-${sdls.entity_id}`}
-                          value={`sdls-${sdls.entity_id}`}
-                        >
-                          <AccordionTrigger className="py-3 hover:no-underline">
-                            <span className="flex flex-1 items-center justify-between gap-3 pr-4 text-sm">
-                              <span className="font-medium truncate">
-                                {sdls.product_type
-                                  ? `${sdls.name} (${sdls.product_type})`
-                                  : sdls.name}
-                              </span>
-                              <span className="tabular-nums text-muted-foreground shrink-0">
-                                {sdls.progress_pct}% · {sdls.verified_leaves}/{sdls.weight}
-                              </span>
-                            </span>
-                          </AccordionTrigger>
-                          <AccordionContent className="space-y-3 pl-2">
-                            <Progress value={sdls.progress_pct} className="h-2" />
-                            {sdls.systems.map((system) => (
-                              <ProgressRow
-                                key={`system-${system.entity_id}`}
-                                label={system.name}
-                                pct={system.progress_pct}
-                                weight={system.weight}
-                                verified={system.verified_leaves}
-                                status={system.status}
-                              />
-                            ))}
-                          </AccordionContent>
-                        </AccordionItem>
-                      ))}
-                    </Accordion>
+                    <div className="space-y-3 pl-2">
+                      {flight.sdls
+                        .flatMap((sdls) => sdls.systems)
+                        .map((system) => (
+                          <ProgressRow
+                            key={`system-${system.entity_id}`}
+                            label={system.name}
+                            pct={system.progress_pct}
+                            weight={system.weight}
+                            verified={system.verified_leaves}
+                            status={system.status}
+                          />
+                        ))}
+                    </div>
                   </AccordionContent>
                 </AccordionItem>
               ))}

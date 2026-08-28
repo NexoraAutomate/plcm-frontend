@@ -222,8 +222,8 @@ export default function SubsystemsPage() {
   function openEdit(subsystem: typeof subsystems[0]) {
     setEditingId(subsystem.id);
     setFormData({
-      name: subsystem.name,
-      description: subsystem.description,
+      name: subsystem.name ?? '',
+      description: subsystem.description ?? '',
       system_id: subsystem.system_id,
     });
     setIsEditOpen(true);
@@ -371,7 +371,7 @@ export default function SubsystemsPage() {
               <div>
                 <Label>Description</Label>
                 <Input
-                  value={formData.description}
+                  value={formData.description ?? ''}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Details"
                 />
@@ -573,7 +573,7 @@ export default function SubsystemsPage() {
             <div>
               <Label>Description</Label>
               <Input
-                value={formData.description}
+                value={formData.description ?? ''}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               />
             </div>

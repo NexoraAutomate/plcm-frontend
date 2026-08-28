@@ -81,7 +81,7 @@ export function MaintenanceCaseDialog({
     if (editingCase) {
       setFormData({
         project_id: editingCase.project_id.toString(),
-        description: editingCase.description,
+        description: editingCase.description ?? '',
         status: editingCase.status,
         resolution_notes: editingCase.resolution_notes || '',
       });

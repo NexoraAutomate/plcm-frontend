@@ -224,8 +224,8 @@ export default function SystemsPage() {
   function openEdit(system: typeof systems[0]) {
     setEditingId(system.id);
     setFormData({
-      name: system.name,
-      description: system.description,
+      name: system.name ?? '',
+      description: system.description ?? '',
       project_id: system.project_id,
       status_id: system.status_id ?? 0,
       installation_date: system.installation_date
@@ -399,7 +399,7 @@ export default function SystemsPage() {
               <div>
                 <Label>Description</Label>
                 <Input
-                  value={formData.description}
+                  value={formData.description ?? ''}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder={`${entityLabel('system')} details`}
                 />
@@ -444,7 +444,7 @@ export default function SystemsPage() {
                 <Label>Installation Date</Label>
                 <Input
                   type="date"
-                  value={formData.installation_date}
+                  value={formData.installation_date ?? ''}
                   onChange={(e) =>
                     setFormData({ ...formData, installation_date: e.target.value })
                   }
@@ -645,7 +645,7 @@ export default function SystemsPage() {
             <div>
               <Label>Description</Label>
               <Input
-                value={formData.description}
+                value={formData.description ?? ''}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder={`${entityLabel('system')} details`}
               />
@@ -690,7 +690,7 @@ export default function SystemsPage() {
               <Label>Installation Date</Label>
               <Input
                 type="date"
-                value={formData.installation_date}
+                value={formData.installation_date ?? ''}
                 onChange={(e) =>
                   setFormData({ ...formData, installation_date: e.target.value })
                 }

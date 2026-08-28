@@ -94,6 +94,15 @@ function HierarchyFlowNode({ data }: NodeProps<Node<HierarchyNodeData>>) {
     },
   });
   const lifecycleChrome = entityLifecycleCardClass(lifecycleTone);
+  const displayedItemStatus =
+    data.itemStatus ??
+    (data.issued
+      ? 'ISSUED'
+      : data.reserved
+        ? 'RESERVED'
+        : data.assigned
+          ? 'ASSIGNED'
+          : null);
 
   const handleToggle = (event: React.MouseEvent) => {
     event.preventDefault();
@@ -241,19 +250,15 @@ function HierarchyFlowNode({ data }: NodeProps<Node<HierarchyNodeData>>) {
         >
           {data.label}
         </p>
-        {data.assigned || data.reserved || data.shortage || data.issued || data.itemStatus ? (
+        {data.assigned || data.reserved || data.shortage || data.issued || displayedItemStatus ? (
           <div className="mt-1.5 flex flex-wrap gap-1">
-            {data.assigned && !data.issued ? <StatusBadge status="Assigned" className="text-[10px]" /> : null}
-            {data.reserved ? <StatusBadge status="RESERVED" className="text-[10px]" /> : null}
-            {data.shortage ? <StatusBadge status="Shortage" className="text-[10px]" /> : null}
-            {data.itemStatus ? (
-              <StatusBadge status={data.itemStatus} className="text-[10px]" />
-            ) : data.issued ? (
-              <StatusBadge status="ISSUED" className="text-[10px]" />
+            {displayedItemStatus ? (
+              <StatusBadge status={displayedItemStatus} className="text-[10px]" />
             ) : null}
+            {data.shortage ? <StatusBadge status="Shortage" className="text-[10px]" /> : null}
           </div>
         ) : null}
-        <HierarchyNodeFieldLines data={data} />
+        <HierarchyNodeFieldLines data={{ ...data, hideStatus: Boolean(displayedItemStatus) }} />
         {entityActions ? (
           <div
             className="mt-2 flex items-center gap-0.5 border-t border-border/60 pt-1.5"

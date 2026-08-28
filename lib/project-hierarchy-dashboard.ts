@@ -701,3 +701,30 @@ export function collectSubtreeFromNode(
   const component = components.find((item) => item.id === pk);
   return component ? [toSubtreeRef('component', component)] : [];
 }
+
+export function collectProjectEntityRefs(
+  projectId: number,
+  systems: System[],
+  subsystems: Subsystem[],
+  modules: Module[],
+  units: Unit[],
+  components: Component[]
+): Array<{ type: HierarchyEntityType; id: number }> {
+  const refs: Array<{ type: HierarchyEntityType; id: number }> = [];
+  for (const system of getSystemsForProject(systems, projectId)) {
+    refs.push({ type: 'system', id: system.id });
+    for (const subsystem of getSubsystemsForSystem(subsystems, system.id)) {
+      refs.push({ type: 'subsystem', id: subsystem.id });
+      for (const module of getModulesForSubsystem(modules, subsystem.id)) {
+        refs.push({ type: 'module', id: module.id });
+        for (const unit of getUnitsForModule(units, module.id)) {
+          refs.push({ type: 'unit', id: unit.id });
+          for (const component of getComponentsForUnit(components, unit.id)) {
+            refs.push({ type: 'component', id: component.id });
+          }
+        }
+      }
+    }
+  }
+  return refs;
+}

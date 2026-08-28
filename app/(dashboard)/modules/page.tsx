@@ -216,8 +216,8 @@ export default function ModulesPage() {
   function openEdit(module: typeof modules[0]) {
     setEditingId(module.id);
     setFormData({
-      name: module.name,
-      description: module.description,
+      name: module.name ?? '',
+      description: module.description ?? '',
       subsystem_id: module.subsystem_id,
     });
     setIsEditOpen(true);
@@ -365,7 +365,7 @@ export default function ModulesPage() {
               <div>
                 <Label>Description</Label>
                 <Input
-                  value={formData.description}
+                  value={formData.description ?? ''}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Details"
                 />
@@ -567,7 +567,7 @@ export default function ModulesPage() {
             <div>
               <Label>Description</Label>
               <Input
-                value={formData.description}
+                value={formData.description ?? ''}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               />
             </div>

@@ -349,6 +349,7 @@ export default function ReserveInventoryPage() {
 
   const status = project?.status_name ?? plan?.project_status ?? '';
   const canReserve = status === ProjectWorkflowStatus.READY_FOR_INVENTORY;
+  const isCompleted = status === ProjectWorkflowStatus.COMPLETED;
   const notReady = !canReserve;
 
   return (
@@ -385,8 +386,17 @@ export default function ReserveInventoryPage() {
 
       {notReady ? (
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm">
-          Project must be <strong>Ready for Inventory</strong> before reserving.
-          Generate hierarchy first if it is still Approved.
+            {isCompleted ? (
+              <>
+                Project progress reached 100%. Assign developers to assembled parent
+                items below; new stock reservations are disabled.
+              </>
+            ) : (
+              <>
+                Project must be <strong>Ready for Inventory</strong> before reserving.
+                Generate hierarchy first if it is still Approved.
+              </>
+            )}
         </div>
       ) : null}
 
@@ -524,7 +534,7 @@ export default function ReserveInventoryPage() {
                               }
                               disabled={isBusy || !canReserve}
                             >
-                              <SelectTrigger size="sm" className="w-[9.5rem]" aria-label="Serial number">
+                              <SelectTrigger size="sm" className="w-38" aria-label="Serial number">
                                 <SelectValue placeholder="Serial #" />
                               </SelectTrigger>
                               <SelectContent>
@@ -546,7 +556,7 @@ export default function ReserveInventoryPage() {
                             >
                               <SelectTrigger
                                 size="sm"
-                                className="w-[10.5rem]"
+                                className="w-42"
                                 aria-label="Assign developer (optional)"
                               >
                                 <SelectValue placeholder="Developer (optional)" />
@@ -583,7 +593,7 @@ export default function ReserveInventoryPage() {
                             >
                               <SelectTrigger
                                 size="sm"
-                                className="w-[10.5rem]"
+                                className="w-42"
                                 aria-label="Assign developer"
                               >
                                 <SelectValue placeholder="Select developer" />

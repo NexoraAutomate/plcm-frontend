@@ -75,6 +75,7 @@ export default function ProjectDetailPage() {
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
   const [systemHierarchyNames, setSystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
+  const [configurationLabel, setConfigurationLabel] = useState<string | null>(null);
   const progressQuery = useProjectProgressQuery(
     Number.isFinite(Number(projectId)) ? Number(projectId) : null
   );
@@ -83,6 +84,26 @@ export default function ProjectDetailPage() {
     workflowProject && String(workflowProject.id) === projectId
       ? workflowProject
       : projects.find((p) => String(p.id) === projectId);
+
+  useEffect(() => {
+    const configId = project?.hierarchy_config_id;
+    if (!configId) {
+      setConfigurationLabel(null);
+      return;
+    }
+    let cancelled = false;
+    void api.hierarchyConfigurations
+      .get(configId)
+      .then((res) => {
+        if (!cancelled) setConfigurationLabel(res.data.name || res.data.code);
+      })
+      .catch(() => {
+        if (!cancelled) setConfigurationLabel(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project?.hierarchy_config_id, project?.updated_at]);
 
   useEffect(() => {
     const id = Number(projectId);
@@ -418,6 +439,7 @@ export default function ProjectDetailPage() {
       <ProjectWorkflowActions
         project={project}
         users={users}
+        configurationLabel={configurationLabel}
         onUpdated={(next) => setWorkflowProject(next)}
       />
 
@@ -496,7 +518,11 @@ export default function ProjectDetailPage() {
         </Card>
       </div>
 
-      <ProjectProgressPanel data={progressQuery.data} loading={progressQuery.isLoading} />
+      <ProjectProgressPanel
+        data={progressQuery.data}
+        loading={progressQuery.isLoading}
+        configurationLabel={configurationLabel}
+      />
 
       {/* Systems Cards */}
       <EntityCards

@@ -367,3 +367,28 @@ export function applyInventoryFlagsToNodes(
     };
   });
 }
+
+export interface HierarchyAssignmentStatusFields {
+  item_status?: string | null;
+  issued?: boolean;
+  verified?: boolean;
+}
+
+export function applyAssignmentStatusToNodes(
+  nodes: Node<HierarchyNodeData>[],
+  statuses: Map<string, HierarchyAssignmentStatusFields>
+): Node<HierarchyNodeData>[] {
+  return nodes.map((node) => {
+    const key = inventoryFlagKey(node.data.type, node.data.entityId);
+    const assignment = statuses.get(key);
+    if (!assignment) return node;
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        itemStatus: assignment.item_status ?? node.data.itemStatus,
+        issued: assignment.issued ?? node.data.issued,
+      },
+    };
+  });
+}

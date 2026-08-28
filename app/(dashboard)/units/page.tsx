@@ -221,8 +221,8 @@ export default function UnitsPage() {
   function openEdit(unit: typeof units[0]) {
     setEditingId(unit.id);
     setFormData({
-      name: unit.name,
-      description: unit.description,
+      name: unit.name ?? '',
+      description: unit.description ?? '',
       module_id: unit.module_id,
     });
     setIsEditOpen(true);
@@ -371,7 +371,7 @@ export default function UnitsPage() {
               <div>
                 <Label>Description</Label>
                 <Input
-                  value={formData.description}
+                  value={formData.description ?? ''}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Details"
                 />
@@ -573,7 +573,7 @@ export default function UnitsPage() {
             <div>
               <Label>Description</Label>
               <Input
-                value={formData.description}
+                value={formData.description ?? ''}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               />
             </div>

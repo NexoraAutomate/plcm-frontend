@@ -17,11 +17,13 @@ import { useHierarchyEntityActions } from '@/components/hierarchy-dashboard/use-
 import type { DashboardLevelKey } from '@/lib/hierarchy-dashboard-entity-config';
 import {
   buildProjectHierarchyFlow,
+  collectProjectEntityRefs,
   collectSubtreeFromNode,
   type HierarchyDashboardSelection,
 } from '@/lib/project-hierarchy-dashboard';
 import {
   DEFAULT_NODE_FIELD_VISIBILITY,
+  applyAssignmentStatusToNodes,
   applyInventoryFlagsToNodes,
   type HierarchyEntityType,
   type HierarchyNodeFieldVisibility,
@@ -67,6 +69,7 @@ import type {
   Unit,
 } from '@/lib/models';
 import { useProjectInventoryFlags } from '@/hooks/use-project-inventory-flags';
+import { useHierarchyAssignmentStatuses } from '@/hooks/use-hierarchy-assignment-statuses';
 
 interface ProjectHierarchyFlowProps {
   selection: HierarchyDashboardSelection;
@@ -143,6 +146,19 @@ export function ProjectHierarchyFlow({
   const [expandFullHierarchy, setExpandFullHierarchy] = useState(false);
   const [resolutionDeliveries, setResolutionDeliveries] = useState<MaintenanceDelivery[]>([]);
   const inventoryFlags = useProjectInventoryFlags(selection.projectId ?? project?.id);
+  const assignmentEntityRefs = useMemo(
+    () =>
+      collectProjectEntityRefs(
+        selection.projectId ?? project?.id ?? 0,
+        systems,
+        subsystems,
+        modules,
+        units,
+        components
+      ),
+    [selection.projectId, project?.id, systems, subsystems, modules, units, components]
+  );
+  const assignmentStatuses = useHierarchyAssignmentStatuses(assignmentEntityRefs);
 
   const {
     records: projectResolutionRecords,
@@ -338,7 +354,8 @@ export function ProjectHierarchyFlow({
     );
 
     return {
-      nodes: applyInventoryFlagsToNodes(
+      nodes: applyAssignmentStatusToNodes(
+        applyInventoryFlagsToNodes(
         flow.nodes.map((node) => {
         const entityKey = makeEntityKey(node.data.type, node.data.entityId);
         const isReplacedEntity =
@@ -365,6 +382,8 @@ export function ProjectHierarchyFlow({
       }),
         inventoryFlags
       ),
+        assignmentStatuses
+      ),
       edges: flow.edges,
     };
   }, [
@@ -383,6 +402,7 @@ export function ProjectHierarchyFlow({
     dossierMode,
     replacementDateByEntityKey,
     inventoryFlags,
+    assignmentStatuses,
   ]);
 
   const fitViewKey = useMemo(

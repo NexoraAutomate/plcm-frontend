@@ -167,11 +167,10 @@ export default function ProjectsPage(){
     if (
       !formData.name.trim() ||
       !formData.hierarchy_config_id ||
-      !formData.product_type ||
       !formData.flight_count ||
       !formData.sdls_per_flight
     ) {
-      toast.error('Name, configuration, product type, and scope counts are required');
+      toast.error('Name, configuration, and scope counts are required');
       return;
     }
     setIsCreating(true);
@@ -237,8 +236,8 @@ export default function ProjectsPage(){
   function openEdit(project: typeof projects[0]) {
     setEditingId(project.id);
     setFormData({
-      name: project.name,
-      description: project.description,
+      name: project.name ?? '',
+      description: project.description ?? '',
       start_date: toDateInputValue(project.start_date),
       end_date: toDateInputValue(project.end_date),
       owner_id: project.owner_id,
@@ -337,7 +336,7 @@ export default function ProjectsPage(){
             <DialogHeader>
               <DialogTitle>Create Draft {entityLabel('project')}</DialogTitle>
               <DialogDescription>
-                Select an available Smart SDLS configuration and product scope. Status starts as
+                Select an available Smart SDLS configuration and project scope. Status starts as
                 DRAFT until Project Director or Admin approval.
               </DialogDescription>
             </DialogHeader>
@@ -354,7 +353,7 @@ export default function ProjectsPage(){
               <div>
                 <Label>Description</Label>
                 <Input
-                  value={formData.description}
+                  value={formData.description ?? ''}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Project details"
                   disabled={isCreating}
@@ -382,28 +381,6 @@ export default function ProjectsPage(){
                     {availableConfigs.map((c) => (
                       <SelectItem key={c.id} value={String(c.id)}>
                         {c.name} ({c.code})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Product Type *</Label>
-                <Select
-                  value={formData.product_type}
-                  onValueChange={(v) => setFormData({ ...formData, product_type: v })}
-                  disabled={isCreating || !formData.hierarchy_config_id}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="SSDLS-1 / SSDLS-2" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(
-                      availableConfigs.find((c) => c.id === formData.hierarchy_config_id)
-                        ?.product_type_codes ?? []
-                    ).map((code) => (
-                      <SelectItem key={code} value={code}>
-                        {code}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -654,7 +631,7 @@ export default function ProjectsPage(){
             <div>
               <Label>Description</Label>
               <Input
-                value={formData.description}
+                value={formData.description ?? ''}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Project details"
               />

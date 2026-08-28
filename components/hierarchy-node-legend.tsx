@@ -92,6 +92,7 @@ export function HierarchyNodeFieldLines({
     type?: string;
     dossierMode?: 'bhd' | 'mmhd';
     isReplacedEntity?: boolean;
+    hideStatus?: boolean;
     fieldVisibility?: HierarchyNodeFieldVisibility;
   };
 }) {
@@ -121,7 +122,7 @@ export function HierarchyNodeFieldLines({
   if (data.dossierMode === 'bhd' && data.configurationItem?.trim()) {
     lines.push({ label: 'Config', value: data.configurationItem });
   }
-  if (visibility.status && data.status?.trim()) {
+  if (visibility.status && !data.hideStatus && data.status?.trim()) {
     lines.push({ label: 'Status', value: data.status });
   }
   if (visibility.createdAt && data.createdAt) {

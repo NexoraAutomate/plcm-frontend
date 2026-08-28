@@ -52,6 +52,7 @@ import { cn } from '@/lib/utils';
 type Props = {
   project: Project;
   users: User[];
+  configurationLabel?: string | null;
   onUpdated: (project: Project) => void;
 };
 
@@ -115,7 +116,12 @@ function renderSystemBranch(system: HierarchySystemNode) {
   );
 }
 
-export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
+export function ProjectWorkflowActions({
+  project,
+  users,
+  configurationLabel,
+  onUpdated,
+}: Props) {
   const router = useRouter();
   const { ensureHierarchyLoaded } = useDataStore();
   const [busy, setBusy] = useState(false);
@@ -158,6 +164,7 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
   const isReady =
     status === ProjectWorkflowStatus.READY_FOR_INVENTORY ||
     status === ProjectWorkflowStatus.HIERARCHY_GENERATED;
+  const isCompleted = status === ProjectWorkflowStatus.COMPLETED;
   const isCancelled = isProjectReadOnly(status);
   const configSealed = isConfigSealed(status);
   const configChangeDisabled = !isApproved || isReady || isCancelled;
@@ -339,9 +346,9 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium">Workflow</span>
         <StatusBadge status={status || 'Unknown'} />
-        {project.product_type ? (
+        {project.flight_count != null || project.sdls_per_flight != null ? (
           <span className="text-xs text-muted-foreground">
-            {project.product_type} · {project.flight_count ?? '—'} flights ·{' '}
+            {project.flight_count ?? '—'} flights ·{' '}
             {project.sdls_per_flight ?? '—'} SDLS/flight
           </span>
         ) : null}
@@ -432,14 +439,14 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
         </Can>
 
         <Can permission={P.inventory_reserve}>
-          {isReady && !isCancelled ? (
+          {(isReady || isCompleted) && !isCancelled ? (
             <Button
               variant="outline"
               disabled={busy || openConfigChange}
               onClick={() => router.push(`/projects/${project.id}/reserve-inventory`)}
             >
               <Package className="mr-1.5 h-4 w-4" />
-              Reserve inventory
+              {isCompleted ? 'Review inventory assignments' : 'Reserve inventory'}
             </Button>
           ) : null}
         </Can>
@@ -500,27 +507,16 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <ul className="space-y-3 border-t px-3 py-3 text-muted-foreground">
-                {tree.flights.map((flight) => (
-                  <li key={flight.id}>
-                    <span className="font-medium text-foreground">{flight.name}</span>
-                    <ul className="ml-3 mt-1 space-y-2 border-l border-border/60 pl-3">
-                      {flight.sdls.map((sdls) => (
-                        <li key={sdls.id}>
-                          <span className="font-medium text-foreground/90">{sdls.name}</span>
-                          {sdls.product_type ? (
-                            <span className="ml-1 text-xs">({sdls.product_type})</span>
-                          ) : null}
-                          {sdls.systems.length > 0 ? (
-                            <ul className="mt-1 space-y-2">
-                              {sdls.systems.map((system) => renderSystemBranch(system))}
-                            </ul>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
-                  </li>
-                ))}
+              <ul className="border-t px-3 py-3 text-muted-foreground">
+                <TreeNode kind="Configuration" name={configurationLabel || '—'}>
+                  {tree.flights.map((flight) => (
+                    <TreeNode key={flight.id} kind="Flight" name={flight.name}>
+                      {flight.sdls
+                        .flatMap((sdls) => sdls.systems)
+                        .map((system) => renderSystemBranch(system))}
+                    </TreeNode>
+                  ))}
+                </TreeNode>
               </ul>
             </CollapsibleContent>
           </div>
@@ -538,9 +534,6 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
                   re-run.
                 </p>
                 <ul className="list-disc space-y-1 pl-4">
-                  <li>
-                    Product type: <strong>{project.product_type || '—'}</strong>
-                  </li>
                   <li>
                     Flights: <strong>{project.flight_count ?? '—'}</strong>
                   </li>
@@ -630,7 +623,7 @@ export function ProjectWorkflowActions({ project, users, onUpdated }: Props) {
             <AlertDialogCancel disabled={busy}>Keep project</AlertDialogCancel>
             <AlertDialogAction
               disabled={busy || !cancelConfirmed || !cancelPreview}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-white hover:bg-destructive/90"
               onClick={(e) => {
                 e.preventDefault();
                 void handleCancel();
