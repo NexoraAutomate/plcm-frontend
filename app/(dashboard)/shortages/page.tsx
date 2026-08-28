@@ -21,8 +21,8 @@ export default function ShortagesPage() {
             Open shortages
           </CardTitle>
           <CardDescription>
-            All waiting Flight / SDLS demand. Receipt of matching part numbers auto-reserves
-            FCFS.
+            All waiting Flight / SDLS demand. Inventory managers can add received stock here;
+            matching part numbers auto-reserve FCFS.
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -271,8 +271,11 @@ export function ProjectWorkflowActions({
         // Tree panel is best-effort; store refresh above is the primary fix.
       }
       const c = res.data.counts;
+      const shortages = res.data.shortages_created ?? 0;
       toast.success(
-        `Hierarchy ready: ${c.flights} flights · ${c.sdls} SDLS · ${c.systems} systems`
+        `Hierarchy ready: ${c.flights} flights · ${c.sdls} SDLS · ${c.systems} systems${
+          shortages ? ` · ${shortages} shortage${shortages === 1 ? '' : 's'} recorded` : ''
+        }`
       );
       setConfirmOpen(false);
       router.push(`/projects/${project.id}/reserve-inventory`);

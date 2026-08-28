@@ -279,6 +279,7 @@ export const projects = {
         units: number;
         components: number;
       };
+      shortages_created?: number;
       project?: Models.Project;
     }>(`/projects/${id}/generate-hierarchy/`),
   hierarchyTree: (id: number) =>
@@ -840,6 +841,16 @@ export const inventory = {
         mine: options?.mine ?? false,
       },
     }),
+  receiveShortage: (
+    shortageId: number,
+    data: {
+      quantity: number
+      part_number?: string
+      serial_numbers?: string[]
+      location?: string
+    }
+  ) =>
+    api.post<Models.Inventory>('/inventory/shortages/' + shortageId + '/receive/', data),
   listShortageNotices: (options?: { unreadOnly?: boolean }) =>
     api.get<Models.InventoryShortageNotice[]>('/inventory/shortage-notices/', {
       params: { unread_only: options?.unreadOnly ?? false },

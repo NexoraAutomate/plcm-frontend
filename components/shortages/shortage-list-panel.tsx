@@ -3,9 +3,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { AlertTriangle, Ban } from 'lucide-react';
+import { AlertTriangle, Ban, PackagePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Can } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
 import * as api from '@/lib/api';
@@ -45,6 +48,11 @@ export function ShortageListPanel({
 }: Props) {
   const [rows, setRows] = useState<InventoryShortage[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [receiveTarget, setReceiveTarget] = useState<InventoryShortage | null>(null);
+  const [receiveQuantity, setReceiveQuantity] = useState('1');
+  const [receivePartNumber, setReceivePartNumber] = useState('');
+  const [receiveSerialNumber, setReceiveSerialNumber] = useState('');
+  const [receiveLocation, setReceiveLocation] = useState('');
 
   const refresh = useCallback(async () => {
     if (inventoryScope) {
@@ -91,6 +99,50 @@ export function ShortageListPanel({
     }
   }
 
+  function openReceive(row: InventoryShortage) {
+    setReceiveTarget(row);
+    setReceiveQuantity('1');
+    setReceivePartNumber(row.part_number || '');
+    setReceiveSerialNumber('');
+    setReceiveLocation('');
+  }
+
+  async function handleReceive() {
+    if (!receiveTarget) return;
+    const quantity = Number(receiveQuantity);
+    const serialized = receiveTarget.target_entity_type !== 'component';
+    if (!Number.isInteger(quantity) || quantity < 1 || (serialized && quantity !== 1)) {
+      toast.error(serialized ? 'Receive one serialized unit at a time' : 'Enter a quantity of at least 1');
+      return;
+    }
+    if (serialized && (!receivePartNumber.trim() || !receiveSerialNumber.trim() || !receiveLocation.trim())) {
+      toast.error('Part number, serial number, and location are required');
+      return;
+    }
+
+    setBusyId(receiveTarget.id);
+    try {
+      const res = await api.inventory.receiveShortage(receiveTarget.id, {
+        quantity,
+        part_number: receivePartNumber.trim() || undefined,
+        serial_numbers: serialized ? [receiveSerialNumber.trim()] : undefined,
+        location: serialized ? receiveLocation.trim() : undefined,
+      });
+      const fulfilled = res.data.fcfs_fulfillments?.length ?? 0;
+      toast.success(
+        fulfilled > 0
+          ? `Stock received and ${fulfilled} shortage item${fulfilled === 1 ? '' : 's'} auto-reserved`
+          : 'Stock received'
+      );
+      setReceiveTarget(null);
+      await refresh();
+    } catch (error: unknown) {
+      toast.error(apiError(error, 'Failed to receive shortage stock'));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   if (rows.length === 0) {
     return (
       <p className="text-xs text-muted-foreground">No open shortages.</p>
@@ -98,53 +150,145 @@ export function ShortageListPanel({
   }
 
   return (
-    <ul className="space-y-2 text-sm">
-      {rows.map((row) => (
-        <li
-          key={row.id}
-          className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 px-3 py-2"
-        >
-          <div>
-            <div className="flex flex-wrap items-center gap-2 font-medium">
-              <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-              {row.lru_name || row.target_entity_type}
-              <Badge variant={statusVariant(row.status)}>{row.status}</Badge>
+    <>
+      <ul className="space-y-2 text-sm">
+        {rows.map((row) => (
+          <li
+            key={row.id}
+            className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 px-3 py-2"
+          >
+            <div>
+              <div className="flex flex-wrap items-center gap-2 font-medium">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                {row.lru_name || row.target_entity_type}
+                <Badge variant={statusVariant(row.status)}>{row.status}</Badge>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                PN {row.part_number || '—'} · Qty {row.qty_short}
+                {row.qty_original !== row.qty_short ? ` of ${row.qty_original}` : ''}
+                {' · '}
+                {row.flight_name || row.flight_code || `Flight #${row.flight_id}`}
+                {' / '}
+                {row.sdls_name || row.sdls_code || `SDLS #${row.sdls_id}`}
+                {inventoryScope && row.project_name ? (
+                  <>
+                    {' · '}
+                    <Link className="underline" href={`/projects/${row.project_id}`}>
+                      {row.project_name}
+                    </Link>
+                  </>
+                ) : null}
+                {' · '}
+                requested {parseApiDate(row.requested_at).toLocaleString()}
+                {row.requested_by_name ? ` by ${row.requested_by_name}` : ''}
+              </div>
             </div>
-            <div className="text-xs text-muted-foreground">
-              PN {row.part_number || '—'} · Qty {row.qty_short}
-              {row.qty_original !== row.qty_short ? ` of ${row.qty_original}` : ''}
-              {' · '}
-              {row.flight_name || row.flight_code || `Flight #${row.flight_id}`}
-              {' / '}
-              {row.sdls_name || row.sdls_code || `SDLS #${row.sdls_id}`}
-              {inventoryScope && row.project_name ? (
-                <>
-                  {' · '}
-                  <Link className="underline" href={`/projects/${row.project_id}`}>
-                    {row.project_name}
-                  </Link>
-                </>
+            <div className="flex flex-wrap gap-2">
+              {inventoryScope && (row.status === 'OPEN' || row.status === 'PARTIAL') ? (
+                <Can permission={P.inventory_receive}>
+                  <Button
+                    size="sm"
+                    disabled={busyId === row.id}
+                    onClick={() => openReceive(row)}
+                  >
+                    <PackagePlus className="mr-1 h-3.5 w-3.5" />
+                    Add stock
+                  </Button>
+                </Can>
               ) : null}
-              {' · '}
-              requested {parseApiDate(row.requested_at).toLocaleString()}
-              {row.requested_by_name ? ` by ${row.requested_by_name}` : ''}
+              {row.status === 'OPEN' || row.status === 'PARTIAL' ? (
+                <Can permission={P.inventory_reserve}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busyId === row.id}
+                    onClick={() => void handleCancel(row)}
+                  >
+                    <Ban className="mr-1 h-3.5 w-3.5" />
+                    Cancel
+                  </Button>
+                </Can>
+              ) : null}
             </div>
-          </div>
-          {row.status === 'OPEN' || row.status === 'PARTIAL' ? (
-            <Can permission={P.inventory_reserve}>
+          </li>
+        ))}
+      </ul>
+      <Dialog
+        open={receiveTarget != null}
+        onOpenChange={(open) => {
+          if (!open && busyId == null) setReceiveTarget(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add stock for shortage</DialogTitle>
+            <DialogDescription>
+              Receive {receiveTarget?.lru_name || 'this item'} directly from the shortage queue.
+              Matching stock is auto-reserved FCFS.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="shortage-receive-part-number">Part number</Label>
+              <Input
+                id="shortage-receive-part-number"
+                value={receivePartNumber}
+                onChange={(event) => setReceivePartNumber(event.target.value)}
+                placeholder="Part number"
+                disabled={busyId != null}
+              />
+            </div>
+            <div>
+              <Label htmlFor="shortage-receive-quantity">Quantity</Label>
+              <Input
+                id="shortage-receive-quantity"
+                type="number"
+                min="1"
+                max={receiveTarget?.target_entity_type !== 'component' ? 1 : undefined}
+                value={receiveQuantity}
+                onChange={(event) => setReceiveQuantity(event.target.value)}
+                disabled={busyId != null}
+              />
+            </div>
+            {receiveTarget?.target_entity_type !== 'component' ? (
+              <>
+                <div>
+                  <Label htmlFor="shortage-receive-serial">Serial number</Label>
+                  <Input
+                    id="shortage-receive-serial"
+                    value={receiveSerialNumber}
+                    onChange={(event) => setReceiveSerialNumber(event.target.value)}
+                    placeholder="Serial number"
+                    disabled={busyId != null}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="shortage-receive-location">Location</Label>
+                  <Input
+                    id="shortage-receive-location"
+                    value={receiveLocation}
+                    onChange={(event) => setReceiveLocation(event.target.value)}
+                    placeholder="Warehouse location"
+                    disabled={busyId != null}
+                  />
+                </div>
+              </>
+            ) : null}
+            <div className="flex justify-end gap-2">
               <Button
-                size="sm"
                 variant="outline"
-                disabled={busyId === row.id}
-                onClick={() => void handleCancel(row)}
+                onClick={() => setReceiveTarget(null)}
+                disabled={busyId != null}
               >
-                <Ban className="mr-1 h-3.5 w-3.5" />
                 Cancel
               </Button>
-            </Can>
-          ) : null}
-        </li>
-      ))}
-    </ul>
+              <Button onClick={() => void handleReceive()} disabled={busyId != null}>
+                {busyId != null ? 'Receiving…' : 'Receive stock'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
