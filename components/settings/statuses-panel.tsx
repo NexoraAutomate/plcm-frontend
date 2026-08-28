@@ -28,6 +28,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useDataStore } from "@/lib/data-store";
 import { useAppDefinitions } from "@/lib/app-definitions-context";
+import { usePageDataRefresh } from "@/components/page-data-refresh";
 
 function getStatusTypes(entityLabel: (level: string, plural?: boolean) => string) {
   return [
@@ -185,6 +186,8 @@ export function StatusesPanel({ embedded = false }: StatusesPanelProps) {
   const [deleteTarget, setDeleteTarget] = useState<Models.Status | null>(null);
   const [statusTypeFilter, setStatusTypeFilter] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
+
+  usePageDataRefresh(refreshStatuses);
 
   useEffect(() => {
     setStatuses(storeStatuses);

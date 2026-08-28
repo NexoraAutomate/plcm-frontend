@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,6 +31,7 @@ import {
   useActiveSessions,
   useSecuritySettings,
 } from '@/components/settings/hooks/use-security-settings';
+import { usePageDataRefresh } from '@/components/page-data-refresh';
 
 export type SecurityPanelProps = {
   embedded?: boolean;
@@ -51,9 +53,16 @@ export function SecurityPanel({ embedded = false }: SecurityPanelProps) {
     saveSettings,
     updatePasswordPolicy,
     updateTwoFactor,
+    reload: reloadSettings,
   } = useSecuritySettings();
-  const { sessions, loading: sessionsLoading, terminateSession, terminateAllSessions } =
+  const { sessions, loading: sessionsLoading, refresh: refreshSessions, terminateSession, terminateAllSessions } =
     useActiveSessions();
+  const refresh = useCallback(
+    () => Promise.all([reloadSettings(), refreshSessions()]).then(() => undefined),
+    [reloadSettings, refreshSessions]
+  );
+
+  usePageDataRefresh(refresh);
 
   if (loading) return <PageLoader />;
 

@@ -1,11 +1,14 @@
 'use client';
 
+import { useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { SettingsCard } from '@/components/settings/settings-card';
 import { SettingsSection } from '@/components/settings/settings-section';
 import { SettingsToggleGroup } from '@/components/settings/settings-toggle-group';
 import { PageLoader } from '@/components/page-loader';
 import { useAlertSettings } from '@/components/settings/hooks/use-alert-settings';
+import { readAlertSettings } from '@/components/settings/hooks/use-alert-settings';
+import { usePageDataRefresh } from '@/components/page-data-refresh';
 
 export type AlertsPanelProps = {
   embedded?: boolean;
@@ -13,6 +16,9 @@ export type AlertsPanelProps = {
 
 export function AlertsPanel({ embedded = false }: AlertsPanelProps) {
   const { settings, setSettings, loading, saving, saveSettings } = useAlertSettings();
+  const refresh = useCallback(() => setSettings(readAlertSettings()), [setSettings]);
+
+  usePageDataRefresh(refresh);
 
   if (loading) return <PageLoader />;
 

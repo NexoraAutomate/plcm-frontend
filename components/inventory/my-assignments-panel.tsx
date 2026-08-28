@@ -20,6 +20,7 @@ import { StatusBadge } from '@/components/status-badge';
 import { WorkflowCan } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
 import { ReworkWizardDialog, type ReworkWizardTarget } from '@/components/inventory/rework-wizard-dialog';
+import { usePageDataRefresh } from '@/components/page-data-refresh';
 
 function rowKey(row: DeveloperAssignedWork) {
   return `${row.entity_type}:${row.entity_id}`;
@@ -61,6 +62,8 @@ export function MyAssignmentsPanel() {
       setLoading(false);
     }
   }, []);
+
+  usePageDataRefresh(refresh);
 
   useEffect(() => {
     void refresh();
@@ -209,7 +212,7 @@ export function MyAssignmentsPanel() {
           Request all
         </Button>
       </div>
-      <ListContentSuspense loading={loading && rows.length === 0}>
+      <ListContentSuspense loading={loading}>
         {rows.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
             No hierarchy items have been assigned to you yet.

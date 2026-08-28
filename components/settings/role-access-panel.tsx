@@ -48,6 +48,7 @@ import {
   type CrudAction,
 } from '@/lib/role-access-matrix';
 import { cn } from '@/lib/utils';
+import { usePageDataRefresh } from '@/components/page-data-refresh';
 
 export type RoleAccessPanelProps = {
   embedded?: boolean;
@@ -144,6 +145,10 @@ export function RoleAccessPanel({ embedded = false }: RoleAccessPanelProps) {
       setLoading(false);
     }
   }, []);
+
+  const refreshPageData = useCallback(() => loadData(), [loadData]);
+
+  usePageDataRefresh(refreshPageData);
 
   function applyRoleSelection(role: Role | null, id: string) {
     setSelectedRoleId(id);

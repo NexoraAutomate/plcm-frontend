@@ -29,6 +29,7 @@ import {
   isDefinitionsSectionId,
   type DefinitionsSectionId,
 } from '@/components/settings/settings-tabs-config';
+import { usePageDataRefresh } from '@/components/page-data-refresh';
 
 export type DefinitionsPanelProps = {
   embedded?: boolean;
@@ -181,6 +182,7 @@ function DefinitionsLabelsSection() {
     updateDraft,
     updateLevelTemplate,
     save,
+    reload,
     resetDefaults,
     preview,
     selectedLevel,
@@ -188,6 +190,8 @@ function DefinitionsLabelsSection() {
     levels,
     levelLabel,
   } = useDefinitionsSettings();
+
+  usePageDataRefresh(reload);
 
   if (loading) return <PageLoader />;
 

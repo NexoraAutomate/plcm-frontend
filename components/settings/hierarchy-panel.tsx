@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Edit, Search, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,6 +35,7 @@ import { JsonBatchUploadButton } from "@/components/settings/json-batch-upload-b
 import { EntityListImportButton } from "@/components/settings/entity-list-import-button";
 import { EntityListExportButton } from "@/components/settings/entity-list-export-button";
 import { useAppDefinitions } from "@/lib/app-definitions-context";
+import { usePageDataRefresh } from "@/components/page-data-refresh";
 import { SortableTableHead } from "@/components/data-table/sortable-table-head";
 import { useTableSorting } from "@/hooks/use-table-sorting";
 import { EntityListPagination } from "@/components/entity-list-pagination";
@@ -109,7 +110,7 @@ export function HierarchyPanel({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.hierarchies.list();
@@ -119,9 +120,11 @@ export function HierarchyPanel({
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { void loadData(); }, []);
+  usePageDataRefresh(loadData);
+
+  useEffect(() => { void loadData(); }, [loadData]);
 
   // ── Flat-table state (entity-list mode) ─────────────────────────────────────
   const [search, setSearch] = useState("");

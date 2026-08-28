@@ -39,6 +39,7 @@ import {
 } from '@/lib/models';
 import { Can } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
+import { PageRefreshButton } from '@/components/page-data-refresh';
 
 const PAGE_SIZE = 20;
 const ALL = 'all';
@@ -168,12 +169,15 @@ export default function AuditTrailPage() {
             Immutable who / role / when / old→new history for hierarchy and inventory actions.
           </p>
         </div>
-        <Can permission={P.audit_read}>
-          <Button variant="outline" onClick={() => void handleExport()}>
-            <Download className="mr-2 h-4 w-4" />
-            Export CSV
-          </Button>
-        </Can>
+        <div className="flex flex-wrap gap-2">
+          <PageRefreshButton onRefresh={load} />
+          <Can permission={P.audit_read}>
+            <Button variant="outline" onClick={() => void handleExport()}>
+              <Download className="mr-2 h-4 w-4" />
+              Export CSV
+            </Button>
+          </Can>
+        </div>
       </div>
       <Card>
         <CardHeader>

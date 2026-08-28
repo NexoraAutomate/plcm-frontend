@@ -42,6 +42,7 @@ import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { getModulesDashboardConfig, MODULE_STATUS_NAMES } from '@/lib/hierarchy-dashboard-configs';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
+import { PageRefreshButton } from '@/components/page-data-refresh';
 import { useAuth } from '@/lib/auth-context';
 import { canManageInstall, ownInstallRowClass, showOwnInstallBadge } from '@/lib/install-ownership';
 import { cn } from '@/lib/utils';
@@ -236,9 +237,12 @@ export default function ModulesPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{entityLabel('module', true)}</h1>
-        <p className="text-sm text-muted-foreground">Manage subsystem modules</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{entityLabel('module', true)}</h1>
+          <p className="text-sm text-muted-foreground">Manage subsystem modules</p>
+        </div>
+        <PageRefreshButton onRefresh={pagination.refetch} />
       </div>
 
       <ListContentSuspense loading={pagination.fetching}>

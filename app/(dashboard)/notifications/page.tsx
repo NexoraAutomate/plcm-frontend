@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Bell, Search } from 'lucide-react';
 import { format, isToday, isYesterday, startOfDay } from 'date-fns';
 import { NotificationRow } from '@/components/notifications/notification-row';
@@ -11,6 +11,8 @@ import { parseApiDate } from '@/lib/parse-api-date';
 import { Input } from '@/components/ui/input';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { ListContentSuspense } from '@/components/list-content-suspense';
+import { PageRefreshButton } from '@/components/page-data-refresh';
+import { useDataStore } from '@/lib/data-store';
 
 function groupLabel(date: Date): string {
   if (isToday(date)) return 'Today';
@@ -21,6 +23,7 @@ function groupLabel(date: Date): string {
 export default function NotificationsPage() {
   const { isInventoryManager } = useAuth();
   const inventoryManager = isInventoryManager();
+  const { refreshLightweight } = useDataStore();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 250);
   const {
@@ -34,6 +37,14 @@ export default function NotificationsPage() {
     refreshReturnNotices,
     refreshInstallerNotices,
   } = useAppNotifications({ search: debouncedSearch });
+
+  const refresh = useCallback(async () => {
+    await Promise.all([
+      refreshLightweight(),
+      refreshReturnNotices(),
+      refreshInstallerNotices(),
+    ]);
+  }, [refreshInstallerNotices, refreshLightweight, refreshReturnNotices]);
 
   const grouped = useMemo(() => {
     const groups = new Map<string, typeof notifications>();
@@ -56,13 +67,16 @@ export default function NotificationsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Notifications</h1>
-        <p className="text-sm text-muted-foreground">
-          {inventoryManager
-            ? 'Full notification history — search across all inventory notices and system alerts'
-            : 'Your notification history — inventory issued to you and return decisions'}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Notifications</h1>
+          <p className="text-sm text-muted-foreground">
+            {inventoryManager
+              ? 'Full notification history — search across all inventory notices and system alerts'
+              : 'Your notification history — inventory issued to you and return decisions'}
+          </p>
+        </div>
+        <PageRefreshButton onRefresh={refresh} />
       </div>
 
       <div className="relative">

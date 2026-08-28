@@ -47,6 +47,7 @@ import { P } from '@/lib/permission-codes';
 import { useAuth } from '@/lib/auth-context';
 import { canManageInstall, ownInstallRowClass, showOwnInstallBadge } from '@/lib/install-ownership';
 import { cn } from '@/lib/utils';
+import { PageRefreshButton } from '@/components/page-data-refresh';
 import {
   InstallerFilterSelect,
   resolveInstallerFilterId,
@@ -231,9 +232,12 @@ export default function ComponentsPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{entityLabel('component', true)}</h1>
-        <p className="text-sm text-muted-foreground">Manage unit components and parts</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{entityLabel('component', true)}</h1>
+          <p className="text-sm text-muted-foreground">Manage unit components and parts</p>
+        </div>
+        <PageRefreshButton onRefresh={pagination.refetch} />
       </div>
 
       <ListContentSuspense loading={pagination.fetching}>

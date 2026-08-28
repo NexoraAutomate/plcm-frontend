@@ -38,6 +38,7 @@ import { Progress } from '@/components/ui/progress';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
+import { PageRefreshButton } from '@/components/page-data-refresh';
 import * as api from '@/lib/api';
 import type { HierarchyConfigurationSummary } from '@/lib/models';
 import { useAppDefinitions } from '@/lib/app-definitions-context';
@@ -267,9 +268,14 @@ export default function ProjectsPage(){
 
   return (
     <div className="space-y-8">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">{entityLabel('project', true)}</h1>
+          <p className="text-muted-foreground mt-2 text-sm ">Manage satellite lifecycle {entityLabel('project', true).toLowerCase()}</p>
+        </div>
+        <PageRefreshButton onRefresh={pagination.refetch} />
+      </div>
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">{entityLabel('project', true)}</h1>
-        <p className="text-muted-foreground mt-2 text-sm ">Manage satellite lifecycle {entityLabel('project', true).toLowerCase()}</p>
         {filteredOrder ? (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="rounded-full border bg-muted px-3 py-1 text-sm">

@@ -37,6 +37,7 @@ import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
+import { PageRefreshButton } from '@/components/page-data-refresh';
 
 type OrderForm = {
   order_number?: string
@@ -232,9 +233,12 @@ export default function OrdersPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Orders</h1>
-        <p className="text-muted-foreground mt-2">Manage all orders</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Orders</h1>
+          <p className="text-muted-foreground mt-2">Manage all orders</p>
+        </div>
+        <PageRefreshButton onRefresh={pagination.refetch} />
       </div>
 
       <ListContentSuspense loading={pagination.fetching}>

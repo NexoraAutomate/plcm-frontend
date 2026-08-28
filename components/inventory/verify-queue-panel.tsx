@@ -20,6 +20,7 @@ import { ListContentSuspense } from '@/components/list-content-suspense';
 import { StatusBadge } from '@/components/status-badge';
 import { WorkflowCan } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
+import { usePageDataRefresh } from '@/components/page-data-refresh';
 
 function formatWhen(value?: string | null) {
   if (!value) return '—';
@@ -50,6 +51,8 @@ export function VerifyQueuePanel() {
       setLoading(false);
     }
   }, []);
+
+  usePageDataRefresh(refresh);
 
   useEffect(() => {
     void refresh();
@@ -84,7 +87,7 @@ export function VerifyQueuePanel() {
   }
 
   return (
-    <ListContentSuspense loading={loading && rows.length === 0}>
+    <ListContentSuspense loading={loading}>
       {rows.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">
           No items are waiting for verification.

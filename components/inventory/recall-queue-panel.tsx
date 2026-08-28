@@ -27,6 +27,7 @@ import { ListContentSuspense } from '@/components/list-content-suspense';
 import { StatusBadge } from '@/components/status-badge';
 import { Can } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
+import { usePageDataRefresh } from '@/components/page-data-refresh';
 
 function formatWhen(value?: string | null) {
   if (!value) return '—';
@@ -71,6 +72,8 @@ export function RecallQueuePanel({ mine = false }: Props) {
       setLoading(false);
     }
   }, [mine]);
+
+  usePageDataRefresh(refresh);
 
   useEffect(() => {
     void refresh();
@@ -123,7 +126,7 @@ export function RecallQueuePanel({ mine = false }: Props) {
 
   return (
     <>
-      <ListContentSuspense loading={loading && rows.length === 0}>
+      <ListContentSuspense loading={loading}>
         {rows.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
             No open recall tasks.

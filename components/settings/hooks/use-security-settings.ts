@@ -122,22 +122,21 @@ export function useSecuritySettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await api.auth.getSecuritySettings();
-        if (!cancelled) setSettings(fromApi(res.data));
-      } catch {
-        if (!cancelled) setSettings(DEFAULT_SECURITY_SETTINGS);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+  const reload = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.auth.getSecuritySettings();
+      setSettings(fromApi(res.data));
+    } catch {
+      setSettings(DEFAULT_SECURITY_SETTINGS);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
 
   const saveSettings = useCallback(async (next: SecuritySettingsState) => {
     setSaving(true);
@@ -184,6 +183,7 @@ export function useSecuritySettings() {
     saveSettings,
     updatePasswordPolicy,
     updateTwoFactor,
+    reload,
   };
 }
 

@@ -22,6 +22,7 @@ import {
   type SettingsTabConfig,
   type SettingsTabId,
 } from '@/components/settings/settings-tabs-config';
+import { PageDataRefreshProvider, PageRefreshButton } from '@/components/page-data-refresh';
 
 function SettingsTabContent({ tab }: { tab: SettingsTabId }) {
   switch (tab) {
@@ -147,13 +148,17 @@ export function SettingsPage() {
   const activeMeta = visibleTabs.find((t) => t.id === activeTab);
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="text-sm text-muted-foreground">
-          Centralized administration for users, access control, and system configuration
-        </p>
-      </div>
+    <PageDataRefreshProvider>
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+            <p className="text-sm text-muted-foreground">
+              Centralized administration for users, access control, and system configuration
+            </p>
+          </div>
+          <PageRefreshButton />
+        </div>
 
       <Tabs
         value={activeTab}
@@ -191,6 +196,7 @@ export function SettingsPage() {
           </TabsContent>
         ))}
       </Tabs>
-    </div>
+      </div>
+    </PageDataRefreshProvider>
   );
 }

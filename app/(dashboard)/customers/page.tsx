@@ -36,6 +36,7 @@ import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
+import { PageRefreshButton } from '@/components/page-data-refresh';
 
 const emptyCustomerForm: CustomerForm = {
   customer_code: '',
@@ -240,9 +241,12 @@ export default function CustomersPage() {
   return (
     
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Customers</h1>
-        <p className="text-muted-foreground mt-2">Manage your customer list</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Customers</h1>
+          <p className="text-muted-foreground mt-2">Manage your customer list</p>
+        </div>
+        <PageRefreshButton onRefresh={pagination.refetch} />
       </div>
 
       <ListContentSuspense loading={pagination.fetching}>

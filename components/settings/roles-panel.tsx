@@ -35,6 +35,7 @@ import { useSyncedPage } from '@/hooks/use-synced-page';
 import { auth } from '@/lib/api';
 import { P } from '@/lib/permission-codes';
 import type { Permission, Role } from '@/lib/models';
+import { usePageDataRefresh } from '@/components/page-data-refresh';
 
 const PAGE_SIZE = 10;
 
@@ -78,6 +79,8 @@ export function RolesPanel({ embedded = false }: RolesPanelProps) {
       setLoading(false);
     }
   }, [listFilterPatch.sort_by, listFilterPatch.sort_order]);
+
+  usePageDataRefresh(loadData);
 
   useEffect(() => {
     loadData();

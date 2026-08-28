@@ -68,6 +68,7 @@ import { UserLoginHistoryDialog } from '@/components/settings/user-login-history
 import { UserDetailsDialog } from '@/components/settings/user-details-dialog';
 import { UserAvatar } from '@/components/user-avatar';
 import { useAuth } from '@/lib/auth-context';
+import { usePageDataRefresh } from '@/components/page-data-refresh';
 
 export type UsersPanelProps = {
   embedded?: boolean;
@@ -179,6 +180,12 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
       setStats(null);
     }
   }, []);
+
+  const refreshPageData = useCallback(async () => {
+    await Promise.all([pagination.refetch(), refreshStats()]);
+  }, [pagination.refetch, refreshStats]);
+
+  usePageDataRefresh(refreshPageData);
 
   useEffect(() => {
     const fetchData = async () => {

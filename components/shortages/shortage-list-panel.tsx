@@ -14,6 +14,7 @@ import { P } from '@/lib/permission-codes';
 import * as api from '@/lib/api';
 import type { InventoryShortage } from '@/lib/models';
 import { parseApiDate } from '@/lib/parse-api-date';
+import { usePageDataRefresh } from '@/components/page-data-refresh';
 
 type Props = {
   projectId?: number;
@@ -64,6 +65,8 @@ export function ShortageListPanel({
     const res = await api.projects.listShortages(projectId, true);
     setRows(res.data ?? []);
   }, [inventoryScope, projectId]);
+
+  usePageDataRefresh(refresh);
 
   useEffect(() => {
     void refresh().catch(() => {

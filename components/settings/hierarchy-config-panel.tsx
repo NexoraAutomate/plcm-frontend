@@ -46,6 +46,7 @@ import { Can } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
 import { useAuth } from '@/lib/auth-context';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { usePageDataRefresh } from '@/components/page-data-refresh';
 import * as api from '@/lib/api';
 import type {
   HierarchyConfigNode,
@@ -367,6 +368,10 @@ export function HierarchyConfigPanel({
       else setLoading(false);
     }
   }, [canListAll]);
+
+  const refreshPageData = useCallback(() => load({ quiet: true }), [load]);
+
+  usePageDataRefresh(refreshPageData);
 
   useEffect(() => {
     void load();
