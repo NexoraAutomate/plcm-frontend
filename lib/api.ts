@@ -855,6 +855,8 @@ export const inventory = {
       targets,
       label_type: labelType,
     }),
+  generateAllLabels: () =>
+    api.post<Models.InventoryLabel[]>('/labels/generate-all', {}),
   printLabels: (data: {
     label_ids: string[]
     label_format?: string

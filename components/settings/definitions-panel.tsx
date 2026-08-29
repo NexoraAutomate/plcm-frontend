@@ -265,6 +265,135 @@ function DefinitionsLabelsSection() {
       </SettingsSection>
 
       <SettingsSection
+        title="Inventory label printing"
+        description="Only Admin decides whether inventory labels use QR codes or barcodes and controls their physical and sticker sizes."
+      >
+        <SettingsCard>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="inventory_label_code_type">Code printed on labels</Label>
+              <Select
+                value={draft.inventory_label_code_type}
+                onValueChange={(value) =>
+                  updateDraft({ inventory_label_code_type: value as 'qr' | 'barcode' })
+                }
+              >
+                <SelectTrigger id="inventory_label_code_type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="qr">QR code</SelectItem>
+                  <SelectItem value="barcode">Bar code</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="inventory_qr_size_in">QR code size (inches)</Label>
+              <Input
+                id="inventory_qr_size_in"
+                type="number"
+                min="0.1"
+                max="20"
+                step="0.01"
+                value={draft.inventory_qr_size_in}
+                onChange={(event) =>
+                  updateDraft({ inventory_qr_size_in: Number(event.target.value) })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>QR sticker size (inches)</Label>
+              <div className="flex gap-2">
+                <Input
+                  aria-label="QR sticker width in inches"
+                  type="number"
+                  min="0.1"
+                  max="8.27"
+                  step="0.01"
+                  value={draft.inventory_qr_sticker_width_in}
+                  onChange={(event) =>
+                    updateDraft({ inventory_qr_sticker_width_in: Number(event.target.value) })
+                  }
+                />
+                <Input
+                  aria-label="QR sticker height in inches"
+                  type="number"
+                  min="0.1"
+                  max="11.69"
+                  step="0.01"
+                  value={draft.inventory_qr_sticker_height_in}
+                  onChange={(event) =>
+                    updateDraft({ inventory_qr_sticker_height_in: Number(event.target.value) })
+                  }
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">Width × height</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Barcode size (inches)</Label>
+              <div className="flex gap-2">
+                <Input
+                  aria-label="Barcode width in inches"
+                  type="number"
+                  min="0.1"
+                  max="20"
+                  step="0.01"
+                  value={draft.inventory_barcode_width_in}
+                  onChange={(event) =>
+                    updateDraft({ inventory_barcode_width_in: Number(event.target.value) })
+                  }
+                />
+                <Input
+                  aria-label="Barcode height in inches"
+                  type="number"
+                  min="0.1"
+                  max="20"
+                  step="0.01"
+                  value={draft.inventory_barcode_height_in}
+                  onChange={(event) =>
+                    updateDraft({ inventory_barcode_height_in: Number(event.target.value) })
+                  }
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">Width × height</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Barcode sticker size (inches)</Label>
+              <div className="flex gap-2">
+                <Input
+                  aria-label="Barcode sticker width in inches"
+                  type="number"
+                  min="0.1"
+                  max="8.27"
+                  step="0.01"
+                  value={draft.inventory_barcode_sticker_width_in}
+                  onChange={(event) =>
+                    updateDraft({ inventory_barcode_sticker_width_in: Number(event.target.value) })
+                  }
+                />
+                <Input
+                  aria-label="Barcode sticker height in inches"
+                  type="number"
+                  min="0.1"
+                  max="11.69"
+                  step="0.01"
+                  value={draft.inventory_barcode_sticker_height_in}
+                  onChange={(event) =>
+                    updateDraft({ inventory_barcode_sticker_height_in: Number(event.target.value) })
+                  }
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">Width × height</p>
+            </div>
+          </div>
+          <p className="mt-4 text-xs text-muted-foreground">
+            The PDF grid automatically uses these sticker dimensions. QR defaults are
+            0.65 × 0.65 in; barcode defaults are 2.0 × 0.5 in.
+          </p>
+        </SettingsCard>
+      </SettingsSection>
+
+      <SettingsSection
         title="Per-level serial & part number templates"
         description={`Select a hierarchy level and define its templates. ${TEMPLATE_PLACEHOLDER_HELP} Preview uses the first entity from the Entity List catalog.`}
       >

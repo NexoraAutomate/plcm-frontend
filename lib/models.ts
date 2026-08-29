@@ -114,6 +114,14 @@ export interface AppDefinitions {
   serial_template_unit: string
   part_template_component: string
   serial_template_component: string
+  inventory_label_code_type: 'qr' | 'barcode' | string
+  inventory_qr_size_in: number
+  inventory_barcode_width_in: number
+  inventory_barcode_height_in: number
+  inventory_qr_sticker_width_in: number
+  inventory_qr_sticker_height_in: number
+  inventory_barcode_sticker_width_in: number
+  inventory_barcode_sticker_height_in: number
   updated_at?: string | null
 }
 
@@ -999,6 +1007,7 @@ export interface InventoryLabel {
   id: number
   label_id: string
   signed_payload: string
+  barcode_payload?: string
   inventory_id: number
   inventory_instance_id?: number | null
   serial_number?: string | null

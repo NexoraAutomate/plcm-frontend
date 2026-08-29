@@ -114,7 +114,7 @@ export function InventoryLabelScanner({ onDetected }: ScannerProps) {
             id="label-payload"
             value={manualPayload}
             onChange={(event) => setManualPayload(event.target.value)}
-            placeholder="PLCM1.…"
+            placeholder="PLCM1.… or PLCB.…"
             autoComplete="off"
           />
           <Button type="submit">Resolve</Button>

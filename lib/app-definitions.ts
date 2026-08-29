@@ -81,6 +81,14 @@ export const DEFAULT_APP_DEFINITIONS: Omit<AppDefinitions, 'id' | 'updated_at'> 
   serial_template_unit: LEVEL_DEFAULTS.unit.serial,
   part_template_component: LEVEL_DEFAULTS.component.part,
   serial_template_component: LEVEL_DEFAULTS.component.serial,
+  inventory_label_code_type: 'qr',
+  inventory_qr_size_in: 0.65,
+  inventory_barcode_width_in: 2,
+  inventory_barcode_height_in: 0.5,
+  inventory_qr_sticker_width_in: 1.25,
+  inventory_qr_sticker_height_in: 1.25,
+  inventory_barcode_sticker_width_in: 2.25,
+  inventory_barcode_sticker_height_in: 0.9,
 };
 
 export const TEMPLATE_PLACEHOLDER_HELP =

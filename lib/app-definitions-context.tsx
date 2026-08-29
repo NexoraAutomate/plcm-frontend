@@ -36,8 +36,9 @@ export function AppDefinitionsProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
 
   const applyDefinitions = useCallback((next: AppDefinitions) => {
-    setRuntimeAppDefinitions(next);
-    setDefinitions(next);
+    const merged = { ...FALLBACK, ...next };
+    setRuntimeAppDefinitions(merged);
+    setDefinitions(merged);
   }, []);
 
   const refresh = useCallback(async () => {

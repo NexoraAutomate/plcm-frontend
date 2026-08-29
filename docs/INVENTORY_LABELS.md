@@ -15,11 +15,14 @@ The backend must resolve and authorize a signed payload before inventory details
 are displayed. Invalid, altered, unassigned, deactivated, replaced, and
 conflicting labels produce a clear result state.
 
-The payload contains only an opaque label ID and a server signature:
-`PLCM1.<label-id>.<signature>`. A copied physical sticker cannot be detected by
-software alone. Use activation/investigation, server validation, scan history,
-and user/time/location checks to identify suspicious reuse. Authorized managers
-can investigate, deactivate, or replace a compromised label from the scan result.
+QR payloads contain only an opaque label ID and a server signature:
+`PLCM1.<label-id>.<signature>`. Barcodes use a shorter signed payload:
+`PLCB.<base36-label-database-id>.<short-signature>`, which is suitable for
+millions of labels while remaining server-validated. A copied physical sticker
+cannot be detected by software alone. Use activation/investigation, server
+validation, scan history, and user/time/location checks to identify suspicious
+reuse. Authorized managers can investigate, deactivate, or replace a compromised
+label from the scan result.
 
 The current frontend has no test runner, so label behavior is covered by the
 typed API/UI implementation and the backend tests; use `npm run lint` and

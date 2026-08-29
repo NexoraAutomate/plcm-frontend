@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { History, Printer, RefreshCw, ShieldAlert, Tag } from 'lucide-react';
+import { FileDown, History, RefreshCw, ShieldAlert, Tag } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,11 @@ import * as api from '@/lib/api';
 import type { Inventory, InventoryInstance, InventoryLabel, InventoryLabelHistory } from '@/lib/models';
 import { qrDataUrl } from '@/components/reporting/ReportQRCode';
 import { code128Bars } from '@/lib/code128';
+import {
+  type InventoryPrintCode,
+  saveInventoryLabelsPdf,
+} from '@/lib/inventory-label-pdf';
+import { useAppDefinitions } from '@/lib/app-definitions-context';
 
 interface InventoryLabelDialogProps {
   open: boolean;
@@ -45,37 +50,24 @@ function Code128Barcode({ value }: { value: string }) {
   );
 }
 
-function downloadBarcode(label: InventoryLabel) {
-  const bars = code128Bars(label.signed_payload);
-  const scale = 2;
-  let cursor = 4;
-  const width = bars.reduce((total, bar) => total + bar.width * scale, 8);
-  const rectangles = bars.map((bar) => {
-    const x = cursor;
-    cursor += bar.width * scale;
-    return bar.dark ? `<rect x="${x}" y="2" width="${bar.width * scale}" height="38" />` : '';
-  }).join('');
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="54" viewBox="0 0 ${width} 54"><rect width="100%" height="100%" fill="white"/>${rectangles}<text x="50%" y="51" text-anchor="middle" font-size="8">${label.signed_payload}</text></svg>`;
-  const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = `label-${label.label_id}.svg`;
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
-
-function LabelPreview({ label }: { label: InventoryLabel }) {
+function LabelPreview({ label, code }: { label: InventoryLabel; code: InventoryPrintCode }) {
   const [qr, setQr] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    if (code !== 'qr') {
+      setQr(null);
+      return () => {
+        cancelled = true;
+      };
+    }
     void qrDataUrl(label.signed_payload, 144).then((url) => {
       if (!cancelled) setQr(url);
     });
     return () => {
       cancelled = true;
     };
-  }, [label.signed_payload]);
+  }, [code, label.signed_payload]);
 
   return (
     <div className="label-print-card flex min-w-0 flex-col gap-3 rounded-lg border bg-white p-4 text-black">
@@ -84,34 +76,19 @@ function LabelPreview({ label }: { label: InventoryLabel }) {
           <p className="font-semibold">{label.inventory_name || 'Inventory item'}</p>
           <p className="font-mono text-xs">{label.serial_number || label.part_number || 'Unserialized stock'}</p>
         </div>
-        <Badge variant="outline">{label.label_type}</Badge>
+        <Badge variant="outline">{code === 'qr' ? 'QR code' : 'Bar code'}</Badge>
       </div>
       <div className="flex flex-wrap items-center gap-4">
-        {label.label_type !== 'barcode' ? (
+        {code === 'qr' ? (
           qr ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={qr} alt={`QR code for ${label.serial_number || label.label_id}`} className="h-28 w-28" />
           ) : (
             <div className="h-28 w-28 animate-pulse rounded bg-muted" />
           )
-        ) : null}
-        {label.label_type !== 'qr' ? <Code128Barcode value={label.signed_payload} /> : null}
-      </div>
-      <div className="flex gap-2 text-xs">
-        {qr && label.label_type !== 'barcode' ? (
-          <a
-            href={qr}
-            download={`label-${label.label_id}.png`}
-            className="underline underline-offset-2"
-          >
-            Download QR
-          </a>
-        ) : null}
-        {label.label_type !== 'qr' ? (
-          <button type="button" className="underline underline-offset-2" onClick={() => downloadBarcode(label)}>
-            Download barcode
-          </button>
-        ) : null}
+        ) : (
+          <Code128Barcode value={label.barcode_payload || label.signed_payload} />
+        )}
       </div>
       <p className="break-all font-mono text-[10px] text-slate-500">{label.label_id}</p>
     </div>
@@ -124,11 +101,13 @@ export function InventoryLabelDialog({
   item,
   instance,
 }: InventoryLabelDialogProps) {
+  const { definitions } = useAppDefinitions();
   const [labels, setLabels] = useState<InventoryLabel[]>([]);
   const [history, setHistory] = useState<InventoryLabelHistory | null>(null);
-  const [labelType, setLabelType] = useState<'qr' | 'barcode' | 'both'>('both');
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
+  const printCode: InventoryPrintCode =
+    definitions.inventory_label_code_type === 'barcode' ? 'barcode' : 'qr';
 
   const targets = useMemo(() => {
     if (instance?.id) {
@@ -142,7 +121,7 @@ export function InventoryLabelDialog({
         serial_number: entry.serial_number,
       }));
     }
-    return [{ inventory_id: item.id, serial_number: item.serial_number }];
+    return [{ inventory_id: item.id }];
   }, [instance, item]);
 
   async function refresh() {
@@ -170,7 +149,7 @@ export function InventoryLabelDialog({
   async function generate() {
     setBusy(true);
     try {
-      const result = await api.inventory.generateLabels(targets, labelType);
+      const result = await api.inventory.generateLabels(targets, printCode);
       setLabels(result.data);
       toast.success(`Ready: ${result.data.length} label${result.data.length === 1 ? '' : 's'}`);
     } catch (error: unknown) {
@@ -190,12 +169,12 @@ export function InventoryLabelDialog({
     try {
       await api.inventory.printLabels({
         label_ids: [label.label_id],
-        label_format: 'standard',
+        label_format: printCode,
         reason: reason.trim() || undefined,
       });
+      await saveInventoryLabelsPdf([label], printCode, definitions);
       await refresh();
-      toast.success(label.print_count > 0 ? 'Reprint recorded' : 'First print recorded');
-      window.setTimeout(() => window.print(), 0);
+      toast.success(`Saved ${printCode.toUpperCase()} label as PDF`);
     } catch (error: unknown) {
       const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       toast.error(typeof detail === 'string' ? detail : 'Unable to record print');
@@ -215,12 +194,12 @@ export function InventoryLabelDialog({
     try {
       await api.inventory.printLabels({
         label_ids: activeLabels.map((label) => label.label_id),
-        label_format: 'standard',
+        label_format: printCode,
         reason: reason.trim() || undefined,
       });
+      await saveInventoryLabelsPdf(activeLabels, printCode, definitions);
       await refresh();
-      toast.success(`Recorded ${activeLabels.length} label prints`);
-      window.setTimeout(() => window.print(), 0);
+      toast.success(`Saved ${activeLabels.length} ${printCode.toUpperCase()} labels as PDF`);
     } catch (error: unknown) {
       const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       toast.error(typeof detail === 'string' ? detail : 'Unable to record bulk print');
@@ -247,22 +226,16 @@ export function InventoryLabelDialog({
             Inventory labels
           </DialogTitle>
           <DialogDescription>
-            Signed labels resolve through the server and never contain sensitive inventory data.
+            Signed labels resolve through the server. The printable label also shows the
+            product name, part number, and serial number for correct placement.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-wrap items-end gap-3 border-b pb-4">
           <div className="min-w-40">
-            <Label htmlFor="label-type">Label type</Label>
-            <select
-              id="label-type"
-              value={labelType}
-              onChange={(event) => setLabelType(event.target.value as typeof labelType)}
-              className="mt-1 h-9 w-full rounded-md border bg-background px-2 text-sm"
-            >
-              <option value="both">QR + barcode</option>
-              <option value="qr">QR only</option>
-              <option value="barcode">Barcode only</option>
-            </select>
+            <Label>Admin print format</Label>
+            <p className="mt-1 h-9 rounded-md border bg-muted px-2 py-2 text-sm">
+              {printCode === 'qr' ? 'QR code' : 'Bar code'}
+            </p>
           </div>
           <div className="min-w-64 flex-1">
             <Label htmlFor="reprint-reason">Reprint reason (required for copies)</Label>
@@ -276,12 +249,14 @@ export function InventoryLabelDialog({
           </div>
           <Button onClick={() => void generate()} disabled={busy}>
             <RefreshCw className="mr-2 h-4 w-4" />
-            {busy ? 'Working…' : `Generate ${targets.length > 1 ? 'bulk ' : ''}label${targets.length > 1 ? 's' : ''}`}
+            {busy
+              ? 'Working…'
+              : `Generate missing ${targets.length > 1 ? 'labels' : 'label'}`}
           </Button>
           {labels.some((label) => label.status === 'active') ? (
             <Button variant="outline" onClick={() => void printAll()} disabled={busy}>
-              <Printer className="mr-2 h-4 w-4" />
-              Print all
+              <FileDown className="mr-2 h-4 w-4" />
+              Save all as PDF
             </Button>
           ) : null}
         </div>
@@ -293,15 +268,15 @@ export function InventoryLabelDialog({
           <div className="grid gap-4 md:grid-cols-2">
             {labels.map((label) => (
               <div key={label.label_id} className={label.status === 'active' ? '' : 'opacity-60'}>
-                <LabelPreview label={label} />
+              <LabelPreview label={label} code={printCode} />
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <span className="text-xs text-muted-foreground">
                     {label.status} · {label.print_count} printed
                   </span>
                   <div className="flex gap-1">
                     <Button size="sm" variant="outline" onClick={() => void print(label)} disabled={busy || label.status !== 'active'}>
-                      <Printer className="mr-1 h-3.5 w-3.5" />
-                      {label.print_count ? 'Reprint' : 'Print'}
+                      <FileDown className="mr-1 h-3.5 w-3.5" />
+                      {label.print_count ? 'Save copy' : 'Save PDF'}
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => void viewHistory(label)}>
                       <History className="mr-1 h-3.5 w-3.5" />

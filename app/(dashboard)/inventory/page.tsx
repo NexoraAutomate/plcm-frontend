@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Edit, Trash2, Search, Layers, Network, Copy, ChevronDown, PackageMinus, ListOrdered, Undo2, RefreshCw, Download, Upload, FileText, AlertCircle, CheckCircle2, Tag, ScanLine } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Layers, Network, Copy, ChevronDown, PackageMinus, ListOrdered, Undo2, RefreshCw, Download, Upload, FileText, AlertCircle, CheckCircle2, Tag, ScanLine, QrCode } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
@@ -71,6 +71,7 @@ import { InventoryIssueDialog } from '@/components/inventory-issue-dialog';
 import { InventoryReservationHoldDialog } from '@/components/inventory-reservation-hold-dialog';
 import { IssuanceRemarksDialog } from '@/components/inventory/issuance-remarks-dialog';
 import { InventoryLabelDialog } from '@/components/inventory/inventory-label-dialog';
+import { InventoryBulkLabelDialog } from '@/components/inventory/inventory-bulk-label-dialog';
 import { StatusBadge } from '@/components/status-badge';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -334,6 +335,7 @@ export default function InventoryPage() {
     item: InventoryItem;
     instance?: InventoryInstance;
   } | null>(null);
+  const [bulkLabelsOpen, setBulkLabelsOpen] = useState(false);
 
   // CSV import/export state
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -1686,6 +1688,18 @@ export default function InventoryPage() {
               Import
             </Button>
           )}
+          {inventoryManager ? (
+            <Can permission={P.inventory_label_generate}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBulkLabelsOpen(true)}
+              >
+                <QrCode className="mr-2 h-4 w-4" />
+                Generate all labels
+              </Button>
+            </Can>
+          ) : null}
           <Can permission={P.view_inventory_issuances}>
             <Button variant="outline" asChild>
               <Link href="/inventory/issuances">
@@ -2560,6 +2574,11 @@ export default function InventoryPage() {
           }}
         />
       ) : null}
+
+      <InventoryBulkLabelDialog
+        open={bulkLabelsOpen}
+        onOpenChange={setBulkLabelsOpen}
+      />
 
       <IssuanceRemarksDialog
         open={returnIssuanceId != null}
