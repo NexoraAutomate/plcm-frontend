@@ -946,6 +946,10 @@ export const entities = {
     }),
   get: (id: number) => api.get<Models.Entity>(`/entities/${id}/`),
   getStatusHistory: (id: number) => api.get<Models.EntityStatusHistory[]>(`/entities/${id}/status-history/`),
+  getLifecycleHistory: (entityType: string, entityPk: number) =>
+    api.get<Models.EntityLifecycleHistoryEvent[]>(
+      `/entities/${encodeURIComponent(entityType)}/${entityPk}/lifecycle-history/`
+    ),
   getMaintenanceLogs: (id: number) => api.get<Models.MaintenanceLog[]>(`/entities/${id}/maintenance-logs/`),
   getReplacementChain: (entityType: string, entityPk: number) =>
     api.get<Models.EntityReplacementChainItem[]>(

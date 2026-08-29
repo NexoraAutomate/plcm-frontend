@@ -44,12 +44,10 @@ import { isProjectReadOnly } from '@/lib/workflow-status';
 import { useProjectInventoryFlags } from '@/hooks/use-project-inventory-flags';
 import { inventoryFlagKey } from '@/lib/system-hierarchy-graph';
 import {
-  ENTITY_LIFECYCLE_LABEL,
   entityLifecycleCardClass,
   resolveEntityLifecycleTone,
 } from '@/lib/entity-lifecycle-style';
 import { EntityInventoryHoldDetails } from '@/components/entity-inventory-hold-details';
-import { StatusBadge } from '@/components/status-badge';
 import type { HierarchyAssignmentStatus } from '@/lib/models';
 
 type HardwareOwnerType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
@@ -158,7 +156,6 @@ export function EntityInstallMetadataCard({
     assignedDeveloperId: entity.assigned_developer_id,
     assignment,
   });
-  const lifecycleLabel = ENTITY_LIFECYCLE_LABEL[tone];
   const showOwnInstallChrome =
     tone === 'neutral' &&
     !inventoryManager &&
@@ -322,7 +319,6 @@ export function EntityInstallMetadataCard({
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <CardTitle className="text-base">Installation & Media</CardTitle>
-                  {lifecycleLabel ? <StatusBadge status={lifecycleLabel} /> : null}
                   <ChevronDown
                     className={cn(
                       'h-4 w-4 shrink-0 text-muted-foreground transition-transform',

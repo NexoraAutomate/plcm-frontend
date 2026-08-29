@@ -13,6 +13,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { StatusBadge } from '@/components/status-badge';
 import { EntityStatusHistorySheet } from '@/components/entity-status-history-sheet';
 import { EntityInstallMetadataCard } from '@/components/entity-install-metadata-card';
+import { resolveStatusName } from '@/lib/entity-status';
 import {
   resolveCurrentInstallEntity,
   resolveProjectIdForHardwareEntity,
@@ -28,7 +29,16 @@ export default function ComponentDetailPage() {
   const params = useParams();
   const componentId = params.id as string;
   const { pageLoading } = useEntityHierarchyGate();
-  const { components, units, modules, subsystems, systems, projects, updateComponent } = useDataStore();
+  const {
+    components,
+    units,
+    modules,
+    subsystems,
+    systems,
+    projects,
+    statuses,
+    updateComponent,
+  } = useDataStore();
   
   const component = useResolvedHardwareEntity(componentId, 'component', components);
   const unit = component ? resolveCurrentInstallEntity(component.unit_id, units) : null;
@@ -158,7 +168,7 @@ export default function ComponentDetailPage() {
             <div>
               <p className="text-xs text-muted-foreground">Status</p>
               <div className="flex items-center gap-1">
-                <StatusBadge status={component.status?.status_name || 'Unknown'} />
+                <StatusBadge status={resolveStatusName(component, statuses)} />
                 <EntityStatusHistorySheet
                   entityType="component"
                   entityPk={component.id}
@@ -188,22 +198,10 @@ export default function ComponentDetailPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div>
                 <p className="text-sm text-muted-foreground">Name</p>
                 <p className="text-base font-medium mt-1">{component.name}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Status</p>
-                <div className="mt-1 flex items-center gap-2">
-                  <StatusBadge status={component.status?.status_name || 'Unknown'} />
-                  <EntityStatusHistorySheet
-                    entityType="component"
-                    entityPk={component.id}
-                    entityName={component.name}
-                    triggerVariant="icon"
-                  />
-                </div>
               </div>
             </div>
             {component.description && (

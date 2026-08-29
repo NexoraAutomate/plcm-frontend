@@ -353,7 +353,14 @@ export interface ConfigChangeCreateProjectResult {
 }
 
 export const WorkflowAuditAction = {
+  CREATED: 'CREATED',
+  ASSIGNED: 'ASSIGNED',
+  UNASSIGNED: 'UNASSIGNED',
+  HM_ASSIGNED: 'HM_ASSIGNED',
+  STATUS_CHANGED: 'STATUS_CHANGED',
+  COMPLETE_REPORTED: 'COMPLETE_REPORTED',
   RESERVED: 'RESERVED',
+  RESERVATION_EXTENDED: 'RESERVATION_EXTENDED',
   RELEASED: 'RELEASED',
   ISSUED: 'ISSUED',
   INSTALLATION_IN_PROGRESS: 'INSTALLATION_IN_PROGRESS',
@@ -384,7 +391,14 @@ export type WorkflowAuditActionCode =
   (typeof WorkflowAuditAction)[keyof typeof WorkflowAuditAction]
 
 export const WORKFLOW_AUDIT_ACTION_LABELS: Record<string, string> = {
+  CREATED: 'Created',
+  ASSIGNED: 'Developer Assigned',
+  UNASSIGNED: 'Developer Unassigned',
+  HM_ASSIGNED: 'Hierarchy Manager Assigned',
+  STATUS_CHANGED: 'Status Changed',
+  COMPLETE_REPORTED: 'Installation Complete Reported',
   RESERVED: 'Reserved',
+  RESERVATION_EXTENDED: 'Reservation Extended',
   RELEASED: 'Released',
   ISSUED: 'Issued',
   INSTALLATION_IN_PROGRESS: 'Installation in Progress',
@@ -423,7 +437,7 @@ export const WORKFLOW_AUDIT_ROLE_LABELS: Record<string, string> = {
 export interface WorkflowAuditEvent {
   id: string
   occurred_at: string
-  actor_user_id: number
+  actor_user_id: number | null
   actor_username?: string | null
   actor_role: string
   action: string
@@ -437,6 +451,11 @@ export interface WorkflowAuditEvent {
   ip_address?: string | null
   user_agent?: string | null
   correlation_id?: string | null
+}
+
+export interface EntityLifecycleHistoryEvent extends WorkflowAuditEvent {
+  /** Normalized status/workflow event returned for a hardware node. */
+  source?: string
 }
 
 export interface WorkflowAuditActionCatalogItem {

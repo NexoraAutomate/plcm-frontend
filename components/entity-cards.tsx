@@ -179,7 +179,6 @@ export function EntityCards({
               const assignedId =
                 assignment?.assigned_developer_id ?? entity.assigned_developer_id ?? null;
               const issued = Boolean(assignment?.issued);
-              const showAssigned = Boolean(assignedId) && !issued;
               const flagKey = childEntityType
                 ? inventoryFlagKey(childEntityType, entity.id)
                 : '';
@@ -197,6 +196,12 @@ export function EntityCards({
                 statusName: statusLabel !== 'Unknown' ? statusLabel : null,
               });
               const lifecycleLabel = ENTITY_LIFECYCLE_LABEL[tone];
+              const primaryStatus = assignment?.defect_pending
+                ? 'Defect / rework'
+                : assignment?.item_status ||
+                  (issued
+                    ? 'ISSUED'
+                    : lifecycleLabel || (statusLabel !== 'Unknown' ? statusLabel : null));
               const ownsInstall = canManageInstall({
                 isInventoryManager: inventoryManager,
                 currentUserId: user?.id,
@@ -293,25 +298,7 @@ export function EntityCards({
                             />
                           ) : null}
                           <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
-                            {lifecycleLabel &&
-                            !showAssigned &&
-                            lifecycleLabel !== assignment?.item_status ? (
-                              <StatusBadge status={lifecycleLabel} />
-                            ) : null}
-                            {showAssigned ? <StatusBadge status="Assigned" /> : null}
-                            {assignment?.item_status ? (
-                              <StatusBadge status={assignment.item_status} />
-                            ) : issued && !['ISSUED', 'Issued'].includes(statusLabel) ? (
-                              <StatusBadge status="ISSUED" />
-                            ) : null}
-                            {assignment?.defect_pending ? (
-                              <StatusBadge status="Failed" />
-                            ) : null}
-                            {statusLabel !== 'Unknown' &&
-                            statusLabel.toUpperCase() !== (assignment?.item_status || '').toUpperCase() &&
-                            statusLabel.toUpperCase() !== (lifecycleLabel || '').toUpperCase() ? (
-                              <StatusBadge status={statusLabel} />
-                            ) : null}
+                            {primaryStatus ? <StatusBadge status={primaryStatus} /> : null}
                             {childEntityType ? (
                               <div onClick={(event) => event.preventDefault()}>
                                 <EntityStatusHistorySheet

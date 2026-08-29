@@ -54,12 +54,11 @@ export function WorkflowAuditHistorySheet({
       const res = await api.auditTrail.list(
         0,
         50,
-        projectId
-          ? { project_id: projectId }
-          : {
-              entity_type: entityType,
-              entity_id: entityId != null ? String(entityId) : undefined,
-            }
+        {
+          entity_type: entityType,
+          entity_id: entityId != null ? String(entityId) : undefined,
+          project_id: projectId ?? undefined,
+        }
       );
       setRows(res.data ?? []);
     } catch {

@@ -18,6 +18,7 @@ import { EntityForm } from '@/components/entity-form';
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import * as Models from '@/lib/models';
+import { resolveStatusName } from '@/lib/entity-status';
 import {
   buildCreateEntityByType,
 } from '@/lib/inventory-child-install';
@@ -340,7 +341,7 @@ export default function SubsystemDetailPage() {
             <div>
               <p className="text-xs text-muted-foreground">Status</p>
               <div className="flex items-center gap-1">
-                <StatusBadge status={subsystem.status?.status_name || 'Unknown'} />
+                <StatusBadge status={resolveStatusName(subsystem, statuses)} />
                 <EntityStatusHistorySheet
                   entityType="subsystem"
                   entityPk={subsystem.id}

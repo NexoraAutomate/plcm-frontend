@@ -26,6 +26,7 @@ import { isProjectReadOnly } from '@/lib/workflow-status';
 import { useProjectInventoryFlags } from '@/hooks/use-project-inventory-flags';
 import { inventoryFlagKey } from '@/lib/system-hierarchy-graph';
 import {
+  ENTITY_LIFECYCLE_LABEL,
   resolveEntityLifecycleTone,
 } from '@/lib/entity-lifecycle-style';
 import { EntityInventoryHoldDetails } from '@/components/entity-inventory-hold-details';
@@ -165,6 +166,14 @@ export function HierarchyEntityDetailPanel({
     assignment: assignmentProgress,
     statusName: entity ? getEntityStatusName(entity, statuses) : null,
   });
+  const statusName = entity ? getEntityStatusName(entity, statuses) : undefined;
+  const primaryStatus =
+    assignmentProgress?.defect_pending
+      ? 'Defect / rework'
+      : assignmentProgress?.item_status ||
+        (assignmentIssued
+          ? 'ISSUED'
+          : ENTITY_LIFECYCLE_LABEL[lifecycleTone] || statusName);
   const isCancelled = isProjectReadOnly(project?.status_name);
 
   const loadLinkedInventory = useCallback(async () => {
@@ -220,7 +229,6 @@ export function HierarchyEntityDetailPanel({
     [linkedInventory, originalBuild?.partNumber]
   );
 
-  const statusName = entity ? getEntityStatusName(entity, statuses) : undefined;
   const installerLabel = useMemo(() => {
     if (!entity?.installed_by_id) return undefined;
     const found = users.find((item) => item.id === entity.installed_by_id);
@@ -320,20 +328,7 @@ export function HierarchyEntityDetailPanel({
             <div className="py-2">
               {statusName ? (
                 <div className="mb-2 flex flex-wrap gap-1">
-                  {entity.assigned_developer_id && !assignmentIssued ? (
-                    <StatusBadge status="Assigned" />
-                  ) : null}
-                  {assignmentProgress?.item_status ? (
-                    <StatusBadge status={assignmentProgress.item_status} />
-                  ) : assignmentIssued && statusName.toUpperCase() !== 'ISSUED' ? (
-                    <StatusBadge status="ISSUED" />
-                  ) : null}
-                  {statusName &&
-                  statusName.toUpperCase() !== (assignmentProgress?.item_status || '').toUpperCase() ? (
-                    <StatusBadge status={statusName} />
-                  ) : !assignmentProgress?.item_status ? (
-                    <StatusBadge status={statusName} />
-                  ) : null}
+                  {primaryStatus ? <StatusBadge status={primaryStatus} /> : null}
                 </div>
               ) : entity.assigned_developer_id && !assignmentIssued ? (
                 <div className="mb-2">
@@ -390,20 +385,7 @@ export function HierarchyEntityDetailPanel({
             <div className="py-2">
               {statusName ? (
                 <div className="mb-2 flex flex-wrap gap-1">
-                  {entity.assigned_developer_id && !assignmentIssued ? (
-                    <StatusBadge status="Assigned" />
-                  ) : null}
-                  {assignmentProgress?.item_status ? (
-                    <StatusBadge status={assignmentProgress.item_status} />
-                  ) : assignmentIssued && statusName.toUpperCase() !== 'ISSUED' ? (
-                    <StatusBadge status="ISSUED" />
-                  ) : null}
-                  {statusName &&
-                  statusName.toUpperCase() !== (assignmentProgress?.item_status || '').toUpperCase() ? (
-                    <StatusBadge status={statusName} />
-                  ) : !assignmentProgress?.item_status ? (
-                    <StatusBadge status={statusName} />
-                  ) : null}
+                  {primaryStatus ? <StatusBadge status={primaryStatus} /> : null}
                 </div>
               ) : entity.assigned_developer_id && !assignmentIssued ? (
                 <div className="mb-2">

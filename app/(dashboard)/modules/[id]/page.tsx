@@ -40,6 +40,7 @@ import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity'
 import { useHierarchyCreateFormOptions } from '@/hooks/use-hierarchy-create-form-options';
 import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
 import { isProjectReadOnly } from '@/lib/workflow-status';
+import { resolveStatusName } from '@/lib/entity-status';
 
 export default function ModuleDetailPage() {
   const { entityLabel } = useAppDefinitions();
@@ -356,7 +357,7 @@ export default function ModuleDetailPage() {
             <div>
               <p className="text-xs text-muted-foreground">Status</p>
               <div className="flex items-center gap-1">
-                <StatusBadge status={module.status?.status_name || 'Unknown'} />
+                <StatusBadge status={resolveStatusName(module, statuses)} />
                 <EntityStatusHistorySheet
                   entityType="module"
                   entityPk={module.id}

@@ -512,7 +512,16 @@ export default function ProjectDetailPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Status</p>
-              <StatusBadge status={project.status_name || 'Unknown'} />
+              <div className="flex items-center gap-1">
+                <StatusBadge status={project.status_name || 'Unknown'} />
+                <EntityStatusHistorySheet
+                  entityType="project"
+                  entityPk={project.id}
+                  entityName={project.name}
+                  statuses={statuses}
+                  triggerVariant="icon"
+                />
+              </div>
             </div>
           </CardContent>
         </Card>

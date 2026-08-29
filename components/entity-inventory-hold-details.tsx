@@ -7,7 +7,6 @@ import {
   shortageDisplayFields,
   type EntityLifecycleTone,
 } from '@/lib/entity-lifecycle-style';
-import { StatusBadge } from '@/components/status-badge';
 import { cn } from '@/lib/utils';
 
 function Field({
@@ -91,7 +90,6 @@ export function EntityInventoryHoldDetails({
         <p className="text-sm font-medium">
           {tone === 'short' ? 'Inventory shortage' : 'Reserved inventory'}
         </p>
-        {label ? <StatusBadge status={label} /> : null}
       </div>
       <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
         <div>
