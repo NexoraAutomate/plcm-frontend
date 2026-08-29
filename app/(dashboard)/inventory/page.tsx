@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Edit, Trash2, Search, Layers, Network, Copy, ChevronDown, PackageMinus, ListOrdered, Undo2, RefreshCw, Download, Upload, FileText, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Layers, Network, Copy, ChevronDown, PackageMinus, ListOrdered, Undo2, RefreshCw, Download, Upload, FileText, AlertCircle, CheckCircle2, Tag, ScanLine } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
@@ -70,6 +70,7 @@ import { InventoryHierarchyDialog } from '@/components/inventory-hierarchy-dialo
 import { InventoryIssueDialog } from '@/components/inventory-issue-dialog';
 import { InventoryReservationHoldDialog } from '@/components/inventory-reservation-hold-dialog';
 import { IssuanceRemarksDialog } from '@/components/inventory/issuance-remarks-dialog';
+import { InventoryLabelDialog } from '@/components/inventory/inventory-label-dialog';
 import { StatusBadge } from '@/components/status-badge';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -329,6 +330,10 @@ export default function InventoryPage() {
     useState<InventoryInstance | null>(null);
   const [returnIssuanceId, setReturnIssuanceId] = useState<number | null>(null);
   const [returnRemarksBusy, setReturnRemarksBusy] = useState(false);
+  const [labelTarget, setLabelTarget] = useState<{
+    item: InventoryItem;
+    instance?: InventoryInstance;
+  } | null>(null);
 
   // CSV import/export state
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -1641,6 +1646,14 @@ export default function InventoryPage() {
             Refresh
           </Button>
           <Can permission={P.view_inventory}>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/scan">
+                <ScanLine className="mr-2 h-4 w-4" />
+                Scan
+              </Link>
+            </Button>
+          </Can>
+          <Can permission={P.view_inventory}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" disabled={exportBusy}>
@@ -1962,6 +1975,18 @@ export default function InventoryPage() {
                               >
                                 <Network className={ACTION_ICON.hierarchy} />
                               </Button>
+                              <Can permission={[P.inventory_label_generate, P.inventory_label_print]}>
+                                <Button
+                                  size="icon-sm"
+                                  variant="ghost"
+                                  className={cn(ACTION_BTN, 'group/label')}
+                                  onClick={() => setLabelTarget({ item })}
+                                  title="Generate, print, or view labels"
+                                  aria-label="Generate, print, or view labels"
+                                >
+                                  <Tag className="size-3.5 text-muted-foreground transition-colors group-hover/label:text-violet-600" />
+                                </Button>
+                              </Can>
                               {canAddStock ? (
                                 <Button
                                   size="icon-sm"
@@ -2155,6 +2180,18 @@ export default function InventoryPage() {
                                               )}
                                             </TableCell>
                                             <TableCell>
+                                              <Can permission={[P.inventory_label_generate, P.inventory_label_print]}>
+                                                <Button
+                                                  size="icon-sm"
+                                                  variant="ghost"
+                                                  className={cn(ACTION_BTN, 'group/label')}
+                                                  title="Generate, print, or view this serial label"
+                                                  aria-label="Generate, print, or view this serial label"
+                                                  onClick={() => setLabelTarget({ item, instance })}
+                                                >
+                                                  <Tag className="size-3.5 text-muted-foreground transition-colors group-hover/label:text-violet-600" />
+                                                </Button>
+                                              </Can>
                                               {!instance.is_reserved && canIssue ? (
                                                 <Can permission={[P.issue_inventory, P.inventory_issue_workflow]}>
                                                   <Button
@@ -2512,6 +2549,17 @@ export default function InventoryPage() {
           void pagination.invalidate();
         }}
       />
+
+      {labelTarget ? (
+        <InventoryLabelDialog
+          item={labelTarget.item}
+          instance={labelTarget.instance}
+          open
+          onOpenChange={(open) => {
+            if (!open) setLabelTarget(null);
+          }}
+        />
+      ) : null}
 
       <IssuanceRemarksDialog
         open={returnIssuanceId != null}

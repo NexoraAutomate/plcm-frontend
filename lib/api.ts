@@ -831,6 +831,53 @@ export const inventory = {
     }),
   listInstances: (inventoryId: number) =>
     api.get<Models.InventoryInstance[]>(`/inventory/${inventoryId}/instances/`),
+  listLabels: (options?: {
+    inventoryId?: number
+    inventoryInstanceId?: number
+    includeInactive?: boolean
+  }) =>
+    api.get<Models.InventoryLabel[]>('/labels/', {
+      params: buildQueryParams({
+        inventory_id: options?.inventoryId,
+        inventory_instance_id: options?.inventoryInstanceId,
+        include_inactive: options?.includeInactive ?? false,
+      }),
+    }),
+  generateLabels: (
+    targets: Array<{
+      inventory_id: number
+      inventory_instance_id?: number | null
+      serial_number?: string | null
+    }>,
+    labelType: Models.InventoryLabelType = 'both',
+  ) =>
+    api.post<Models.InventoryLabel[]>('/labels/generate', {
+      targets,
+      label_type: labelType,
+    }),
+  printLabels: (data: {
+    label_ids: string[]
+    label_format?: string
+    quantity?: number
+    reason?: string | null
+  }) => api.post<Models.InventoryLabelPrintEvent[]>('/labels/print', data),
+  getLabelHistory: (labelId: string) =>
+    api.get<Models.InventoryLabelHistory>(`/labels/${encodeURIComponent(labelId)}/history`),
+  scanLabel: (data: { payload: string; location?: string | null; source?: string }) =>
+    api.post<Models.InventoryLabelScanResponse>('/labels/scan', data),
+  deactivateLabel: (labelId: string, reason: string) =>
+    api.post<Models.InventoryLabel>(`/labels/${encodeURIComponent(labelId)}/deactivate`, {
+      reason,
+    }),
+  investigateLabel: (labelId: string, reason: string) =>
+    api.post<Models.InventoryLabel>(`/labels/${encodeURIComponent(labelId)}/investigate`, {
+      reason,
+    }),
+  replaceLabel: (labelId: string, reason: string, labelType: Models.InventoryLabelType = 'both') =>
+    api.post<Models.InventoryLabel[]>(
+      `/labels/${encodeURIComponent(labelId)}/replace`,
+      { reason, label_type: labelType },
+    ),
   createInstance: (inventoryId: number, data: Partial<Models.InventoryInstance>) =>
     api.post<Models.InventoryInstance>(`/inventory/${inventoryId}/instances/`, data),
   listShortages: (options?: { activeOnly?: boolean; projectId?: number; mine?: boolean }) =>

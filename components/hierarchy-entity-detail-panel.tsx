@@ -326,13 +326,9 @@ export function HierarchyEntityDetailPanel({
             </p>
           ) : isBhdMode ? (
             <div className="py-2">
-              {statusName ? (
+              {primaryStatus ? (
                 <div className="mb-2 flex flex-wrap gap-1">
-                  {primaryStatus ? <StatusBadge status={primaryStatus} /> : null}
-                </div>
-              ) : entity.assigned_developer_id && !assignmentIssued ? (
-                <div className="mb-2">
-                  <StatusBadge status="Assigned" />
+                  <StatusBadge status={primaryStatus} />
                 </div>
               ) : null}
 
@@ -383,13 +379,9 @@ export function HierarchyEntityDetailPanel({
             </div>
           ) : (
             <div className="py-2">
-              {statusName ? (
+              {primaryStatus ? (
                 <div className="mb-2 flex flex-wrap gap-1">
-                  {primaryStatus ? <StatusBadge status={primaryStatus} /> : null}
-                </div>
-              ) : entity.assigned_developer_id && !assignmentIssued ? (
-                <div className="mb-2">
-                  <StatusBadge status="Assigned" />
+                  <StatusBadge status={primaryStatus} />
                 </div>
               ) : null}
 

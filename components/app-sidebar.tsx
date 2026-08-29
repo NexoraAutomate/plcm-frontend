@@ -29,6 +29,7 @@ import {
   ListChecks,
   SearchCheck,
   ScrollText,
+  ScanLine,
   ChevronDown,
   ChevronRight,
   Settings,
@@ -100,6 +101,12 @@ const navItems: NavItem[] = [
     href: "/inventory",
     icon: Package,
     permission: NAV_PERMISSIONS["/inventory"] as PermissionCode,
+  },
+  {
+    label: "Scan Label",
+    href: "/scan",
+    icon: ScanLine,
+    permission: NAV_PERMISSIONS["/scan"] as PermissionCode,
   },
   {
     label: "Shortages",

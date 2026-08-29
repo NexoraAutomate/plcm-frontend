@@ -212,36 +212,44 @@ function DefinitionsLabelsSection() {
         title="Level names & abbreviations"
         description="Display names for hierarchy levels and short codes used as {levelAbbr} in templates (e.g. SYS, SUB)."
       >
-        <SettingsCard>
+        <SettingsCard className="max-w-5xl py-3" contentClassName="px-3 pt-0 sm:px-4">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-160 text-sm">
+            <table className="w-full min-w-160 table-fixed text-sm">
+              <colgroup>
+                <col className="w-28" />
+                <col />
+                <col />
+                <col className="w-32" />
+              </colgroup>
               <thead>
                 <tr className="border-b text-left text-muted-foreground">
-                  <th className="pb-2 pr-3 font-medium">Key</th>
-                  <th className="pb-2 pr-3 font-medium">Singular</th>
-                  <th className="pb-2 pr-3 font-medium">Plural</th>
-                  <th className="pb-2 font-medium">Level abbrev</th>
+                  <th className="pb-1.5 pr-3 text-xs font-medium">Key</th>
+                  <th className="pb-1.5 pr-3 text-xs font-medium">Singular</th>
+                  <th className="pb-1.5 pr-3 text-xs font-medium">Plural</th>
+                  <th className="pb-1.5 text-xs font-medium">Level abbrev</th>
                 </tr>
               </thead>
               <tbody>
                 {ENTITY_ROWS.map((row) => (
                   <tr key={row.key} className="border-b border-border/60 last:border-0">
-                    <td className="py-3 pr-3 font-mono text-xs text-muted-foreground">{row.key}</td>
-                    <td className="py-3 pr-3">
+                    <td className="py-1.5 pr-3 font-mono text-xs text-muted-foreground">{row.key}</td>
+                    <td className="py-1.5 pr-3">
                       <Input
+                        className="h-8 px-2 text-sm"
                         value={draft[row.singular]}
                         onChange={(e) => updateDraft({ [row.singular]: e.target.value })}
                       />
                     </td>
-                    <td className="py-3 pr-3">
+                    <td className="py-1.5 pr-3">
                       <Input
+                        className="h-8 px-2 text-sm"
                         value={draft[row.plural]}
                         onChange={(e) => updateDraft({ [row.plural]: e.target.value })}
                       />
                     </td>
-                    <td className="py-3">
+                    <td className="py-1.5">
                       <Input
-                        className="font-mono uppercase"
+                        className="h-8 px-2 font-mono text-sm uppercase"
                         value={draft[row.abbrev]}
                         onChange={(e) =>
                           updateDraft({ [row.abbrev]: e.target.value.toUpperCase() })

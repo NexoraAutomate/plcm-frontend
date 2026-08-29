@@ -993,6 +993,72 @@ export interface InventoryInstance extends HierarchyInstallFields {
   fcfs_fulfillments?: FCFSFulfillment[] | null
 }
 
+export type InventoryLabelType = 'qr' | 'barcode' | 'both'
+
+export interface InventoryLabel {
+  id: number
+  label_id: string
+  signed_payload: string
+  inventory_id: number
+  inventory_instance_id?: number | null
+  serial_number?: string | null
+  inventory_name?: string | null
+  part_number?: string | null
+  label_type: InventoryLabelType | string
+  status: string
+  print_count: number
+  first_printed_at?: string | null
+  last_printed_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface InventoryLabelPrintEvent {
+  id: number
+  label_id: string
+  user_id: number
+  printed_at: string
+  reason?: string | null
+  label_type: string
+  label_format: string
+  quantity: number
+  is_first_print: boolean
+}
+
+export interface InventoryLabelHistory {
+  label: InventoryLabel
+  print_events: InventoryLabelPrintEvent[]
+  scan_events: Array<{
+    id?: number
+    scanned_at: string
+    user_id?: number | null
+    location?: string | null
+    valid: boolean
+    suspicious: boolean
+    reason?: string | null
+  }>
+}
+
+export interface InventoryLabelScanResponse {
+  valid: boolean
+  status: string
+  message: string
+  warnings: string[]
+  label?: InventoryLabel | null
+  inventory?: (Inventory & { instance?: InventoryInstance | null }) | null
+  stock_history: Record<string, unknown>[]
+  build_history: Record<string, unknown>[]
+  maintenance_history: Record<string, unknown>[]
+  ownership_location_history: Record<string, unknown>[]
+  hierarchy?: {
+    entity_type: string
+    entity_id: number
+    ancestors: Record<string, unknown>[]
+    descendants: Record<string, unknown>[]
+  } | null
+  print_history: InventoryLabelPrintEvent[]
+}
+
 export interface Inventory extends HierarchyInstallFields {
   id: number
   name: string

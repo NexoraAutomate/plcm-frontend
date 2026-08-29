@@ -61,6 +61,10 @@ export const P = {
   issue_inventory: 'issue_inventory',
   revert_inventory_install: 'revert_inventory_install',
   view_inventory_issuances: 'view_inventory_issuances',
+  inventory_label_generate: 'inventory.label.generate',
+  inventory_label_print: 'inventory.label.print',
+  inventory_label_scan: 'inventory.label.scan',
+  inventory_label_manage: 'inventory.label.manage',
 
   // Maintenance
   view_maintenance: 'view_maintenance',
@@ -224,6 +228,7 @@ export const NAV_PERMISSIONS: Record<string, PermissionCode | PermissionCode[]> 
   '/projects': P.view_projects,
   '/inventory': P.view_inventory,
   '/inventory/issuances': P.view_inventory_issuances,
+  '/scan': [P.view_inventory, P.inventory_label_scan],
   '/shortages': [P.view_inventory, P.inventory_receive],
   '/issue-queue': [P.inventory_issue_workflow, P.issue_inventory],
   '/inspect-queue': P.item_inspect,
