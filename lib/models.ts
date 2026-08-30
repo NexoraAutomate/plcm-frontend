@@ -273,6 +273,7 @@ export interface Project {
   product_type?: string | null
   flight_count?: number | null
   sdls_per_flight?: number | null
+  sdls_counts_by_flight?: number[] | null
   assigned_hm_id?: number | null
   created_by_id?: number | null
   approved_by_id?: number | null
@@ -564,7 +565,8 @@ export interface ProjectDraftCreate {
   hierarchy_config_id: number
   product_type: string
   flight_count: number
-  sdls_per_flight: number
+  sdls_per_flight?: number
+  sdls_counts_by_flight: number[]
 }
 
 /** Spec 04 — project hierarchy inventory reservation */

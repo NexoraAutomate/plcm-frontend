@@ -213,8 +213,11 @@ export function ProjectWorkflowActions({
     });
   }, [users]);
 
-  const expectedSdls =
-    (project.flight_count ?? 0) * (project.sdls_per_flight ?? 0);
+  const sdlsCounts =
+    project.sdls_counts_by_flight ??
+    Array(project.flight_count ?? 0).fill(project.sdls_per_flight ?? 0);
+  const expectedSdls = sdlsCounts.reduce((total, count) => total + count, 0);
+  const sdlsSummary = sdlsCounts.length > 0 ? sdlsCounts.join(', ') : '—';
 
   async function handleApprove() {
     setBusy(true);
@@ -349,10 +352,10 @@ export function ProjectWorkflowActions({
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium">Workflow</span>
         <StatusBadge status={status || 'Unknown'} />
-        {project.flight_count != null || project.sdls_per_flight != null ? (
+        {project.flight_count != null || sdlsCounts.length > 0 ? (
           <span className="text-xs text-muted-foreground">
             {project.flight_count ?? '—'} flights ·{' '}
-            {project.sdls_per_flight ?? '—'} SDLS/flight
+            {sdlsSummary} SDLS by flight
           </span>
         ) : null}
         {project.hierarchy_config_id ? (
@@ -541,7 +544,8 @@ export function ProjectWorkflowActions({
                     Flights: <strong>{project.flight_count ?? '—'}</strong>
                   </li>
                   <li>
-                    SDLS per flight: <strong>{project.sdls_per_flight ?? '—'}</strong>
+                    SDLS by flight:{' '}
+                    <strong>{sdlsCounts.length > 0 ? sdlsSummary : '—'}</strong>
                   </li>
                   <li>
                     Total SDLS nodes: <strong>{expectedSdls || '—'}</strong>

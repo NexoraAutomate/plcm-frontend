@@ -87,6 +87,7 @@ export default function ProjectsPage(){
     product_type: '',
     flight_count: 1,
     sdls_per_flight: 1,
+    sdls_counts_by_flight: [1],
   });
   const { data: statuses = [] } = useStatusesByTypeQuery('projects');
 
@@ -103,6 +104,7 @@ export default function ProjectsPage(){
       product_type: '',
       flight_count: 1,
       sdls_per_flight: 1,
+      sdls_counts_by_flight: [1],
     });
   }
 
@@ -165,11 +167,15 @@ export default function ProjectsPage(){
   );
 
   async function handleCreate() {
+    const sdlsCounts = formData.sdls_counts_by_flight
+      .slice(0, Number(formData.flight_count))
+      .map((count) => Number(count));
     if (
       !formData.name.trim() ||
       !formData.hierarchy_config_id ||
       !formData.flight_count ||
-      !formData.sdls_per_flight
+      sdlsCounts.length !== Number(formData.flight_count) ||
+      sdlsCounts.some((count) => count < 1)
     ) {
       toast.error('Name, configuration, and scope counts are required');
       return;
@@ -188,7 +194,10 @@ export default function ProjectsPage(){
         hierarchy_config_id: formData.hierarchy_config_id,
         product_type: formData.product_type,
         flight_count: Number(formData.flight_count),
-        sdls_per_flight: Number(formData.sdls_per_flight),
+        // Keep the legacy field populated for older API consumers; generation
+        // uses the per-flight values below.
+        sdls_per_flight: Math.max(...sdlsCounts),
+        sdls_counts_by_flight: sdlsCounts,
       });
       toast.success(`Draft project created (${res.data.status_name || 'DRAFT'})`);
       pagination.invalidate();
@@ -248,6 +257,9 @@ export default function ProjectsPage(){
       product_type: project.product_type ?? '',
       flight_count: project.flight_count ?? 1,
       sdls_per_flight: project.sdls_per_flight ?? 1,
+      sdls_counts_by_flight:
+        project.sdls_counts_by_flight ??
+        Array(project.flight_count ?? 1).fill(project.sdls_per_flight ?? 1),
     });
     setIsEditOpen(true);
   }
@@ -392,36 +404,60 @@ export default function ProjectsPage(){
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Flight count *</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={formData.flight_count}
+                  onChange={(e) => {
+                    const flightCount = Math.max(1, Number(e.target.value) || 1);
+                    setFormData((prev) => ({
+                      ...prev,
+                      flight_count: flightCount,
+                      sdls_counts_by_flight: Array.from(
+                        { length: flightCount },
+                        (_, index) => prev.sdls_counts_by_flight[index] ?? 1
+                      ),
+                    }));
+                  }}
+                  disabled={isCreating}
+                />
+              </div>
+              <div className="space-y-2 rounded-md border p-3">
                 <div>
-                  <Label>Flight count *</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={formData.flight_count}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        flight_count: Math.max(1, Number(e.target.value) || 1),
-                      })
-                    }
-                    disabled={isCreating}
-                  />
+                  <Label>SDLS count for each flight *</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Set the SDLS count independently for every flight.
+                  </p>
                 </div>
-                <div>
-                  <Label>SDLS per flight *</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={formData.sdls_per_flight}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        sdls_per_flight: Math.max(1, Number(e.target.value) || 1),
-                      })
-                    }
-                    disabled={isCreating}
-                  />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {formData.sdls_counts_by_flight.map((count, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Label htmlFor={`flight-sdls-${index}`} className="min-w-20">
+                        Flight {index + 1}
+                      </Label>
+                      <Input
+                        id={`flight-sdls-${index}`}
+                        type="number"
+                        min={1}
+                        value={count}
+                        onChange={(e) => {
+                          const nextCount = Math.max(1, Number(e.target.value) || 1);
+                          setFormData((prev) => {
+                            const counts = [...prev.sdls_counts_by_flight];
+                            counts[index] = nextCount;
+                            return {
+                              ...prev,
+                              sdls_per_flight: Math.max(...counts),
+                              sdls_counts_by_flight: counts,
+                            };
+                          });
+                        }}
+                        disabled={isCreating}
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
