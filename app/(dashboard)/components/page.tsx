@@ -1,7 +1,8 @@
 'use client';
 
 import { useAppDefinitions } from '@/lib/app-definitions-context';
-import { useState, useEffect, useMemo } from 'react';
+import { Fragment, useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTrigger, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Search } from 'lucide-react';
+import { ChevronDown, Plus, Edit, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatusBadge } from '@/components/status-badge';
 import Link from 'next/link';
@@ -24,7 +25,7 @@ import { EntityNameWithFault } from '@/components/entity-fault-ping';
 import { useEntityFaultMap } from '@/hooks/use-entity-fault-map';
 import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
 import { useHierarchiesQuery, useStatusesByTypeQuery } from '@/hooks/queries';
-import { fetchComponentsPage } from '@/hooks/queries/fetchers';
+import { fetchAllComponents, fetchComponentsPage } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
 import { usePaginatedList } from '@/hooks/use-paginated-list';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
@@ -52,6 +53,44 @@ import {
   InstallerFilterSelect,
   resolveInstallerFilterId,
 } from '@/components/installer-filter-select';
+
+interface ComponentPartNumberGroup {
+  key: string;
+  partNumber: string;
+  components: Component[];
+}
+
+interface ComponentTableRow {
+  key: string;
+  grouped: boolean;
+  components: Component[];
+}
+
+function componentPartNumberKey(component: Component): string {
+  const partNumber = component.part_number?.trim().toLowerCase();
+  return partNumber ? `part:${partNumber}` : `component:${component.id}`;
+}
+
+function groupComponentsByPartNumber(components: Component[]): ComponentPartNumberGroup[] {
+  const groups = new Map<string, ComponentPartNumberGroup>();
+
+  for (const component of components) {
+    const key = componentPartNumberKey(component);
+    const existing = groups.get(key);
+    if (existing) {
+      existing.components.push(component);
+      continue;
+    }
+
+    groups.set(key, {
+      key,
+      partNumber: component.part_number?.trim() || '',
+      components: [component],
+    });
+  }
+
+  return Array.from(groups.values());
+}
 
 export default function ComponentsPage() {
   const { entityLabel } = useAppDefinitions();
@@ -100,12 +139,56 @@ export default function ComponentsPage() {
     filters: listFilters,
   });
   const components = pagination.items;
+  const allComponentsQuery = useQuery({
+    queryKey: queryKeys.componentsAll(listFilters),
+    queryFn: () => fetchAllComponents(listFilters),
+    enabled: !pageLoading && pagination.total > 0,
+  });
+  const allComponents = allComponentsQuery.data ?? components;
+  const componentGroups = useMemo(
+    () => groupComponentsByPartNumber(allComponents),
+    [allComponents]
+  );
+  const componentTableRows = useMemo<ComponentTableRow[]>(() => {
+    const groupsByKey = new Map(componentGroups.map((group) => [group.key, group]));
+    const emittedKeys = new Set<string>();
+    const rows: ComponentTableRow[] = [];
+
+    for (const component of components) {
+      const key = componentPartNumberKey(component);
+      if (emittedKeys.has(key)) continue;
+
+      const group = groupsByKey.get(key);
+      if (group && group.components.length > 1) {
+        rows.push({ key, grouped: true, components: group.components });
+      } else {
+        rows.push({ key, grouped: false, components: [component] });
+      }
+      emittedKeys.add(key);
+    }
+
+    return rows;
+  }, [componentGroups, components]);
   const [parentScopedComponentNames, setParentScopedComponentNames] = useState<Hierarchy[] | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [formData, setFormData] = useState({
     name: '',
     description: '',
+    serial_number: '',
     unit_id: 0,
   });
+
+  useEffect(() => {
+    const visibleGroupedKeys = new Set(
+      componentTableRows.filter((row) => row.grouped).map((row) => row.key)
+    );
+    setExpandedRows((previous) => {
+      const next = new Set(
+        Array.from(previous).filter((key) => visibleGroupedKeys.has(key))
+      );
+      return next.size === previous.size ? previous : next;
+    });
+  }, [componentTableRows]);
 
   useEffect(() => {
     if (!formData.unit_id) {
@@ -173,9 +256,13 @@ export default function ComponentsPage() {
       return;
     }
     try {
-      await createComponent(formData);
+      await createComponent({
+        ...formData,
+        serial_number: formData.serial_number.trim() || undefined,
+      });
       pagination.invalidate();
-      setFormData({ name: '', description: '', unit_id: 0 });
+      await allComponentsQuery.refetch();
+      setFormData({ name: '', description: '', serial_number: '', unit_id: 0 });
       setIsCreateOpen(false);
     } catch {
       // Error handled
@@ -189,9 +276,13 @@ export default function ComponentsPage() {
       return;
     }
     try {
-      await updateComponent(editingId, formData);
+      await updateComponent(editingId, {
+        ...formData,
+        serial_number: formData.serial_number.trim() || undefined,
+      });
       pagination.invalidate();
-      setFormData({ name: '', description: '', unit_id: 0 });
+      await allComponentsQuery.refetch();
+      setFormData({ name: '', description: '', serial_number: '', unit_id: 0 });
       setEditingId(null);
       setIsEditOpen(false);
     } catch {
@@ -214,10 +305,52 @@ export default function ComponentsPage() {
     setFormData({
       name: component.name ?? '',
       description: component.description ?? '',
+      serial_number: component.serial_number ?? '',
       unit_id: component.unit_id,
     });
     setIsEditOpen(true);
   }
+
+  const toggleExpandedRow = (key: string) => {
+    setExpandedRows((previous) => {
+      const next = new Set(previous);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const renderComponentActions = (component: Component) => {
+    const ownsInstall = canManageInstall({
+      isInventoryManager: inventoryManager,
+      currentUserId: user?.id,
+      installedById: component.installed_by_id,
+    });
+
+    return (
+      <div className="flex gap-2 justify-end">
+        <Link href={`/components/${component.id}`} onClick={(e) => e.stopPropagation()}>
+          <Button variant="outline" size="sm">
+            View
+          </Button>
+        </Link>
+        {ownsInstall ? (
+          <Can permission={P.edit_components}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={(e) => {
+                e.stopPropagation();
+                openEdit(component);
+              }}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+          </Can>
+        ) : null}
+      </div>
+    );
+  };
 
   if (pageLoading || (pagination.loading && components.length === 0)) return <PageLoader />;
 
@@ -370,6 +503,14 @@ export default function ComponentsPage() {
                 />
               </div>
               <div>
+                <Label>Serial Number (optional)</Label>
+                <Input
+                  value={formData.serial_number}
+                  onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
+                  placeholder="Enter serial number"
+                />
+              </div>
+              <div>
                 <Label>{`${entityLabel('unit')} *`}</Label>
                 <Select
                   value={formData.unit_id.toString()}
@@ -406,12 +547,15 @@ export default function ComponentsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ListContentSuspense loading={pagination.fetching}>
+          <ListContentSuspense loading={pagination.fetching || allComponentsQuery.isFetching}>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10" />
                   <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Name</SortableTableHead>
+                  <SortableTableHead column="part_number" sort={sort} onSort={cycleSort}>Part Number</SortableTableHead>
+                  <TableHead>Serial Number</TableHead>
                   <SortableTableHead column="unit_id" sort={sort} onSort={cycleSort}>{entityLabel('unit')}</SortableTableHead>
                   <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
                   <TableHead>Inventory Qty</TableHead>
@@ -421,18 +565,164 @@ export default function ComponentsPage() {
               <TableBody>
                 {components.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                       {`No ${entityLabel('component', true).toLowerCase()} found`}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  components.map((component) => {
+                  componentTableRows.map((row) => {
+                    if (row.grouped) {
+                      const group = row.components;
+                      const firstComponent = group[0];
+                      const groupUnitIds = new Set(group.map((component) => component.unit_id));
+                      const groupStatusNames = new Set(group.map(getStatusName));
+                      const groupUnit = units.find((u) => u.id === firstComponent.unit_id);
+                      const groupInventoryQuantity = group.reduce(
+                        (total, component) =>
+                          total + getCount(inventoryQtyByComponent, component.id),
+                        0
+                      );
+                      const isExpanded = expandedRows.has(row.key);
+
+                      return (
+                        <Fragment key={row.key}>
+                          <TableRow
+                            className={cn('cursor-pointer', isExpanded && 'bg-muted/30')}
+                            onClick={() => toggleExpandedRow(row.key)}
+                          >
+                            <TableCell className="p-2">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  toggleExpandedRow(row.key);
+                                }}
+                                aria-expanded={isExpanded}
+                                aria-label={
+                                  isExpanded
+                                    ? `Collapse ${group.length} components with part number ${group[0].part_number || '—'}`
+                                    : `Expand ${group.length} components with part number ${group[0].part_number || '—'}`
+                                }
+                                title={isExpanded ? 'Collapse' : 'Show component serials'}
+                              >
+                                <ChevronDown
+                                  className={cn(
+                                    'h-4 w-4 transition-transform',
+                                    isExpanded && 'rotate-180'
+                                  )}
+                                />
+                              </Button>
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {group.length} {entityLabel('component', true).toLowerCase()}
+                            </TableCell>
+                            <TableCell>{firstComponent.part_number?.trim() || '—'}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {group.length} serial numbers
+                            </TableCell>
+                            <TableCell>
+                              {groupUnitIds.size === 1 && groupUnit ? (
+                                <ParentEntityLink href={`/units/${groupUnit.id}`} label={groupUnit.name} />
+                              ) : (
+                                'Multiple units'
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {groupStatusNames.size === 1 ? (
+                                <StatusBadge status={getStatusName(firstComponent)} />
+                              ) : (
+                                'Multiple'
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <EntityCountCell
+                                count={groupInventoryQuantity}
+                                label="Inventory quantity for this part number"
+                              />
+                            </TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground">
+                              {isExpanded ? 'Hide details' : 'View details'}
+                            </TableCell>
+                          </TableRow>
+                          {isExpanded ? (
+                            <TableRow className="bg-muted/20 hover:bg-muted/20">
+                              <TableCell colSpan={8} className="p-0">
+                                <div className="px-6 py-3">
+                                  <p className="mb-2 text-xs font-medium text-muted-foreground">
+                                    Components with part number {firstComponent.part_number?.trim() || '—'}
+                                  </p>
+                                  <div className="overflow-x-auto rounded-md border bg-background">
+                                    <Table>
+                                      <TableHeader>
+                                        <TableRow>
+                                          <TableHead>Name</TableHead>
+                                          <TableHead>Serial Number</TableHead>
+                                          <TableHead>{entityLabel('unit')}</TableHead>
+                                          <TableHead>Status</TableHead>
+                                          <TableHead>Inventory Qty</TableHead>
+                                          <TableHead className="text-right">Actions</TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {group.map((component) => {
+                                          const unit = units.find((u) => u.id === component.unit_id);
+                                          return (
+                                            <TableRow
+                                              key={component.id}
+                                              className="cursor-pointer"
+                                              onClick={() => router.push(`/components/${component.id}`)}
+                                            >
+                                              <TableCell className="font-medium">
+                                                <EntityNameWithFault
+                                                  name={component.name}
+                                                  entityType="component"
+                                                  entityId={component.id}
+                                                  faultMap={faultMap}
+                                                />
+                                              </TableCell>
+                                              <TableCell className="font-mono text-sm">
+                                                {component.serial_number?.trim() || '—'}
+                                              </TableCell>
+                                              <TableCell>
+                                                {unit ? (
+                                                  <ParentEntityLink
+                                                    href={`/units/${unit.id}`}
+                                                    label={unit.name}
+                                                  />
+                                                ) : (
+                                                  'N/A'
+                                                )}
+                                              </TableCell>
+                                              <TableCell>
+                                                <StatusBadge status={getStatusName(component)} />
+                                              </TableCell>
+                                              <TableCell>
+                                                <EntityCountCell
+                                                  count={getCount(inventoryQtyByComponent, component.id)}
+                                                  label="Inventory quantity"
+                                                />
+                                              </TableCell>
+                                              <TableCell className="text-right">
+                                                {renderComponentActions(component)}
+                                              </TableCell>
+                                            </TableRow>
+                                          );
+                                        })}
+                                      </TableBody>
+                                    </Table>
+                                  </div>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ) : null}
+                        </Fragment>
+                      );
+                    }
+                    const component = row.components[0];
                     const unit = units.find((u) => u.id === component.unit_id);
-                    const ownsInstall = canManageInstall({
-                      isInventoryManager: inventoryManager,
-                      currentUserId: user?.id,
-                      installedById: component.installed_by_id,
-                    });
                     return (
                       <TableRow
                         key={component.id}
@@ -447,6 +737,7 @@ export default function ComponentsPage() {
                         )}
                         onClick={() => router.push(`/components/${component.id}`)}
                       >
+                        <TableCell />
                         <TableCell className="font-medium">
                           <EntityNameWithFault
                             name={component.name}
@@ -464,6 +755,10 @@ export default function ComponentsPage() {
                               Installed by you
                             </p>
                           ) : null}
+                        </TableCell>
+                        <TableCell>{component.part_number?.trim() || '—'}</TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {component.serial_number?.trim() || '—'}
                         </TableCell>
                         <TableCell>
                           {unit ? (
@@ -485,36 +780,7 @@ export default function ComponentsPage() {
                           />
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex gap-2 justify-end">
-                            <Link href={`/components/${component.id}`} onClick={(e) => e.stopPropagation()}>
-                              <Button variant="outline" size="sm">
-                                View
-                              </Button>
-                            </Link>
-                            {ownsInstall ? (
-                              <Can permission={P.edit_components}>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={(e) => { e.stopPropagation(); openEdit(component)}}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                              </Can>
-                            ) : null}
-                            {/* <ConfirmDialog
-                              title={`Delete ${entityLabel('component')}`}
-                              description="Are you sure you want to delete this component?"
-                              onConfirm={() => handleDelete(component.id)}
-                            >
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </ConfirmDialog> */}
-                          </div>
+                          {renderComponentActions(component)}
                         </TableCell>
                       </TableRow>
                     );
@@ -568,6 +834,14 @@ export default function ComponentsPage() {
               <Input
                 value={formData.description ?? ''}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>Serial Number (optional)</Label>
+              <Input
+                value={formData.serial_number}
+                onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
+                placeholder="Enter serial number"
               />
             </div>
             <div>

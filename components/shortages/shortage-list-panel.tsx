@@ -21,6 +21,7 @@ type Props = {
   /** IM all-open list when true */
   inventoryScope?: boolean;
   pollMs?: number;
+  onRowsChange?: (rows: InventoryShortage[]) => void;
 };
 
 function apiError(error: unknown, fallback: string): string {
@@ -46,6 +47,7 @@ export function ShortageListPanel({
   projectId,
   inventoryScope = false,
   pollMs = 12_000,
+  onRowsChange,
 }: Props) {
   const [rows, setRows] = useState<InventoryShortage[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -58,13 +60,17 @@ export function ShortageListPanel({
   const refresh = useCallback(async () => {
     if (inventoryScope) {
       const res = await api.inventory.listShortages({ activeOnly: true });
-      setRows(res.data ?? []);
+      const nextRows = res.data ?? [];
+      setRows(nextRows);
+      onRowsChange?.(nextRows);
       return;
     }
     if (projectId == null) return;
     const res = await api.projects.listShortages(projectId, true);
-    setRows(res.data ?? []);
-  }, [inventoryScope, projectId]);
+    const nextRows = res.data ?? [];
+    setRows(nextRows);
+    onRowsChange?.(nextRows);
+  }, [inventoryScope, onRowsChange, projectId]);
 
   usePageDataRefresh(refresh);
 

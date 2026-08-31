@@ -853,7 +853,7 @@ export interface Component extends HierarchyInstallFields {
   status_id: number
   created_at: string
   part_number: string
-  serial_number: string
+  serial_number?: string
   configuration_item: string
   unit?: Unit
   status?: Status

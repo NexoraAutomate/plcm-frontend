@@ -374,7 +374,11 @@ export function ProjectWorkflowActions({
         <div className="flex flex-wrap items-end gap-2">
           <div className="min-w-55 space-y-1">
             <Label>Assign Hierarchy Manager</Label>
-            <Select value={hmId} onValueChange={setHmId} disabled={busy || isCancelled}>
+            <Select
+              value={hmId}
+              onValueChange={setHmId}
+              disabled={busy || isCancelled || isApproved}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select HM" />
               </SelectTrigger>
@@ -387,7 +391,11 @@ export function ProjectWorkflowActions({
               </SelectContent>
             </Select>
           </div>
-          <Button variant="outline" onClick={() => void handleAssignHm()} disabled={busy || isCancelled}>
+          <Button
+            variant="outline"
+            onClick={() => void handleAssignHm()}
+            disabled={busy || isCancelled || isApproved}
+          >
             <UserCog className="mr-1.5 h-4 w-4" />
             Assign HM
           </Button>

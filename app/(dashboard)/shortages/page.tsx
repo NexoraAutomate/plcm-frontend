@@ -1,11 +1,18 @@
 'use client';
 
+import { useCallback, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { ShortageListPanel } from '@/components/shortages/shortage-list-panel';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageDataRefreshProvider, PageRefreshButton } from '@/components/page-data-refresh';
+import type { InventoryShortage } from '@/lib/models';
 
 export default function ShortagesPage() {
+  const [hasShortages, setHasShortages] = useState<boolean | null>(null);
+  const handleShortagesChange = useCallback((rows: InventoryShortage[]) => {
+    setHasShortages(rows.length > 0);
+  }, []);
+
   return (
     <PageDataRefreshProvider>
       <div className="space-y-4">
@@ -19,7 +26,7 @@ export default function ShortagesPage() {
           </div>
           <PageRefreshButton />
         </div>
-        <Card>
+        <Card className={hasShortages === false ? 'hidden' : ''}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <AlertTriangle className="h-4 w-4" />
@@ -31,7 +38,11 @@ export default function ShortagesPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ShortageListPanel inventoryScope pollMs={12_000} />
+            <ShortageListPanel
+              inventoryScope
+              pollMs={12_000}
+              onRowsChange={handleShortagesChange}
+            />
           </CardContent>
         </Card>
       </div>

@@ -17,7 +17,7 @@ import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
 import { EntityForm } from '@/components/entity-form';
 import { P } from '@/lib/permission-codes';
-import { useState, useEffect, useMemo } from 'react';
+import { useCallback, useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import * as Models from '@/lib/models';
@@ -76,6 +76,7 @@ export default function ProjectDetailPage() {
   const [loadingStatuses, setLoadingStatuses] = useState(true);
   const [systemHierarchyNames, setSystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
   const [configurationLabel, setConfigurationLabel] = useState<string | null>(null);
+  const [hasProjectShortages, setHasProjectShortages] = useState<boolean | null>(null);
   const progressQuery = useProjectProgressQuery(
     Number.isFinite(Number(projectId)) ? Number(projectId) : null
   );
@@ -113,6 +114,14 @@ export default function ProjectDetailPage() {
       .then((res) => setWorkflowProject(res.data))
       .catch(() => undefined);
   }, [projectId]);
+
+  useEffect(() => {
+    setHasProjectShortages(null);
+  }, [projectId, project?.status_name]);
+
+  const handleProjectShortagesChange = useCallback((rows: Models.InventoryShortage[]) => {
+    setHasProjectShortages(rows.length > 0);
+  }, []);
 
   // Project-scoped shells (only needs view_projects) — do not rely solely on the
   // global /systems dump, which can be empty for some roles or capped catalogs.
@@ -459,14 +468,22 @@ export default function ProjectDetailPage() {
       <ProjectReservationsPanel project={project} />
 
       {project.status_name === 'READY_FOR_INVENTORY' ? (
-        <div className="space-y-2 rounded-lg border p-4">
+        <div
+          className={`space-y-2 rounded-lg border p-4 ${
+            hasProjectShortages === false ? 'hidden' : ''
+          }`}
+        >
           <div>
             <h3 className="text-sm font-medium">Shortages</h3>
             <p className="text-xs text-muted-foreground">
               Waiting demand for this project. Matching receipts auto-reserve FCFS.
             </p>
           </div>
-          <ShortageListPanel projectId={project.id} pollMs={12_000} />
+          <ShortageListPanel
+            projectId={project.id}
+            pollMs={12_000}
+            onRowsChange={handleProjectShortagesChange}
+          />
         </div>
       ) : null}
 

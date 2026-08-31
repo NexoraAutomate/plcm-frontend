@@ -197,6 +197,12 @@ export const fetchUnitsPage = (skip: number, limit: number, filters?: ListFilter
 export const fetchComponentsPage = (skip: number, limit: number, filters?: ListFilterParams) =>
   fetchPaginatedList((s, l, f) => api.components.list(s, l, undefined, f), skip, limit, filters);
 
+export const fetchAllComponents = (filters?: ListFilterParams) =>
+  fetchCappedPages<Component>(
+    (skip, limit, options) => api.components.list(skip, limit, options, filters),
+    { pageSize: LIST_BOOTSTRAP_SIZE, maxItems: ABSOLUTE_FETCH_CAP },
+  );
+
 export const fetchMaintenanceLogsPage = (skip: number, limit: number, filters?: ListFilterParams) =>
   fetchPaginatedList((s, l, f) => api.maintenanceLogs.list(s, l, f), skip, limit, filters);
 
