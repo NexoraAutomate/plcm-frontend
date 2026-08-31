@@ -986,6 +986,7 @@ export interface InventoryProjectHold {
 export interface InventoryInstance extends HierarchyInstallFields {
   id: number
   inventory_id: number
+  /** Server-generated unit identity when a manufacturer serial is unavailable. */
   serial_number?: string
   configuration_item?: string
   status_id?: number
@@ -1079,6 +1080,7 @@ export interface Inventory extends HierarchyInstallFields {
   configuration_item?: string
   status_id?: number
   sku?: string
+  /** Total physical units in this catalog group, derived from instances. */
   quantity: number
   reserved_quantity?: number
   available_quantity?: number

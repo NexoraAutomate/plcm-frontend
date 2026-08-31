@@ -114,7 +114,7 @@ export default function InventoryAddChildrenPage() {
         }
 
         setInventoryItem(item);
-        const type = item.inventory_type as HierarchyEntityType;
+        const type = item.inventory_type as Exclude<HierarchyEntityType, 'component'>;
         const childEntityType = getChildInventoryType(type);
 
         const parsedInstanceId = instanceIdFromQuery ? Number(instanceIdFromQuery) : null;

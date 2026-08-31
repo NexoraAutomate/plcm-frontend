@@ -24,7 +24,7 @@ export function getInventoryTypeLabel(type: HierarchyEntityType | undefined): st
   return type.charAt(0).toUpperCase() + type.slice(1);
 }
 
-/** Only component inventory supports bulk quantity; other types use accumulated instances. */
+/** Components accept a bulk quantity when receiving stock. */
 export function inventorySupportsQuantity(type: HierarchyEntityType): boolean {
   return type === 'component';
 }
@@ -34,15 +34,10 @@ export function resolveInventoryQuantity(type: HierarchyEntityType, quantity: nu
 }
 
 export function inventoryUsesInstances(type: HierarchyEntityType): boolean {
-  return !inventorySupportsQuantity(type);
+  return true;
 }
 
 export function getInventorySerialNumbers(item: Inventory): string[] {
-  if (inventorySupportsQuantity(item.inventory_type as HierarchyEntityType)) {
-    const serial =
-      item.original_serial_number?.trim() || item.serial_number?.trim();
-    return serial ? [serial] : [];
-  }
   const serials = (item.instances ?? [])
     .map(
       (instance) =>

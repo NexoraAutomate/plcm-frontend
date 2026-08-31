@@ -193,9 +193,8 @@ function instanceSerialNumber(instance: InventoryInstance): string {
 
 /** Serial numbers for expandable rows: one per in-stock instance when present. */
 function getExpandableSerialInstances(item: Inventory): InventoryInstance[] {
-  if (!inventoryUsesInstances(item.inventory_type as EntityType)) return [];
   const all = (item.instances ?? []).filter((instance) => Boolean(instance?.id));
-  return all.filter((instance) => Boolean(instanceSerialNumber(instance)));
+  return all;
 }
 
 function enrichInventoryItems(
@@ -334,6 +333,10 @@ export default function InventoryPage() {
   const [labelTarget, setLabelTarget] = useState<{
     item: InventoryItem;
     instance?: InventoryInstance;
+  } | null>(null);
+  const [instanceDeleteTarget, setInstanceDeleteTarget] = useState<{
+    item: InventoryItem;
+    instance: InventoryInstance;
   } | null>(null);
   const [bulkLabelsOpen, setBulkLabelsOpen] = useState(false);
 
@@ -659,10 +662,6 @@ export default function InventoryPage() {
 
     const serialNumber = addMoreForm.serial_number.trim();
     const location = addMoreForm.location.trim();
-    if (!serialNumber || !location) {
-      toast.error('Serial number and location are required');
-      return;
-    }
     if (!addMoreForm.holder_user_id) {
       toast.error('Inventory holder is required');
       return;
@@ -673,9 +672,9 @@ export default function InventoryPage() {
     try {
       if (inventoryUsesInstances(addMoreItem.inventory_type as EntityType)) {
         const created = await api.inventory.createInstance(addMoreItem.id, {
-          serial_number: serialNumber,
+          serial_number: serialNumber || undefined,
           holder_user_id: holderUserId,
-          location,
+          location: location || undefined,
         });
         toastFulfillments(created.data?.fcfs_fulfillments);
       } else {
@@ -768,7 +767,7 @@ export default function InventoryPage() {
       toast.error('Part number is required for serialized inventory');
       return;
     }
-    if (usesInstances && !formData.location.trim()) {
+    if (usesInstances && selectedEntityType !== 'component' && !formData.location.trim()) {
       toast.error('Location is required for each serialized unit');
       return;
     }
@@ -815,7 +814,12 @@ export default function InventoryPage() {
       );
       return;
     }
-    if (usesInstances && editingInstanceId && !formData.location.trim()) {
+    if (
+      usesInstances &&
+      selectedEntityType !== 'component' &&
+      editingInstanceId &&
+      !formData.location.trim()
+    ) {
       toast.error('Location is required for each serialized unit');
       return;
     }
@@ -890,7 +894,7 @@ export default function InventoryPage() {
 
   async function handleAddInstance() {
     if (!editingId || !editingGroup) return;
-    if (!formData.location.trim()) {
+    if (editingGroup.inventory_type !== 'component' && !formData.location.trim()) {
       toast.error('Location is required for each serialized unit');
       return;
     }
@@ -969,7 +973,7 @@ export default function InventoryPage() {
     }
   }
 
-  async function openEdit(item: InventoryItem) {
+  async function openEdit(item: InventoryItem, instanceId?: number) {
     setEditingId(item.id);
     setFormTab('general');
     setSelectedEntityType(item.inventory_type as EntityType);
@@ -986,7 +990,10 @@ export default function InventoryPage() {
       setFormData(inventoryFormFromItem(fullItem));
 
       if (inventoryUsesInstances(fullItem.inventory_type as EntityType) && itemInstances.length > 0) {
-        loadInstanceIntoForm(itemInstances[0], fullItem);
+        const selectedInstance =
+          (instanceId ? itemInstances.find((instance) => instance.id === instanceId) : null) ??
+          itemInstances[0];
+        loadInstanceIntoForm(selectedInstance, fullItem);
       } else {
         setEditingInstanceId(null);
       }
@@ -1214,7 +1221,11 @@ export default function InventoryPage() {
         <div>
           <Label>
             Serial Number
-            {inventoryUsesInstances(selectedEntityType) && mode === 'create' ? ' *' : ''}
+            {inventoryUsesInstances(selectedEntityType) &&
+            selectedEntityType !== 'component' &&
+            mode === 'create'
+              ? ' *'
+              : ''}
           </Label>
           <Input
             value={formData.serial_number}
@@ -1223,7 +1234,7 @@ export default function InventoryPage() {
           />
           {inventoryUsesInstances(selectedEntityType) ? (
             <p className="text-xs text-muted-foreground">
-              Each serialized unit gets its own serial number.
+              Each unit gets its own identity. Leave blank to generate one automatically.
             </p>
           ) : null}
         </div>
@@ -1469,7 +1480,7 @@ export default function InventoryPage() {
         <TabsContent value="units" className={formTabSingleClassName}>
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm text-muted-foreground">
-              {instances.length} serialized unit{instances.length === 1 ? '' : 's'} in this group
+              {instances.length} inventory unit{instances.length === 1 ? '' : 's'} in this group
             </p>
             {canCreateInventory ? (
               <Button type="button" size="sm" variant="outline" onClick={handleAddInstance}>
@@ -1482,7 +1493,7 @@ export default function InventoryPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Serial Number</TableHead>
+                  <TableHead>Unit Identity</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -1491,7 +1502,7 @@ export default function InventoryPage() {
                 {instances.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={3} className="text-center text-muted-foreground py-6">
-                      No serialized units yet
+                      No inventory units yet
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -1898,13 +1909,13 @@ export default function InventoryPage() {
                                 aria-expanded={isExpanded}
                                 aria-label={
                                   isExpanded
-                                    ? 'Collapse serial numbers'
-                                    : `Expand ${serialInstances.length} serial numbers`
+                                    ? 'Collapse inventory units'
+                                    : `Expand ${serialInstances.length} inventory units`
                                 }
                                 title={
                                   isExpanded
                                     ? 'Collapse'
-                                    : `Show all ${serialInstances.length} serial numbers`
+                                    : `Show all ${serialInstances.length} inventory units`
                                 }
                               >
                                 <ChevronDown
@@ -2131,13 +2142,13 @@ export default function InventoryPage() {
                             <TableCell colSpan={inventoryManager ? 10 : 9} className="p-0">
                               <div className="px-6 py-3">
                                 <p className="mb-2 text-xs font-medium text-muted-foreground">
-                                  All serial numbers for part {item.partNumber || item.entityName || '—'}
+                                  All units for part {item.partNumber || item.entityName || '—'}
                                 </p>
                                 <div className="overflow-x-auto rounded-md border bg-background">
                                   <Table>
                                     <TableHeader>
                                       <TableRow>
-                                        <TableHead>Serial Number</TableHead>
+                                        <TableHead>Unit Identity</TableHead>
                                         <TableHead>Inventory Holder</TableHead>
                                         <TableHead>Location</TableHead>
                                         <TableHead>Status</TableHead>
@@ -2145,7 +2156,7 @@ export default function InventoryPage() {
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                      {serialInstances.map((instance) => {
+                                      {serialInstances.map((instance, index) => {
                                         const holder = instance.holder_user_id
                                           ? users.find((user) => user.id === instance.holder_user_id)
                                           : undefined;
@@ -2161,10 +2172,10 @@ export default function InventoryPage() {
                                                   }
                                                   title="View reservation details"
                                                 >
-                                                  {instanceSerialNumber(instance) || '—'}
+                                                  {instanceSerialNumber(instance) || `Unit ${index + 1}`}
                                                 </button>
                                               ) : (
-                                                instanceSerialNumber(instance) || '—'
+                                                instanceSerialNumber(instance) || `Unit ${index + 1}`
                                               )}
                                             </TableCell>
                                             <TableCell>
@@ -2222,6 +2233,36 @@ export default function InventoryPage() {
                                                   </Button>
                                                 </Can>
                                               ) : null}
+                                              <Can permission={P.edit_inventory}>
+                                                {canEditInventory ? (
+                                                  <Button
+                                                    size="icon-sm"
+                                                    variant="ghost"
+                                                    className={cn(ACTION_BTN, 'group/edit')}
+                                                    title="Edit this unit"
+                                                    aria-label={`Edit ${instanceSerialNumber(instance) || `unit ${index + 1}`}`}
+                                                    onClick={() => void openEdit(item, instance.id)}
+                                                  >
+                                                    <Edit className={ACTION_ICON.edit} />
+                                                  </Button>
+                                                ) : null}
+                                              </Can>
+                                              <Can permission={P.delete_inventory}>
+                                                {inventoryManager ? (
+                                                  <Button
+                                                    size="icon-sm"
+                                                    variant="ghost"
+                                                    className={cn(ACTION_BTN, 'group/delete')}
+                                                    title="Delete this unit"
+                                                    aria-label={`Delete ${instanceSerialNumber(instance) || `unit ${index + 1}`}`}
+                                                    onClick={() =>
+                                                      setInstanceDeleteTarget({ item, instance })
+                                                    }
+                                                  >
+                                                    <Trash2 className={ACTION_ICON.delete} />
+                                                  </Button>
+                                                ) : null}
+                                              </Can>
                                               {instance.is_reserved &&
                                               instance.open_issuance_id &&
                                               instance.open_issuance_status !== 'return_pending' &&
@@ -2720,6 +2761,33 @@ export default function InventoryPage() {
         title="Delete selected inventory"
         description={`Delete ${selectedCount} selected inventory item${selectedCount === 1 ? '' : 's'} and all of their serial numbers? This cannot be undone.`}
         onConfirm={() => void handleBulkDelete()}
+      />
+
+      <ConfirmDialog
+        open={instanceDeleteTarget != null}
+        onOpenChange={(open) => {
+          if (!open) setInstanceDeleteTarget(null);
+        }}
+        title="Delete inventory unit"
+        description={
+          instanceDeleteTarget
+            ? `Delete unit ${instanceSerialNumber(instanceDeleteTarget.instance) || `#${instanceDeleteTarget.instance.id}`} from ${instanceDeleteTarget.item.name}? This cannot be undone.`
+            : ''
+        }
+        confirmValue={
+          instanceDeleteTarget
+            ? instanceSerialNumber(instanceDeleteTarget.instance) || `Unit ${instanceDeleteTarget.instance.id}`
+            : undefined
+        }
+        confirmPrompt="To confirm deletion, type this unit identity:"
+        confirmInputLabel="Unit identity"
+        confirmPlaceholder="Enter unit identity"
+        onConfirm={() => {
+          if (!instanceDeleteTarget) return;
+          const instanceId = instanceDeleteTarget.instance.id;
+          setInstanceDeleteTarget(null);
+          void handleDeleteInstance(instanceId);
+        }}
       />
     </div>
   );

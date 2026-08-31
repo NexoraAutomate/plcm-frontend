@@ -119,13 +119,12 @@ export function ShortageListPanel({
   async function handleReceive() {
     if (!receiveTarget) return;
     const quantity = Number(receiveQuantity);
-    const serialized = receiveTarget.target_entity_type !== 'component';
-    if (!Number.isInteger(quantity) || quantity < 1 || (serialized && quantity !== 1)) {
-      toast.error(serialized ? 'Receive one serialized unit at a time' : 'Enter a quantity of at least 1');
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      toast.error('Enter a quantity of at least 1');
       return;
     }
-    if (serialized && (!receivePartNumber.trim() || !receiveSerialNumber.trim() || !receiveLocation.trim())) {
-      toast.error('Part number, serial number, and location are required');
+    if (!receivePartNumber.trim()) {
+      toast.error('Part number is required');
       return;
     }
 
@@ -134,8 +133,10 @@ export function ShortageListPanel({
       const res = await api.inventory.receiveShortage(receiveTarget.id, {
         quantity,
         part_number: receivePartNumber.trim() || undefined,
-        serial_numbers: serialized ? [receiveSerialNumber.trim()] : undefined,
-        location: serialized ? receiveLocation.trim() : undefined,
+        serial_numbers: receiveSerialNumber.trim()
+          ? [receiveSerialNumber.trim()]
+          : undefined,
+        location: receiveLocation.trim() || undefined,
       });
       const fulfilled = res.data.fcfs_fulfillments?.length ?? 0;
       toast.success(
@@ -260,7 +261,7 @@ export function ShortageListPanel({
             {receiveTarget?.target_entity_type !== 'component' ? (
               <>
                 <div>
-                  <Label htmlFor="shortage-receive-serial">Serial number (generated)</Label>
+                  <Label htmlFor="shortage-receive-serial">Unit identity (optional)</Label>
                   <Input
                     id="shortage-receive-serial"
                     value={receiveSerialNumber}
