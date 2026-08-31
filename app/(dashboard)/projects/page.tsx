@@ -124,10 +124,17 @@ export default function ProjectsPage(){
 
   useEffect(() => {
     if (searchParams.get('action') === 'create') {
+      setFormData((previous) => ({
+        ...previous,
+        order_id: orderFilterId ?? previous.order_id,
+      }));
       setIsCreateOpen(true);
-      router.replace('/projects', { scroll: false });
+      const nextParams = new URLSearchParams(searchParams.toString());
+      nextParams.delete('action');
+      const query = nextParams.toString();
+      router.replace(query ? `/projects?${query}` : '/projects', { scroll: false });
     }
-  }, [searchParams, router]);
+  }, [searchParams, router, orderFilterId]);
 
   const listFilters = useMemo(
     () =>
@@ -173,16 +180,17 @@ export default function ProjectsPage(){
     if (
       !formData.name.trim() ||
       !formData.hierarchy_config_id ||
+      !formData.order_id ||
       !formData.flight_count ||
       sdlsCounts.length !== Number(formData.flight_count) ||
       sdlsCounts.some((count) => count < 1)
     ) {
-      toast.error('Name, configuration, and scope counts are required');
+      toast.error('Name, order, configuration, and scope counts are required');
       return;
     }
     setIsCreating(true);
     try {
-      const res = await api.projects.createDraft({
+      const res = await api.projects.createDraftsByFlight({
         name: formData.name.trim(),
         description: formData.description || null,
         start_date: formData.start_date
@@ -190,7 +198,7 @@ export default function ProjectsPage(){
           : undefined,
         end_date: formData.end_date ? `${formData.end_date}T00:00:00` : undefined,
         owner_id: formData.owner_id || undefined,
-        order_id: formData.order_id || undefined,
+        order_id: formData.order_id,
         hierarchy_config_id: formData.hierarchy_config_id,
         product_type: formData.product_type,
         flight_count: Number(formData.flight_count),
@@ -199,11 +207,14 @@ export default function ProjectsPage(){
         sdls_per_flight: Math.max(...sdlsCounts),
         sdls_counts_by_flight: sdlsCounts,
       });
-      toast.success(`Draft project created (${res.data.status_name || 'DRAFT'})`);
+      const createdCount = res.data.count ?? res.data.projects.length;
+      toast.success(
+        `${createdCount} draft ${entityLabel('project', true).toLowerCase()} created`
+      );
       pagination.invalidate();
       resetCreateForm();
       setIsCreateOpen(false);
-      router.push(`/projects/${res.data.id}`);
+      router.push('/projects');
     } catch (error: unknown) {
       const detail =
         (error as { response?: { data?: { detail?: string } } })?.response?.data
@@ -481,22 +492,21 @@ export default function ProjectsPage(){
                 </div>
               </div>
               <div>
-                <Label>Order (optional)</Label>
+                <Label>Order *</Label>
                 <Select
-                  value={formData.order_id ? formData.order_id.toString() : 'none'}
+                  value={formData.order_id ? formData.order_id.toString() : ''}
                   onValueChange={(v) =>
                     setFormData({
                       ...formData,
-                      order_id: v === 'none' ? 0 : parseInt(v),
+                      order_id: parseInt(v, 10),
                     })
                   }
                   disabled={isCreating}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select order (optional)" />
+                    <SelectValue placeholder="Select order" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
                     {orders.map((o) => (
                       <SelectItem key={o.id} value={o.id.toString()}>
                         {o.order_number}

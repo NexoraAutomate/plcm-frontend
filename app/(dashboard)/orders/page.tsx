@@ -87,6 +87,9 @@ export default function OrdersPage() {
   
   const [formData, setFormData] = useState<OrderForm>(emptyOrderForm);
   const { data: statuses = [] } = useStatusesByTypeQuery('orders');
+  const defaultStatusId = statuses.find(
+    (status) => status.status_name.trim().toLowerCase() === 'created'
+  )?.id;
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({
     open: false,
     id: null,
@@ -98,6 +101,15 @@ export default function OrdersPage() {
       router.replace('/orders', { scroll: false });
     }
   }, [searchParams, router]);
+
+  useEffect(() => {
+    if (defaultStatusId === undefined || isEditOpen) return;
+    setFormData((previous) =>
+      previous.status_id === undefined
+        ? { ...previous, status_id: defaultStatusId }
+        : previous
+    );
+  }, [defaultStatusId, formData.status_id, isEditOpen]);
 
   const listFilters = useMemo(
     () =>

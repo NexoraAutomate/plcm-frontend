@@ -8,12 +8,13 @@ import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
 import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Calendar, Layers, Code2 } from 'lucide-react';
+import { Calendar, Layers, Code2 } from 'lucide-react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { StatusBadge } from '@/components/status-badge';
 import { EntityStatusHistorySheet } from '@/components/entity-status-history-sheet';
 import { EntityInstallMetadataCard } from '@/components/entity-install-metadata-card';
 import { resolveStatusName } from '@/lib/entity-status';
+import { HierarchyEntityHeader } from '@/components/hierarchy-entity-header';
 import {
   resolveCurrentInstallEntity,
   resolveProjectIdForHardwareEntity,
@@ -52,8 +53,9 @@ export default function ComponentDetailPage() {
         components,
       })
     : null;
+  const project = projects.find((p) => p.id === projectId);
   const hierarchyReadOnly = isProjectReadOnly(
-    projects.find((p) => p.id === projectId)?.status_name
+    project?.status_name
   );
   const systemId = component
     ? resolveSystemIdForHardwareEntity('component', component.id, {
@@ -113,17 +115,22 @@ export default function ComponentDetailPage() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="flex items-center gap-4">
-        <Link href={unit ? `/units/${unit.id}` : '/components'}>
-          <Button variant="ghost" size="icon" className="h-10 w-10">
-            <ArrowLeft className="h-6 w-6" />
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{component.name}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{component.description}</p>
-        </div>
-      </div>
+      <HierarchyEntityHeader
+        name={component.name}
+        description={component.description}
+        backHref={unit ? `/units/${unit.id}` : '/components'}
+        projectName={project?.name}
+        systemName={
+          component && systemId != null
+            ? systems.find((item) => item.id === systemId)?.name
+            : undefined
+        }
+        sdlsNumber={
+          component && systemId != null
+            ? systems.find((item) => item.id === systemId)?.sdls_number
+            : undefined
+        }
+      />
 
       {/* Component Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

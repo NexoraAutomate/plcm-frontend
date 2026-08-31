@@ -259,6 +259,8 @@ export const projects = {
   create: (data: Partial<Models.Project>) => api.post<Models.Project>("/projects/", data),
   createDraft: (data: Models.ProjectDraftCreate) =>
     api.post<Models.Project>("/projects/draft/", data),
+  createDraftsByFlight: (data: Models.ProjectDraftCreate) =>
+    api.post<Models.ProjectDraftBulkCreateResponse>("/projects/draft/bulk/", data),
   assignHm: (id: number, hmUserId: number) =>
     api.post<Models.Project>(`/projects/${id}/assign-hm/`, { hm_user_id: hmUserId }),
   approve: (id: number) => api.post<Models.Project>(`/projects/${id}/approve/`),

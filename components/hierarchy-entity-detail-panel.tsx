@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, X } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +25,7 @@ import { ReworkWizardDialog, type ReworkWizardTarget } from '@/components/invent
 import { WorkflowAuditHistorySheet } from '@/components/workflow-audit-history-sheet';
 import { isProjectReadOnly } from '@/lib/workflow-status';
 import { useProjectInventoryFlags } from '@/hooks/use-project-inventory-flags';
+import { queryKeys } from '@/hooks/queries/query-keys';
 import { inventoryFlagKey } from '@/lib/system-hierarchy-graph';
 import {
   ENTITY_LIFECYCLE_LABEL,
@@ -138,6 +140,7 @@ export function HierarchyEntityDetailPanel({
   const { entityLabel } = useAppDefinitions();
   const { users, patchHierarchyEntity } = useDataStore();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [linkedInventory, setLinkedInventory] = useState<Inventory[]>([]);
   const [assignOpen, setAssignOpen] = useState(false);
   const [requesting, setRequesting] = useState(false);
@@ -175,6 +178,12 @@ export function HierarchyEntityDetailPanel({
           ? 'ISSUED'
           : ENTITY_LIFECYCLE_LABEL[lifecycleTone] || statusName);
   const isCancelled = isProjectReadOnly(project?.status_name);
+  const canVerifyItem = Boolean(
+    assignmentProgress?.issuance_id &&
+      assignmentProgress.complete_reported &&
+      assignmentProgress.test_result?.toLowerCase() === 'pass' &&
+      !assignmentProgress.verified
+  );
 
   const loadLinkedInventory = useCallback(async () => {
     if (!entity || !selection) {
@@ -270,6 +279,12 @@ export function HierarchyEntityDetailPanel({
     try {
       await action();
       toast.success(success);
+      if (project?.id) {
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.projectProgress(project.id),
+        });
+      }
+      await queryClient.invalidateQueries({ queryKey: ['projects'] });
       const res = await api.hierarchyWorkflow.assignmentStatus(selection.type, [
         selection.entityId,
       ]);
@@ -284,6 +299,17 @@ export function HierarchyEntityDetailPanel({
     } finally {
       setInstallBusy(false);
     }
+  }
+
+  async function handleVerifyInstallation() {
+    const issuanceId = assignmentProgress?.issuance_id;
+    if (!issuanceId) return;
+
+    await runInstallAction(
+      () => api.inventory.verifyItemInstallation(issuanceId),
+      'Installation verified',
+      'Could not verify installation'
+    );
   }
 
   const typeLabel = selection ? entityLabel(selection.type) : '';
@@ -582,6 +608,17 @@ export function HierarchyEntityDetailPanel({
                     </p>
                   ) : null}
                 </div>
+              ) : null}
+            </WorkflowCan>
+            <WorkflowCan role={['HM', 'ADMIN']} permission={P.item_verify}>
+              {canVerifyItem ? (
+                <Button
+                  className="w-full"
+                  disabled={installBusy}
+                  onClick={() => void handleVerifyInstallation()}
+                >
+                  {installBusy ? 'Verifying…' : 'Verify Item Installation'}
+                </Button>
               ) : null}
             </WorkflowCan>
               </>

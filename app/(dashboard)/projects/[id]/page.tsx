@@ -35,6 +35,7 @@ import { syncEntityPicture } from '@/lib/entity-picture-upload';
 import { useHierarchyCreateFormOptions } from '@/hooks/use-hierarchy-create-form-options';
 import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
 import { ProjectWorkflowActions } from '@/components/projects/project-workflow-actions';
+import { GeneratedHierarchyCard } from '@/components/projects/generated-hierarchy-card';
 import { ProjectReservationsPanel } from '@/components/projects/project-reservations-panel';
 import { ProjectProgressPanel } from '@/components/projects/project-progress-panel';
 import { ShortageListPanel } from '@/components/shortages/shortage-list-panel';
@@ -448,8 +449,12 @@ export default function ProjectDetailPage() {
       <ProjectWorkflowActions
         project={project}
         users={users}
-        configurationLabel={configurationLabel}
         onUpdated={(next) => setWorkflowProject(next)}
+      />
+
+      <GeneratedHierarchyCard
+        project={project}
+        configurationLabel={configurationLabel}
       />
 
       <ConfigChangeBanner project={project} />

@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useDataStore } from '@/lib/data-store';
 import type { User } from '@/lib/models';
+import { hasWorkflowRole, ROLE } from '@/lib/workflow-roles';
 
 const NONE_VALUE = '__none__';
 
@@ -31,7 +32,11 @@ export function ProjectManagerSelect({
   const options = useMemo(
     () =>
       [...users]
-        .filter((user) => user.is_active)
+        .filter(
+          (user) =>
+            user.is_active &&
+            hasWorkflowRole(user.roles, [ROLE.ADMIN, ROLE.PD, ROLE.HM])
+        )
         .sort((a, b) =>
           projectManagerLabel(a).localeCompare(projectManagerLabel(b), undefined, {
             sensitivity: 'base',
@@ -47,11 +52,7 @@ export function ProjectManagerSelect({
       user.username === current ||
       user.full_name?.trim() === current
   );
-  const selectValue = matched
-    ? String(matched.id)
-    : current
-      ? `legacy:${current}`
-      : NONE_VALUE;
+  const selectValue = matched ? String(matched.id) : NONE_VALUE;
 
   return (
     <Select
@@ -59,10 +60,6 @@ export function ProjectManagerSelect({
       onValueChange={(next) => {
         if (next === NONE_VALUE) {
           onChange('');
-          return;
-        }
-        if (next.startsWith('legacy:')) {
-          onChange(next.slice('legacy:'.length));
           return;
         }
         const user = options.find((item) => String(item.id) === next);
@@ -74,9 +71,6 @@ export function ProjectManagerSelect({
       </SelectTrigger>
       <SelectContent>
         <SelectItem value={NONE_VALUE}>None</SelectItem>
-        {!matched && current ? (
-          <SelectItem value={`legacy:${current}`}>{current}</SelectItem>
-        ) : null}
         {options.map((user) => (
           <SelectItem key={user.id} value={String(user.id)}>
             {projectManagerLabel(user)}

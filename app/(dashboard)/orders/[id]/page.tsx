@@ -19,6 +19,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { StatusBadge } from '@/components/status-badge';
 import { EntityNameWithFault } from '@/components/entity-fault-ping';
 import { useEntityFaultMap } from '@/hooks/use-entity-fault-map';
+import { Can } from '@/components/auth/can';
+import { P } from '@/lib/permission-codes';
 
 function formatDate(value?: string | null) {
   if (!value) return '—';
@@ -177,34 +179,38 @@ export default function OrderDetailPage() {
               {orderProjects.length} project{orderProjects.length === 1 ? '' : 's'} linked to this order
             </CardDescription>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => router.push(`/projects?order_id=${order.id}`)}
-          >
-            View in Projects
-          </Button>
+          {orderProjects.length > 0 ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push(`/projects?order_id=${order.id}`)}
+            >
+              View in Projects
+            </Button>
+          ) : null}
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Start</TableHead>
-                  <TableHead>End</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {orderProjects.length === 0 ? (
+          {orderProjects.length === 0 ? (
+            <div className="flex min-h-48 items-center justify-center">
+              <Can permission={[P.project_create_draft, P.create_projects]}>
+                <Button onClick={() => router.push(`/projects?action=create&order_id=${order.id}`)}>
+                  Create New Project
+                </Button>
+              </Can>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                      No projects linked to this order yet
-                    </TableCell>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Start</TableHead>
+                    <TableHead>End</TableHead>
                   </TableRow>
-                ) : (
-                  orderProjects.map((project) => (
+                </TableHeader>
+                <TableBody>
+                  {orderProjects.map((project) => (
                     <TableRow
                       key={project.id}
                       className="cursor-pointer hover:bg-muted/50"
@@ -217,11 +223,11 @@ export default function OrderDetailPage() {
                       <TableCell>{formatDate(project.start_date)}</TableCell>
                       <TableCell>{formatDate(project.end_date)}</TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

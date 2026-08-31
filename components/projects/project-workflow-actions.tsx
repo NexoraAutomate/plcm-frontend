@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, ChevronDown, GitBranch, UserCog, Ban, Lock, Package, FileCog } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -47,79 +47,16 @@ import { ProjectWorkflowStatus, isProjectReadOnly } from '@/lib/workflow-status'
 import { isConfigSealed, isOpenConfigChange } from '@/lib/config-change';
 import { useDataStore } from '@/lib/data-store';
 import { useRouter } from 'next/navigation';
-import { cn } from '@/lib/utils';
 
 type Props = {
   project: Project;
   users: User[];
-  configurationLabel?: string | null;
   onUpdated: (project: Project) => void;
 };
-
-type HierarchyTree = Awaited<
-  ReturnType<typeof api.projects.hierarchyTree>
->['data'];
-
-type HierarchySystemNode = HierarchyTree['flights'][number]['sdls'][number]['systems'][number];
-
-function TreeNode({
-  kind,
-  name,
-  children,
-}: {
-  kind: string;
-  name: string;
-  children?: ReactNode;
-}) {
-  return (
-    <li>
-      <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-        <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-          {kind}
-        </span>
-        <span className="text-foreground">{name}</span>
-      </div>
-      {children ? (
-        <ul className="ml-3 mt-1 space-y-1 border-l border-border/60 pl-3">{children}</ul>
-      ) : null}
-    </li>
-  );
-}
-
-function renderSystemBranch(system: HierarchySystemNode) {
-  return (
-    <TreeNode key={`system-${system.id}`} kind="System" name={system.name}>
-      {(system.subsystems ?? []).map((subsystem) => (
-        <TreeNode
-          key={`subsystem-${subsystem.id}`}
-          kind="Subsystem"
-          name={subsystem.name}
-        >
-          {(subsystem.modules ?? []).map((module) => (
-            <TreeNode key={`module-${module.id}`} kind="Module" name={module.name}>
-              {(module.units ?? []).map((unit) => (
-                <TreeNode key={`unit-${unit.id}`} kind="Unit" name={unit.name}>
-                  {(unit.components ?? []).map((component) => (
-                    <TreeNode
-                      key={`component-${component.id}`}
-                      kind="Component"
-                      name={component.name}
-                    />
-                  ))}
-                </TreeNode>
-              ))}
-            </TreeNode>
-          ))}
-        </TreeNode>
-      ))}
-    </TreeNode>
-  );
-}
 
 export function ProjectWorkflowActions({
   project,
   users,
-  configurationLabel,
   onUpdated,
 }: Props) {
   const router = useRouter();
@@ -129,8 +66,7 @@ export function ProjectWorkflowActions({
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelPreview, setCancelPreview] = useState<ProjectCancelPreview | null>(null);
   const [cancelConfirmed, setCancelConfirmed] = useState(false);
-  const [tree, setTree] = useState<HierarchyTree | null>(null);
-  const [treeOpen, setTreeOpen] = useState(false);
+  const [workflowOpen, setWorkflowOpen] = useState(false);
   const [hmId, setHmId] = useState<string>(
     project.assigned_hm_id ? String(project.assigned_hm_id) : ''
   );
@@ -182,25 +118,6 @@ export function ProjectWorkflowActions({
     !isCancelled &&
     status !== ProjectWorkflowStatus.COMPLETED &&
     status !== ProjectWorkflowStatus.READY_TO_DELIVER;
-
-  useEffect(() => {
-    if (!isReady && !isCancelled) {
-      setTree(null);
-      return;
-    }
-    let cancelled = false;
-    void api.projects
-      .hierarchyTree(project.id)
-      .then((res) => {
-        if (!cancelled) setTree(res.data);
-      })
-      .catch(() => {
-        if (!cancelled) setTree(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [project.id, isReady, status]);
 
   const hmCandidates = useMemo(() => {
     return users.filter((u) => {
@@ -267,12 +184,6 @@ export function ProjectWorkflowActions({
       }
       // Spec 03 writes systems via generate API; project cards read the client store.
       await ensureHierarchyLoaded({ force: true });
-      try {
-        const treeRes = await api.projects.hierarchyTree(project.id);
-        setTree(treeRes.data);
-      } catch {
-        // Tree panel is best-effort; store refresh above is the primary fix.
-      }
       const c = res.data.counts;
       const shortages = res.data.shortages_created ?? 0;
       toast.success(
@@ -348,27 +259,42 @@ export function ProjectWorkflowActions({
           : 'Project must be APPROVED before hierarchy generation';
 
   return (
-    <div className="space-y-4 rounded-lg border p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-medium">Workflow</span>
-        <StatusBadge status={status || 'Unknown'} />
-        {project.flight_count != null || sdlsCounts.length > 0 ? (
-          <span className="text-xs text-muted-foreground">
-            {project.flight_count ?? '—'} flights ·{' '}
-            {sdlsSummary} SDLS by flight
-          </span>
-        ) : null}
-        {project.hierarchy_config_id ? (
-          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-            {configSealed ? <Lock className="h-3 w-3" /> : null}
-            Config #{project.hierarchy_config_id}
-            {project.hierarchy_config_version
-              ? ` v${project.hierarchy_config_version}`
-              : ''}
-            {configSealed ? ' (sealed)' : ''}
-          </span>
-        ) : null}
-      </div>
+    <>
+      <Collapsible open={workflowOpen} onOpenChange={setWorkflowOpen}>
+        <div className="space-y-4 rounded-lg border p-4">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between gap-2 text-left"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium">Workflow</span>
+                <StatusBadge status={status || 'Unknown'} />
+                {project.flight_count != null || sdlsCounts.length > 0 ? (
+                  <span className="text-xs text-muted-foreground">
+                    {project.flight_count ?? '—'} flights ·{' '}
+                    {sdlsSummary} SDLS by flight
+                  </span>
+                ) : null}
+                {project.hierarchy_config_id ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    {configSealed ? <Lock className="h-3 w-3" /> : null}
+                    Config #{project.hierarchy_config_id}
+                    {project.hierarchy_config_version
+                      ? ` v${project.hierarchy_config_version}`
+                      : ''}
+                    {configSealed ? ' (sealed)' : ''}
+                  </span>
+                ) : null}
+              </div>
+              <ChevronDown
+                className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
+                  workflowOpen ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
 
       <Can permission={P.project_assign_hm}>
         <div className="flex flex-wrap items-end gap-2">
@@ -500,42 +426,9 @@ export function ProjectWorkflowActions({
           ) : null}
         </WorkflowCan>
       </div>
-
-      {tree && tree.flights.length > 0 ? (
-        <Collapsible open={treeOpen} onOpenChange={setTreeOpen}>
-          <div className="rounded-md border bg-muted/30 text-sm">
-            <CollapsibleTrigger asChild>
-              <button
-                type="button"
-                className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left font-medium hover:bg-muted/50"
-              >
-                <span>
-                  {isCancelled ? 'Generated hierarchy (read-only)' : 'Generated hierarchy'}
-                </span>
-                <ChevronDown
-                  className={cn(
-                    'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
-                    treeOpen && 'rotate-180'
-                  )}
-                />
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <ul className="border-t px-3 py-3 text-muted-foreground">
-                <TreeNode kind="Configuration" name={configurationLabel || '—'}>
-                  {tree.flights.map((flight) => (
-                    <TreeNode key={flight.id} kind="Flight" name={flight.name}>
-                      {flight.sdls
-                        .flatMap((sdls) => sdls.systems)
-                        .map((system) => renderSystemBranch(system))}
-                    </TreeNode>
-                  ))}
-                </TreeNode>
-              </ul>
-            </CollapsibleContent>
-          </div>
-        </Collapsible>
-      ) : null}
+          </CollapsibleContent>
+        </div>
+      </Collapsible>
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
@@ -649,6 +542,6 @@ export function ProjectWorkflowActions({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   );
 }

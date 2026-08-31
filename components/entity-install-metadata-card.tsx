@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronDown, Pencil, Upload, Trash2, Replace, Network } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,7 +37,9 @@ import {
 import type { HierarchyEntityType } from '@/lib/entity-hierarchy';
 import { HARDWARE_ENTITY_DETAIL_PATH } from '@/lib/entity-replacement';
 import { useAuth } from '@/lib/auth-context';
+import { WorkflowCan } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
+import { queryKeys } from '@/hooks/queries/query-keys';
 import { RevertToInventoryButton } from '@/components/revert-to-inventory-button';
 import { canManageInstall, isOwnInstall } from '@/lib/install-ownership';
 import { cn } from '@/lib/utils';
@@ -104,6 +107,7 @@ export function EntityInstallMetadataCard({
 }: EntityInstallMetadataCardProps) {
   const { users, projects } = useDataStore();
   const { can, user, isInventoryManager } = useAuth();
+  const queryClient = useQueryClient();
   const inventoryManager = isInventoryManager();
   const cancelled =
     projectId != null &&
@@ -127,6 +131,7 @@ export function EntityInstallMetadataCard({
   const [linkedOemName, setLinkedOemName] = useState<string | undefined>();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [editingAttachment, setEditingAttachment] = useState<EntityAttachment | null>(null);
+  const [verifying, setVerifying] = useState(false);
 
   const oemName = entity.oem_name?.trim() || linkedOemName;
   const inventoryFlags = useProjectInventoryFlags(projectId);
@@ -156,6 +161,12 @@ export function EntityInstallMetadataCard({
     assignedDeveloperId: entity.assigned_developer_id,
     assignment,
   });
+  const canVerifyItem = Boolean(
+    assignment?.issuance_id &&
+      assignment.complete_reported &&
+      assignment.test_result?.toLowerCase() === 'pass' &&
+      !assignment.verified
+  );
   const showOwnInstallChrome =
     tone === 'neutral' &&
     !inventoryManager &&
@@ -236,6 +247,31 @@ export function EntityInstallMetadataCard({
       toast.success('Photo removed');
     } catch {
       toast.error('Failed to remove photo');
+    }
+  };
+
+  const handleVerifyInstallation = async () => {
+    const issuanceId = assignment?.issuance_id;
+    if (!issuanceId) return;
+
+    setVerifying(true);
+    try {
+      await api.inventory.verifyItemInstallation(issuanceId);
+      toast.success('Installation verified');
+      if (projectId) {
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.projectProgress(projectId),
+        });
+      }
+      const res = await api.hierarchyWorkflow.assignmentStatus(ownerType, [entity.id]);
+      setAssignment(res.data?.[0] ?? null);
+    } catch (error: unknown) {
+      const detail =
+        (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        'Could not verify installation';
+      toast.error(typeof detail === 'string' ? detail : 'Could not verify installation');
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -340,6 +376,19 @@ export function EntityInstallMetadataCard({
                     Hierarchy
                   </Link>
                 </Button>
+              ) : null}
+              {canVerifyItem ? (
+                <WorkflowCan role={['HM', 'ADMIN']} permission={P.item_verify}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={cancelled || verifying}
+                    onClick={() => void handleVerifyInstallation()}
+                  >
+                    {verifying ? 'Verifying…' : 'Verify Item Installation'}
+                  </Button>
+                </WorkflowCan>
               ) : null}
               {allowReplace && projectId && canEdit ? (
                 <Button type="button" variant="outline" size="sm" onClick={() => setReplaceOpen(true)}>

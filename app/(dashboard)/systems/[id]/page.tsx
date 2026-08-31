@@ -9,7 +9,7 @@ import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Calendar, Layers } from 'lucide-react';
+import { Calendar, Layers } from 'lucide-react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
@@ -40,6 +40,7 @@ import {
 import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
 import { useHierarchyCreateFormOptions } from '@/hooks/use-hierarchy-create-form-options';
 import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
+import { HierarchyEntityHeader } from '@/components/hierarchy-entity-header';
 
 export default function SystemDetailPage() {
   const { entityLabel } = useAppDefinitions();
@@ -300,17 +301,13 @@ export default function SystemDetailPage() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="flex items-center gap-4">
-        <Link href={project ? `/projects/${project.id}` : '/systems'}>
-          <Button variant="ghost" size="icon" className="h-10 w-10">
-            <ArrowLeft className="h-6 w-6" />
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{system.name}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{system.description}</p>
-        </div>
-      </div>
+      <HierarchyEntityHeader
+        name={system.name}
+        description={system.description}
+        backHref={project ? `/projects/${project.id}` : '/systems'}
+        projectName={project?.name}
+        sdlsNumber={system.sdls_number}
+      />
 
       {/* System Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

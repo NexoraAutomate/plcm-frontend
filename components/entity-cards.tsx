@@ -3,7 +3,16 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2, ArrowRight, Network, Pencil, Replace, UserPlus } from 'lucide-react';
+import {
+  Plus,
+  Trash2,
+  ArrowRight,
+  Network,
+  Pencil,
+  Replace,
+  UserPlus,
+  CheckCircle2,
+} from 'lucide-react';
 import { StatusBadge } from './status-badge';
 import { resolveStatusName } from '@/lib/entity-status';
 import type { Status } from '@/lib/models';
@@ -23,6 +32,8 @@ import { AssignDeveloperDialog } from '@/components/hierarchy/assign-developer-d
 import * as api from '@/lib/api';
 import type { HierarchyAssignmentStatus } from '@/lib/models';
 import { useProjectInventoryFlags } from '@/hooks/use-project-inventory-flags';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/hooks/queries/query-keys';
 import { inventoryFlagKey } from '@/lib/system-hierarchy-graph';
 import {
   ENTITY_LIFECYCLE_LABEL,
@@ -30,6 +41,7 @@ import {
   resolveEntityLifecycleTone,
 } from '@/lib/entity-lifecycle-style';
 import { EntityInventoryHoldDetails } from '@/components/entity-inventory-hold-details';
+import { toast } from 'sonner';
 
 interface EntityCardsProps {
   title: string;
@@ -103,6 +115,7 @@ export function EntityCards({
   const { can, user, isInventoryManager } = useAuth();
   const { ensureHierarchyLoaded, markLocalInstallReverted, users, patchHierarchyEntity } =
     useDataStore();
+  const queryClient = useQueryClient();
   const inventoryFlags = useProjectInventoryFlags(projectId);
   const inventoryManager = isInventoryManager();
   const canCreate = !createPermission || can(createPermission);
@@ -118,6 +131,7 @@ export function EntityCards({
   const [assignmentById, setAssignmentById] = useState<Record<number, HierarchyAssignmentStatus>>(
     {}
   );
+  const [verifyingId, setVerifyingId] = useState<number | null>(null);
 
   const entityStatusKey = entities
     .map((entity) => `${entity.id}:${entity.assigned_developer_id ?? ''}`)
@@ -150,6 +164,33 @@ export function EntityCards({
       cancelled = true;
     };
   }, [childEntityType, entityStatusKey]);
+
+  async function handleVerifyInstallation(entityId: number, issuanceId: number) {
+    if (!childEntityType) return;
+
+    setVerifyingId(entityId);
+    try {
+      await api.inventory.verifyItemInstallation(issuanceId);
+      toast.success('Installation verified');
+      if (projectId) {
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.projectProgress(projectId),
+        });
+      }
+      const res = await api.hierarchyWorkflow.assignmentStatus(childEntityType, [entityId]);
+      const row = res.data?.[0];
+      if (row) {
+        setAssignmentById((prev) => ({ ...prev, [entityId]: row }));
+      }
+    } catch (error: unknown) {
+      const detail =
+        (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        'Could not verify installation';
+      toast.error(typeof detail === 'string' ? detail : 'Could not verify installation');
+    } finally {
+      setVerifyingId(null);
+    }
+  }
 
   return (
     <>
@@ -223,6 +264,12 @@ export function EntityCards({
                     entity.part_number ||
                     entity.serial_number
                 );
+              const canVerifyItem = Boolean(
+                assignment?.issuance_id &&
+                  assignment.complete_reported &&
+                  assignment.test_result?.toLowerCase() === 'pass' &&
+                  !assignment.verified
+              );
               const showOwnInstallChrome =
                 tone === 'neutral' &&
                 !inventoryManager &&
@@ -323,6 +370,27 @@ export function EntityCards({
                             <ArrowRight className="h-3 w-3" />
                           </Button>
                         </Link>
+                        {canVerifyItem ? (
+                          <WorkflowCan role={['HM', 'ADMIN']} permission={P.item_verify}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 min-w-22 gap-1.5"
+                              disabled={verifyingId === entity.id}
+                              onClick={() =>
+                                void handleVerifyInstallation(
+                                  entity.id,
+                                  assignment.issuance_id as number
+                                )
+                              }
+                            >
+                              <CheckCircle2 className="h-3 w-3" />
+                              {verifyingId === entity.id
+                                ? 'Verifying…'
+                                : 'Verify Item Installation'}
+                            </Button>
+                          </WorkflowCan>
+                        ) : null}
                         {onEdit && canEdit && !readOnly ? (
                           <Button
                             variant="outline"

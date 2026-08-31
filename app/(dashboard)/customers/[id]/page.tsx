@@ -82,6 +82,18 @@ export default function CustomerDetailPage(){
       open: false,
       id: null,
     });
+    const defaultStatusId = statuses.find(
+      (status) => status.status_name.trim().toLowerCase() === 'created'
+    )?.id;
+
+    useEffect(() => {
+      if (defaultStatusId === undefined || isEditOpen) return;
+      setFormData((previous) =>
+        previous.status_id === undefined
+          ? { ...previous, status_id: defaultStatusId }
+          : previous
+      );
+    }, [defaultStatusId, formData.status_id, isEditOpen]);
  
     const filtered = customerOrders.filter((o) => {
     const matchesSearch =

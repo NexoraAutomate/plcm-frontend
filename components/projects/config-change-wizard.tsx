@@ -357,7 +357,8 @@ export function ConfigChangeWizard({
               Return all inventory
             </Button>
           ) : null}
-          {canCancelConfigChange(status) ? (
+          {canCancelConfigChange(status) &&
+          status !== ConfigChangeRequestStatus.INVENTORY_RETURNED ? (
             <Button
               variant="outline"
               onClick={() => void handleCancelChange()}
@@ -435,12 +436,23 @@ export function ConfigChangeWizard({
           </div>
           <Can permission={P.config_change_request}>
             {status === ConfigChangeRequestStatus.INVENTORY_RETURNED ? (
-              <Button
-                onClick={() => void handleSubmit()}
-                disabled={busy || !targetConfigId || !productType}
-              >
-                Submit change request
-              </Button>
+              <div className="flex flex-wrap items-center gap-2 md:col-span-2">
+                <Button
+                  onClick={() => void handleSubmit()}
+                  disabled={busy || !targetConfigId || !productType}
+                >
+                  Submit change request
+                </Button>
+                {canCancelConfigChange(status) ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => void handleCancelChange()}
+                    disabled={busy}
+                  >
+                    Cancel configuration change
+                  </Button>
+                ) : null}
+              </div>
             ) : null}
           </Can>
         </div>

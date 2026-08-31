@@ -569,6 +569,11 @@ export interface ProjectDraftCreate {
   sdls_counts_by_flight: number[]
 }
 
+export interface ProjectDraftBulkCreateResponse {
+  projects: Project[]
+  count: number
+}
+
 /** Spec 04 — project hierarchy inventory reservation */
 export interface InventoryReservation {
   id: number
@@ -785,6 +790,8 @@ export interface System extends HierarchyInstallFields {
   name: string
   description: string
   project_id: number
+  sdls_id?: number | null
+  sdls_number?: number | null
   status_id: number
   part_number: string
   serial_number: string

@@ -9,7 +9,7 @@ import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Calendar, Layers } from 'lucide-react';
+import { Calendar, Layers } from 'lucide-react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
@@ -41,6 +41,7 @@ import { useHierarchyCreateFormOptions } from '@/hooks/use-hierarchy-create-form
 import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
 import { isProjectReadOnly } from '@/lib/workflow-status';
 import { resolveStatusName } from '@/lib/entity-status';
+import { HierarchyEntityHeader } from '@/components/hierarchy-entity-header';
 
 export default function UnitDetailPage() {
   const { entityLabel } = useAppDefinitions();
@@ -83,8 +84,9 @@ export default function UnitDetailPage() {
         components: [],
       })
     : null;
+  const project = projects.find((p) => p.id === projectId);
   const hierarchyReadOnly = isProjectReadOnly(
-    projects.find((p) => p.id === projectId)?.status_name
+    project?.status_name
   );
   const systemId = unit
     ? resolveSystemIdForHardwareEntity('unit', unit.id, {
@@ -326,17 +328,22 @@ export default function UnitDetailPage() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="flex items-center gap-4">
-        <Link href={module ? `/modules/${module.id}` : '/units'}>
-          <Button variant="ghost" size="icon" className="h-10 w-10">
-            <ArrowLeft className="h-6 w-6" />
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{unit.name}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{unit.description}</p>
-        </div>
-      </div>
+      <HierarchyEntityHeader
+        name={unit.name}
+        description={unit.description}
+        backHref={module ? `/modules/${module.id}` : '/units'}
+        projectName={project?.name}
+        systemName={
+          unit && systemId != null
+            ? systems.find((item) => item.id === systemId)?.name
+            : undefined
+        }
+        sdlsNumber={
+          unit && systemId != null
+            ? systems.find((item) => item.id === systemId)?.sdls_number
+            : undefined
+        }
+      />
 
       {/* Unit Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

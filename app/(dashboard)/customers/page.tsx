@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Search, Plus, Edit,UserRoundPen ,Check,X, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -80,6 +80,18 @@ export default function CustomersPage() {
   const { data: statuses = [] } = useStatusesByTypeQuery('customers');
   const [formData, setFormData] = useState<CustomerForm>(emptyCustomerForm);
   const router = useRouter();
+  const defaultStatusId = statuses.find(
+    (status) => status.status_name.trim().toLowerCase() === 'active'
+  )?.id;
+
+  useEffect(() => {
+    if (defaultStatusId === undefined || isEditOpen) return;
+    setFormData((previous) =>
+      previous.status_id === undefined
+        ? { ...previous, status_id: defaultStatusId }
+        : previous
+    );
+  }, [defaultStatusId, formData.status_id, isEditOpen]);
 
   const listFilters = useMemo(
     () =>

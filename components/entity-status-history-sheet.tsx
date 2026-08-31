@@ -139,6 +139,10 @@ export function EntityStatusHistorySheet({
     ),
     [history]
   );
+  const visibleHistory = useMemo(
+    () => sortedHistory.filter((entry) => entry.action !== 'STATUS_CHANGED'),
+    [sortedHistory]
+  );
 
   const loadHistory = useCallback(async () => {
     setLoading(true);
@@ -224,16 +228,16 @@ export function EntityStatusHistorySheet({
             <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
               {error}
             </div>
-          ) : sortedHistory.length === 0 ? (
+          ) : visibleHistory.length === 0 ? (
             <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
               No status history recorded yet.
             </div>
           ) : (
             <ScrollArea className="flex-1 pr-3">
               <ol className="relative space-y-0 border-l border-border pl-5">
-                {sortedHistory.map((entry, index) => {
+                {visibleHistory.map((entry, index) => {
                   const isCurrent = index === 0;
-                  const isInitial = index === sortedHistory.length - 1;
+                  const isInitial = index === visibleHistory.length - 1;
                   const statusValue =
                     typeof entry.new_value?.status === 'string'
                       ? entry.new_value.status
