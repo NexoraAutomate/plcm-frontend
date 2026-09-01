@@ -15,13 +15,12 @@ import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
 import { P } from '@/lib/permission-codes';
 import { EntityForm } from '@/components/entity-form';
+import { HierarchyEntityInventoryDialog } from '@/components/hierarchy/hierarchy-entity-inventory-create-dialog';
+import { isExistingProject } from '@/lib/project-existing';
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import * as Models from '@/lib/models';
 import { resolveStatusName } from '@/lib/entity-status';
-import {
-  buildCreateEntityByType,
-} from '@/lib/inventory-child-install';
 import * as api from '@/lib/api';
 import { listTemplateNames } from '@/lib/hierarchy-template-names';
 import { EntityStatusHistorySheet } from '@/components/entity-status-history-sheet';
@@ -37,8 +36,6 @@ import {
   systemHierarchyPath,
 } from '@/lib/entity-replacement';
 import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
-import { useHierarchyCreateFormOptions } from '@/hooks/use-hierarchy-create-form-options';
-import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
 import { isProjectReadOnly } from '@/lib/workflow-status';
 import { HierarchyEntityHeader } from '@/components/hierarchy-entity-header';
 
@@ -53,17 +50,10 @@ export default function SubsystemDetailPage() {
     systems,
     modules,
     projects,
-    createSystem,
-    createSubsystem,
-    createModule,
-    createUnit,
-    createComponent,
     deleteModule,
     updateModule,
     updateSubsystem,
-    runSilentEntityBatch,
   } = useDataStore();
-  const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -85,6 +75,7 @@ export default function SubsystemDetailPage() {
   const hierarchyReadOnly = isProjectReadOnly(
     project?.status_name
   );
+  const isExisting = isExistingProject(project);
   const subsystemModules = subsystem
     ? filterChildrenForParentSlot(modules, subsystem, subsystems, (mod) => mod.subsystem_id)
     : [];
@@ -108,28 +99,6 @@ export default function SubsystemDetailPage() {
     () => moduleHierarchyNames.map((hierarchy) => hierarchy.name),
     [moduleHierarchyNames]
   );
-
-  const {
-    inventoryItems,
-    createFormFields: moduleCreateFormFields,
-    handleFieldChange: handleModuleCreateFieldChange,
-    createInitialValues: moduleCreateInitialValues,
-  } = useHierarchyCreateFormOptions({
-    entityType: 'module',
-    entityLabel: entityLabel('module'),
-    nameOptions,
-    statusOptions,
-    allowedNames,
-    parent: subsystem
-      ? {
-          fieldName: 'subsystem_id',
-          label: 'Subsystem',
-          id: subsystem.id,
-          name: subsystem.name,
-        }
-      : undefined,
-    enabled: isAddOpen,
-  });
 
   const moduleEditFormFields = useMemo(
     () => [
@@ -162,48 +131,8 @@ export default function SubsystemDetailPage() {
         options: statusOptions,
       },
     ],
-    [nameOptions, statusOptions]
+    [nameOptions, statusOptions, entityLabel]
   );
-
-  async function handleAddModule(formData: Record<string, any>) {
-    if (!subsystem) {
-      toast.error(`${entityLabel('subsystem')} not found`);
-      return;
-    }
-    setIsSubmitting(true);
-    setIsAddOpen(false);
-    try {
-      const created = await runSilentEntityBatch(async () => {
-        const createEntityByType = buildCreateEntityByType({
-          createSystem,
-          createSubsystem,
-          createModule,
-          createUnit,
-          createComponent,
-        }, { silent: true });
-
-        return createHierarchyEntityFromForm({
-          entityType: 'module',
-          parentId: subsystem.id,
-          formData,
-          inventoryItems,
-          createEntity: (data) => createEntityByType('module', data),
-          createEntityByType,
-        });
-      });
-      toast.success(
-        created.childrenInstalled > 0
-          ? `Module added and ${created.childrenInstalled} child entit${created.childrenInstalled === 1 ? 'y' : 'ies'} installed from inventory`
-          : `${entityLabel('module')} added successfully`
-      );
-    } catch (error) {
-      console.error('Module creation error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to add module';
-      toast.error(errorMessage);
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
 
   async function handleDeleteModule(id: number) {
     try {
@@ -382,7 +311,6 @@ export default function SubsystemDetailPage() {
         title="Modules"
         description={`Manage modules for ${subsystem.name}`}
         entities={subsystemModules}
-        onAdd={() => setIsAddOpen(true)}
         onEdit={openEditModule}
         onReplace={(entity) => {
           setReplaceTarget({
@@ -406,8 +334,7 @@ export default function SubsystemDetailPage() {
                 }) ?? '#'
             : undefined
         }
-        addButtonLabel={`Add ${entityLabel('module')}`}
-        emptyMessage={`No ${entityLabel('module', true).toLowerCase()} yet. Click Add ${entityLabel('module')} to create one.`}
+        emptyMessage={`No ${entityLabel('module', true).toLowerCase()} yet.`}
         childEntityType="module"
         createPermission={P.create_modules}
         editPermission={P.edit_modules}
@@ -416,26 +343,23 @@ export default function SubsystemDetailPage() {
         projectId={projectId}
       />
 
-      {/* {`Add ${entityLabel('module')}`} Dialog */}
-      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{`Add ${entityLabel('module')}`}</DialogTitle>
-            <DialogDescription>Create a new module for {subsystem.name}</DialogDescription>
-          </DialogHeader>
-          <EntityForm
-            key={`add-module-${subsystem.id}`}
-            fields={moduleCreateFormFields}
-            initialValues={moduleCreateInitialValues}
-            onFieldChange={handleModuleCreateFieldChange}
-            onSubmit={handleAddModule}
-            isLoading={isSubmitting}
-            onCancel={() => setIsAddOpen(false)}
+      {isExisting ? (
+        editingModule ? (
+          <HierarchyEntityInventoryDialog
+            open={isEditOpen}
+            onOpenChange={(open) => {
+              setIsEditOpen(open);
+              if (!open) setEditingId(null);
+            }}
+            entityType="module"
+            entityId={editingModule.id}
+            entity={editingModule}
+            parentId={subsystem.id}
+            title={`Edit ${entityLabel('module')}`}
+            description={`Register details for ${editingModule.name}`}
           />
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Module Dialog */}
+        ) : null
+      ) : (
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -463,6 +387,7 @@ export default function SubsystemDetailPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+      )}
 
       {projectId ? (
         <ReplaceFromInventoryDialog

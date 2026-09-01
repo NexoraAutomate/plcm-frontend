@@ -280,6 +280,7 @@ export interface Project {
   approved_at?: string | null
   successor_project_id?: number | null
   predecessor_project_id?: number | null
+  is_existing_project?: boolean
 }
 
 export interface ProjectCancelPreview {
@@ -567,6 +568,7 @@ export interface ProjectDraftCreate {
   flight_count: number
   sdls_per_flight?: number
   sdls_counts_by_flight: number[]
+  is_existing_project?: boolean
 }
 
 export interface ProjectDraftBulkCreateResponse {

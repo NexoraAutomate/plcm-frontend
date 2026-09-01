@@ -15,14 +15,13 @@ import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
 import { P } from '@/lib/permission-codes';
 import { EntityForm } from '@/components/entity-form';
+import { HierarchyEntityInventoryDialog } from '@/components/hierarchy/hierarchy-entity-inventory-create-dialog';
+import { isExistingProject } from '@/lib/project-existing';
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import { listTemplateNames } from '@/lib/hierarchy-template-names';
 import * as Models from '@/lib/models';
-import {
-  buildCreateEntityByType,
-} from '@/lib/inventory-child-install';
 import { EntityStatusHistorySheet } from '@/components/entity-status-history-sheet';
 import { EntityInstallMetadataCard } from '@/components/entity-install-metadata-card';
 import {
@@ -37,8 +36,6 @@ import {
   systemHierarchyPath,
 } from '@/lib/entity-replacement';
 import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
-import { useHierarchyCreateFormOptions } from '@/hooks/use-hierarchy-create-form-options';
-import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
 import { isProjectReadOnly } from '@/lib/workflow-status';
 import { resolveStatusName } from '@/lib/entity-status';
 import { HierarchyEntityHeader } from '@/components/hierarchy-entity-header';
@@ -56,17 +53,10 @@ export default function UnitDetailPage() {
     systems,
     components,
     projects,
-    createSystem,
-    createSubsystem,
-    createModule,
-    createUnit,
-    createComponent,
     deleteComponent,
     updateComponent,
     updateUnit,
-    runSilentEntityBatch,
   } = useDataStore();
-  const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -88,6 +78,7 @@ export default function UnitDetailPage() {
   const hierarchyReadOnly = isProjectReadOnly(
     project?.status_name
   );
+  const isExisting = isExistingProject(project);
   const systemId = unit
     ? resolveSystemIdForHardwareEntity('unit', unit.id, {
         subsystems,
@@ -127,28 +118,6 @@ export default function UnitDetailPage() {
     [componentHierarchyNames]
   );
 
-  const {
-    inventoryItems,
-    createFormFields: componentCreateFormFields,
-    handleFieldChange: handleComponentCreateFieldChange,
-    createInitialValues: componentCreateInitialValues,
-  } = useHierarchyCreateFormOptions({
-    entityType: 'component',
-    entityLabel: entityLabel('component'),
-    nameOptions,
-    statusOptions,
-    allowedNames,
-    parent: unit
-      ? {
-          fieldName: 'unit_id',
-          label: 'Unit',
-          id: unit.id,
-          name: unit.name,
-        }
-      : undefined,
-    enabled: isAddOpen,
-  });
-
   const componentEditFormFields = useMemo(
     () => [
       {
@@ -180,49 +149,8 @@ export default function UnitDetailPage() {
         options: statusOptions,
       },
     ],
-    [nameOptions, statusOptions]
+    [nameOptions, statusOptions, entityLabel]
   );
-
-  async function handleAddComponent(formData: Record<string, any>) {
-    if (!unit) {
-      toast.error(`${entityLabel('unit')} not found`);
-      return;
-    }
-    setIsSubmitting(true);
-    setIsAddOpen(false);
-    try {
-      const created = await runSilentEntityBatch(async () => {
-        const createEntityByType = buildCreateEntityByType({
-          createSystem,
-          createSubsystem,
-          createModule,
-          createUnit,
-          createComponent,
-        }, { silent: true });
-
-        return createHierarchyEntityFromForm({
-          entityType: 'component',
-          parentId: unit.id,
-          formData,
-          inventoryItems,
-          createEntity: (data) => createEntityByType('component', data),
-          createEntityByType,
-          extraPayload: { sku: String(formData.sku || '') },
-        });
-      });
-      toast.success(
-        created.childrenInstalled > 0
-          ? `Component added and ${created.childrenInstalled} child entit${created.childrenInstalled === 1 ? 'y' : 'ies'} installed from inventory`
-          : `${entityLabel('component')} added successfully`
-      );
-    } catch (error) {
-      console.error('[v0] Component creation error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to add component';
-      toast.error(errorMessage);
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
 
   async function handleDeleteComponent(id: number) {
     try {
@@ -405,7 +333,6 @@ export default function UnitDetailPage() {
         title="Components"
         description={`Manage components for ${unit.name}`}
         entities={unitComponents}
-        onAdd={() => setIsAddOpen(true)}
         onEdit={openEditComponent}
         onReplace={(entity) => {
           setReplaceTarget({
@@ -429,8 +356,7 @@ export default function UnitDetailPage() {
                 }) ?? '#'
             : undefined
         }
-        addButtonLabel={`Add ${entityLabel('component')}`}
-        emptyMessage={`No ${entityLabel('component', true).toLowerCase()} yet. Click Add ${entityLabel('component')} to create one.`}
+        emptyMessage={`No ${entityLabel('component', true).toLowerCase()} yet.`}
         childEntityType="component"
         createPermission={P.create_components}
         editPermission={P.edit_components}
@@ -439,26 +365,23 @@ export default function UnitDetailPage() {
         projectId={projectId}
       />
 
-      {/* {`Add ${entityLabel('component')}`} Dialog */}
-      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{`Add ${entityLabel('component')}`}</DialogTitle>
-            <DialogDescription>Create a new component for {unit.name}</DialogDescription>
-          </DialogHeader>
-          <EntityForm
-            key={`add-component-${unit.id}`}
-            fields={componentCreateFormFields}
-            initialValues={componentCreateInitialValues}
-            onFieldChange={handleComponentCreateFieldChange}
-            onSubmit={handleAddComponent}
-            isLoading={isSubmitting}
-            onCancel={() => setIsAddOpen(false)}
+      {isExisting ? (
+        editingComponent ? (
+          <HierarchyEntityInventoryDialog
+            open={isEditOpen}
+            onOpenChange={(open) => {
+              setIsEditOpen(open);
+              if (!open) setEditingId(null);
+            }}
+            entityType="component"
+            entityId={editingComponent.id}
+            entity={editingComponent}
+            parentId={unit.id}
+            title={`Edit ${entityLabel('component')}`}
+            description={`Register details for ${editingComponent.name}`}
           />
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Component Dialog */}
+        ) : null
+      ) : (
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -486,6 +409,7 @@ export default function UnitDetailPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+      )}
 
       {projectId ? (
         <ReplaceFromInventoryDialog

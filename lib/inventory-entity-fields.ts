@@ -1,4 +1,9 @@
 import type { Inventory, InventoryInstance } from '@/lib/models';
+import {
+  inventorySupportsQuantity,
+  inventoryUsesInstances,
+  type HierarchyEntityType,
+} from '@/lib/entity-hierarchy';
 
 /** Merge catalog row with a consumed serialized unit for entity creation. */
 export function mergeInventoryWithInstance(
@@ -82,6 +87,53 @@ export function inventoryGroupFieldsFromForm(
         }
       : {}),
   };
+}
+
+export function hierarchyEntityToFormData(
+  entity: {
+    name: string;
+    description?: string | null;
+    part_number?: string | null;
+    serial_number?: string | null;
+    status_id?: number | null;
+  },
+  entityType: HierarchyEntityType
+) {
+  return {
+    ...emptyInventoryEntityForm,
+    inventory_type: entityType,
+    name: entity.name,
+    description: entity.description || '',
+    part_number: entity.part_number || '',
+    serial_number: entity.serial_number || '',
+    status_id: entity.status_id ? String(entity.status_id) : '',
+  };
+}
+
+/** Payload for POST /inventory/ — ensures quantity is valid for the entity type. */
+export function buildInventoryCreatePayload(
+  formData: typeof emptyInventoryEntityForm,
+  selectedEntityType: HierarchyEntityType | string,
+  removePicture: boolean,
+  options?: { context?: 'inventory' | 'hierarchy' }
+) {
+  const entityType = selectedEntityType as HierarchyEntityType;
+  const context = options?.context ?? 'inventory';
+  const group = inventoryGroupFieldsFromForm(formData, entityType, removePicture);
+  const instance = inventoryUsesInstances(entityType)
+    ? inventoryInstanceFieldsFromForm(
+        context === 'hierarchy'
+          ? { ...formData, location: formData.location || 'On-site' }
+          : formData,
+        removePicture
+      )
+    : {};
+  const quantity = inventorySupportsQuantity(entityType)
+    ? formData.quantity > 0
+      ? formData.quantity
+      : 1
+    : 1;
+  return { ...group, ...instance, quantity };
 }
 
 export function inventoryInstanceFieldsFromForm(

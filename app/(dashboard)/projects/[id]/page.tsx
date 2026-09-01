@@ -16,6 +16,8 @@ import { Plus, Edit, Trash2, Search, Clock, AlertTriangle, Zap, Pause, CheckCirc
 import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
 import { EntityForm } from '@/components/entity-form';
+import { HierarchyEntityInventoryDialog } from '@/components/hierarchy/hierarchy-entity-inventory-create-dialog';
+import { isExistingProject } from '@/lib/project-existing';
 import { P } from '@/lib/permission-codes';
 import { useCallback, useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
@@ -24,16 +26,11 @@ import * as Models from '@/lib/models';
 import { listTemplateNames } from '@/lib/hierarchy-template-names';
 import { EntityStatusHistorySheet } from '@/components/entity-status-history-sheet';
 import {
-  buildCreateEntityByType,
-} from '@/lib/inventory-child-install';
-import {
   hierarchyInstallFormFields,
   hierarchyInstallInitialValues,
   parseHierarchyInstallPayload,
 } from '@/lib/hierarchy-install-fields';
 import { syncEntityPicture } from '@/lib/entity-picture-upload';
-import { useHierarchyCreateFormOptions } from '@/hooks/use-hierarchy-create-form-options';
-import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
 import { ProjectWorkflowActions } from '@/components/projects/project-workflow-actions';
 import { GeneratedHierarchyCard } from '@/components/projects/generated-hierarchy-card';
 import { ProjectReservationsPanel } from '@/components/projects/project-reservations-panel';
@@ -56,19 +53,12 @@ export default function ProjectDetailPage() {
     systems,
     orders,
     users,
-    createSystem,
-    createSubsystem,
-    createModule,
-    createUnit,
-    createComponent,
     deleteSystem,
     updateSystem,
-    runSilentEntityBatch,
     ensureHierarchyLoaded,
   } = useDataStore();
   const [workflowProject, setWorkflowProject] = useState<Models.Project | null>(null);
   const [scopedSystems, setScopedSystems] = useState<Models.System[]>([]);
-  const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -204,29 +194,6 @@ export default function ProjectDetailPage() {
     [users]
   );
 
-  const {
-    inventoryItems,
-    createFormFields: systemCreateFormFields,
-    handleFieldChange: handleSystemCreateFieldChange,
-    createInitialValues: systemCreateInitialValues,
-  } = useHierarchyCreateFormOptions({
-    entityType: 'system',
-    entityLabel: entityLabel('system'),
-    nameOptions,
-    statusOptions,
-    allowedNames: allowedSystemNames,
-    parent: project
-      ? {
-          fieldName: 'project_id',
-          label: entityLabel('project'),
-          id: project.id,
-          name: project.name,
-        }
-      : undefined,
-    extraFields: installFields,
-    enabled: isAddOpen,
-  });
-
   const systemEditFormFields = useMemo(
     () => [
       {
@@ -270,54 +237,8 @@ export default function ProjectDetailPage() {
         ownerId: editingId ?? undefined,
       }),
     ],
-    [nameOptions, projects, statusOptions, users, editingId]
+    [nameOptions, projects, statusOptions, users, editingId, entityLabel]
   );
-
-  async function handleAddSystem(formData: Record<string, any>) {
-    if (!project) {
-      toast.error('Project not found');
-      return;
-    }
-    if (!formData.name?.trim() || !formData.id) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-    setIsSubmitting(true);
-    setIsAddOpen(false);
-    try {
-      const created = await runSilentEntityBatch(async () => {
-        const createEntityByType = buildCreateEntityByType({
-          createSystem,
-          createSubsystem,
-          createModule,
-          createUnit,
-          createComponent,
-        }, { silent: true });
-
-        return createHierarchyEntityFromForm({
-          entityType: 'system',
-          parentId: project.id,
-          formData,
-          inventoryItems,
-          createEntity: (data) => createEntityByType('system', data),
-          createEntityByType,
-          extraPayload: parseHierarchyInstallPayload(formData),
-        });
-      });
-      await syncEntityPicture('system', created.id, formData);
-      toast.success(
-        created.childrenInstalled > 0
-          ? `System added and ${created.childrenInstalled} child entit${created.childrenInstalled === 1 ? 'y' : 'ies'} installed from inventory`
-          : `${entityLabel('system')} added successfully`
-      );
-    } catch (error) {
-      console.error('System creation error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to add system';
-      toast.error(errorMessage);
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
 
   async function handleDeleteSystem(id: number) {
     try {
@@ -411,6 +332,7 @@ export default function ProjectDetailPage() {
   }
 
   const hierarchyReadOnly = isProjectReadOnly(project.status_name);
+  const isExisting = isExistingProject(project);
 
   return (
     <div className="space-y-6">
@@ -564,16 +486,14 @@ export default function ProjectDetailPage() {
             : `Manage ${entityLabel('system', true).toLowerCase()} for ${project.name}`
         }
         entities={projectSystems}
-        onAdd={() => setIsAddOpen(true)}
         onEdit={openEditSystem}
         onDelete={handleDeleteSystem}
         detailPath={(id) => `/systems/${id}`}
         secondaryPath={(id) => `/projects/${projectId}/systems/${id}/hierarchy`}
-        addButtonLabel={`Add ${entityLabel('system')}`}
         emptyMessage={
           hierarchyReadOnly
             ? `No ${entityLabel('system', true).toLowerCase()} on this cancelled project.`
-            : `No ${entityLabel('system', true).toLowerCase()} yet. Click Add ${entityLabel('system')} to create one.`
+            : `No ${entityLabel('system', true).toLowerCase()} in this project yet.`
         }
         childEntityType="system"
         createPermission={P.create_systems}
@@ -583,29 +503,31 @@ export default function ProjectDetailPage() {
         projectId={Number.isFinite(Number(projectId)) ? Number(projectId) : null}
       />
 
-      {/* {`Add ${entityLabel('system')}`} Dialog */}
-      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        {/* <Button className="ml-auto" onClick={() => setIsAddOpen(true)}>
-          + New System
-        </Button> */}
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add New System</DialogTitle>
-            <DialogDescription>Create a new system for this project</DialogDescription>
-          </DialogHeader>
-          <EntityForm
-            key={`add-system-${project.id}`}
-            fields={systemCreateFormFields}
-            initialValues={systemCreateInitialValues}
-            onFieldChange={handleSystemCreateFieldChange}
-            onSubmit={handleAddSystem}
-            isLoading={isSubmitting}
-            onCancel={() => setIsAddOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit System Dialog */}
+      {isExisting ? (
+        editingSystem ? (
+        <HierarchyEntityInventoryDialog
+          open={isEditOpen}
+          onOpenChange={(open) => {
+            setIsEditOpen(open);
+            if (!open) setEditingId(null);
+          }}
+          entityType="system"
+          entityId={editingSystem.id}
+          entity={editingSystem}
+          parentId={project.id}
+          title={`Edit ${entityLabel('system')}`}
+          description={`Register details for ${editingSystem.name}`}
+          onSaved={async () => {
+            const id = Number(projectId);
+            if (Number.isFinite(id)) {
+              const res = await api.projects.getSystems(id);
+              setScopedSystems(res.data ?? []);
+              await ensureHierarchyLoaded({ force: true });
+            }
+          }}
+        />
+        ) : null
+      ) : (
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -635,6 +557,7 @@ export default function ProjectDetailPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+      )}
     </div>
   );
 }

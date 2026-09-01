@@ -15,14 +15,13 @@ import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
 import { P } from '@/lib/permission-codes';
 import { EntityForm } from '@/components/entity-form';
+import { HierarchyEntityInventoryDialog } from '@/components/hierarchy/hierarchy-entity-inventory-create-dialog';
+import { isExistingProject } from '@/lib/project-existing';
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import { listTemplateNames } from '@/lib/hierarchy-template-names';
 import * as Models from '@/lib/models';
-import {
-  buildCreateEntityByType,
-} from '@/lib/inventory-child-install';
 import { EntityStatusHistorySheet } from '@/components/entity-status-history-sheet';
 import { EntityInstallMetadataCard } from '@/components/entity-install-metadata-card';
 import {
@@ -37,8 +36,6 @@ import {
   systemHierarchyPath,
 } from '@/lib/entity-replacement';
 import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
-import { useHierarchyCreateFormOptions } from '@/hooks/use-hierarchy-create-form-options';
-import { createHierarchyEntityFromForm } from '@/lib/hierarchy-create-form';
 import { isProjectReadOnly } from '@/lib/workflow-status';
 import { resolveStatusName } from '@/lib/entity-status';
 import { HierarchyEntityHeader } from '@/components/hierarchy-entity-header';
@@ -55,17 +52,10 @@ export default function ModuleDetailPage() {
     systems,
     units,
     projects,
-    createSystem,
-    createSubsystem,
-    createModule,
-    createUnit,
-    createComponent,
     deleteUnit,
     updateUnit,
     updateModule,
-    runSilentEntityBatch,
   } = useDataStore();
-  const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -87,6 +77,7 @@ export default function ModuleDetailPage() {
   const hierarchyReadOnly = isProjectReadOnly(
     project?.status_name
   );
+  const isExisting = isExistingProject(project);
   const systemId = module
     ? resolveSystemIdForHardwareEntity('module', module.id, {
         subsystems,
@@ -126,28 +117,6 @@ export default function ModuleDetailPage() {
     [unitHierarchyNames]
   );
 
-  const {
-    inventoryItems,
-    createFormFields: unitCreateFormFields,
-    handleFieldChange: handleUnitCreateFieldChange,
-    createInitialValues: unitCreateInitialValues,
-  } = useHierarchyCreateFormOptions({
-    entityType: 'unit',
-    entityLabel: entityLabel('unit'),
-    nameOptions,
-    statusOptions,
-    allowedNames,
-    parent: module
-      ? {
-          fieldName: 'module_id',
-          label: 'Module',
-          id: module.id,
-          name: module.name,
-        }
-      : undefined,
-    enabled: isAddOpen,
-  });
-
   const unitEditFormFields = useMemo(
     () => [
       {
@@ -179,48 +148,8 @@ export default function ModuleDetailPage() {
         options: statusOptions,
       },
     ],
-    [nameOptions, statusOptions]
+    [nameOptions, statusOptions, entityLabel]
   );
-
-  async function handleAddUnit(formData: Record<string, any>) {
-    if (!module) {
-      toast.error(`${entityLabel('module')} not found`);
-      return;
-    }
-    setIsSubmitting(true);
-    setIsAddOpen(false);
-    try {
-      const created = await runSilentEntityBatch(async () => {
-        const createEntityByType = buildCreateEntityByType({
-          createSystem,
-          createSubsystem,
-          createModule,
-          createUnit,
-          createComponent,
-        }, { silent: true });
-
-        return createHierarchyEntityFromForm({
-          entityType: 'unit',
-          parentId: module.id,
-          formData,
-          inventoryItems,
-          createEntity: (data) => createEntityByType('unit', data),
-          createEntityByType,
-        });
-      });
-      toast.success(
-        created.childrenInstalled > 0
-          ? `Unit added and ${created.childrenInstalled} child entit${created.childrenInstalled === 1 ? 'y' : 'ies'} installed from inventory`
-          : `${entityLabel('unit')} added successfully`
-      );
-    } catch (error) {
-      console.error('[v0] Unit creation error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to add unit';
-      toast.error(errorMessage);
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
 
   async function handleDeleteUnit(id: number) {
     try {
@@ -403,7 +332,6 @@ export default function ModuleDetailPage() {
         title="Units"
         description={`Manage units for ${module.name}`}
         entities={moduleUnits}
-        onAdd={() => setIsAddOpen(true)}
         onEdit={openEditUnit}
         onReplace={(entity) => {
           setReplaceTarget({
@@ -427,8 +355,7 @@ export default function ModuleDetailPage() {
                 }) ?? '#'
             : undefined
         }
-        addButtonLabel={`Add ${entityLabel('unit')}`}
-        emptyMessage={`No ${entityLabel('unit', true).toLowerCase()} yet. Click Add ${entityLabel('unit')} to create one.`}
+        emptyMessage={`No ${entityLabel('unit', true).toLowerCase()} yet.`}
         childEntityType="unit"
         createPermission={P.create_units}
         editPermission={P.edit_units}
@@ -437,26 +364,23 @@ export default function ModuleDetailPage() {
         projectId={projectId}
       />
 
-      {/* {`Add ${entityLabel('unit')}`} Dialog */}
-      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{`Add ${entityLabel('unit')}`}</DialogTitle>
-            <DialogDescription>Create a new unit for {module.name}</DialogDescription>
-          </DialogHeader>
-          <EntityForm
-            key={`add-unit-${module.id}`}
-            fields={unitCreateFormFields}
-            initialValues={unitCreateInitialValues}
-            onFieldChange={handleUnitCreateFieldChange}
-            onSubmit={handleAddUnit}
-            isLoading={isSubmitting}
-            onCancel={() => setIsAddOpen(false)}
+      {isExisting ? (
+        editingUnit ? (
+          <HierarchyEntityInventoryDialog
+            open={isEditOpen}
+            onOpenChange={(open) => {
+              setIsEditOpen(open);
+              if (!open) setEditingId(null);
+            }}
+            entityType="unit"
+            entityId={editingUnit.id}
+            entity={editingUnit}
+            parentId={module.id}
+            title={`Edit ${entityLabel('unit')}`}
+            description={`Register details for ${editingUnit.name}`}
           />
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Unit Dialog */}
+        ) : null
+      ) : (
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -484,6 +408,7 @@ export default function ModuleDetailPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+      )}
 
       {projectId ? (
         <ReplaceFromInventoryDialog

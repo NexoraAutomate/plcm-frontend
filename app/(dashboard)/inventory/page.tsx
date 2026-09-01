@@ -25,6 +25,7 @@ import { toastFulfillments } from '@/lib/fcfs-toast';
 import * as api from '@/lib/api';
 import { EntityAttachmentsSection, type PendingAttachmentUpload } from '@/components/entity-attachments-section';
 import {
+  buildInventoryCreatePayload,
   emptyInventoryEntityForm,
   inventoryFormFromInstance,
   inventoryFormFromItem,
@@ -747,10 +748,8 @@ export default function InventoryPage() {
     }
   }
 
-  const buildInventoryPayload = () => ({
-    ...buildGroupPayload(),
-    ...(inventoryUsesInstances(selectedEntityType) ? buildInstancePayload() : {}),
-  });
+  const buildInventoryPayload = () =>
+    buildInventoryCreatePayload(formData, selectedEntityType, removePicture);
 
   async function handleCreate() {
     const usesInstances = inventoryUsesInstances(selectedEntityType);

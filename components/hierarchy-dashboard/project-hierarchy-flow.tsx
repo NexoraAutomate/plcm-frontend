@@ -10,9 +10,8 @@ import {
   useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import { useHierarchyEntityActions } from '@/components/hierarchy-dashboard/use-hierarchy-entity-actions';
 import type { DashboardLevelKey } from '@/lib/hierarchy-dashboard-entity-config';
 import {
@@ -68,6 +67,7 @@ import type {
   System,
   Unit,
 } from '@/lib/models';
+import { isExistingProject } from '@/lib/project-existing';
 import { useProjectInventoryFlags } from '@/hooks/use-project-inventory-flags';
 import { useHierarchyAssignmentStatuses } from '@/hooks/use-hierarchy-assignment-statuses';
 
@@ -122,12 +122,14 @@ export function ProjectHierarchyFlow({
   onEntityChanged,
   dossierMode = 'bhd',
 }: ProjectHierarchyFlowProps) {
+  const isExisting = isExistingProject(project);
   const { entityActionHandlers, entityActionDialogs } = useHierarchyEntityActions({
     selection,
     onSelectionChange,
     updateSelection,
     systemsOverride: systems,
     onEntityChanged,
+    isExistingProject: isExisting,
   });
 
   const [panel, setPanel] = useState<{
@@ -467,17 +469,8 @@ export function ProjectHierarchyFlow({
           )}
         >
           <p className="text-sm text-muted-foreground">
-            No systems found for this project. Add a system to build the hierarchy graph.
+            No systems found for this project.
           </p>
-          <Button
-            type="button"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => entityActionHandlers.onAddRootSystem(selection.projectId!)}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add system
-          </Button>
         </div>
         {entityActionDialogs}
       </>
@@ -516,7 +509,7 @@ export function ProjectHierarchyFlow({
             onToggleDetails={handleToggleDetails}
             onNavigate={handleNavigate}
             onViewResolutionHistory={handleViewResolutionHistory}
-            entityActions={entityActionHandlers}
+            entityActions={isExisting ? entityActionHandlers : undefined}
           >
             <ReactFlow
               nodes={nodes}

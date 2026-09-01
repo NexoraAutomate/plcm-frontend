@@ -98,6 +98,7 @@ export default function ProjectsPage(){
     flight_count: 1,
     sdls_per_flight: 1,
     sdls_counts_by_flight: [1],
+    is_existing_project: false,
   });
   const { data: statuses = [] } = useStatusesByTypeQuery('projects');
 
@@ -115,6 +116,7 @@ export default function ProjectsPage(){
       flight_count: 1,
       sdls_per_flight: 1,
       sdls_counts_by_flight: [1],
+      is_existing_project: false,
     });
   }
 
@@ -311,10 +313,13 @@ export default function ProjectsPage(){
         // uses the per-flight values below.
         sdls_per_flight: Math.max(...sdlsCounts),
         sdls_counts_by_flight: sdlsCounts,
+        is_existing_project: formData.is_existing_project,
       });
       const createdCount = res.data.count ?? res.data.projects.length;
       toast.success(
-        `${createdCount} draft ${entityLabel('project', true).toLowerCase()} created`
+        formData.is_existing_project
+          ? `${createdCount} existing ${entityLabel('project', createdCount === 1).toLowerCase()} created with hierarchy generated`
+          : `${createdCount} draft ${entityLabel('project', true).toLowerCase()} created`
       );
       pagination.invalidate();
       resetCreateForm();
@@ -376,6 +381,7 @@ export default function ProjectsPage(){
       sdls_counts_by_flight:
         project.sdls_counts_by_flight ??
         Array(project.flight_count ?? 1).fill(project.sdls_per_flight ?? 1),
+      is_existing_project: project.is_existing_project ?? false,
     });
     setIsEditOpen(true);
   }
@@ -620,9 +626,29 @@ export default function ProjectsPage(){
                   </SelectContent>
                 </Select>
               </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="add-as-existing-project"
+                  checked={formData.is_existing_project}
+                  onCheckedChange={(checked) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      is_existing_project: checked === true,
+                    }))
+                  }
+                  disabled={isCreating}
+                />
+                <Label
+                  htmlFor="add-as-existing-project"
+                  className="cursor-pointer text-sm font-normal"
+                >
+                  Add as Existing Project
+                </Label>
+              </div>
               <p className="text-xs text-muted-foreground">
-                Status will be set to <strong>DRAFT</strong>. Generate Hierarchy stays disabled
-                until Project Director or Admin approval (Spec 03).
+                {formData.is_existing_project
+                  ? 'The project will be auto-approved, you will be assigned as Hierarchy Manager, and the hierarchy shells will be generated from the selected configuration.'
+                  : 'Status will be set to DRAFT. Generate Hierarchy stays disabled until Project Director or Admin approval (Spec 03).'}
               </p>
               <div className="flex gap-2 justify-end pt-4">
                 <Button

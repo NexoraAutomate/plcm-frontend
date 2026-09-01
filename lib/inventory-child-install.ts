@@ -359,6 +359,38 @@ type StoreCreateFn = (
   options?: { silent?: boolean }
 ) => Promise<{ id: number }>;
 
+export function buildUpdateEntityByType(
+  handlers: {
+    updateSystem: (id: number, data: Record<string, unknown>) => Promise<{ id: number }>;
+    updateSubsystem: (id: number, data: Record<string, unknown>) => Promise<{ id: number }>;
+    updateModule: (id: number, data: Record<string, unknown>) => Promise<{ id: number }>;
+    updateUnit: (id: number, data: Record<string, unknown>) => Promise<{ id: number }>;
+    updateComponent: (id: number, data: Record<string, unknown>) => Promise<{ id: number }>;
+  }
+): CreateEntityByTypeFn {
+  return (entityType, data) => {
+    const id = Number(data.id);
+    if (!Number.isFinite(id)) {
+      return Promise.reject(new Error('Entity id is required for update'));
+    }
+    const { id: _ignored, ...payload } = data;
+    switch (entityType) {
+      case 'system':
+        return handlers.updateSystem(id, payload).then((result) => ({ id: result.id }));
+      case 'subsystem':
+        return handlers.updateSubsystem(id, payload).then((result) => ({ id: result.id }));
+      case 'module':
+        return handlers.updateModule(id, payload).then((result) => ({ id: result.id }));
+      case 'unit':
+        return handlers.updateUnit(id, payload).then((result) => ({ id: result.id }));
+      case 'component':
+        return handlers.updateComponent(id, payload).then((result) => ({ id: result.id }));
+      default:
+        return Promise.reject(new Error(`Unsupported entity type: ${entityType}`));
+    }
+  };
+}
+
 export function buildCreateEntityByType(
   handlers: {
     createSystem: StoreCreateFn | ((data: Record<string, unknown>) => Promise<{ id: number }>);

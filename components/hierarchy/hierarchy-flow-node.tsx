@@ -265,16 +265,18 @@ function HierarchyFlowNode({ data }: NodeProps<Node<HierarchyNodeData>>) {
             onPointerDown={stopEvent}
             onClick={stopEvent}
           >
-            {renderEntityAction(
-              `Add sibling ${typeLabel}`,
-              <Plus className="pointer-events-none h-3 w-3" aria-hidden="true" />,
-              () => entityActions.onAddSibling(data.entityId, data.type)
-            )}
-            {childType
+            {entityActions.onAddSibling
+              ? renderEntityAction(
+                  `Add sibling ${typeLabel}`,
+                  <Plus className="pointer-events-none h-3 w-3" aria-hidden="true" />,
+                  () => entityActions.onAddSibling!(data.entityId, data.type)
+                )
+              : null}
+            {childType && entityActions.onAddChild
               ? renderEntityAction(
                   `Add ${entityLabel(childType).toLowerCase()}`,
                   <CornerDownRight className="pointer-events-none h-3 w-3" aria-hidden="true" />,
-                  () => entityActions.onAddChild(data.entityId, data.type)
+                  () => entityActions.onAddChild!(data.entityId, data.type)
                 )
               : null}
             {renderEntityAction(

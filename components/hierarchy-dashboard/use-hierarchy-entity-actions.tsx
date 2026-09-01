@@ -42,6 +42,7 @@ import type { HierarchyEntityType } from '@/lib/system-hierarchy-graph';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { EntityForm, type FormField } from '@/components/entity-form';
+import { HierarchyEntityInventoryDialog } from '@/components/hierarchy/hierarchy-entity-inventory-create-dialog';
 import { InventorySerialSelectDialog } from '@/components/inventory-serial-select-dialog';
 
 type DialogMode = 'add-sibling' | 'add-child' | 'edit';
@@ -54,11 +55,11 @@ interface DialogState {
 }
 
 export interface HierarchyEntityActionHandlers {
-  onAddSibling: (entityId: number, type: HierarchyEntityType) => void;
-  onAddChild: (entityId: number, type: HierarchyEntityType) => void;
+  onAddSibling?: (entityId: number, type: HierarchyEntityType) => void;
+  onAddChild?: (entityId: number, type: HierarchyEntityType) => void;
   onEdit: (entityId: number, type: HierarchyEntityType) => void;
   onDelete: (entityId: number, type: HierarchyEntityType, label: string) => void;
-  onAddRootSystem: (projectId: number) => void;
+  onAddRootSystem?: (projectId: number) => void;
 }
 
 interface UseHierarchyEntityActionsOptions {
@@ -67,6 +68,8 @@ interface UseHierarchyEntityActionsOptions {
   updateSelection: (key: DashboardLevelKey, value?: number) => void;
   systemsOverride?: System[];
   onEntityChanged?: () => void | Promise<void>;
+  /** When true, edit uses the inventory-style dialog; add actions are disabled. */
+  isExistingProject?: boolean;
 }
 
 function formatAxiosError(error: unknown, fallback: string): string {
@@ -95,6 +98,7 @@ export function useHierarchyEntityActions({
   updateSelection,
   systemsOverride = [],
   onEntityChanged,
+  isExistingProject = false,
 }: UseHierarchyEntityActionsOptions) {
   const { entityLabel } = useAppDefinitions();
   const dashboardLevels = useMemo(() => getDashboardLevels(entityLabel), [entityLabel]);
@@ -522,29 +526,8 @@ export function useHierarchyEntityActions({
 
   const entityActionHandlers = useMemo<HierarchyEntityActionHandlers>(
     () => ({
-      onAddSibling: (entityId, type) => {
-        const { siblingParentId } = resolveEntityParentIds(
-          type,
-          entityId,
-          selection,
-          effectiveSystems,
-          subsystems,
-          modules,
-          units,
-          components
-        );
-        if (!siblingParentId) {
-          toast.error('Unable to resolve parent for new entity.');
-          return;
-        }
-        openDialog('add-sibling', type, siblingParentId);
-      },
-      onAddChild: (entityId, type) => {
-        const childType = CHILD_ENTITY_TYPE[type];
-        if (!childType) return;
-        openDialog('add-child', childType, entityId);
-      },
       onEdit: (entityId, type) => {
+        if (!isExistingProject) return;
         const { editParentId } = resolveEntityParentIds(
           type,
           entityId,
@@ -562,6 +545,7 @@ export function useHierarchyEntityActions({
         openDialog('edit', type, editParentId, entityId);
       },
       onDelete: (entityId, type, label) => {
+        if (!isExistingProject) return;
         setDeleteTarget({
           entityType: type,
           entityId,
@@ -569,11 +553,9 @@ export function useHierarchyEntityActions({
           selectionKey: SELECTION_KEY_BY_ENTITY[type],
         });
       },
-      onAddRootSystem: (projectId) => {
-        openDialog('add-child', 'system', projectId);
-      },
     }),
     [
+      isExistingProject,
       selection,
       effectiveSystems,
       subsystems,
@@ -735,7 +717,27 @@ export function useHierarchyEntityActions({
 
   const entityActionDialogs = (
     <>
-      <Dialog open={Boolean(dialogState)} onOpenChange={(open) => !open && closeDialog()}>
+      {isExistingProject && dialogState?.mode === 'edit' && editingEntity ? (
+        <HierarchyEntityInventoryDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) closeDialog();
+          }}
+          entityType={dialogState.entityType}
+          entityId={dialogState.entityId}
+          entity={editingEntity}
+          parentId={dialogState.parentId}
+          title={`Edit ${entityLabel(dialogState.entityType)}`}
+          description={`Register details for ${editingEntity.name}`}
+          onSaved={async () => {
+            closeDialog();
+            await notifyEntityChanged();
+          }}
+        />
+      ) : null}
+
+      {!isExistingProject ? (
+      <Dialog open={Boolean(dialogState?.mode === 'edit')} onOpenChange={(open) => !open && closeDialog()}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
@@ -758,7 +760,7 @@ export function useHierarchyEntityActions({
             </DialogDescription>
           </DialogHeader>
 
-          {dialogState && !loadingFormData ? (
+          {dialogState?.mode === 'edit' && !loadingFormData ? (
             <EntityForm
               key={`${dialogState.mode}-${dialogState.entityType}-${dialogState.parentId}-${dialogState.entityId ?? 'new'}`}
               fields={formFields}
@@ -774,6 +776,7 @@ export function useHierarchyEntityActions({
           )}
         </DialogContent>
       </Dialog>
+      ) : null}
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}
