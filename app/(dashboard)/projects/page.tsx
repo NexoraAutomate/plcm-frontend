@@ -10,7 +10,13 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Search, GitBranch } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, GitBranch, ChevronDown } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { cn } from '@/lib/utils';
+import {
+  groupProjectsByName,
+  shouldShowProjectGroup,
+} from '@/lib/project-name-grouping';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { StatusBadge } from '@/components/status-badge';
@@ -70,6 +76,10 @@ export default function ProjectsPage(){
   const orderFilterParam = searchParams.get('order_id');
   const orderFilterId = orderFilterParam ? Number(orderFilterParam) : null;
   const [statusFilter, setStatusFilter] = useState<string>(statusFilterParam || 'Total');
+  const [groupByProjectName, setGroupByProjectName] = useState(false);
+  const [expandedProjectGroups, setExpandedProjectGroups] = useState<Set<string>>(
+    () => new Set()
+  );
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -172,6 +182,101 @@ export default function ProjectsPage(){
     () => getSystemCountByProjectId(systems),
     [systems]
   );
+
+  const projectGroups = useMemo(
+    () => groupProjectsByName(projects),
+    [projects]
+  );
+
+  function toggleProjectGroup(key: string) {
+    setExpandedProjectGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function renderProjectRow(
+    project: (typeof projects)[0],
+    options?: { indented?: boolean }
+  ) {
+    const owner = users.find((u) => u.id === project.owner_id);
+    const status = statuses.find((s) => s.id === project.status_id);
+    return (
+      <TableRow
+        key={project.id}
+        className="cursor-pointer"
+        onClick={() => router.push(`/projects/${project.id}`)}
+      >
+        <TableCell className={cn('font-medium', options?.indented && 'pl-10')}>
+          <EntityNameWithFault
+            name={project.name}
+            entityType="project"
+            entityId={project.id}
+            faultMap={faultMap}
+          />
+        </TableCell>
+        <TableCell>{owner?.full_name || 'N/A'}</TableCell>
+        <TableCell>
+          <StatusBadge status={status?.status_name || 'Unknown'} />
+        </TableCell>
+        <TableCell className="text-sm text-muted-foreground">
+          {new Date(project.start_date).toLocaleDateString()}
+        </TableCell>
+        <TableCell className="text-sm text-muted-foreground">
+          {new Date(project.end_date).toLocaleDateString()}
+        </TableCell>
+        <TableCell>
+          <EntityCountCell
+            count={getCount(systemCountByProject, project.id)}
+            label="Total systems"
+          />
+        </TableCell>
+        <TableCell className="min-w-35">
+          <div className="flex items-center gap-2 rounded-md p-1">
+            <Progress value={project.progress ?? 0} className="h-2 flex-1" />
+            <span className="w-10 text-right text-xs font-medium tabular-nums">
+              {project.progress ?? 0}%
+            </span>
+          </div>
+        </TableCell>
+        <TableCell className="text-right">
+          <div className="flex gap-2 justify-end">
+            <Link href={`/projects/${project.id}`} onClick={(e) => e.stopPropagation()}>
+              <Button variant="outline" size="sm">
+                View
+              </Button>
+            </Link>
+            <Can permission={P.edit_projects}>
+              <button
+                type="button"
+                className="rounded p-1 hover:bg-muted"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openEdit(project);
+                }}
+              >
+                <Edit className="h-4 w-4 text-accent-foreground hover:text-blue-600" />
+              </button>
+            </Can>
+            <Can permission={P.delete_projects}>
+              <button
+                type="button"
+                className="rounded p-1 hover:bg-muted"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeleteConfirm({ open: true, id: project.id });
+                }}
+              >
+                <Trash2 className="h-4 w-4 text-accent-foreground hover:text-red-600" />
+              </button>
+            </Can>
+          </div>
+        </TableCell>
+      </TableRow>
+    );
+  }
 
   async function handleCreate() {
     const sdlsCounts = formData.sdls_counts_by_flight
@@ -544,12 +649,30 @@ export default function ProjectsPage(){
               Showing {projects.length} on this page · {pagination.total} matching
             </CardDescription>
           </div>
-          <Button variant="outline" size="sm" className="shrink-0" asChild>
-            <Link href="/hierarchy-dashboard">
-              <GitBranch className="mr-2 h-4 w-4" />
-              Hierarchy Dashboard
-            </Link>
-          </Button>
+          <div className="flex shrink-0 items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="group-by-project-name"
+                checked={groupByProjectName}
+                onCheckedChange={(checked) => {
+                  setGroupByProjectName(checked === true);
+                  setExpandedProjectGroups(new Set());
+                }}
+              />
+              <Label
+                htmlFor="group-by-project-name"
+                className="cursor-pointer text-sm font-normal whitespace-nowrap"
+              >
+                Group by {entityLabel('project').toLowerCase()} name
+              </Label>
+            </div>
+            <Button variant="outline" size="sm" className="shrink-0" asChild>
+              <Link href="/hierarchy-dashboard">
+                <GitBranch className="mr-2 h-4 w-4" />
+                Hierarchy Dashboard
+              </Link>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <ListContentSuspense loading={pagination.fetching}>
@@ -574,78 +697,53 @@ export default function ProjectsPage(){
                       No projects found
                     </TableCell>
                   </TableRow>
-                ) : (
-                  projects.map((project) => {
-                    const owner = users.find((u) => u.id === project.owner_id);
-                    const status = statuses.find((s) => s.id === project.status_id);
-                    return (
+                ) : groupByProjectName ? (
+                  projectGroups.flatMap((group) => {
+                    if (!shouldShowProjectGroup(group)) {
+                      return group.projects.map((project) => renderProjectRow(project));
+                    }
+
+                    const isExpanded = expandedProjectGroups.has(group.key);
+                    const rows = [
                       <TableRow
-                        key={project.id}
-                        className="cursor-pointer"
-                        onClick={() => router.push(`/projects/${project.id}`)}
+                        key={`group-${group.key}`}
+                        className="bg-muted/30 hover:bg-muted/50"
                       >
-                        <TableCell className="font-medium">
-                          <EntityNameWithFault
-                            name={project.name}
-                            entityType="project"
-                            entityId={project.id}
-                            faultMap={faultMap}
-                          />
-                        </TableCell>
-                        <TableCell>{owner?.full_name || 'N/A'}</TableCell>
-                        <TableCell><StatusBadge status={status?.status_name || 'Unknown'} /></TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{new Date(project.start_date).toLocaleDateString()}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{new Date(project.end_date).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <EntityCountCell
-                            count={getCount(systemCountByProject, project.id)}
-                            label="Total systems"
-                          />
-                        </TableCell>
-                        <TableCell className="min-w-35">
-                          <div className="flex items-center gap-2 rounded-md p-1">
-                            <Progress value={project.progress ?? 0} className="h-2 flex-1" />
-                            <span className="w-10 text-right text-xs font-medium tabular-nums">
-                              {project.progress ?? 0}%
+                        <TableCell colSpan={8} className="p-0">
+                          <button
+                            type="button"
+                            className="flex w-full items-center gap-2 px-4 py-3 text-left font-medium"
+                            onClick={() => toggleProjectGroup(group.key)}
+                            aria-expanded={isExpanded}
+                          >
+                            <ChevronDown
+                              className={cn(
+                                'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
+                                isExpanded && 'rotate-180'
+                              )}
+                            />
+                            <span>{group.displayName}</span>
+                            <span className="text-xs font-normal text-muted-foreground">
+                              {group.projects.length}{' '}
+                              {group.projects.length === 1 ? 'flight' : 'flights'}
                             </span>
-                          </div>
+                          </button>
                         </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex gap-2 justify-end">
-                            <Link href={`/projects/${project.id}`} onClick={(e) => e.stopPropagation()}>
-                              <Button variant="outline" size="sm">
-                                View
-                              </Button>
-                            </Link>
-                            <Can permission={P.edit_projects}>
-                              <button
-                                type="button"
-                                className="rounded p-1 hover:bg-muted"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openEdit(project);
-                                }}
-                              >
-                                <Edit className="h-4 w-4 text-accent-foreground hover:text-blue-600" />
-                              </button>
-                            </Can>
-                            <Can permission={P.delete_projects}>
-                              <button
-                                type="button"
-                                className="rounded p-1 hover:bg-muted"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeleteConfirm({ open: true, id: project.id });
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 text-accent-foreground hover:text-red-600" />
-                              </button>
-                            </Can>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
+                      </TableRow>,
+                    ];
+
+                    if (isExpanded) {
+                      rows.push(
+                        ...group.projects.map((project) =>
+                          renderProjectRow(project, { indented: true })
+                        )
+                      );
+                    }
+
+                    return rows;
                   })
+                ) : (
+                  projects.map((project) => renderProjectRow(project))
                 )}
               </TableBody>
             </Table>
