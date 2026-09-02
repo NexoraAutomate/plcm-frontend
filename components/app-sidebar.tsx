@@ -40,7 +40,6 @@ import { useAppDefinitions } from "@/lib/app-definitions-context";
 import { NAV_PERMISSIONS, SETTINGS_ACCESS_PERMISSIONS, type PermissionCode } from "@/lib/permission-codes";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { useAppFullscreen } from "@/components/app-fullscreen";
 import {
   Tooltip,
   TooltipContent,
@@ -262,12 +261,10 @@ function NavLink({
   item,
   pathname,
   collapsed,
-  onNavigate,
 }: {
   item: NavItem;
   pathname: string;
   collapsed: boolean;
-  onNavigate?: (href: string) => void;
 }) {
   const isActive =
     pathname === item.href || pathname.startsWith(item.href + "/");
@@ -275,7 +272,6 @@ function NavLink({
   const link = (
     <Link
       href={item.href}
-      onClick={() => onNavigate?.(item.href)}
       className={cn(
         "flex items-center rounded-lg text-sm font-medium transition-colors",
         collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2.5",
@@ -305,7 +301,6 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { logout, can } = useAuth();
   const { entityLabel } = useAppDefinitions();
-  const { enter: enterFullscreen } = useAppFullscreen();
   const [pinned, setPinned] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [reportingOpen, setReportingOpen] = useState(false);
@@ -323,12 +318,6 @@ export function AppSidebar() {
   }, [pathname]);
 
   const collapsed = !pinned;
-
-  const handleNavigate = (href: string) => {
-    if (href === "/executive-dashboard" || href.startsWith("/executive-dashboard/")) {
-      enterFullscreen();
-    }
-  };
 
   const visibleNav = useMemo(
     () =>
@@ -442,7 +431,6 @@ export function AppSidebar() {
                 item={item}
                 pathname={pathname}
                 collapsed={collapsed}
-                onNavigate={handleNavigate}
               />
             ))}
 
@@ -456,7 +444,6 @@ export function AppSidebar() {
                   }}
                   pathname={pathname}
                   collapsed={collapsed}
-                  onNavigate={handleNavigate}
                 />
               ) : (
                 <>
@@ -527,7 +514,6 @@ export function AppSidebar() {
                     item={item}
                     pathname={pathname}
                     collapsed={collapsed}
-                    onNavigate={handleNavigate}
                   />
                 ))}
               </div>
@@ -549,7 +535,6 @@ export function AppSidebar() {
                   item={settingsItem}
                   pathname={pathname}
                   collapsed={collapsed}
-                  onNavigate={handleNavigate}
                 />
               </div>
             </div>

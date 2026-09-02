@@ -36,12 +36,12 @@ export function AlertPanel({ alerts, className, insight }: AlertPanelProps) {
             return (
               <li
                 key={alert.id}
-                className="flex items-start gap-2 rounded-md border border-transparent px-1.5 py-1.5 transition-colors hover:border-[#242424] hover:bg-white/[0.03]"
+                className="flex items-start gap-2 rounded-md border border-transparent px-1.5 py-1.5 transition-colors hover:border-[var(--exec-border)] hover:bg-[var(--exec-hover)]"
               >
                 <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color }} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[12px] leading-snug text-[#F5F5F5]">{alert.title}</p>
-                  <p className="mt-0.5 text-[10px] uppercase tracking-wide text-[#9CA3AF]">
+                  <p className="truncate text-[12px] leading-snug text-[var(--exec-text)]">{alert.title}</p>
+                  <p className="mt-0.5 text-[10px] uppercase tracking-wide text-[var(--exec-muted)]">
                     {alert.timeAgo}
                   </p>
                 </div>
@@ -49,7 +49,7 @@ export function AlertPanel({ alerts, className, insight }: AlertPanelProps) {
             );
           })}
           {!alerts.length ? (
-            <li className="px-2 py-6 text-center text-[11px] text-[#9CA3AF]">No alerts</li>
+            <li className="px-2 py-6 text-center text-[11px] text-[var(--exec-muted)]">No alerts</li>
           ) : null}
         </ul>
       </div>

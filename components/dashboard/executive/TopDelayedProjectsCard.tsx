@@ -134,13 +134,13 @@ export function TopDelayedProjectsCard({
         <div className="shrink-0 px-2.5 pt-2 pb-1.5 sm:px-3 sm:pt-2.5 sm:pb-2">
           <h3
             ref={titleFit.ref as React.RefObject<HTMLHeadingElement>}
-            className="w-full overflow-hidden font-semibold leading-tight text-[#F5F5F5]"
+            className="w-full overflow-hidden font-semibold leading-tight text-[var(--exec-text)]"
             style={{ fontSize: titleFit.fontSize }}
           >
             Top Delayed Projects
           </h3>
           <p
-            className="mt-0.5 leading-tight text-[#D1D5DB]"
+            className="mt-0.5 leading-tight text-[var(--exec-text-secondary)]"
             style={{ fontSize: scale.subtitle }}
           >
             by Days Overdue
@@ -150,7 +150,7 @@ export function TopDelayedProjectsCard({
         <div className="flex min-h-0 flex-1 flex-col px-2.5 pb-2 pt-1 sm:px-3">
           <div
             ref={listRef}
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin] [scrollbar-color:#3F3F46_transparent]"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin] [scrollbar-color:var(--exec-scrollbar)_transparent]"
             style={{ gap: rowGap }}
             onWheel={(e) => e.stopPropagation()}
           >
@@ -167,7 +167,7 @@ export function TopDelayedProjectsCard({
                       onClick={() => onBarClick?.(item)}
                     >
                       <p
-                        className="truncate font-medium leading-tight text-[#F5F5F5]"
+                        className="truncate font-medium leading-tight text-[var(--exec-text)]"
                         style={{ fontSize: nameSize }}
                       >
                         {item.name}
@@ -204,7 +204,7 @@ export function TopDelayedProjectsCard({
               </div>
             ) : (
               <p
-                className="flex h-full items-center justify-center text-[#9CA3AF]"
+                className="flex h-full items-center justify-center text-[var(--exec-muted)]"
                 style={{ fontSize: scale.name }}
               >
                 No delayed projects
@@ -212,12 +212,12 @@ export function TopDelayedProjectsCard({
             )}
           </div>
 
-          <div className="mt-1 shrink-0 border-t border-[#242424] pt-1">
+          <div className="mt-1 shrink-0 border-t border-[var(--exec-border)] pt-1">
             <div className="flex justify-between px-0.5">
               {ticks.map((t) => (
                 <span
                   key={t}
-                  className="tabular-nums text-[#9CA3AF]"
+                  className="tabular-nums text-[var(--exec-muted)]"
                   style={{ fontSize: scale.axis }}
                 >
                   {t}
@@ -225,7 +225,7 @@ export function TopDelayedProjectsCard({
               ))}
             </div>
             <p
-              className="mt-0.5 text-center uppercase tracking-wide text-[#9CA3AF]"
+              className="mt-0.5 text-center uppercase tracking-wide text-[var(--exec-muted)]"
               style={{ fontSize: scale.axis }}
             >
               Days

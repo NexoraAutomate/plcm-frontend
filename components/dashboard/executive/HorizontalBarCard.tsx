@@ -5,6 +5,7 @@ import { Bar } from '@ant-design/charts';
 import { DashboardCard } from './DashboardCard';
 import type { ExecInsight, ExecNamedValue } from './types';
 import { EXEC } from './theme';
+import { useExecTheme } from './use-exec-theme';
 
 interface HorizontalBarCardProps {
   title: string;
@@ -25,6 +26,7 @@ export function HorizontalBarCard({
   onBarClick,
   insight,
 }: HorizontalBarCardProps) {
+  const { exec, chartTheme } = useExecTheme();
   const sorted = useMemo(() => [...data].sort((a, b) => a.value - b.value), [data]);
 
   const config = useMemo(
@@ -36,10 +38,15 @@ export function HorizontalBarCard({
         height: 155,
         autoFit: true,
         legend: false,
-        theme: 'classicDark',
+        theme: chartTheme,
         axis: {
-          x: { labelFill: EXEC.muted, labelFontSize: 10, gridStroke: '#242424', line: false },
-          y: { labelFill: EXEC.muted, labelFontSize: 10, line: false, tick: false },
+          x: {
+            labelFill: exec.muted,
+            labelFontSize: 10,
+            gridStroke: exec.grid,
+            line: false,
+          },
+          y: { labelFill: exec.muted, labelFontSize: 10, line: false, tick: false },
         },
         style: {
           fill: color,
@@ -50,7 +57,7 @@ export function HorizontalBarCard({
         label: {
           text: 'value',
           position: 'right',
-          style: { fill: EXEC.muted, fontSize: 10 },
+          style: { fill: exec.muted, fontSize: 10 },
         },
         tooltip: true,
         onReady: (plot: {
@@ -63,7 +70,7 @@ export function HorizontalBarCard({
           });
         },
       }) as Record<string, unknown>,
-    [color, onBarClick, sorted, valueLabel]
+    [chartTheme, color, exec.grid, exec.muted, onBarClick, sorted, valueLabel]
   );
 
   return (

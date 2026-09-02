@@ -37,7 +37,7 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [passwordPolicy, setPasswordPolicy] = useState<PasswordPolicyPublic | null>(null);
-  const { isAuthenticated, authReady, can } = useAuth();
+  const { isAuthenticated, authReady, can, user } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -50,9 +50,9 @@ export default function SignupPage() {
   useEffect(() => {
     if (!authReady) return;
     if (isAuthenticated) {
-      router.replace(firstAccessiblePath(can));
+      router.replace(firstAccessiblePath(can, user?.roles));
     }
-  }, [isAuthenticated, authReady, router, can]);
+  }, [isAuthenticated, authReady, router, can, user?.roles]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

@@ -46,7 +46,7 @@ export function ExecutiveCommandGrid({
     <div
       className="executive-command-center grid h-full min-h-0 w-full gap-3 overflow-hidden p-3"
       style={{
-        background: EXEC.bg,
+        background: 'var(--exec-bg)',
         gridTemplateRows: 'minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.95fr)',
         gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
         fontFamily: 'var(--font-exec-inter), Inter, system-ui, sans-serif',

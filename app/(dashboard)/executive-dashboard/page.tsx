@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Inter } from 'next/font/google';
 import { Loader2 } from 'lucide-react';
@@ -14,7 +14,6 @@ import { useExecutiveDashboard } from '@/hooks/use-executive-dashboard';
 import { buildCommandCenterViewModel } from '@/lib/executive-command-center';
 import { ExecutiveCommandGrid } from '@/components/dashboard/executive';
 import type { ExecFiltersState } from '@/components/dashboard/executive';
-import { useAppFullscreen } from '@/components/app-fullscreen';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -52,18 +51,12 @@ function inferRange(dateFrom: string): string | undefined {
 
 export default function ExecutiveDashboardPage() {
   const router = useRouter();
-  const { enter } = useAppFullscreen();
   const { data: customers = [] } = useCustomersQuery(0, LIST_BOOTSTRAP_SIZE);
   const { data: orders = [] } = useOrdersQuery(0, LIST_BOOTSTRAP_SIZE);
   const { data: projects = [] } = useProjectsQuery(0, LIST_BOOTSTRAP_SIZE);
 
   const { data, loading, fetching, error, filters, updateFilters, refetch } =
     useExecutiveDashboard();
-
-  // Enter fullscreen when landing here (login redirect / deep link). Sidebar click also calls enter.
-  useEffect(() => {
-    enter();
-  }, [enter]);
 
   const model = useMemo(() => buildCommandCenterViewModel(data), [data]);
 
@@ -118,10 +111,13 @@ export default function ExecutiveDashboardPage() {
   if (loading && !data) {
     return (
       <div
-        className={cn(inter.variable, 'flex min-h-0 flex-1 items-center justify-center')}
-        style={{ background: '#090909' }}
+        className={cn(
+          inter.variable,
+          'flex min-h-0 flex-1 items-center justify-center bg-[var(--exec-bg)] text-[var(--exec-muted)]'
+        )}
+        data-executive-command-center
       >
-        <div className="flex items-center gap-2 text-sm text-[#9CA3AF]">
+        <div className="flex items-center gap-2 text-sm">
           <Loader2 className="h-5 w-5 animate-spin text-[#8B5CF6]" />
           Loading executive command center…
         </div>
@@ -131,18 +127,20 @@ export default function ExecutiveDashboardPage() {
 
   return (
     <div
-      className={cn(inter.variable, 'relative flex min-h-0 flex-1 flex-col overflow-hidden')}
-      style={{ background: '#090909', color: '#F5F5F5' }}
+      className={cn(
+        inter.variable,
+        'relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--exec-bg)] text-[var(--exec-text)]'
+      )}
       data-executive-command-center
     >
       {error ? (
-        <div className="absolute left-3 right-3 top-3 z-20 rounded-lg border border-[#EF4444]/40 bg-[#141414] p-3 text-sm">
+        <div className="absolute left-3 right-3 top-3 z-20 rounded-lg border border-[#EF4444]/40 bg-[var(--exec-card)] p-3 text-sm">
           <p className="font-medium text-[#EF4444]">Failed to load dashboard</p>
-          <p className="text-[#9CA3AF]">{error}</p>
+          <p className="text-[var(--exec-muted)]">{error}</p>
           <Button
             variant="outline"
             size="sm"
-            className="mt-2 border-[#242424] bg-transparent text-[#F5F5F5]"
+            className="mt-2 border-[var(--exec-border)] bg-transparent text-[var(--exec-text)]"
             onClick={refetch}
           >
             Retry

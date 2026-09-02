@@ -193,7 +193,7 @@ export function ConfigSplitCard({ components, rows, className, insight }: Config
           <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
             <h3
               ref={titleFit.ref as React.RefObject<HTMLHeadingElement>}
-              className="min-w-0 flex-1 overflow-hidden font-semibold leading-tight text-[#F5F5F5]"
+              className="min-w-0 flex-1 overflow-hidden font-semibold leading-tight text-[var(--exec-text)]"
               style={{ fontSize: titleFit.fontSize }}
             >
               Configuration Changes
@@ -242,13 +242,13 @@ export function ConfigSplitCard({ components, rows, className, insight }: Config
         >
           <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
             <p
-              className="shrink-0 font-semibold leading-tight text-[#F5F5F5]"
+              className="shrink-0 font-semibold leading-tight text-[var(--exec-text)]"
               style={{ fontSize: scale.section }}
             >
               Top Modified {filterMeta.label}s
             </p>
             <p
-              className="mt-0.5 shrink-0 leading-tight text-[#9CA3AF]"
+              className="mt-0.5 shrink-0 leading-tight text-[var(--exec-muted)]"
               style={{ fontSize: scale.sectionSub }}
             >
               by Change Count · {filterMeta.label} types
@@ -256,7 +256,7 @@ export function ConfigSplitCard({ components, rows, className, insight }: Config
 
             <div
               ref={listRef}
-              className="mt-1.5 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-width:thin] [scrollbar-color:#3F3F46_transparent]"
+              className="mt-1.5 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-width:thin] [scrollbar-color:var(--exec-scrollbar)_transparent]"
               onWheel={(e) => e.stopPropagation()}
             >
               {sorted.length ? (
@@ -270,7 +270,7 @@ export function ConfigSplitCard({ components, rows, className, insight }: Config
                         style={{ height: rowHeight }}
                       >
                         <p
-                          className="truncate font-medium leading-tight text-[#F5F5F5]"
+                          className="truncate font-medium leading-tight text-[var(--exec-text)]"
                           style={{ fontSize: nameSize }}
                           title={item.name}
                         >
@@ -293,7 +293,7 @@ export function ConfigSplitCard({ components, rows, className, insight }: Config
                             />
                           </div>
                           <span
-                            className="shrink-0 text-right font-semibold tabular-nums text-[#F5F5F5]"
+                            className="shrink-0 text-right font-semibold tabular-nums text-[var(--exec-text)]"
                             style={{
                               fontSize: scale.value,
                               width: scale.valueCol,
@@ -308,7 +308,7 @@ export function ConfigSplitCard({ components, rows, className, insight }: Config
                 </div>
               ) : (
                 <p
-                  className="flex h-full items-center justify-center text-[#9CA3AF]"
+                  className="flex h-full items-center justify-center text-[var(--exec-muted)]"
                   style={{ fontSize: scale.name }}
                 >
                   No {filterMeta.label.toLowerCase()} replacements yet
@@ -316,12 +316,12 @@ export function ConfigSplitCard({ components, rows, className, insight }: Config
               )}
             </div>
 
-            <div className="mt-1 shrink-0 border-t border-[#242424] pt-1">
+            <div className="mt-1 shrink-0 border-t border-[var(--exec-border)] pt-1">
               <div className="flex justify-between px-0.5">
                 {ticks.map((t) => (
                   <span
                     key={t}
-                    className="tabular-nums text-[#9CA3AF]"
+                    className="tabular-nums text-[var(--exec-muted)]"
                     style={{ fontSize: scale.axis }}
                   >
                     {t}
@@ -333,15 +333,15 @@ export function ConfigSplitCard({ components, rows, className, insight }: Config
 
           <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
             <p
-              className="mb-1.5 shrink-0 font-semibold leading-tight text-[#F5F5F5]"
+              className="mb-1.5 shrink-0 font-semibold leading-tight text-[var(--exec-text)]"
               style={{ fontSize: scale.section }}
             >
               Recent Changes
             </p>
-            <div className="min-h-0 flex-1 overflow-auto rounded-md border border-[#242424] [scrollbar-width:thin] [scrollbar-color:#3F3F46_transparent]">
+            <div className="min-h-0 flex-1 overflow-auto rounded-md border border-[var(--exec-border)] [scrollbar-width:thin] [scrollbar-color:var(--exec-scrollbar)_transparent]">
               <table className="w-full text-left" style={{ fontSize: scale.tableCell }}>
                 <thead
-                  className="sticky top-0 bg-[#0C0C0C] uppercase tracking-wide text-[#9CA3AF]"
+                  className="sticky top-0 bg-[var(--exec-elevated)] uppercase tracking-wide text-[var(--exec-muted)]"
                   style={{ fontSize: scale.tableHead }}
                 >
                   <tr>
@@ -355,11 +355,11 @@ export function ConfigSplitCard({ components, rows, className, insight }: Config
                   {filteredRows.map((row) => {
                     const st = statusStyle(row.status);
                     return (
-                      <tr key={row.id} className="border-t border-[#242424]">
-                        <td className="max-w-22 truncate px-1.5 py-1.5 font-medium text-[#F5F5F5]">
+                      <tr key={row.id} className="border-t border-[var(--exec-border)]">
+                        <td className="max-w-22 truncate px-1.5 py-1.5 font-medium text-[var(--exec-text)]">
                           {row.partNumber}
                         </td>
-                        <td className="max-w-24 truncate px-1.5 py-1.5 text-[#9CA3AF]">
+                        <td className="max-w-24 truncate px-1.5 py-1.5 text-[var(--exec-muted)]">
                           {row.reason}
                         </td>
                         <td className="px-1.5 py-1.5">
@@ -378,7 +378,7 @@ export function ConfigSplitCard({ components, rows, className, insight }: Config
                             {row.status || '—'}
                           </span>
                         </td>
-                        <td className="whitespace-nowrap px-1.5 py-1.5 text-[#9CA3AF]">
+                        <td className="whitespace-nowrap px-1.5 py-1.5 text-[var(--exec-muted)]">
                           {row.date}
                         </td>
                       </tr>
@@ -386,7 +386,7 @@ export function ConfigSplitCard({ components, rows, className, insight }: Config
                   })}
                   {!filteredRows.length ? (
                     <tr>
-                      <td colSpan={4} className="px-2 py-8 text-center text-[#9CA3AF]">
+                      <td colSpan={4} className="px-2 py-8 text-center text-[var(--exec-muted)]">
                         No recent {filterMeta.label.toLowerCase()} changes
                       </td>
                     </tr>
@@ -403,9 +403,9 @@ export function ConfigSplitCard({ components, rows, className, insight }: Config
 
 export function RecentChangesTable({ rows }: { rows: ExecConfigChangeRow[] }) {
   return (
-    <div className="overflow-hidden rounded-md border border-[#242424]">
+    <div className="overflow-hidden rounded-md border border-[var(--exec-border)]">
       <table className="w-full text-left text-[11px]">
-        <thead className="bg-[#0C0C0C] text-[10px] uppercase tracking-wide text-[#9CA3AF]">
+        <thead className="bg-[var(--exec-elevated)] text-[10px] uppercase tracking-wide text-[var(--exec-muted)]">
           <tr>
             <th className="px-2 py-1.5 font-medium">Entity</th>
             <th className="px-2 py-1.5 font-medium">Reason</th>
@@ -417,13 +417,13 @@ export function RecentChangesTable({ rows }: { rows: ExecConfigChangeRow[] }) {
           {rows.slice(0, 5).map((row) => {
             const st = statusStyle(row.status);
             return (
-              <tr key={row.id} className="border-t border-[#242424]">
-                <td className="px-2 py-1.5 font-medium text-[#F5F5F5]">{row.partNumber}</td>
-                <td className="px-2 py-1.5 text-[#9CA3AF]">{row.reason}</td>
+              <tr key={row.id} className="border-t border-[var(--exec-border)]">
+                <td className="px-2 py-1.5 font-medium text-[var(--exec-text)]">{row.partNumber}</td>
+                <td className="px-2 py-1.5 text-[var(--exec-muted)]">{row.reason}</td>
                 <td className="px-2 py-1.5">
                   <span style={{ color: st.color }}>{row.status}</span>
                 </td>
-                <td className="px-2 py-1.5 text-[#9CA3AF]">{row.date}</td>
+                <td className="px-2 py-1.5 text-[var(--exec-muted)]">{row.date}</td>
               </tr>
             );
           })}

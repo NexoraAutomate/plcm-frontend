@@ -5,6 +5,7 @@ import { Area } from '@ant-design/charts';
 import { DashboardCard } from './DashboardCard';
 import type { ExecInsight, ExecSeriesPoint } from './types';
 import { EXEC } from './theme';
+import { useExecTheme } from './use-exec-theme';
 
 const SERIES = [
   { key: 'Projects Started', color: EXEC.purple, totalKey: 'started' as const, label: 'Started' },
@@ -72,6 +73,7 @@ export function AreaChartCard({
   onClick,
   insight,
 }: AreaChartCardProps) {
+  const { exec, chartTheme } = useExecTheme();
   const chartHostRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const [host, setHost] = useState({ w: 420, h: 148 });
@@ -159,7 +161,7 @@ export function AreaChartCard({
         height: chartHeight,
         autoFit: false,
         legend: false,
-        theme: 'classicDark',
+        theme: chartTheme,
         shapeField: 'smooth',
         style: {
           fillOpacity: 0.22,
@@ -177,7 +179,7 @@ export function AreaChartCard({
         },
         axis: {
           x: {
-            labelFill: '#9CA3AF',
+            labelFill: exec.muted,
             labelFontSize: scale.axis,
             labelFontWeight: 500,
             line: false,
@@ -185,11 +187,11 @@ export function AreaChartCard({
             grid: null,
           },
           y: {
-            labelFill: '#9CA3AF',
+            labelFill: exec.muted,
             labelFontSize: scale.axis,
             labelFontWeight: 500,
             grid: true,
-            gridStroke: '#2A2A2A',
+            gridStroke: exec.grid,
             gridStrokeOpacity: 1,
             gridLineWidth: 1,
             line: false,
@@ -217,7 +219,7 @@ export function AreaChartCard({
           },
         },
       }) as Record<string, unknown>,
-    [chartData, chartHeight, chartWidth, scale.axis, scale.lineWidth, yMax]
+    [chartData, chartHeight, chartTheme, chartWidth, exec.grid, exec.muted, scale.axis, scale.lineWidth, yMax]
   );
 
   return (
@@ -233,7 +235,7 @@ export function AreaChartCard({
         <div className="shrink-0 px-2.5 pt-2 pb-0 sm:px-3 sm:pt-2.5">
           <h3
             ref={titleFit.ref as React.RefObject<HTMLHeadingElement>}
-            className="w-full overflow-hidden font-semibold leading-tight text-[#F5F5F5]"
+            className="w-full overflow-hidden font-semibold leading-tight text-[var(--exec-text)]"
             style={{ fontSize: titleFit.fontSize }}
           >
             {title}
@@ -286,11 +288,11 @@ export function AreaChartCard({
             </div>
 
             {totals ? (
-              <div className="flex flex-col justify-center gap-2 border-l border-[#242424] pl-2 sm:gap-3 sm:pl-2.5">
+              <div className="flex flex-col justify-center gap-2 border-l border-[var(--exec-border)] pl-2 sm:gap-3 sm:pl-2.5">
                 {SERIES.map((s) => (
                   <div key={s.totalKey} className="min-w-0">
                     <p
-                      className="font-medium leading-none text-[#9CA3AF]"
+                      className="font-medium leading-none text-[var(--exec-muted)]"
                       style={{ fontSize: scale.totalLabel }}
                     >
                       {s.label}

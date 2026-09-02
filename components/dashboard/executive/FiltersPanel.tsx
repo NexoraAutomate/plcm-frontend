@@ -73,7 +73,7 @@ function FilterSelect({
             <SelectValue placeholder={`All ${label}`} />
           )}
         </SelectTrigger>
-        <SelectContent className="border-[#242424] bg-[#141414] text-[#F5F5F5]">
+        <SelectContent className="border-border bg-popover text-popover-foreground">
           <SelectItem value="all">All {label}</SelectItem>
           {options.map((o) => (
             <SelectItem key={o.value} value={o.value}>
@@ -144,8 +144,8 @@ export function FiltersPanel({
           <div className="flex min-w-0 items-center gap-2.5">
             <CalendarDays className="h-4 w-4 shrink-0 text-[#A78BFA]" aria-hidden />
             <div className="min-w-0">
-              <p className="text-[10px] font-medium text-[#9CA3AF]">Last Updated</p>
-              <p className="mt-0.5 truncate text-[12px] font-medium text-[#F5F5F5]">
+              <p className="text-[10px] font-medium text-[var(--exec-muted)]">Last Updated</p>
+              <p className="mt-0.5 truncate text-[12px] font-medium text-[var(--exec-text)]">
                 {lastUpdated
                   ? new Date(lastUpdated).toLocaleString(undefined, {
                       month: 'short',
@@ -163,7 +163,7 @@ export function FiltersPanel({
               type="button"
               onClick={onRefresh}
               disabled={fetching}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[#242424] text-[#9CA3AF] transition hover:border-[#8B5CF6]/50 hover:text-[#F5F5F5] disabled:opacity-50"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--exec-border)] text-[var(--exec-muted)] transition hover:border-[#8B5CF6]/50 hover:text-[var(--exec-text)] disabled:opacity-50"
               aria-label="Refresh dashboard"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${fetching ? 'animate-spin' : ''}`} />

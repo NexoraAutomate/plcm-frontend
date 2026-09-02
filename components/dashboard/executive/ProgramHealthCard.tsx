@@ -6,6 +6,7 @@ import type { EChartsType } from 'echarts';
 import { DashboardCard } from './DashboardCard';
 import type { ExecGaugeMetric } from './types';
 import { EXEC } from './theme';
+import { useExecTheme } from './use-exec-theme';
 
 const ReactECharts = dynamic(() => import('echarts-for-react'), { ssr: false });
 
@@ -53,6 +54,7 @@ interface ProgramHealthCardProps {
 }
 
 export function ProgramHealthCard({ metric, className }: ProgramHealthCardProps) {
+  const { exec } = useExecTheme();
   const available = metric.available !== false;
   const chartHostRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<EChartsType | null>(null);
@@ -133,7 +135,7 @@ export function ProgramHealthCard({ metric, className }: ProgramHealthCardProps)
           axisLine: {
             lineStyle: {
               width: scale.ring,
-              color: [[1, '#1F1F1F']],
+              color: [[1, exec.gaugeTrack]],
             },
           },
           axisTick: { show: false },
@@ -147,7 +149,7 @@ export function ProgramHealthCard({ metric, className }: ProgramHealthCardProps)
         },
       ],
     }),
-    [available, metric.color, metric.value, scale.radius, scale.ring]
+    [available, exec.gaugeTrack, metric.color, metric.value, scale.radius, scale.ring]
   );
 
   const trend = metric.trend;
@@ -168,7 +170,7 @@ export function ProgramHealthCard({ metric, className }: ProgramHealthCardProps)
         <div className="shrink-0 px-2.5 pt-2 pb-0 sm:px-3 sm:pt-2.5">
           <h3
             ref={titleFit.ref as React.RefObject<HTMLHeadingElement>}
-            className="w-full overflow-hidden font-semibold leading-tight text-[#F5F5F5]"
+            className="w-full overflow-hidden font-semibold leading-tight text-[var(--exec-text)]"
             style={{ fontSize: titleFit.fontSize }}
           >
             Overall Program Health
@@ -217,7 +219,7 @@ export function ProgramHealthCard({ metric, className }: ProgramHealthCardProps)
                 <span className="truncate">{trendText}</span>
               </span>
               <span
-                className="mt-1 max-w-full truncate leading-tight text-[#9CA3AF]"
+                className="mt-1 max-w-full truncate leading-tight text-[var(--exec-muted)]"
                 style={{ fontSize: vsSize }}
               >
                 vs last month

@@ -16,15 +16,15 @@ export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login, isAuthenticated, authReady, can } = useAuth();
+  const { login, isAuthenticated, authReady, can, user } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (!authReady) return;
     if (isAuthenticated) {
-      router.replace(firstAccessiblePath(can));
+      router.replace(firstAccessiblePath(can, user?.roles));
     }
-  }, [isAuthenticated, authReady, router, can]);
+  }, [isAuthenticated, authReady, router, can, user?.roles]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -41,12 +41,18 @@ export default function LoginPage() {
       let destination = '/executive-dashboard';
       if (stored) {
         try {
-          const user = JSON.parse(stored) as { permissions?: string[] };
-          const perms = user.permissions ?? [];
-          destination = firstAccessiblePath((p) => {
-            const list = Array.isArray(p) ? p : [p];
-            return list.some((code) => perms.includes(code));
-          });
+          const storedUser = JSON.parse(stored) as {
+            permissions?: string[];
+            roles?: string[];
+          };
+          const perms = storedUser.permissions ?? [];
+          destination = firstAccessiblePath(
+            (p) => {
+              const list = Array.isArray(p) ? p : [p];
+              return list.some((code) => perms.includes(code));
+            },
+            storedUser.roles
+          );
         } catch {
           /* keep default */
         }

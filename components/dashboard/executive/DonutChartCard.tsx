@@ -5,6 +5,7 @@ import { Pie } from '@ant-design/charts';
 import { DashboardCard } from './DashboardCard';
 import type { ExecInsight, ExecNamedValue } from './types';
 import { EXEC } from './theme';
+import { useExecTheme } from './use-exec-theme';
 
 interface DonutChartCardProps {
   title: string;
@@ -72,6 +73,7 @@ export function DonutChartCard({
   insight,
   legendPlacement = 'bottom',
 }: DonutChartCardProps) {
+  const { exec, chartTheme } = useExecTheme();
   const total = Math.round(data.reduce((s, d) => s + d.value, 0));
   const side = legendPlacement === 'side';
   const chartHostRef = useRef<HTMLDivElement>(null);
@@ -119,7 +121,7 @@ export function DonutChartCard({
         width: pieWidth,
         height: pieHeight,
         autoFit: false,
-        theme: 'classicDark',
+        theme: chartTheme,
         legend: side
           ? false
           : {
@@ -127,7 +129,7 @@ export function DonutChartCard({
                 position: 'bottom',
                 itemMarker: 'circle',
                 itemLabelFontSize: scale.bottomLegendFont,
-                itemLabelFill: EXEC.muted,
+                itemLabelFill: exec.muted,
                 maxRows: 2,
               },
             },
@@ -139,7 +141,7 @@ export function DonutChartCard({
         },
         label: false,
         tooltip: true,
-        style: { stroke: EXEC.card, lineWidth: scale.stroke },
+        style: { stroke: exec.card, lineWidth: scale.stroke },
         onReady: (plot: {
           on: (event: string, cb: (evt: { data?: { data?: ExecNamedValue } }) => void) => void;
         }) => {
@@ -150,7 +152,7 @@ export function DonutChartCard({
           });
         },
       }) as Record<string, unknown>,
-    [colorByName, data, onSliceClick, pieHeight, pieWidth, scale, side]
+    [chartTheme, colorByName, data, exec.card, exec.muted, onSliceClick, pieHeight, pieWidth, scale, side]
   );
 
   const centerOverlay = (
@@ -159,13 +161,13 @@ export function DonutChartCard({
         {side ? (
           <>
             <p
-              className="font-medium uppercase tracking-wide text-[#9CA3AF]"
+              className="font-medium uppercase tracking-wide text-[var(--exec-muted)]"
               style={{ fontSize: scale.totalLabel }}
             >
               Total
             </p>
             <p
-              className="font-bold leading-none text-[#F5F5F5]"
+              className="font-bold leading-none text-[var(--exec-text)]"
               style={{ fontSize: scale.total, marginTop: scale.totalLabel * 0.15 }}
             >
               {total}
@@ -173,11 +175,11 @@ export function DonutChartCard({
           </>
         ) : (
           <>
-            <p className="font-bold leading-none text-[#F5F5F5]" style={{ fontSize: scale.total }}>
+            <p className="font-bold leading-none text-[var(--exec-text)]" style={{ fontSize: scale.total }}>
               {total}
             </p>
             <p
-              className="mt-0.5 uppercase tracking-wide text-[#9CA3AF]"
+              className="mt-0.5 uppercase tracking-wide text-[var(--exec-muted)]"
               style={{ fontSize: scale.totalLabel }}
             >
               Total
@@ -200,7 +202,7 @@ export function DonutChartCard({
         <div className="shrink-0 px-2.5 pt-2 pb-0 sm:px-3 sm:pt-2.5">
           <h3
             ref={titleFit.ref as React.RefObject<HTMLHeadingElement>}
-            className="w-full overflow-hidden font-semibold leading-tight text-[#F5F5F5]"
+            className="w-full overflow-hidden font-semibold leading-tight text-[var(--exec-text)]"
             style={{ fontSize: titleFit.fontSize }}
           >
             {title}
@@ -224,7 +226,7 @@ export function DonutChartCard({
                 return (
                   <li
                     key={item.name}
-                    className="flex items-center justify-between gap-1.5 border-b border-[#242424] last:border-b-0"
+                    className="flex items-center justify-between gap-1.5 border-b border-[var(--exec-border)] last:border-b-0"
                     style={{
                       paddingTop: scale.legendGap * 0.55,
                       paddingBottom: scale.legendGap * 0.55,
@@ -240,16 +242,16 @@ export function DonutChartCard({
                         }}
                         aria-hidden
                       />
-                      <span className="truncate text-[#F5F5F5]" style={{ fontSize: scale.legend }}>
+                      <span className="truncate text-[var(--exec-text)]" style={{ fontSize: scale.legend }}>
                         {item.name}
                       </span>
                     </span>
                     <span
-                      className="shrink-0 font-semibold tabular-nums text-[#F5F5F5]"
+                      className="shrink-0 font-semibold tabular-nums text-[var(--exec-text)]"
                       style={{ fontSize: scale.legendValue }}
                     >
                       {Math.round(item.value)}{' '}
-                      <span className="font-normal text-[#9CA3AF]">({pct}%)</span>
+                      <span className="font-normal text-[var(--exec-muted)]">({pct}%)</span>
                     </span>
                   </li>
                 );

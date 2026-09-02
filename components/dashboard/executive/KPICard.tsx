@@ -183,7 +183,7 @@ export function KPICard({
         <div className="shrink-0 px-2.5 pt-2 pb-0 sm:px-3 sm:pt-2.5">
           <h3
             ref={titleFit.ref as React.RefObject<HTMLHeadingElement>}
-            className="w-full overflow-hidden font-semibold leading-tight text-[#F5F5F5]"
+            className="w-full overflow-hidden font-semibold leading-tight text-[var(--exec-text)]"
             style={{ fontSize: titleFit.fontSize }}
           >
             {label}
@@ -214,7 +214,7 @@ export function KPICard({
                 <span className="whitespace-nowrap">{formatTrendValue(trend.value)}</span>
               </div>
               <p
-                className="mt-0.5 whitespace-nowrap leading-tight text-[#9CA3AF] sm:mt-1"
+                className="mt-0.5 whitespace-nowrap leading-tight text-[var(--exec-muted)] sm:mt-1"
                 style={{ fontSize: scale.vs }}
               >
                 vs last month

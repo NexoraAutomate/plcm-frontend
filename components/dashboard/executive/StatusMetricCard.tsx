@@ -42,14 +42,14 @@ export function StatusMetricCard({
       <div className="flex h-full min-h-[52px] items-center gap-3 px-3 py-2">
         <Icon className="h-5 w-5 shrink-0 text-[#A78BFA]" aria-hidden />
 
-        <p className="min-w-0 flex-1 truncate text-left text-[13px] font-medium text-[#F5F5F5]">
+        <p className="min-w-0 flex-1 truncate text-left text-[13px] font-medium text-[var(--exec-text)]">
           {label}
         </p>
 
         <div className="flex shrink-0 items-baseline gap-2.5">
           <AnimatedNumber
             value={value}
-            className="text-[24px] font-bold leading-none tabular-nums text-[#F5F5F5]"
+            className="text-[24px] font-bold leading-none tabular-nums text-[var(--exec-text)]"
           />
           {trend ? (
             <p
@@ -59,7 +59,7 @@ export function StatusMetricCard({
               <span className="mr-0.5 text-[9px]" aria-hidden>
                 {trendGlyph}
               </span>
-              {trendText} <span className="font-normal text-[#9CA3AF]">vs last month</span>
+              {trendText} <span className="font-normal text-[var(--exec-muted)]">vs last month</span>
             </p>
           ) : null}
         </div>

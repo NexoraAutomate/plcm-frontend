@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { DashboardCard } from './DashboardCard';
 import type { ExecInsight, ExecTreemapNode } from './types';
 import { EXEC } from './theme';
+import { useExecTheme } from './use-exec-theme';
 
 const ReactECharts = dynamic(() => import('echarts-for-react'), { ssr: false });
 
@@ -33,6 +34,7 @@ export function TreemapCard({
   onNodeClick,
   insight,
 }: TreemapCardProps) {
+  const { exec } = useExecTheme();
   const option = useMemo(
     () => ({
       backgroundColor: 'transparent',
@@ -50,30 +52,30 @@ export function TreemapCard({
           breadcrumb: { show: false },
           label: {
             show: true,
-            color: EXEC.text,
+            color: exec.text,
             fontSize: 10,
             formatter: '{b}',
           },
           upperLabel: {
             show: true,
             height: 18,
-            color: EXEC.text,
+            color: exec.text,
             fontSize: 10,
           },
           itemStyle: {
-            borderColor: EXEC.bg,
+            borderColor: exec.bg,
             borderWidth: 2,
             gapWidth: 2,
           },
           levels: [
             {
-              itemStyle: { borderColor: EXEC.bg, borderWidth: 3, gapWidth: 3 },
+              itemStyle: { borderColor: exec.bg, borderWidth: 3, gapWidth: 3 },
               upperLabel: { show: false },
             },
             {
               color: [EXEC.purple, '#6366F1', '#4F46E5'],
               colorMappingBy: 'id',
-              itemStyle: { borderColor: EXEC.bg, borderWidth: 2, gapWidth: 2 },
+              itemStyle: { borderColor: exec.bg, borderWidth: 2, gapWidth: 2 },
             },
             {
               color: [EXEC.cyan, '#0EA5E9', '#06B6D4'],
@@ -88,7 +90,7 @@ export function TreemapCard({
         },
       ],
     }),
-    [tree]
+    [exec.bg, exec.text, tree]
   );
 
   return (

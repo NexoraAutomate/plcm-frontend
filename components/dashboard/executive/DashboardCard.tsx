@@ -27,16 +27,18 @@ interface DashboardCardProps {
 function InsightBody({ insight, title }: { insight: ExecInsight; title?: string }) {
   return (
     <div className="max-w-70 space-y-2 text-left">
-      {title ? <p className="text-[12px] font-semibold leading-snug text-white">{title}</p> : null}
+      {title ? (
+        <p className="text-[12px] font-semibold leading-snug text-popover-foreground">{title}</p>
+      ) : null}
       <div>
         <p className="text-[9px] font-semibold uppercase tracking-wider text-[#A78BFA]">Calculation</p>
-        <p className="mt-0.5 text-[11px] leading-snug text-[#E5E7EB]">{insight.calculation}</p>
+        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{insight.calculation}</p>
       </div>
       <div>
         <p className="text-[9px] font-semibold uppercase tracking-wider text-[#34D399]">
           Decision value
         </p>
-        <p className="mt-0.5 text-[11px] leading-snug text-[#E5E7EB]">{insight.benefit}</p>
+        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{insight.benefit}</p>
       </div>
     </div>
   );
@@ -67,7 +69,7 @@ function InsightTrigger({
           onMouseDown={(e) => e.stopPropagation()}
         >
           <Info
-            className={cn('h-3 w-3', gradient ? 'text-white' : 'text-[#9CA3AF]')}
+            className={cn('h-3 w-3', gradient ? 'text-white' : 'text-[var(--exec-muted)]')}
             aria-hidden
           />
         </button>
@@ -75,7 +77,7 @@ function InsightTrigger({
       <TooltipContent
         side="top"
         sideOffset={8}
-        className="z-[80] border border-[#3F3F46] bg-[#18181B] px-3 py-2.5 text-white shadow-xl"
+        className="z-[80] border border-border bg-popover px-3 py-2.5 text-popover-foreground shadow-xl"
       >
         <InsightBody insight={insight} title={title} />
       </TooltipContent>
@@ -115,7 +117,7 @@ export function DashboardCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
       className={cn(
-        'group relative flex h-full min-h-0 flex-col overflow-hidden border shadow-[0_0_0_1px_rgba(255,255,255,0.02)] transition-all duration-300',
+        'group relative flex h-full min-h-0 flex-col overflow-hidden border shadow-[var(--exec-card-shadow)] transition-all duration-300',
         'hover:-translate-y-0.5 hover:shadow-[0_0_24px_rgba(139,92,246,0.18)] hover:border-[#8B5CF6]/40',
         onClick && 'cursor-pointer',
         className
@@ -140,7 +142,7 @@ export function DashboardCard({
               <h3
                 className={cn(
                   'flex items-center gap-1 text-[14px] font-semibold leading-tight',
-                  gradient ? 'text-white' : 'text-[#F5F5F5]'
+                  gradient ? 'text-white' : 'text-[var(--exec-text)]'
                 )}
               >
                 <span className="truncate">{title}</span>
@@ -151,7 +153,7 @@ export function DashboardCard({
               <p
                 className={cn(
                   'mt-0.5 text-[11px] leading-tight',
-                  gradient ? 'text-white/70' : 'text-[#D1D5DB]'
+                  gradient ? 'text-white/70' : 'text-[var(--exec-text-secondary)]'
                 )}
               >
                 {subtitle}

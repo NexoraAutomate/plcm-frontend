@@ -6,6 +6,7 @@ import type { EChartsType } from 'echarts';
 import { DashboardCard } from './DashboardCard';
 import type { ExecGaugeMetric } from './types';
 import { EXEC } from './theme';
+import { useExecTheme } from './use-exec-theme';
 
 const ReactECharts = dynamic(() => import('echarts-for-react'), { ssr: false });
 
@@ -57,6 +58,7 @@ interface GaugeCardProps {
 }
 
 export function GaugeCard({ metric, className, onClick }: GaugeCardProps) {
+  const { exec } = useExecTheme();
   const available = metric.available !== false;
   const chartHostRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<EChartsType | null>(null);
@@ -118,7 +120,7 @@ export function GaugeCard({ metric, className, onClick }: GaugeCardProps) {
           axisLine: {
             lineStyle: {
               width: scale.ring,
-              color: [[1, '#2A2A2A']],
+              color: [[1, exec.gaugeTrack]],
             },
           },
           axisTick: { show: false },
@@ -132,7 +134,7 @@ export function GaugeCard({ metric, className, onClick }: GaugeCardProps) {
         },
       ],
     }),
-    [available, metric.color, metric.max, metric.value, scale.ring]
+    [available, exec.gaugeTrack, metric.color, metric.max, metric.value, scale.ring]
   );
 
   const trend = metric.trend;
@@ -155,14 +157,14 @@ export function GaugeCard({ metric, className, onClick }: GaugeCardProps) {
           <>
             <p
               ref={fitTop.ref as React.RefObject<HTMLParagraphElement>}
-              className="w-full overflow-hidden leading-tight text-[#D1D5DB]"
+              className="w-full overflow-hidden leading-tight text-[var(--exec-text-secondary)]"
               style={{ fontSize: fitTop.fontSize }}
             >
               {topText}
             </p>
             <h3
               ref={fitBottom.ref as React.RefObject<HTMLHeadingElement>}
-              className="mt-0.5 w-full overflow-hidden font-semibold leading-tight text-[#F5F5F5]"
+              className="mt-0.5 w-full overflow-hidden font-semibold leading-tight text-[var(--exec-text)]"
               style={{ fontSize: fitBottom.fontSize }}
             >
               {bottomText}
@@ -172,7 +174,7 @@ export function GaugeCard({ metric, className, onClick }: GaugeCardProps) {
           <>
             <h3
               ref={fitTop.ref as React.RefObject<HTMLHeadingElement>}
-              className="w-full overflow-hidden font-semibold leading-tight text-[#F5F5F5]"
+              className="w-full overflow-hidden font-semibold leading-tight text-[var(--exec-text)]"
               style={{ fontSize: fitTop.fontSize }}
             >
               {topText}
@@ -180,7 +182,7 @@ export function GaugeCard({ metric, className, onClick }: GaugeCardProps) {
             {bottomText ? (
               <p
                 ref={fitBottom.ref as React.RefObject<HTMLParagraphElement>}
-                className="mt-0.5 w-full overflow-hidden leading-tight text-[#D1D5DB]"
+                className="mt-0.5 w-full overflow-hidden leading-tight text-[var(--exec-text-secondary)]"
                 style={{ fontSize: fitBottom.fontSize }}
               >
                 {bottomText}
@@ -224,7 +226,7 @@ export function GaugeCard({ metric, className, onClick }: GaugeCardProps) {
               </span>
               {metric.unit ? (
                 <span
-                  className="max-w-full truncate text-center font-medium leading-none text-[#D1D5DB]"
+                  className="max-w-full truncate text-center font-medium leading-none text-[var(--exec-text-secondary)]"
                   style={{ fontSize: scale.unit, marginTop: scale.gap }}
                 >
                   {metric.unit}
@@ -249,7 +251,7 @@ export function GaugeCard({ metric, className, onClick }: GaugeCardProps) {
                 </span>
                 <span className="truncate">{trendText}</span>
               </p>
-              <p className="mt-0.5 truncate text-[9px] leading-tight text-[#9CA3AF] sm:mt-1 sm:text-[10px]">
+              <p className="mt-0.5 truncate text-[9px] leading-tight text-[var(--exec-muted)] sm:mt-1 sm:text-[10px]">
                 vs last month
               </p>
             </>

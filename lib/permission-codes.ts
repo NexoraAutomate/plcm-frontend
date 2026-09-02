@@ -2,6 +2,11 @@
  * Canonical permission codes — keep in sync with backend app/auth.py DEFAULT_PERMISSIONS.
  */
 
+import {
+  resolveWorkflowRoles,
+  type WorkflowRoleCode,
+} from '@/lib/workflow-roles';
+
 export const P = {
   // Users
   view_users: 'view_users',
@@ -283,19 +288,57 @@ export const SETTINGS_ACCESS_PERMISSIONS: PermissionCode[] = [
 
 /**
  * Preferential landing routes after login — first match the user can access.
+ * Used when the user has no Spec 00 workflow role (legacy roles).
  */
-export const LANDING_CANDIDATES: Array<{ href: string; permission: PermissionCode }> = [
+export const LANDING_CANDIDATES: Array<{
+  href: string;
+  permission: PermissionCode | PermissionCode[];
+}> = [
   { href: '/executive-dashboard', permission: P.view_executive_dashboard },
+  { href: '/hierarchy-dashboard', permission: P.view_hierarchy_dashboard },
+  { href: '/inventory', permission: P.view_inventory },
+  { href: '/my-assignments', permission: [P.item_request, P.item_install_test] },
   { href: '/projects', permission: P.view_projects },
   { href: '/maintenance', permission: P.view_maintenance_cases },
-  { href: '/inventory', permission: P.view_inventory },
   { href: '/systems', permission: P.view_systems },
   { href: '/customers', permission: P.view_customers },
   { href: '/orders', permission: P.view_orders },
-  { href: '/settings', permission: P.view_users },
+  { href: '/settings', permission: SETTINGS_ACCESS_PERMISSIONS },
 ];
 
-export function firstAccessiblePath(canFn: (p: string | string[]) => boolean): string {
+/**
+ * Default home page per Spec 00 workflow role (priority: ADMIN → PD → HM → IM → DEV).
+ * Permission is re-checked so a role without access still falls through.
+ */
+export const ROLE_LANDING: Array<{
+  role: WorkflowRoleCode;
+  href: string;
+  permission: PermissionCode | PermissionCode[];
+}> = [
+  { role: 'ADMIN', href: '/settings', permission: SETTINGS_ACCESS_PERMISSIONS },
+  { role: 'PD', href: '/executive-dashboard', permission: P.view_executive_dashboard },
+  { role: 'HM', href: '/hierarchy-dashboard', permission: P.view_hierarchy_dashboard },
+  { role: 'IM', href: '/inventory', permission: P.view_inventory },
+  {
+    role: 'DEV',
+    href: '/my-assignments',
+    permission: [P.item_request, P.item_install_test],
+  },
+];
+
+export function firstAccessiblePath(
+  canFn: (p: string | string[]) => boolean,
+  roleNames?: string[]
+): string {
+  if (roleNames?.length) {
+    const have = resolveWorkflowRoles(roleNames);
+    for (const entry of ROLE_LANDING) {
+      if (have.has(entry.role) && canFn(entry.permission)) {
+        return entry.href;
+      }
+    }
+  }
+
   for (const candidate of LANDING_CANDIDATES) {
     if (canFn(candidate.permission)) return candidate.href;
   }

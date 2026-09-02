@@ -9,7 +9,7 @@ import type {
   ExecTrend,
   ExecTreemapNode,
 } from '@/components/dashboard/executive/types';
-import { EXEC } from '@/components/dashboard/executive/theme';
+import { EXEC_DARK as EXEC } from '@/components/dashboard/executive/theme';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 

@@ -60,7 +60,7 @@ export function LogoCard({ className }: { className?: string }) {
         className="flex h-full min-h-0 items-center gap-2 overflow-hidden px-2 py-1.5 sm:gap-2.5 sm:px-2.5 sm:py-2"
       >
         <div
-          className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#242424] bg-[#0C0C0C]"
+          className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--exec-border)] bg-[var(--exec-elevated)]"
           style={{ width: iconSize, height: iconSize }}
         >
           <Image
@@ -74,14 +74,14 @@ export function LogoCard({ className }: { className?: string }) {
         <div className="min-w-0 flex-1 overflow-hidden">
           <p
             ref={titleFit.ref as React.RefObject<HTMLParagraphElement>}
-            className="w-full overflow-hidden font-semibold leading-tight text-[#F5F5F5]"
+            className="w-full overflow-hidden font-semibold leading-tight text-[var(--exec-text)]"
             style={{ fontSize: titleFit.fontSize }}
           >
             PLCM Executive Dashboard
           </p>
           <p
             ref={subFit.ref as React.RefObject<HTMLParagraphElement>}
-            className="mt-0.5 w-full overflow-hidden uppercase tracking-wider text-[#9CA3AF]"
+            className="mt-0.5 w-full overflow-hidden uppercase tracking-wider text-[var(--exec-muted)]"
             style={{ fontSize: subFit.fontSize }}
           >
             Product Lifecycle Management

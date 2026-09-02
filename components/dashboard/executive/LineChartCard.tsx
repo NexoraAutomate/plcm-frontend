@@ -5,6 +5,7 @@ import { Line } from '@ant-design/charts';
 import { DashboardCard } from './DashboardCard';
 import type { ExecInsight, ExecNamedValue, ExecSeriesPoint } from './types';
 import { EXEC } from './theme';
+import { useExecTheme } from './use-exec-theme';
 
 interface LineChartCardProps {
   title: string;
@@ -24,6 +25,7 @@ export function LineChartCard({
   onClick,
   insight,
 }: LineChartCardProps) {
+  const { exec, chartTheme } = useExecTheme();
   const config = useMemo(
     () =>
       ({
@@ -33,19 +35,24 @@ export function LineChartCard({
         height: 145,
         autoFit: true,
         legend: false,
-        theme: 'classicDark',
+        theme: chartTheme,
         style: { stroke: color, lineWidth: 2 },
         point: {
           size: 3,
-          style: { fill: color, stroke: EXEC.card, lineWidth: 1 },
+          style: { fill: color, stroke: exec.card, lineWidth: 1 },
         },
         axis: {
-          x: { labelFill: EXEC.muted, labelFontSize: 10, line: false, tick: false },
-          y: { labelFill: EXEC.muted, labelFontSize: 10, gridStroke: '#242424', line: false },
+          x: { labelFill: exec.muted, labelFontSize: 10, line: false, tick: false },
+          y: {
+            labelFill: exec.muted,
+            labelFontSize: 10,
+            gridStroke: exec.grid,
+            line: false,
+          },
         },
         tooltip: true,
       }) as Record<string, unknown>,
-    [color, data]
+    [chartTheme, color, data, exec.card, exec.grid, exec.muted]
   );
 
   return (
@@ -63,6 +70,7 @@ interface DualLineChartCardProps {
 }
 
 export function DualLineChartCard({ title, data, className, insight }: DualLineChartCardProps) {
+  const { exec, chartTheme } = useExecTheme();
   const chartData = useMemo(() => {
     const rows: { month: string; value: number; type: string }[] = [];
     for (const row of data) {
@@ -82,12 +90,12 @@ export function DualLineChartCard({ title, data, className, insight }: DualLineC
         seriesField: 'type',
         height: 145,
         autoFit: true,
-        theme: 'classicDark',
+        theme: chartTheme,
         legend: {
           color: {
             position: 'top',
             itemLabelFontSize: 10,
-            itemLabelFill: EXEC.muted,
+            itemLabelFill: exec.muted,
           },
         },
         scale: {
@@ -98,12 +106,17 @@ export function DualLineChartCard({ title, data, className, insight }: DualLineC
         },
         style: { lineWidth: 2 },
         axis: {
-          x: { labelFill: EXEC.muted, labelFontSize: 10, line: false, tick: false },
-          y: { labelFill: EXEC.muted, labelFontSize: 10, gridStroke: '#242424', line: false },
+          x: { labelFill: exec.muted, labelFontSize: 10, line: false, tick: false },
+          y: {
+            labelFill: exec.muted,
+            labelFontSize: 10,
+            gridStroke: exec.grid,
+            line: false,
+          },
         },
         tooltip: { shared: true },
       }) as Record<string, unknown>,
-    [chartData]
+    [chartData, chartTheme, exec.grid, exec.muted]
   );
 
   return (

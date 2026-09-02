@@ -125,7 +125,7 @@ export function ScatterChartCard({
             })}
 
             {!data.length ? (
-              <p className="absolute inset-0 flex items-center justify-center text-[11px] text-[#9CA3AF]">
+              <p className="absolute inset-0 flex items-center justify-center text-[11px] text-[var(--exec-muted)]">
                 No milestones in the next 6 months
               </p>
             ) : null}
@@ -133,7 +133,7 @@ export function ScatterChartCard({
 
           <div className="absolute inset-x-0 bottom-0 flex justify-between px-0.5">
             {months.map((m) => (
-              <span key={m} className="text-[10px] font-medium text-[#D1D5DB]">
+              <span key={m} className="text-[10px] font-medium text-[var(--exec-text-secondary)]">
                 {m}
               </span>
             ))}
@@ -141,7 +141,7 @@ export function ScatterChartCard({
         </div>
 
         {/* Totals */}
-        <div className="flex flex-col justify-between border-l border-[#242424] py-1 pl-6 h-11/12">
+        <div className="flex flex-col justify-between border-l border-[var(--exec-border)] py-1 pl-6 h-11/12">
           {PRIORITIES.map((p) => (
             <div key={p} className="min-w-0">
               <p className="text-[9px] leading-none text-[#E5E7EB]">{p}</p>
