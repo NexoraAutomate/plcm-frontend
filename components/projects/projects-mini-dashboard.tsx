@@ -35,6 +35,7 @@ import {
   renderPieSliceLabel,
 } from '@/components/dashboard/chart-overlays';
 import { getSystemCountByProjectId } from '@/lib/entity-counts';
+import { PROJECT_STATUS_COLORS as WORKFLOW_PROJECT_STATUS_COLORS, workflowStatusLabel } from '@/lib/workflow-status';
 
 const PROJECT_STATUS_COLORS: Record<string, string> = {
   Initiation: 'oklch(0.55 0.02 250)',
@@ -43,6 +44,7 @@ const PROJECT_STATUS_COLORS: Record<string, string> = {
   Monitoring: 'oklch(0.70 0.18 45)',
   Completed: 'oklch(0.65 0.15 165)',
   'On Hold': 'oklch(0.55 0.2 15)',
+  ...WORKFLOW_PROJECT_STATUS_COLORS,
 };
 
 interface ProjectsMiniDashboardProps {
@@ -120,15 +122,23 @@ export function ProjectsMiniDashboard({
     'Unknown';
 
   const projectStatusData = useMemo(() => {
-    const counts = new Map<string, { name: string; value: number }>();
+    const counts = new Map<string, { name: string; code: string; value: number }>();
     for (const status of projectStatuses) {
-      counts.set(status.status_name, { name: status.status_name, value: 0 });
+      counts.set(status.status_name, {
+        name: workflowStatusLabel(status.status_name),
+        code: status.status_name,
+        value: 0,
+      });
     }
     for (const project of projects) {
-      const name = getProjectStatusName(project);
-      const entry = counts.get(name) ?? { name, value: 0 };
+      const code = getProjectStatusName(project);
+      const entry = counts.get(code) ?? {
+        name: workflowStatusLabel(code),
+        code,
+        value: 0,
+      };
       entry.value += 1;
-      counts.set(name, entry);
+      counts.set(code, entry);
     }
     return Array.from(counts.values()).filter((d) => d.value > 0);
   }, [projects, projectStatuses]);
@@ -271,19 +281,20 @@ export function ProjectsMiniDashboard({
                         className="cursor-pointer"
                         onClick={(_, index) => {
                           const entry = projectStatusData[index];
-                          if (entry?.name) onStatusFilter(entry.name);
+                          if (entry?.code) onStatusFilter(entry.code);
                         }}
                       >
                         {projectStatusData.map((entry, i) => (
                           <Cell
-                            key={entry.name}
+                            key={entry.code}
                             fill={
+                              PROJECT_STATUS_COLORS[entry.code] ??
                               PROJECT_STATUS_COLORS[entry.name] ??
                               CHART_COLORS[i % CHART_COLORS.length]
                             }
                             opacity={
                               activeStatusFilter !== 'Total' &&
-                              entry.name !== activeStatusFilter
+                              entry.code !== activeStatusFilter
                                 ? 0.35
                                 : 1
                             }
@@ -320,7 +331,7 @@ export function ProjectsMiniDashboard({
                     >
                       <span className="min-w-0 flex-1 truncate font-medium">{p.name}</span>
                       <span className="shrink-0 text-xs text-muted-foreground">
-                        {getProjectStatusName(p)}
+                        {workflowStatusLabel(getProjectStatusName(p))}
                       </span>
                       <span className="tabular-nums text-muted-foreground">{p.progress ?? 0}%</span>
                     </button>

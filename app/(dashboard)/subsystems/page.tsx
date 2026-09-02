@@ -45,7 +45,10 @@ import {
 } from '@/lib/hierarchy-dashboard-configs';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
-import { PageRefreshButton } from '@/components/page-data-refresh';
+import {
+  ListStatsVisibilityControls,
+  useListStatsVisibility,
+} from '@/components/list-stats-visibility';
 import { useAuth } from '@/lib/auth-context';
 import { canManageInstall, ownInstallRowClass, showOwnInstallBadge } from '@/lib/install-ownership';
 import { cn } from '@/lib/utils';
@@ -56,6 +59,7 @@ import {
 
 export default function SubsystemsPage() {
   const { entityLabel } = useAppDefinitions();
+  const { showStats, setShowStats } = useListStatsVisibility();
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -248,26 +252,32 @@ export default function SubsystemsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">{entityLabel('subsystem', true)}</h1>
           <p className="text-sm text-muted-foreground">Manage system subsystems</p>
         </div>
-        <PageRefreshButton onRefresh={pagination.refetch} />
+        <ListStatsVisibilityControls
+          showStats={showStats}
+          onShowStatsChange={setShowStats}
+          onRefresh={pagination.refetch}
+        />
       </div>
 
-      <ListContentSuspense loading={pagination.fetching}>
-      <HierarchyListDashboard
-        config={getSubsystemsDashboardConfig(entityLabel)}
-        items={subsystems}
-        parents={systems}
-        children={modules}
-        getChildParentId={(module) => module.subsystem_id}
-        getStatusName={getStatusName}
-        getParentId={(subsystem) => subsystem.system_id}
-        faultMap={faultMap}
-        activeStatusName={statusFilter}
-        activeParentId={parentFilter}
-        onStatusFilter={applyStatusFilter}
-        onParentFilter={applyParentFilter}
-        totalCount={pagination.total}
-      />
-      </ListContentSuspense>
+      {showStats && (
+        <ListContentSuspense loading={pagination.fetching}>
+          <HierarchyListDashboard
+            config={getSubsystemsDashboardConfig(entityLabel)}
+            items={subsystems}
+            parents={systems}
+            children={modules}
+            getChildParentId={(module) => module.subsystem_id}
+            getStatusName={getStatusName}
+            getParentId={(subsystem) => subsystem.system_id}
+            faultMap={faultMap}
+            activeStatusName={statusFilter}
+            activeParentId={parentFilter}
+            onStatusFilter={applyStatusFilter}
+            onParentFilter={applyParentFilter}
+            totalCount={pagination.total}
+          />
+        </ListContentSuspense>
+      )}
 
       {(statusFilter !== 'all' || parentFilter !== 'all') && (
         <div className="flex flex-wrap items-center gap-2">

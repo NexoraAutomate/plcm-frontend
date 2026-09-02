@@ -39,7 +39,7 @@ import { ShortageListPanel } from '@/components/shortages/shortage-list-panel';
 import { useProjectProgressQuery } from '@/hooks/queries';
 import { ConfigChangeBanner } from '@/components/projects/config-change-banner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ProjectWorkflowStatus, isProjectReadOnly } from '@/lib/workflow-status';
+import { ProjectWorkflowStatus, isProjectReadOnly, workflowStatusLabel } from '@/lib/workflow-status';
 import { isCurrentInstallEntity } from '@/lib/entity-replacement';
 
 export default function ProjectDetailPage() {
@@ -182,7 +182,7 @@ export default function ProjectDetailPage() {
     [systemHierarchyNames]
   );
   const statusOptions = useMemo(
-    () => statuses.map((s) => ({ label: s.status_name, value: s.id })),
+    () => statuses.map((s) => ({ label: workflowStatusLabel(s.status_name), value: s.id })),
     [statuses]
   );
   const allowedSystemNames = useMemo(

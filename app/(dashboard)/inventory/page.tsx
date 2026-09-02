@@ -85,6 +85,7 @@ import {
   suggestAbbreviation,
 } from '@/lib/app-definitions';
 import { P } from '@/lib/permission-codes';
+import { workflowStatusLabel } from '@/lib/workflow-status';
 
 const ACTION_BTN =
   'h-7 w-7 bg-transparent shadow-none border-0 hover:bg-transparent';
@@ -1187,7 +1188,7 @@ export default function InventoryPage() {
               <SelectContent>
                 {statuses.map((status) => (
                   <SelectItem key={status.id} value={String(status.id)}>
-                    {status.status_name}
+                    {workflowStatusLabel(status.status_name)}
                   </SelectItem>
                 ))}
               </SelectContent>

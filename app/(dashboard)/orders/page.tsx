@@ -37,7 +37,10 @@ import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
-import { PageRefreshButton } from '@/components/page-data-refresh';
+import {
+  ListStatsVisibilityControls,
+  useListStatsVisibility,
+} from '@/components/list-stats-visibility';
 
 type OrderForm = {
   order_number?: string
@@ -72,6 +75,7 @@ const emptyOrderForm: OrderForm = {
 };
 
 export default function OrdersPage() {
+  const { showStats, setShowStats } = useListStatsVisibility();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { customers, projects, createOrder, updateOrder, deleteOrder } = useDataStore();
@@ -250,22 +254,28 @@ export default function OrdersPage() {
           <h1 className="text-3xl font-bold tracking-tight">Orders</h1>
           <p className="text-muted-foreground mt-2">Manage all orders</p>
         </div>
-        <PageRefreshButton onRefresh={pagination.refetch} />
+        <ListStatsVisibilityControls
+          showStats={showStats}
+          onShowStatsChange={setShowStats}
+          onRefresh={pagination.refetch}
+        />
       </div>
 
-      <ListContentSuspense loading={pagination.fetching}>
-      <OrdersMiniDashboard
-        orders={orders}
-        projects={projects}
-        customers={customers}
-        orderStatuses={statuses}
-        activeOrderStatusId={statusFilter}
-        activeCustomerId={customerFilter}
-        onOrderStatusFilter={setStatusFilter}
-        onCustomerFilter={setCustomerFilter}
-        totalCount={pagination.total}
-      />
-      </ListContentSuspense>
+      {showStats && (
+        <ListContentSuspense loading={pagination.fetching}>
+          <OrdersMiniDashboard
+            orders={orders}
+            projects={projects}
+            customers={customers}
+            orderStatuses={statuses}
+            activeOrderStatusId={statusFilter}
+            activeCustomerId={customerFilter}
+            onOrderStatusFilter={setStatusFilter}
+            onCustomerFilter={setCustomerFilter}
+            totalCount={pagination.total}
+          />
+        </ListContentSuspense>
+      )}
 
       {(statusFilter !== 'all' || customerFilter !== 'all') && (
         <div className="flex flex-wrap items-center gap-2">

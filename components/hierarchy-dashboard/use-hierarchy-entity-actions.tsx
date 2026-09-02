@@ -23,6 +23,7 @@ import {
 import type { HierarchyDashboardSelection } from '@/lib/project-hierarchy-dashboard';
 import { syncEntityPicture } from '@/lib/entity-picture-upload';
 import { needsSerialSelection } from '@/lib/inventory-install';
+import { workflowStatusLabel } from '@/lib/workflow-status';
 import { buildCreateEntityByType } from '@/lib/inventory-child-install';
 import {
   buildParentField,
@@ -649,7 +650,7 @@ export function useHierarchyEntityActions({
       type: 'select',
       required: true,
       options: statuses.map((status) => ({
-        label: status.status_name,
+        label: workflowStatusLabel(status.status_name),
         value: status.id,
       })),
     });

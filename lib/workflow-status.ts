@@ -119,14 +119,28 @@ export function normalizeWorkflowStatusCode(status: string | null | undefined): 
   return fromLabel ? fromLabel[0] : null;
 }
 
+/** Title-case SCREAMING_SNAKE / snake_case codes for display. */
+export function humanizeStatusCode(code: string): string {
+  return code
+    .trim()
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
+}
+
 /**
  * Human label for badges. Spec codes → Spec labels.
- * Unknown legacy names (Initiation, In Stock, …) pass through unchanged.
+ * Unknown SCREAMING_SNAKE codes are title-cased; legacy names pass through.
  */
 export function workflowStatusLabel(status: string | null | undefined): string {
   if (!status) return 'Unknown';
   const code = normalizeWorkflowStatusCode(status);
   if (code && WORKFLOW_STATUS_LABELS[code]) return WORKFLOW_STATUS_LABELS[code];
+  const trimmed = status.trim();
+  if (/^[A-Za-z0-9]+(_[A-Za-z0-9]+)+$/.test(trimmed) || /^[A-Z][A-Z0-9_]*$/.test(trimmed)) {
+    return humanizeStatusCode(trimmed);
+  }
   return status;
 }
 

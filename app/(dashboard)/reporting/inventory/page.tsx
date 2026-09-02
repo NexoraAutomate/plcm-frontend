@@ -26,6 +26,12 @@ import {
 } from '@/components/reporting/report-utils';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { workflowStatusLabel } from '@/lib/workflow-status';
+
+function displayInventoryStatus(value?: string | null) {
+  if (!value) return '—';
+  return workflowStatusLabel(value);
+}
 
 const INVENTORY_MODES = [
   { value: 'current', label: 'Current Stock' },
@@ -174,7 +180,9 @@ export default function InventoryReportsPage() {
                 i.issued_by_name || '—',
                 i.issued_at ? formatReportDate(new Date(i.issued_at)) : '—',
                 entityDetail(i),
-                i.issuance_status || i.status_name || '—',
+                i.issuance_status || i.status_name
+                  ? displayInventoryStatus(i.issuance_status || i.status_name)
+                  : '—',
               ]
             : [
                 i.name,
@@ -184,7 +192,7 @@ export default function InventoryReportsPage() {
                 i.quantity ?? '—',
                 i.available_quantity ?? '—',
                 i.location || '—',
-                i.status_name || '—',
+                displayInventoryStatus(i.status_name),
                 i.sku || '—',
               ]
         ),
@@ -341,9 +349,14 @@ export default function InventoryReportsPage() {
                       issued_at: i.issued_at
                         ? formatReportDate(new Date(i.issued_at))
                         : '—',
-                      issuance_status: i.issuance_status || i.status_name || '—',
+                      issuance_status: displayInventoryStatus(
+                        i.issuance_status || i.status_name
+                      ),
                     }))
-                  : data.items || []) as unknown as Record<string, unknown>[]
+                  : (data.items || []).map((i) => ({
+                      ...i,
+                      status_name: displayInventoryStatus(i.status_name),
+                    }))) as unknown as Record<string, unknown>[]
               }
             />
           </ReportSection>

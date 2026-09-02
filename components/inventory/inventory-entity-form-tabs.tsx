@@ -13,6 +13,7 @@ import {
 } from '@/lib/entity-hierarchy';
 import type { InventoryEntityFormType } from '@/hooks/use-inventory-entity-form';
 import type { emptyInventoryEntityForm } from '@/lib/inventory-entity-fields';
+import { workflowStatusLabel } from '@/lib/workflow-status';
 
 export type InventoryEntityFormData = typeof emptyInventoryEntityForm;
 
@@ -246,7 +247,7 @@ export function InventoryEntityFormTabs({
                 <SelectContent>
                   {statuses.map((status) => (
                     <SelectItem key={status.id} value={String(status.id)}>
-                      {status.status_name}
+                      {workflowStatusLabel(status.status_name)}
                     </SelectItem>
                   ))}
                 </SelectContent>

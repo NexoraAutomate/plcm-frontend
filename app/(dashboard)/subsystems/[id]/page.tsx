@@ -14,6 +14,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
 import { P } from '@/lib/permission-codes';
+import { workflowStatusLabel } from '@/lib/workflow-status';
 import { EntityForm } from '@/components/entity-form';
 import { HierarchyEntityInventoryDialog } from '@/components/hierarchy/hierarchy-entity-inventory-create-dialog';
 import { isExistingProject } from '@/lib/project-existing';
@@ -92,7 +93,7 @@ export default function SubsystemDetailPage() {
     [moduleHierarchyNames]
   );
   const statusOptions = useMemo(
-    () => statuses.map((s) => ({ label: s.status_name, value: s.id })),
+    () => statuses.map((s) => ({ label: workflowStatusLabel(s.status_name), value: s.id })),
     [statuses]
   );
   const allowedNames = useMemo(

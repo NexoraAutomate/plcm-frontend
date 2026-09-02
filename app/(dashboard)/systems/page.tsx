@@ -45,7 +45,11 @@ import { P } from '@/lib/permission-codes';
 import { useAuth } from '@/lib/auth-context';
 import { canManageInstall, isOwnInstall } from '@/lib/install-ownership';
 import { cn } from '@/lib/utils';
-import { PageRefreshButton } from '@/components/page-data-refresh';
+import { workflowStatusLabel } from '@/lib/workflow-status';
+import {
+  ListStatsVisibilityControls,
+  useListStatsVisibility,
+} from '@/components/list-stats-visibility';
 import {
   InstallerFilterSelect,
   resolveInstallerFilterId,
@@ -57,6 +61,7 @@ const SYSTEM_STATUS_NAMES = ['Design', 'Development', 'Testing', 'Operational', 
 
 export default function SystemsPage() {
   const { entityLabel } = useAppDefinitions();
+  const { showStats, setShowStats } = useListStatsVisibility();
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -278,24 +283,30 @@ export default function SystemsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">{entityLabel('system', true)}</h1>
           <p className="text-sm text-muted-foreground">Manage satellite systems hierarchy</p>
         </div>
-        <PageRefreshButton onRefresh={pagination.refetch} />
+        <ListStatsVisibilityControls
+          showStats={showStats}
+          onShowStatsChange={setShowStats}
+          onRefresh={pagination.refetch}
+        />
       </div>
 
-      <ListContentSuspense loading={pagination.fetching}>
-      <SystemsListDashboard
-        systems={systems}
-        projects={projects}
-        subsystems={subsystems}
-        systemStatuses={allStatuses}
-        faultMap={faultMap}
-        activeStatusName={statusFilter}
-        activeProjectId={projectFilter}
-        onStatusFilter={applyStatusFilter}
-        onProjectFilter={applyProjectFilter}
-        getStatusName={getStatusName}
-        totalCount={pagination.total}
-      />
-      </ListContentSuspense>
+      {showStats && (
+        <ListContentSuspense loading={pagination.fetching}>
+          <SystemsListDashboard
+            systems={systems}
+            projects={projects}
+            subsystems={subsystems}
+            systemStatuses={allStatuses}
+            faultMap={faultMap}
+            activeStatusName={statusFilter}
+            activeProjectId={projectFilter}
+            onStatusFilter={applyStatusFilter}
+            onProjectFilter={applyProjectFilter}
+            getStatusName={getStatusName}
+            totalCount={pagination.total}
+          />
+        </ListContentSuspense>
+      )}
 
       {(statusFilter !== 'all' || projectFilter !== 'all') && (
         <div className="flex flex-wrap items-center gap-2">
@@ -438,7 +449,7 @@ export default function SystemsPage() {
                   <SelectContent>
                     {statuses.map((status) => (
                       <SelectItem key={status.id} value={status.id.toString()}>
-                        {status.status_name}
+                        {workflowStatusLabel(status.status_name)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -684,7 +695,7 @@ export default function SystemsPage() {
                 <SelectContent>
                   {statuses.map((status) => (
                     <SelectItem key={status.id} value={status.id.toString()}>
-                      {status.status_name}
+                      {workflowStatusLabel(status.status_name)}
                     </SelectItem>
                   ))}
                 </SelectContent>

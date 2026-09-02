@@ -24,6 +24,7 @@ import {
   type Status,
 } from '@/lib/models';
 import { useDataStore } from '@/lib/data-store';
+import { workflowStatusLabel } from '@/lib/workflow-status';
 
 interface EntityStatusHistorySheetProps {
   entityType: HardwareEntityType;
@@ -72,9 +73,11 @@ function formatEventDetails(entry: EntityLifecycleHistoryEvent): string | null {
   const oldStatus = typeof oldValue?.status === 'string' ? oldValue.status : null;
   const newStatus = typeof newValue?.status === 'string' ? newValue.status : null;
   if (oldStatus && newStatus) {
-    details.push(`${oldStatus} → ${newStatus}`);
+    details.push(
+      `${workflowStatusLabel(oldStatus)} → ${workflowStatusLabel(newStatus)}`
+    );
   } else if (newStatus) {
-    details.push(`Status: ${newStatus}`);
+    details.push(`Status: ${workflowStatusLabel(newStatus)}`);
   }
 
   const assignedDeveloper =

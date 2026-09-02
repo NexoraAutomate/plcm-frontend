@@ -14,6 +14,7 @@ import { InventoryLabelScanner } from '@/components/inventory/inventory-label-sc
 import * as api from '@/lib/api';
 import type { InventoryLabelScanResponse } from '@/lib/models';
 import { P } from '@/lib/permission-codes';
+import { workflowStatusLabel } from '@/lib/workflow-status';
 
 function HistorySection({ title, entries }: { title: string; entries: Record<string, unknown>[] }) {
   return (
@@ -147,7 +148,17 @@ export default function ScanPage() {
                   <div><p className="text-xs text-muted-foreground">Inventory</p><p className="font-medium">{inventory.name}</p></div>
                   <div><p className="text-xs text-muted-foreground">Part number</p><p>{inventory.part_number || '—'}</p></div>
                   <div><p className="text-xs text-muted-foreground">Serial number</p><p className="font-mono">{result.label?.serial_number || '—'}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Current status</p><p>{String((inventory as { status_name?: string }).status_name || inventory.instance?.status_name || '—')}</p></div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Current status</p>
+                    <p>
+                      {(() => {
+                        const raw =
+                          (inventory as { status_name?: string }).status_name ||
+                          inventory.instance?.status_name;
+                        return raw ? workflowStatusLabel(String(raw)) : '—';
+                      })()}
+                    </p>
+                  </div>
                   <div><p className="text-xs text-muted-foreground">Label prints</p><p>{result.label?.print_count ?? 0}</p></div>
                 </div>
                 <div className="flex flex-wrap gap-2">

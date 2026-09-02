@@ -36,7 +36,10 @@ import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
-import { PageRefreshButton } from '@/components/page-data-refresh';
+import {
+  ListStatsVisibilityControls,
+  useListStatsVisibility,
+} from '@/components/list-stats-visibility';
 
 const emptyCustomerForm: CustomerForm = {
   customer_code: '',
@@ -61,6 +64,7 @@ type CustomerForm = {
 };
 
 export default function CustomersPage() {
+  const { showStats, setShowStats } = useListStatsVisibility();
   const {
     orders,
     projects,
@@ -258,20 +262,26 @@ export default function CustomersPage() {
           <h1 className="text-3xl font-bold tracking-tight">Customers</h1>
           <p className="text-muted-foreground mt-2">Manage your customer list</p>
         </div>
-        <PageRefreshButton onRefresh={pagination.refetch} />
+        <ListStatsVisibilityControls
+          showStats={showStats}
+          onShowStatsChange={setShowStats}
+          onRefresh={pagination.refetch}
+        />
       </div>
 
-      <ListContentSuspense loading={pagination.fetching}>
-      <CustomersListDashboard
-        customers={customers}
-        orders={orders}
-        projects={projects}
-        customerStatuses={statuses}
-        activeStatusId={statusFilter}
-        onStatusFilter={setStatusFilter}
-        totalCount={pagination.total}
-      />
-      </ListContentSuspense>
+      {showStats && (
+        <ListContentSuspense loading={pagination.fetching}>
+          <CustomersListDashboard
+            customers={customers}
+            orders={orders}
+            projects={projects}
+            customerStatuses={statuses}
+            activeStatusId={statusFilter}
+            onStatusFilter={setStatusFilter}
+            totalCount={pagination.total}
+          />
+        </ListContentSuspense>
+      )}
 
       {statusFilter !== 'all' && filteredStatusLabel && (
         <div className="flex flex-wrap items-center gap-2">

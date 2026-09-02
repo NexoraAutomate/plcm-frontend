@@ -2,7 +2,7 @@
 
 import { AlertTriangle, CheckCircle2, Percent } from 'lucide-react';
 import type { ProjectProgress } from '@/lib/models';
-import { ITEM_STATUS_LABELS, type ItemStatusCode } from '@/lib/workflow-status';
+import { workflowStatusLabel } from '@/lib/workflow-status';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { StatusBadge } from '@/components/status-badge';
@@ -23,7 +23,7 @@ import {
 
 function statusLabel(code?: string | null) {
   if (!code) return 'Not started';
-  return ITEM_STATUS_LABELS[code as ItemStatusCode] ?? code.replaceAll('_', ' ');
+  return workflowStatusLabel(code);
 }
 
 function reasonLabel(reason: string) {

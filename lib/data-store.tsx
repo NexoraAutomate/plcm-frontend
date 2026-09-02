@@ -758,7 +758,16 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       setProjects(projects.filter((p) => p.id !== id));
       toast.success('Project deleted successfully');
     } catch (err) {
-      toast.error('Failed to delete project');
+      const detail =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { detail?: unknown } } }).response?.data
+              ?.detail
+          : undefined;
+      toast.error(
+        typeof detail === 'string' && detail.trim()
+          ? detail
+          : 'Failed to delete project'
+      );
       throw err;
     }
   };

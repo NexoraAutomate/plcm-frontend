@@ -45,7 +45,10 @@ import { P } from '@/lib/permission-codes';
 import { useAuth } from '@/lib/auth-context';
 import { canManageInstall, ownInstallRowClass, showOwnInstallBadge } from '@/lib/install-ownership';
 import { cn } from '@/lib/utils';
-import { PageRefreshButton } from '@/components/page-data-refresh';
+import {
+  ListStatsVisibilityControls,
+  useListStatsVisibility,
+} from '@/components/list-stats-visibility';
 import {
   InstallerFilterSelect,
   resolveInstallerFilterId,
@@ -53,6 +56,7 @@ import {
 
 export default function UnitsPage() {
   const { entityLabel } = useAppDefinitions();
+  const { showStats, setShowStats } = useListStatsVisibility();
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -248,26 +252,32 @@ export default function UnitsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">{entityLabel('unit', true)}</h1>
           <p className="text-sm text-muted-foreground">Manage module units and assemblies</p>
         </div>
-        <PageRefreshButton onRefresh={pagination.refetch} />
+        <ListStatsVisibilityControls
+          showStats={showStats}
+          onShowStatsChange={setShowStats}
+          onRefresh={pagination.refetch}
+        />
       </div>
 
-      <ListContentSuspense loading={pagination.fetching}>
-      <HierarchyListDashboard
-        config={getUnitsDashboardConfig(entityLabel)}
-        items={units}
-        parents={modules}
-        children={components}
-        getChildParentId={(component) => component.unit_id}
-        getStatusName={getStatusName}
-        getParentId={(unit) => unit.module_id}
-        faultMap={faultMap}
-        activeStatusName={statusFilter}
-        activeParentId={parentFilter}
-        onStatusFilter={applyStatusFilter}
-        onParentFilter={applyParentFilter}
-        totalCount={pagination.total}
-      />
-      </ListContentSuspense>
+      {showStats && (
+        <ListContentSuspense loading={pagination.fetching}>
+          <HierarchyListDashboard
+            config={getUnitsDashboardConfig(entityLabel)}
+            items={units}
+            parents={modules}
+            children={components}
+            getChildParentId={(component) => component.unit_id}
+            getStatusName={getStatusName}
+            getParentId={(unit) => unit.module_id}
+            faultMap={faultMap}
+            activeStatusName={statusFilter}
+            activeParentId={parentFilter}
+            onStatusFilter={applyStatusFilter}
+            onParentFilter={applyParentFilter}
+            totalCount={pagination.total}
+          />
+        </ListContentSuspense>
+      )}
 
       {(statusFilter !== 'all' || parentFilter !== 'all') && (
         <div className="flex flex-wrap items-center gap-2">

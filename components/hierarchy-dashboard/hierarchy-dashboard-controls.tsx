@@ -10,6 +10,7 @@ import { useMemo } from 'react';
 import type { HierarchyDashboardSelection } from '@/lib/project-hierarchy-dashboard';
 import type { Project } from '@/lib/models';
 import type { HierarchyDossierMode } from '@/lib/hierarchy-dossier-mode';
+import { workflowStatusLabel } from '@/lib/workflow-status';
 import { Button } from '@/components/ui/button';
 import { HierarchyDossierCombobox } from '@/components/hierarchy-dashboard/hierarchy-dossier-combobox';
 import {
@@ -135,7 +136,9 @@ export function HierarchyDashboardControls({
       {selectedProject ? (
         <p className="text-sm text-muted-foreground">
           Viewing <span className="font-medium text-foreground">{selectedProject.name}</span>
-          {selectedProject.status_name ? ` · ${selectedProject.status_name}` : ''}
+          {selectedProject.status_name
+            ? ` · ${workflowStatusLabel(selectedProject.status_name)}`
+            : ''}
         </p>
       ) : null}
     </>

@@ -48,7 +48,10 @@ import { P } from '@/lib/permission-codes';
 import { useAuth } from '@/lib/auth-context';
 import { canManageInstall, ownInstallRowClass, showOwnInstallBadge } from '@/lib/install-ownership';
 import { cn } from '@/lib/utils';
-import { PageRefreshButton } from '@/components/page-data-refresh';
+import {
+  ListStatsVisibilityControls,
+  useListStatsVisibility,
+} from '@/components/list-stats-visibility';
 import {
   InstallerFilterSelect,
   resolveInstallerFilterId,
@@ -94,6 +97,7 @@ function groupComponentsByPartNumber(components: Component[]): ComponentPartNumb
 
 export default function ComponentsPage() {
   const { entityLabel } = useAppDefinitions();
+  const { showStats, setShowStats } = useListStatsVisibility();
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -370,26 +374,32 @@ export default function ComponentsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">{entityLabel('component', true)}</h1>
           <p className="text-sm text-muted-foreground">Manage unit components and parts</p>
         </div>
-        <PageRefreshButton onRefresh={pagination.refetch} />
+        <ListStatsVisibilityControls
+          showStats={showStats}
+          onShowStatsChange={setShowStats}
+          onRefresh={pagination.refetch}
+        />
       </div>
 
-      <ListContentSuspense loading={pagination.fetching}>
-      <HierarchyListDashboard
-        config={getComponentsDashboardConfig(entityLabel)}
-        items={components}
-        parents={units}
-        children={inventory}
-        getChildParentId={(item) => item.component_id}
-        getStatusName={getStatusName}
-        getParentId={(component) => component.unit_id}
-        faultMap={faultMap}
-        activeStatusName={statusFilter}
-        activeParentId={parentFilter}
-        onStatusFilter={applyStatusFilter}
-        onParentFilter={applyParentFilter}
-        totalCount={pagination.total}
-      />
-      </ListContentSuspense>
+      {showStats && (
+        <ListContentSuspense loading={pagination.fetching}>
+          <HierarchyListDashboard
+            config={getComponentsDashboardConfig(entityLabel)}
+            items={components}
+            parents={units}
+            children={inventory}
+            getChildParentId={(item) => item.component_id}
+            getStatusName={getStatusName}
+            getParentId={(component) => component.unit_id}
+            faultMap={faultMap}
+            activeStatusName={statusFilter}
+            activeParentId={parentFilter}
+            onStatusFilter={applyStatusFilter}
+            onParentFilter={applyParentFilter}
+            totalCount={pagination.total}
+          />
+        </ListContentSuspense>
+      )}
 
       {(statusFilter !== 'all' || parentFilter !== 'all') && (
         <div className="flex flex-wrap items-center gap-2">

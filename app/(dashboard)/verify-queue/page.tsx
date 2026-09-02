@@ -11,7 +11,7 @@ export default function VerifyQueuePage() {
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Verify queue</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Verify Installations</h1>
             <p className="text-sm text-muted-foreground">
               Items the Developer has tested Pass and reported complete. Verify to set Installed
               Verified. Verify stays disabled until complete is reported.

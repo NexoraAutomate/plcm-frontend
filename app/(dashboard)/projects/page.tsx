@@ -38,13 +38,17 @@ import { ProjectsMiniDashboard } from '@/components/projects/projects-mini-dashb
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { toDateInputValue } from '@/lib/hierarchy-install-fields';
+import { workflowStatusLabel } from '@/lib/workflow-status';
 import { getSystemCountByProjectId, getCount } from '@/lib/entity-counts';
 import { EntityCountCell } from '@/components/entity-count-cell';
 import { Progress } from '@/components/ui/progress';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
-import { PageRefreshButton } from '@/components/page-data-refresh';
+import {
+  ListStatsVisibilityControls,
+  useListStatsVisibility,
+} from '@/components/list-stats-visibility';
 import * as api from '@/lib/api';
 import type { HierarchyConfigurationSummary } from '@/lib/models';
 import { useAppDefinitions } from '@/lib/app-definitions-context';
@@ -52,6 +56,7 @@ import { useAppDefinitions } from '@/lib/app-definitions-context';
 export default function ProjectsPage(){
   const router = useRouter();
   const { entityLabel } = useAppDefinitions();
+  const { showStats, setShowStats } = useListStatsVisibility();
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({
     open: false,
     id: null,
@@ -407,7 +412,11 @@ export default function ProjectsPage(){
           <h1 className="text-3xl font-bold tracking-tight">{entityLabel('project', true)}</h1>
           <p className="text-muted-foreground mt-2 text-sm ">Manage satellite lifecycle {entityLabel('project', true).toLowerCase()}</p>
         </div>
-        <PageRefreshButton onRefresh={pagination.refetch} />
+        <ListStatsVisibilityControls
+          showStats={showStats}
+          onShowStatsChange={setShowStats}
+          onRefresh={pagination.refetch}
+        />
       </div>
       <div>
         {filteredOrder ? (
@@ -422,22 +431,24 @@ export default function ProjectsPage(){
         ) : null}
       </div>
 
-      <ListContentSuspense loading={pagination.fetching}>
-      <ProjectsMiniDashboard
-        projects={orderScopedProjects}
-        systems={systems}
-        projectStatuses={statuses}
-        activeStatusFilter={statusFilter}
-        onStatusFilter={setStatusFilter}
-        filteredOrder={filteredOrder}
-        totalCount={pagination.total}
-      />
-      </ListContentSuspense>
+      {showStats && (
+        <ListContentSuspense loading={pagination.fetching}>
+          <ProjectsMiniDashboard
+            projects={orderScopedProjects}
+            systems={systems}
+            projectStatuses={statuses}
+            activeStatusFilter={statusFilter}
+            onStatusFilter={setStatusFilter}
+            filteredOrder={filteredOrder}
+            totalCount={pagination.total}
+          />
+        </ListContentSuspense>
+      )}
 
       {statusFilter !== 'Total' && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-full border bg-muted px-3 py-1 text-sm">
-            Status: <strong>{statusFilter}</strong>
+            Status: <strong>{workflowStatusLabel(statusFilter)}</strong>
           </span>
           <Button variant="ghost" size="sm" onClick={() => setStatusFilter('Total')}>
             Clear status filter
@@ -860,7 +871,7 @@ export default function ProjectsPage(){
                 <SelectContent>
                   {statuses.map((s) => (
                     <SelectItem key={s.id} value={s.id.toString()}>
-                      {s.status_name}
+                      {workflowStatusLabel(s.status_name)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -882,7 +893,7 @@ export default function ProjectsPage(){
           setDeleteConfirm((prev) => ({ ...prev, open, id: open ? prev.id : null }))
         }
         title="Delete Project"
-        description="Are you sure? This will delete associated systems. This action cannot be undone."
+        description="Are you sure? Reserved inventory will be released back to stock. Projects past issue-to-developer cannot be deleted. This action cannot be undone."
         onConfirm={confirmDelete}
       />
     </div>
