@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, GitBranch, UserCog, Ban, Package, FileCog } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -253,16 +252,16 @@ export function ProjectWorkflowActions({
   return (
     <>
       <div className="space-y-4 rounded-lg border p-4">
-        <Can permission={P.project_assign_hm}>
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="min-w-55 space-y-1">
-              <Label>Assign Hierarchy Manager</Label>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3 md:gap-4">
+          <Can permission={P.project_assign_hm}>
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium">Assign Hierarchy Manager</h3>
               <Select
                 value={hmId}
                 onValueChange={setHmId}
                 disabled={busy || isCancelled || isApproved}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select HM" />
                 </SelectTrigger>
                 <SelectContent>
@@ -273,116 +272,129 @@ export function ProjectWorkflowActions({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <Button
-              variant="outline"
-              onClick={() => void handleAssignHm()}
-              disabled={busy || isCancelled || isApproved}
-            >
-              <UserCog className="mr-1.5 h-4 w-4" />
-              Assign HM
-            </Button>
-          </div>
-        </Can>
-
-        <div className="flex flex-wrap gap-2">
-          <Can permission={P.project_approve}>
-            <Button onClick={() => void handleApprove()} disabled={busy || !isDraft || isCancelled}>
-              <CheckCircle2 className="mr-1.5 h-4 w-4" />
-              Approve
-            </Button>
-          </Can>
-
-          <Can permission={[P.config_change_request, P.config_change_approve]}>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
-                    <Button
-                      variant="outline"
-                      disabled={busy || configChangeDisabled}
-                      onClick={() =>
-                        router.push(`/projects/${project.id}/configuration-change`)
-                      }
-                    >
-                      <FileCog className="mr-1.5 h-4 w-4" />
-                      Configuration Change
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>{configChangeTooltip}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </Can>
-
-          <Can permission={P.hierarchy_generate}>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
-                    <Button
-                      variant="outline"
-                      disabled={busy || generateDisabled}
-                      onClick={() => setConfirmOpen(true)}
-                    >
-                      <GitBranch className="mr-1.5 h-4 w-4" />
-                      Generate Hierarchy
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>{generateTooltip}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </Can>
-
-          <Can permission={P.inventory_reserve}>
-            {(isReady || isCompleted) && !isCancelled ? (
               <Button
                 variant="outline"
-                disabled={busy || openConfigChange}
-                onClick={() => router.push(`/projects/${project.id}/reserve-inventory`)}
+                className="w-full"
+                onClick={() => void handleAssignHm()}
+                disabled={busy || isCancelled || isApproved}
               >
-                <Package className="mr-1.5 h-4 w-4" />
-                {isCompleted ? 'Review inventory assignments' : 'Reserve inventory'}
+                <UserCog className="mr-1.5 h-4 w-4" />
+                Assign HM
               </Button>
-            ) : null}
+            </div>
           </Can>
 
-          <Can permission={P.project_cancel}>
-            <Button
-              variant="destructive"
-              disabled={busy || !canCancel}
-              onClick={() => void openCancelDialog()}
-            >
-              <Ban className="mr-1.5 h-4 w-4" />
-              Cancel project
-            </Button>
-          </Can>
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium">Administrative Actions</h3>
+            <Can permission={P.project_approve}>
+              <Button
+                className="w-full"
+                onClick={() => void handleApprove()}
+                disabled={busy || !isDraft || isCancelled}
+              >
+                <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                Approve
+              </Button>
+            </Can>
 
-          <WorkflowCan role={['HM', 'ADMIN', 'PD']}>
-            {!isApproved && !isReady ? (
-              <p className="w-full text-xs text-muted-foreground">
-                Generate Hierarchy stays disabled until Project Director or Admin approval.
-              </p>
-            ) : null}
-            {isReady ? (
-              <p className="w-full text-xs text-muted-foreground">
-                Hierarchy generated — open Reserve inventory to match and lock stock for
-                each shell.
-              </p>
-            ) : null}
-            {isApproved && openConfigChange ? (
-              <p className="w-full text-xs text-muted-foreground">
-                Generate Hierarchy is blocked while a configuration change is open.
-              </p>
-            ) : null}
-            {isCancelled ? (
-              <p className="w-full text-xs text-muted-foreground">
-                Hierarchy is read-only after cancellation or configuration change.
-              </p>
-            ) : null}
-          </WorkflowCan>
+            <Can permission={[P.config_change_request, P.config_change_approve]}>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="block w-full">
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        disabled={busy || configChangeDisabled}
+                        onClick={() =>
+                          router.push(`/projects/${project.id}/configuration-change`)
+                        }
+                      >
+                        <FileCog className="mr-1.5 h-4 w-4" />
+                        Configuration Change
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>{configChangeTooltip}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </Can>
+
+            <Can permission={P.project_cancel}>
+              <Button
+                variant="destructive"
+                className="w-full"
+                disabled={busy || !canCancel}
+                onClick={() => void openCancelDialog()}
+              >
+                <Ban className="mr-1.5 h-4 w-4" />
+                Cancel Project
+              </Button>
+            </Can>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium">Hierarchy &amp; Inventory</h3>
+            <Can permission={P.hierarchy_generate}>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="block w-full">
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        disabled={busy || generateDisabled}
+                        onClick={() => setConfirmOpen(true)}
+                      >
+                        <GitBranch className="mr-1.5 h-4 w-4" />
+                        Generate Hierarchy
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>{generateTooltip}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </Can>
+
+            <Can permission={P.inventory_reserve}>
+              {(isReady || isCompleted) && !isCancelled ? (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  disabled={busy || openConfigChange}
+                  onClick={() => router.push(`/projects/${project.id}/reserve-inventory`)}
+                >
+                  <Package className="mr-1.5 h-4 w-4" />
+                  {isCompleted ? 'Review inventory assignments' : 'Reserve Inventory'}
+                </Button>
+              ) : null}
+            </Can>
+          </div>
         </div>
+
+        <WorkflowCan role={['HM', 'ADMIN', 'PD']}>
+          {!isApproved && !isReady ? (
+            <p className="text-xs text-muted-foreground">
+              Generate Hierarchy stays disabled until Project Director or Admin approval.
+            </p>
+          ) : null}
+          {isReady ? (
+            <p className="text-xs text-muted-foreground">
+              Hierarchy generated — open Reserve inventory to match and lock stock for
+              each shell.
+            </p>
+          ) : null}
+          {isApproved && openConfigChange ? (
+            <p className="text-xs text-muted-foreground">
+              Generate Hierarchy is blocked while a configuration change is open.
+            </p>
+          ) : null}
+          {isCancelled ? (
+            <p className="text-xs text-muted-foreground">
+              Hierarchy is read-only after cancellation or configuration change.
+            </p>
+          ) : null}
+        </WorkflowCan>
       </div>
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
