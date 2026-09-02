@@ -31,6 +31,7 @@ import { ListContentSuspense } from '@/components/list-content-suspense';
 import { Can } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
 import { usePageDataRefresh } from '@/components/page-data-refresh';
+import { uploadIssuanceProformaIfNeeded } from '@/lib/issuance-signature';
 
 function formatWhen(value?: string | null) {
   if (!value) return '—';
@@ -80,7 +81,13 @@ export function IssueQueuePanel() {
     }
     setSubmitting(true);
     try {
-      await api.inventory.issueItemRequest(selected.id, signed);
+      const res = await api.inventory.issueItemRequest(selected.id, signed);
+      const issuanceId = res.data?.issued_issuance_id;
+      await uploadIssuanceProformaIfNeeded(
+        issuanceId,
+        signature.signatureType,
+        signature.proformaFile
+      );
       toast.success('Item issued to developer');
       setSelected(null);
       signature.reset();
@@ -178,6 +185,8 @@ export function IssueQueuePanel() {
                 onDigitalPayloadChange={signature.setDigitalPayload}
                 hardCopyAck={signature.hardCopyAck}
                 onHardCopyAckChange={signature.setHardCopyAck}
+                proformaFile={signature.proformaFile}
+                onProformaFileChange={signature.setProformaFile}
                 disabled={submitting}
               />
             </div>

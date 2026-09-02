@@ -544,7 +544,7 @@ export default function OrdersPage() {
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className='bg-slate-200 dark:bg-black hover:bg-slate-200'>
+                <TableRow>
                   <SortableTableHead column="order_number" sort={sort} onSort={cycleSort}>Order No.</SortableTableHead>
                   <SortableTableHead column="title" sort={sort} onSort={cycleSort}>Title</SortableTableHead>
                   <SortableTableHead column="customer_id" sort={sort} onSort={cycleSort}>Customer</SortableTableHead>

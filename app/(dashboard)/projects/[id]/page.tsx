@@ -7,12 +7,10 @@ import { useDataStore } from '@/lib/data-store';
 import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
 import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, FileText, Calendar, Layers, Pencil, Network, Ban } from 'lucide-react';
+import { ArrowLeft, FileText, Calendar, Layers, Network, Ban, GitBranch, Package, AlertTriangle, Workflow } from 'lucide-react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Search, Clock, AlertTriangle, Zap, Pause, CheckCircle } from 'lucide-react';
 import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
 import { EntityForm } from '@/components/entity-form';
@@ -34,13 +32,21 @@ import { syncEntityPicture } from '@/lib/entity-picture-upload';
 import { ProjectWorkflowActions } from '@/components/projects/project-workflow-actions';
 import { GeneratedHierarchyCard } from '@/components/projects/generated-hierarchy-card';
 import { ProjectReservationsPanel } from '@/components/projects/project-reservations-panel';
-import { ProjectProgressPanel } from '@/components/projects/project-progress-panel';
+import {
+  ProjectBottlenecksPanel,
+  ProjectProgressPanel,
+} from '@/components/projects/project-progress-panel';
 import { ShortageListPanel } from '@/components/shortages/shortage-list-panel';
 import { useProjectProgressQuery } from '@/hooks/queries';
 import { ConfigChangeBanner } from '@/components/projects/config-change-banner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProjectWorkflowStatus, isProjectReadOnly, workflowStatusLabel } from '@/lib/workflow-status';
 import { isCurrentInstallEntity } from '@/lib/entity-replacement';
+import {
+  ListStatsVisibilityControls,
+  useListStatsVisibility,
+} from '@/components/list-stats-visibility';
 
 export default function ProjectDetailPage() {
   const { entityLabel } = useAppDefinitions();
@@ -71,6 +77,7 @@ export default function ProjectDetailPage() {
   const progressQuery = useProjectProgressQuery(
     Number.isFinite(Number(projectId)) ? Number(projectId) : null
   );
+  const { showStats, setShowStats } = useListStatsVisibility();
 
   const project =
     workflowProject && String(workflowProject.id) === projectId
@@ -350,7 +357,7 @@ export default function ProjectDetailPage() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <Link href="/projects">
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <ArrowLeft className="h-4 w-4" />
@@ -360,6 +367,12 @@ export default function ProjectDetailPage() {
           <h1 className="text-3xl font-bold tracking-tight">{project.name}</h1>
           <p className="text-sm text-muted-foreground mt-1">Manage {entityLabel('system', true).toLowerCase()} and hierarchy</p>
         </div>
+        <ListStatsVisibilityControls
+          showStats={showStats}
+          onShowStatsChange={setShowStats}
+          onRefresh={() => progressQuery.refetch()}
+          checkboxLabel="Show KPIs"
+        />
         <Button variant="outline" className="gap-2 shrink-0" asChild>
           <Link href={`/hierarchy-dashboard?project_id=${projectId}`}>
             <Network className="h-4 w-4" />
@@ -368,20 +381,9 @@ export default function ProjectDetailPage() {
         </Button>
       </div>
 
-      <ProjectWorkflowActions
-        project={project}
-        users={users}
-        onUpdated={(next) => setWorkflowProject(next)}
-      />
-
-      <GeneratedHierarchyCard
-        project={project}
-        configurationLabel={configurationLabel}
-      />
-
       <ConfigChangeBanner project={project} />
 
-        {project.status_name === ProjectWorkflowStatus.CANCELLED ? (
+      {project.status_name === ProjectWorkflowStatus.CANCELLED ? (
         <Alert variant="destructive">
           <Ban />
           <AlertTitle>Project cancelled</AlertTitle>
@@ -392,90 +394,132 @@ export default function ProjectDetailPage() {
         </Alert>
       ) : null}
 
-      <ProjectReservationsPanel project={project} />
-
-      {project.status_name === 'READY_FOR_INVENTORY' ? (
-        <div
-          className={`space-y-2 rounded-lg border p-4 ${
-            hasProjectShortages === false ? 'hidden' : ''
-          }`}
-        >
-          <div>
-            <h3 className="text-sm font-medium">Shortages</h3>
-            <p className="text-xs text-muted-foreground">
-              Waiting demand for this project. Matching receipts auto-reserve FCFS.
-            </p>
-          </div>
-          <ShortageListPanel
-            projectId={project.id}
-            pollMs={12_000}
-            onRowsChange={handleProjectShortagesChange}
-          />
-        </div>
+      {showStats ? (
+        <ProjectProgressPanel
+          data={progressQuery.data}
+          loading={progressQuery.isLoading}
+          configurationLabel={configurationLabel}
+          details={
+            <Card className="shadow-sm h-full">
+              <CardContent className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                    <FileText className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">Order</p>
+                    <p className="text-sm font-medium truncate">
+                      {order?.order_number || project.order_id}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                    <Calendar className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">Delivery Date</p>
+                    <p className="text-sm font-medium truncate">{project.end_date}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                    <Layers className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">Systems</p>
+                    <p className="text-sm font-medium">{projectSystems.length}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                    <FileText className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">Status</p>
+                    <div className="flex items-center gap-1">
+                      <StatusBadge status={project.status_name || 'Unknown'} />
+                      <EntityStatusHistorySheet
+                        entityType="project"
+                        entityPk={project.id}
+                        entityName={project.name}
+                        statuses={statuses}
+                        triggerVariant="icon"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          }
+        />
       ) : null}
 
-      {/* Project Info Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="shadow-sm">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <FileText className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Order</p>
-              <p className="text-sm font-medium">{order?.order_number || project.order_id}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Calendar className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Delivery Date</p>
-              <p className="text-sm font-medium">{project.end_date}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Layers className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Systems</p>
-              <p className="text-sm font-medium">{projectSystems.length}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <FileText className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Status</p>
-              <div className="flex items-center gap-1">
-                <StatusBadge status={project.status_name || 'Unknown'} />
-                <EntityStatusHistorySheet
-                  entityType="project"
-                  entityPk={project.id}
-                  entityName={project.name}
-                  statuses={statuses}
-                  triggerVariant="icon"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <Tabs defaultValue="workflow" className="gap-4">
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
+          <TabsTrigger value="workflow" className="gap-1.5">
+            <Workflow className="h-4 w-4" />
+            Workflow
+          </TabsTrigger>
+          <TabsTrigger value="hierarchy" className="gap-1.5">
+            <GitBranch className="h-4 w-4" />
+            Generated Hierarchy
+          </TabsTrigger>
+          <TabsTrigger value="reservations" className="gap-1.5">
+            <Package className="h-4 w-4" />
+            Inventory Reservations
+          </TabsTrigger>
+          <TabsTrigger value="bottlenecks" className="gap-1.5">
+            <AlertTriangle className="h-4 w-4" />
+            Bottlenecks
+          </TabsTrigger>
+        </TabsList>
 
-      <ProjectProgressPanel
-        data={progressQuery.data}
-        loading={progressQuery.isLoading}
-        configurationLabel={configurationLabel}
-      />
+        <TabsContent value="workflow" className="mt-0">
+          <ProjectWorkflowActions
+            project={project}
+            users={users}
+            onUpdated={(next) => setWorkflowProject(next)}
+          />
+        </TabsContent>
+
+        <TabsContent value="hierarchy" className="mt-0">
+          <GeneratedHierarchyCard
+            project={project}
+            configurationLabel={configurationLabel}
+          />
+        </TabsContent>
+
+        <TabsContent value="reservations" className="mt-0 space-y-4">
+          <ProjectReservationsPanel project={project} />
+          {project.status_name === 'READY_FOR_INVENTORY' ? (
+            <div
+              className={`space-y-2 rounded-lg border p-4 ${
+                hasProjectShortages === false ? 'hidden' : ''
+              }`}
+            >
+              <div>
+                <h3 className="text-sm font-medium">Shortages</h3>
+                <p className="text-xs text-muted-foreground">
+                  Waiting demand for this project. Matching receipts auto-reserve FCFS.
+                </p>
+              </div>
+              <ShortageListPanel
+                projectId={project.id}
+                pollMs={12_000}
+                onRowsChange={handleProjectShortagesChange}
+              />
+            </div>
+          ) : null}
+        </TabsContent>
+
+        <TabsContent value="bottlenecks" className="mt-0">
+          <ProjectBottlenecksPanel
+            data={progressQuery.data}
+            loading={progressQuery.isLoading}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Systems Cards */}
       <EntityCards

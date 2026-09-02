@@ -523,7 +523,7 @@ export default function CustomerDetailPage(){
                 <div className="overflow-x-auto">
                     <Table>
                     <TableHeader>
-                        <TableRow className='bg-slate-200 dark:bg-black hover:bg-slate-200'>
+                        <TableRow>
                         <TableHead>Order No.</TableHead>
                         <TableHead>Title</TableHead>
                         <TableHead>Customer</TableHead>

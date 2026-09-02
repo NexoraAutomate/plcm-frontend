@@ -1108,6 +1108,18 @@ export interface Inventory extends HierarchyInstallFields {
   fcfs_fulfillments?: FCFSFulfillment[] | null
 }
 
+export interface InventoryStatsSummary {
+  total_catalog_items: number
+  available_units: number
+  reserved_issued_open_units: number
+  out_of_stock_catalog_items: number
+  out_of_stock_top_names: string[]
+  open_shortages: number
+  open_shortage_top_names: string[]
+  pending_issue_requests: number
+  return_pending_inspect: number
+}
+
 export type InventoryIssuanceStatus =
   | 'issued'
   | 'return_pending'
@@ -1144,6 +1156,24 @@ export interface InventoryIssuance {
   closed_by_name?: string | null
   item_lifecycle_status?: string | null
   verified_at?: string | null
+  signature_type?: string | null
+  display_status?: string | null
+  has_signature_attachment?: boolean | null
+  has_proforma_attachment?: boolean | null
+  signature_attachment_id?: number | null
+  proforma_attachment_id?: number | null
+}
+
+export interface InventoryIssuanceSignature {
+  signature_type?: string | null
+  has_signature_attachment: boolean
+  has_proforma_attachment: boolean
+  signature_attachment_id?: number | null
+  proforma_attachment_id?: number | null
+  signature_file_name?: string | null
+  proforma_file_name?: string | null
+  signature_mime_type?: string | null
+  proforma_mime_type?: string | null
 }
 
 export interface InventoryIssuePayload {

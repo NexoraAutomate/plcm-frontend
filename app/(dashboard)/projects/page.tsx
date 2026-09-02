@@ -416,6 +416,7 @@ export default function ProjectsPage(){
           showStats={showStats}
           onShowStatsChange={setShowStats}
           onRefresh={pagination.refetch}
+          checkboxLabel="Show KPIs"
         />
       </div>
       <div>

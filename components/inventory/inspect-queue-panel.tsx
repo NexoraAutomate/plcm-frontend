@@ -27,6 +27,7 @@ import {
   IssueSignatureFields,
   useIssueSignature,
 } from '@/components/inventory/issue-signature-fields';
+import { uploadIssuanceProformaIfNeeded } from '@/lib/issuance-signature';
 import { ListContentSuspense } from '@/components/list-content-suspense';
 import { StatusBadge } from '@/components/status-badge';
 import { Can } from '@/components/auth';
@@ -127,10 +128,15 @@ export function InspectQueuePanel() {
           toast.error('Select a replacement serial');
           return;
         }
-        await api.inventory.reissueReworkItem(selected.id, {
+        const res = await api.inventory.reissueReworkItem(selected.id, {
           ...signed,
           replacement_instance_id: needsReplacement ? replacementId : null,
         });
+        await uploadIssuanceProformaIfNeeded(
+          res.data?.current_issuance_id,
+          signature.signatureType,
+          signature.proformaFile
+        );
         toast.success('Item re-issued to developer');
       }
       setSelected(null);
@@ -312,6 +318,8 @@ export function InspectQueuePanel() {
                   onDigitalPayloadChange={signature.setDigitalPayload}
                   hardCopyAck={signature.hardCopyAck}
                   onHardCopyAckChange={signature.setHardCopyAck}
+                  proformaFile={signature.proformaFile}
+                  onProformaFileChange={signature.setProformaFile}
                   disabled={submitting}
                 />
               ) : null}

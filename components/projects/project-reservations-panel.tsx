@@ -1,14 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { ChevronDown, Clock, Unlock } from 'lucide-react';
+import { Clock, Unlock } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,7 +21,7 @@ import type { InventoryReservation, Project } from '@/lib/models';
 import { isOpenConfigChange } from '@/lib/config-change';
 import { ProjectWorkflowStatus } from '@/lib/workflow-status';
 import { useDataStore } from '@/lib/data-store';
-import { cn } from '@/lib/utils';
+
 type Props = {
   project: Project;
 };
@@ -63,7 +58,6 @@ export function ProjectReservationsPanel({ project }: Props) {
   const [busy, setBusy] = useState(false);
   const [releaseId, setReleaseId] = useState<number | null>(null);
   const [releaseAllOpen, setReleaseAllOpen] = useState(false);
-  const [sectionOpen, setSectionOpen] = useState(false);
   const { ensureHierarchyLoaded } = useDataStore();
 
   const refresh = useCallback(async () => {
@@ -161,40 +155,30 @@ export function ProjectReservationsPanel({ project }: Props) {
     }
   }
 
-  if (!isReady || configChangeOpen) return null;
+  if (!isReady || configChangeOpen) {
+    return (
+      <div className="rounded-lg border p-4 text-sm text-muted-foreground">
+        {configChangeOpen
+          ? 'Inventory reservations are unavailable while a configuration change is open.'
+          : 'Reservations appear after the project is ready for inventory.'}
+      </div>
+    );
+  }
 
   const active = reservations.filter((r) => r.status === 'active');
   const history = reservations.filter((r) => r.status !== 'active');
 
   return (
-    <Collapsible open={sectionOpen} onOpenChange={setSectionOpen}>
+    <>
       <div className="rounded-lg border">
         <div className="flex items-start justify-between gap-3 p-4">
-          <CollapsibleTrigger asChild>
-            <button
-              type="button"
-              className="min-w-0 flex-1 rounded-md text-left outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-medium">Inventory reservations</h3>
-                {active.length > 0 ? (
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground">
-                    {active.length} active
-                  </span>
-                ) : null}
-                <ChevronDown
-                  className={cn(
-                    'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
-                    sectionOpen && 'rotate-180'
-                  )}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Active holds for this project. Use Reserve inventory to lock stock. Idle
-                reservations remind at 30 days, then auto-release after a 7-day grace (Spec 06).
-              </p>
-            </button>
-          </CollapsibleTrigger>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-muted-foreground">
+              Active holds for this project. Use Reserve inventory to lock stock. Idle
+              reservations remind at 30 days, then auto-release after a 7-day grace.
+              {active.length > 0 ? ` · ${active.length} active` : ''}
+            </p>
+          </div>
           {active.length > 0 ? (
             <Can permission={P.inventory_release}>
               <Button
@@ -211,112 +195,110 @@ export function ProjectReservationsPanel({ project }: Props) {
           ) : null}
         </div>
 
-        <CollapsibleContent>
-          <div className="space-y-4 border-t px-4 py-4">
-            {active.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No active project reservations.</p>
-            ) : (
+        <div className="space-y-4 border-t px-4 py-4">
+          {active.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No active project reservations.</p>
+          ) : (
+            <ul className="space-y-2 text-sm">
+              {active.map((r) => (
+                <li
+                  key={r.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 px-3 py-2"
+                >
+                  <div>
+                    <div className="font-medium">
+                      {r.flight_name || `Flight #${r.flight_id}`} /{' '}
+                      {r.sdls_name || `SDLS #${r.sdls_id}`} ·{' '}
+                      {r.inventory_name || r.target_entity_type}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {r.serial_number ? `SN ${r.serial_number}` : 'Qty unit'}
+                      {r.part_number ? ` · PN ${r.part_number}` : ''}
+                      {' · '}
+                      by {r.reserved_by_name || r.reserved_by_user_id}
+                      {r.notes?.includes('shortage fulfillment')
+                        ? ' · auto-reserved (shortage)'
+                        : ''}
+                      {r.extension_count > 0 ? ` · extended ×${r.extension_count}` : ''}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        reminder {formatCountdown(r.expires_at)}
+                        {' · '}
+                        {new Date(r.expires_at).toLocaleDateString()}
+                      </span>
+                      <span>
+                        auto-release {formatCountdown(r.auto_release_at)}
+                        {r.auto_release_at
+                          ? ` · ${new Date(r.auto_release_at).toLocaleDateString()}`
+                          : ''}
+                      </span>
+                      {r.last_reminder_at ? (
+                        <span>
+                          last reminder {new Date(r.last_reminder_at).toLocaleString()}
+                        </span>
+                      ) : (
+                        <span>last reminder —</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Can permission={P.inventory_reserve}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => void handleExtend(r.id)}
+                      >
+                        Extend
+                      </Button>
+                    </Can>
+                    <Can permission={P.inventory_release}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => setReleaseId(r.id)}
+                      >
+                        <Unlock className="mr-1 h-3.5 w-3.5" />
+                        Release
+                      </Button>
+                    </Can>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {history.length > 0 ? (
+            <div className="space-y-2">
+              <h4 className="text-xs font-medium text-muted-foreground">Reservation history</h4>
               <ul className="space-y-2 text-sm">
-                {active.map((r) => (
+                {history.map((r) => (
                   <li
                     key={r.id}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 px-3 py-2"
+                    className="rounded-md border border-dashed bg-muted/10 px-3 py-2 text-xs text-muted-foreground"
                   >
-                    <div>
-                      <div className="font-medium">
-                        {r.flight_name || `Flight #${r.flight_id}`} /{' '}
-                        {r.sdls_name || `SDLS #${r.sdls_id}`} ·{' '}
-                        {r.inventory_name || r.target_entity_type}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {r.serial_number ? `SN ${r.serial_number}` : 'Qty unit'}
-                        {r.part_number ? ` · PN ${r.part_number}` : ''}
-                        {' · '}
-                        by {r.reserved_by_name || r.reserved_by_user_id}
-                        {r.notes?.includes('shortage fulfillment')
-                          ? ' · auto-reserved (shortage)'
-                          : ''}
-                        {r.extension_count > 0 ? ` · extended ×${r.extension_count}` : ''}
-                      </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                        <span className="inline-flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          reminder {formatCountdown(r.expires_at)}
-                          {' · '}
-                          {new Date(r.expires_at).toLocaleDateString()}
-                        </span>
-                        <span>
-                          auto-release {formatCountdown(r.auto_release_at)}
-                          {r.auto_release_at
-                            ? ` · ${new Date(r.auto_release_at).toLocaleDateString()}`
-                            : ''}
-                        </span>
-                        {r.last_reminder_at ? (
-                          <span>
-                            last reminder {new Date(r.last_reminder_at).toLocaleString()}
-                          </span>
-                        ) : (
-                          <span>last reminder —</span>
-                        )}
-                      </div>
+                    <div className="font-medium text-foreground">
+                      {r.flight_name || `Flight #${r.flight_id}`} /{' '}
+                      {r.sdls_name || `SDLS #${r.sdls_id}`} ·{' '}
+                      {r.inventory_name || r.target_entity_type}
+                      {r.serial_number ? ` · SN ${r.serial_number}` : ''}
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Can permission={P.inventory_reserve}>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={busy}
-                          onClick={() => void handleExtend(r.id)}
-                        >
-                          Extend
-                        </Button>
-                      </Can>
-                      <Can permission={P.inventory_release}>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={busy}
-                          onClick={() => setReleaseId(r.id)}
-                        >
-                          <Unlock className="mr-1 h-3.5 w-3.5" />
-                          Release
-                        </Button>
-                      </Can>
+                    <div>
+                      {isAutoReleased(r) ? 'Auto-released (AUTO_RELEASE_EXPIRY)' : 'Released'}
+                      {r.released_at ? ` · ${new Date(r.released_at).toLocaleString()}` : ''}
+                      {r.last_reminder_at
+                        ? ` · last reminder ${new Date(r.last_reminder_at).toLocaleString()}`
+                        : ''}
                     </div>
                   </li>
                 ))}
               </ul>
-            )}
-
-            {history.length > 0 ? (
-              <div className="space-y-2">
-                <h4 className="text-xs font-medium text-muted-foreground">Reservation history</h4>
-                <ul className="space-y-2 text-sm">
-                  {history.map((r) => (
-                    <li
-                      key={r.id}
-                      className="rounded-md border border-dashed bg-muted/10 px-3 py-2 text-xs text-muted-foreground"
-                    >
-                      <div className="font-medium text-foreground">
-                        {r.flight_name || `Flight #${r.flight_id}`} /{' '}
-                        {r.sdls_name || `SDLS #${r.sdls_id}`} ·{' '}
-                        {r.inventory_name || r.target_entity_type}
-                        {r.serial_number ? ` · SN ${r.serial_number}` : ''}
-                      </div>
-                      <div>
-                        {isAutoReleased(r) ? 'Auto-released (AUTO_RELEASE_EXPIRY)' : 'Released'}
-                        {r.released_at ? ` · ${new Date(r.released_at).toLocaleString()}` : ''}
-                        {r.last_reminder_at
-                          ? ` · last reminder ${new Date(r.last_reminder_at).toLocaleString()}`
-                          : ''}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </div>
-        </CollapsibleContent>
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <AlertDialog
@@ -378,6 +360,6 @@ export function ProjectReservationsPanel({ project }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Collapsible>
+    </>
   );
 }

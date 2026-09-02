@@ -30,6 +30,7 @@ import {
   IssueSignatureFields,
   useIssueSignature,
 } from '@/components/inventory/issue-signature-fields';
+import { uploadIssuanceProformaIfNeeded } from '@/lib/issuance-signature';
 
 type Props = {
   open: boolean;
@@ -149,18 +150,28 @@ export function InventoryIssueDialog({
     setSubmitting(true);
     try {
       if (matchingRequest) {
-        await api.inventory.issueItemRequest(matchingRequest.id, {
+        const res = await api.inventory.issueItemRequest(matchingRequest.id, {
           ...signed,
           notes: notes.trim() || null,
         });
+        await uploadIssuanceProformaIfNeeded(
+          res.data?.issued_issuance_id,
+          signature.signatureType,
+          signature.proformaFile
+        );
       } else {
-        await api.inventory.issue(item.id, {
+        const res = await api.inventory.issue(item.id, {
           issued_to_user_id: developerId,
           quantity: usesInstances ? 1 : qty,
           instance_id: resolvedInstanceId ?? null,
           notes: notes.trim() || null,
           ...signed,
         });
+        await uploadIssuanceProformaIfNeeded(
+          res.data?.id,
+          signature.signatureType,
+          signature.proformaFile
+        );
       }
       toast.success('Inventory item issued to developer');
       onOpenChange(false);
@@ -262,6 +273,8 @@ export function InventoryIssueDialog({
               onDigitalPayloadChange={signature.setDigitalPayload}
               hardCopyAck={signature.hardCopyAck}
               onHardCopyAckChange={signature.setHardCopyAck}
+              proformaFile={signature.proformaFile}
+              onProformaFileChange={signature.setProformaFile}
               disabled={submitting}
             />
 

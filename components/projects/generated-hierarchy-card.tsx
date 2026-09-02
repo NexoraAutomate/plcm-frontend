@@ -2,12 +2,9 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { ChevronDown } from 'lucide-react';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import * as api from '@/lib/api';
 import type { Project } from '@/lib/models';
 import { isProjectReadOnly, ProjectWorkflowStatus } from '@/lib/workflow-status';
-import { cn } from '@/lib/utils';
 
 type HierarchyTree = Awaited<
   ReturnType<typeof api.projects.hierarchyTree>
@@ -105,19 +102,22 @@ export function GeneratedHierarchyCard({
   configurationLabel?: string | null;
 }) {
   const [tree, setTree] = useState<HierarchyTree | null>(null);
-  const [treeOpen, setTreeOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
   const status = project.status_name ?? '';
   const isReady =
     status === ProjectWorkflowStatus.READY_FOR_INVENTORY ||
     status === ProjectWorkflowStatus.HIERARCHY_GENERATED;
   const isCancelled = isProjectReadOnly(status);
+  const canLoad = isReady || isCancelled;
 
   useEffect(() => {
-    if (!isReady && !isCancelled) {
+    if (!canLoad) {
       setTree(null);
+      setLoading(false);
       return;
     }
     let cancelled = false;
+    setLoading(true);
     void api.projects
       .hierarchyTree(project.id)
       .then((res) => {
@@ -125,47 +125,52 @@ export function GeneratedHierarchyCard({
       })
       .catch(() => {
         if (!cancelled) setTree(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [project.id, isReady, isCancelled]);
+  }, [project.id, canLoad]);
 
-  if (!tree || tree.flights.length === 0) return null;
+  if (!canLoad) {
+    return (
+      <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+        Generate the hierarchy to view the project tree.
+      </div>
+    );
+  }
+
+  if (loading && !tree) {
+    return (
+      <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+        Loading hierarchy…
+      </div>
+    );
+  }
+
+  if (!tree || tree.flights.length === 0) {
+    return (
+      <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+        No generated hierarchy is available yet.
+      </div>
+    );
+  }
 
   return (
-    <Collapsible open={treeOpen} onOpenChange={setTreeOpen}>
-      <div className="rounded-lg border bg-muted/30 text-sm">
-        <CollapsibleTrigger asChild>
-          <button
-            type="button"
-            className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left font-medium hover:bg-muted/50"
-          >
-            <span>
-              {isCancelled ? 'Generated hierarchy (read-only)' : 'Generated hierarchy'}
-            </span>
-            <ChevronDown
-              className={cn(
-                'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
-                treeOpen && 'rotate-180'
+    <div className="rounded-lg border bg-muted/30 text-sm">
+      <ul className="px-3 py-3 text-muted-foreground">
+        <TreeNode kind="Configuration" name={configurationLabel || '—'}>
+          {tree.flights.map((flight) => (
+            <TreeNode key={flight.id} kind="Flight" name={flight.name}>
+              {flight.sdls.flatMap((sdls) => sdls.systems).map((system) =>
+                renderSystemBranch(system)
               )}
-            />
-          </button>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <ul className="border-t px-3 py-3 text-muted-foreground">
-            <TreeNode kind="Configuration" name={configurationLabel || '—'}>
-              {tree.flights.map((flight) => (
-                <TreeNode key={flight.id} kind="Flight" name={flight.name}>
-                  {flight.sdls.flatMap((sdls) => sdls.systems).map((system) =>
-                    renderSystemBranch(system)
-                  )}
-                </TreeNode>
-              ))}
             </TreeNode>
-          </ul>
-        </CollapsibleContent>
-      </div>
-    </Collapsible>
+          ))}
+        </TreeNode>
+      </ul>
+    </div>
   );
 }

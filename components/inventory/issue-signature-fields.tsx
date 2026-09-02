@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -21,6 +22,8 @@ type Props = {
   onDigitalPayloadChange: (value: string) => void;
   hardCopyAck: boolean;
   onHardCopyAckChange: (value: boolean) => void;
+  proformaFile: File | null;
+  onProformaFileChange: (value: File | null) => void;
   disabled?: boolean;
 };
 
@@ -31,8 +34,12 @@ export function IssueSignatureFields({
   onDigitalPayloadChange,
   hardCopyAck,
   onHardCopyAckChange,
+  proformaFile,
+  onProformaFileChange,
   disabled,
 }: Props) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   return (
     <div className="space-y-3">
       <div className="space-y-2">
@@ -58,14 +65,39 @@ export function IssueSignatureFields({
           disabled={disabled}
         />
       ) : (
-        <label className="flex items-start gap-2 text-sm">
-          <Checkbox
-            checked={hardCopyAck}
-            onCheckedChange={(checked) => onHardCopyAckChange(checked === true)}
-            disabled={disabled}
-          />
-          <span>I confirm a signed hard-copy issue sheet is on file.</span>
-        </label>
+        <div className="space-y-3">
+          <label className="flex items-start gap-2 text-sm">
+            <Checkbox
+              checked={hardCopyAck}
+              onCheckedChange={(checked) => onHardCopyAckChange(checked === true)}
+              disabled={disabled}
+            />
+            <span>I confirm a signed hard-copy issue sheet is on file.</span>
+          </label>
+          <div className="space-y-2">
+            <Label htmlFor="issuance-proforma-upload">
+              Scanned Inventory Issuance Proforma (optional)
+            </Label>
+            <Input
+              id="issuance-proforma-upload"
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg,.webp,.tif,.tiff"
+              disabled={disabled}
+              onChange={(event) => {
+                const file = event.target.files?.[0] ?? null;
+                onProformaFileChange(file);
+              }}
+            />
+            {proformaFile ? (
+              <p className="text-xs text-muted-foreground">{proformaFile.name}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Upload a scan of the signed proforma if available.
+              </p>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -75,11 +107,13 @@ export function useIssueSignature() {
   const [signatureType, setSignatureType] = useState<SignatureKind>('DIGITAL');
   const [digitalPayload, setDigitalPayload] = useState('');
   const [hardCopyAck, setHardCopyAck] = useState(false);
+  const [proformaFile, setProformaFile] = useState<File | null>(null);
 
   function reset() {
     setSignatureType('DIGITAL');
     setDigitalPayload('');
     setHardCopyAck(false);
+    setProformaFile(null);
   }
 
   function payload(): { signature_type: SignatureKind; signature_payload: string } | null {
@@ -98,6 +132,8 @@ export function useIssueSignature() {
     setDigitalPayload,
     hardCopyAck,
     setHardCopyAck,
+    proformaFile,
+    setProformaFile,
     reset,
     payload,
   };

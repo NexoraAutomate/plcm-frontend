@@ -86,6 +86,12 @@ import {
 } from '@/lib/app-definitions';
 import { P } from '@/lib/permission-codes';
 import { workflowStatusLabel } from '@/lib/workflow-status';
+import {
+  ListStatsVisibilityControls,
+  useListStatsVisibility,
+} from '@/components/list-stats-visibility';
+import { InventoryKpiDashboard } from '@/components/inventory/inventory-kpi-dashboard';
+import { useInventoryStatsSummary } from '@/hooks/use-inventory-stats-summary';
 
 const ACTION_BTN =
   'h-7 w-7 bg-transparent shadow-none border-0 hover:bg-transparent';
@@ -233,6 +239,7 @@ function enrichInventoryItems(
 
 export default function InventoryPage() {
   const { definitions, entityLabel } = useAppDefinitions();
+  const { showStats, setShowStats } = useListStatsVisibility();
   const router = useRouter();
   const { user, can, isInventoryManager } = useAuth();
   const inventoryManager = isInventoryManager();
@@ -275,6 +282,11 @@ export default function InventoryPage() {
       fetchInventoryPage(skip, limit, inventoryTypeParam, filters),
     filters: listFilters,
   });
+  const {
+    data: inventoryStats,
+    isFetching: inventoryStatsFetching,
+    refetch: refetchInventoryStats,
+  } = useInventoryStatsSummary(showStats);
   const entityPools = useMemo(
     () => ({ systems, subsystems, modules, units, components }),
     [systems, subsystems, modules, units, components]
@@ -1618,10 +1630,10 @@ export default function InventoryPage() {
               : 'Items currently issued to you — return unused stock to Admin when finished'}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {inventoryManager && (selectedCount > 0 || selectingAll) ? (
             <Can permission={P.delete_inventory}>
-              <div className="flex items-center gap-2 mr-1">
+              <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">
                   {selectingAll
                     ? 'Selecting all…'
@@ -1649,15 +1661,6 @@ export default function InventoryPage() {
               </div>
             </Can>
           ) : null}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void pagination.invalidate()}
-            disabled={pagination.fetching}
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${pagination.fetching ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
           <Can permission={P.view_inventory}>
             <Button variant="outline" size="sm" asChild>
               <Link href="/scan">
@@ -1712,7 +1715,7 @@ export default function InventoryPage() {
             </Can>
           ) : null}
           <Can permission={P.view_inventory_issuances}>
-            <Button variant="outline" asChild>
+            <Button variant="outline" size="sm" asChild>
               <Link href="/inventory/issuances">
                 <ListOrdered className="mr-2 h-4 w-4" />
                 Issuances
@@ -1720,14 +1723,31 @@ export default function InventoryPage() {
             </Button>
           </Can>
           <Can permission={[P.inventory_issue_workflow, P.issue_inventory]}>
-            <Button variant="outline" asChild>
-              <Link href="/issue-queue">
-                Issue queue
-              </Link>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/issue-queue">Issue queue</Link>
             </Button>
           </Can>
+          <ListStatsVisibilityControls
+            className="contents"
+            checkboxLabel="Show KPIs"
+            checkboxPosition="end"
+            showStats={showStats}
+            onShowStatsChange={setShowStats}
+            onRefresh={async () => {
+              await Promise.all([pagination.refetch(), refetchInventoryStats()]);
+            }}
+          />
         </div>
       </div>
+
+      {showStats ? (
+        <ListContentSuspense loading={inventoryStatsFetching && !inventoryStats}>
+          <InventoryKpiDashboard
+            stats={inventoryStats}
+            loading={inventoryStatsFetching}
+          />
+        </ListContentSuspense>
+      ) : null}
 
       <div className="space-y-3">
         <div className="flex flex-wrap gap-4 items-center">

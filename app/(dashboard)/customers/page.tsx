@@ -498,7 +498,7 @@ export default function CustomersPage() {
           <ListContentSuspense loading={pagination.fetching}>
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader  className='bg-slate-200 dark:bg-black hover:bg-slate-200'>
+              <TableHeader>
                 <TableRow>
                   <SortableTableHead column="customer_code" sort={sort} onSort={cycleSort}>Code</SortableTableHead>
                   <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Customer</SortableTableHead>

@@ -136,7 +136,7 @@ export function IssuanceHistorySheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto px-6 bg-white backdrop-blur-md border border-white/20 rounded-xl p-6 ">
+      <SheetContent side="right" className="flex w-full flex-col overflow-y-auto sm:max-w-lg">
         <SheetHeader>
           <SheetTitle>Issuance history</SheetTitle>
           <SheetDescription>
@@ -146,7 +146,7 @@ export function IssuanceHistorySheet({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-6 space-y-4 px-1">
+        <div className="mt-2 flex-1 space-y-4 px-4 pb-4">
           {loading ? (
             <PageLoader />
           ) : events.length === 0 ? (

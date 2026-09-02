@@ -29,30 +29,52 @@ type ListStatsVisibilityControlsProps = {
   onShowStatsChange: (next: boolean) => void;
   onRefresh?: () => void | Promise<unknown>;
   className?: string;
+  checkboxLabel?: string;
+  /** When "end", refresh renders before the checkbox (useful in a right-aligned action row). */
+  checkboxPosition?: 'start' | 'end';
+  showRefresh?: boolean;
 };
 
-/** Checkbox (left) + Refresh — place in the list page header actions. */
+/** Checkbox + optional Refresh — place in the list page header actions. */
 export function ListStatsVisibilityControls({
   showStats,
   onShowStatsChange,
   onRefresh,
   className,
+  checkboxLabel = 'View KPIs',
+  checkboxPosition = 'start',
+  showRefresh = true,
 }: ListStatsVisibilityControlsProps) {
+  const checkbox = (
+    <label
+      htmlFor="list-stats-visible"
+      className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground select-none"
+    >
+      <Checkbox
+        id="list-stats-visible"
+        checked={showStats}
+        onCheckedChange={(value) => onShowStatsChange(value === true)}
+        aria-label={checkboxLabel}
+      />
+      {checkboxLabel}
+    </label>
+  );
+
+  const refresh = showRefresh ? <PageRefreshButton onRefresh={onRefresh} /> : null;
+
   return (
     <div className={cn('flex flex-wrap items-center gap-3', className)}>
-      <label
-        htmlFor="list-stats-visible"
-        className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground select-none"
-      >
-        <Checkbox
-          id="list-stats-visible"
-          checked={showStats}
-          onCheckedChange={(value) => onShowStatsChange(value === true)}
-          aria-label="View KPIs"
-        />
-        View KPIs
-      </label>
-      <PageRefreshButton onRefresh={onRefresh} />
+      {checkboxPosition === 'start' ? (
+        <>
+          {checkbox}
+          {refresh}
+        </>
+      ) : (
+        <>
+          {refresh}
+          {checkbox}
+        </>
+      )}
     </div>
   );
 }

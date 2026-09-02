@@ -593,6 +593,7 @@ export const inventory = {
         inventory_type: inventoryType ?? filters?.inventory_type,
       }),
     }),
+  statsSummary: () => api.get<Models.InventoryStatsSummary>('/inventory/stats/summary'),
   listIds: (inventoryType?: string, filters?: ListFilterParams) =>
     api.get<{ ids: number[] }>('/inventory/ids/', {
       params: buildQueryParams({
@@ -768,6 +769,21 @@ export const inventory = {
     api.get<Models.InventoryIssuance>(`/inventory/issuances/${issuanceId}/`),
   getIssuanceHistory: (issuanceId: number) =>
     api.get<Models.InventoryIssuanceEvent[]>(`/inventory/issuances/${issuanceId}/history/`),
+  getIssuanceSignature: (issuanceId: number) =>
+    api.get<Models.InventoryIssuanceSignature>(`/inventory/issuances/${issuanceId}/signature/`),
+  downloadIssuanceSignatureBlob: (issuanceId: number, kind: 'digital' | 'proforma') =>
+    api.get<Blob>(`/inventory/issuances/${issuanceId}/signature/${kind}/download/`, {
+      responseType: 'blob',
+    }),
+  uploadIssuanceProforma: async (issuanceId: number, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<Models.InventoryIssuanceSignature>(
+      `/inventory/issuances/${issuanceId}/proforma/`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+  },
   returnIssuance: (issuanceId: number, notes: string) =>
     api.post<Models.InventoryIssuance>(`/inventory/issuances/${issuanceId}/return/`, {
       notes,

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { ArrowLeft, Check, RefreshCw, Undo2, X } from 'lucide-react';
+import { ArrowLeft, Check, History, PenLine, RefreshCw, Undo2, X } from 'lucide-react';
 import * as api from '@/lib/api';
 import type { InventoryIssuance, User } from '@/lib/models';
 import { useDataStore } from '@/lib/data-store';
@@ -37,7 +37,13 @@ import {
   type IssuanceRemarksAction,
 } from '@/components/inventory/issuance-remarks-dialog';
 import { IssuanceHistorySheet } from '@/components/inventory/issuance-history-sheet';
+import { IssuanceSignatureDialog } from '@/components/inventory/issuance-signature-dialog';
 import { issuanceCanReturn, issuanceInstallStateLabel } from '@/lib/inventory-issuance';
+import {
+  displayStatusBadgeVariant,
+  issuanceDisplayStatus,
+  issuanceHasSignatureArtifacts,
+} from '@/lib/issuance-signature';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All (history)' },
@@ -47,23 +53,6 @@ const STATUS_OPTIONS = [
   { value: 'returned', label: 'Returned' },
   { value: 'reverted', label: 'Reverted' },
 ];
-
-function statusBadgeVariant(status: string) {
-  switch (status) {
-    case 'issued':
-      return 'default' as const;
-    case 'return_pending':
-      return 'secondary' as const;
-    case 'installed':
-      return 'secondary' as const;
-    case 'returned':
-      return 'outline' as const;
-    case 'reverted':
-      return 'destructive' as const;
-    default:
-      return 'outline' as const;
-  }
-}
 
 function formatWhen(value?: string | null) {
   if (!value) return '—';
@@ -92,6 +81,8 @@ export default function InventoryIssuancesPage() {
   const [remarksRow, setRemarksRow] = useState<InventoryIssuance | null>(null);
   const [historyRow, setHistoryRow] = useState<InventoryIssuance | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [signatureRow, setSignatureRow] = useState<InventoryIssuance | null>(null);
+  const [signatureOpen, setSignatureOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -267,15 +258,12 @@ export default function InventoryIssuancesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((row) => (
-                    <TableRow
-                      key={row.id}
-                      className="cursor-pointer"
-                      onClick={() => {
-                        setHistoryRow(row);
-                        setHistoryOpen(true);
-                      }}
-                    >
+                  {rows.map((row) => {
+                    const displayStatus = issuanceDisplayStatus(row);
+                    const hasSignatureArtifacts = issuanceHasSignatureArtifacts(row);
+
+                    return (
+                    <TableRow key={row.id}>
                       <TableCell>
                         <div className="font-medium">
                           {row.inventory_name || `Inventory #${row.inventory_id}`}
@@ -310,15 +298,41 @@ export default function InventoryIssuancesPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={statusBadgeVariant(row.status)}>
-                          {row.status === 'return_pending' ? 'return pending' : row.status}
+                        <Badge variant={displayStatusBadgeVariant(displayStatus)}>
+                          {displayStatus}
                         </Badge>
                       </TableCell>
                       <TableCell
                         className="text-right align-top"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {issuanceCanReturn(row) ? (
+                        <div className="flex flex-col items-end gap-2">
+                          <div className="flex justify-end gap-0.5">
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              title="View status history"
+                              onClick={() => {
+                                setHistoryRow(row);
+                                setHistoryOpen(true);
+                              }}
+                            >
+                              <History className="size-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              title="View signature / proforma"
+                              disabled={!hasSignatureArtifacts}
+                              onClick={() => {
+                                setSignatureRow(row);
+                                setSignatureOpen(true);
+                              }}
+                            >
+                              <PenLine className="size-4" />
+                            </Button>
+                          </div>
+                          {issuanceCanReturn(row) ? (
                           <Button
                             variant="outline"
                             size="sm"
@@ -363,9 +377,11 @@ export default function InventoryIssuancesPage() {
                             Awaiting admin
                           </span>
                         ) : null}
+                        </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -387,6 +403,12 @@ export default function InventoryIssuancesPage() {
         issuance={historyRow}
         open={historyOpen}
         onOpenChange={setHistoryOpen}
+      />
+
+      <IssuanceSignatureDialog
+        issuance={signatureRow}
+        open={signatureOpen}
+        onOpenChange={setSignatureOpen}
       />
     </div>
   );
