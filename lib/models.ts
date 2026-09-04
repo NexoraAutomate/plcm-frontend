@@ -1,4 +1,6 @@
 
+import type { InventoryLocationTree } from '@/lib/inventory-location-tree'
+
 // User
 export interface User {
   id: number
@@ -122,6 +124,7 @@ export interface AppDefinitions {
   inventory_qr_sticker_height_in: number
   inventory_barcode_sticker_width_in: number
   inventory_barcode_sticker_height_in: number
+  inventory_location_tree?: InventoryLocationTree | null
   updated_at?: string | null
 }
 
@@ -1001,6 +1004,9 @@ export interface InventoryInstance extends HierarchyInstallFields {
   status_id?: number
   holder_user_id?: number
   location?: string
+  location_room?: string | null
+  location_cabinet?: string | null
+  location_rack?: string | null
   added_date?: string
   shelf_life_expires_at?: string
   updated_at?: string
@@ -1095,6 +1101,9 @@ export interface Inventory extends HierarchyInstallFields {
   available_quantity?: number
   total_used?: number
   location?: string
+  location_room?: string | null
+  location_cabinet?: string | null
+  location_rack?: string | null
   description?: string
   oem_name?: string
   entity_id?: number

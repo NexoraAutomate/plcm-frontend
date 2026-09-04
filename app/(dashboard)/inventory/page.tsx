@@ -26,6 +26,7 @@ import * as api from '@/lib/api';
 import { EntityAttachmentsSection, type PendingAttachmentUpload } from '@/components/entity-attachments-section';
 import {
   buildInventoryCreatePayload,
+  composeInventoryLocation,
   emptyInventoryEntityForm,
   inventoryFormFromInstance,
   inventoryFormFromItem,
@@ -91,6 +92,7 @@ import {
   useListStatsVisibility,
 } from '@/components/list-stats-visibility';
 import { InventoryKpiDashboard } from '@/components/inventory/inventory-kpi-dashboard';
+import { CascadingLocationSelects } from '@/components/inventory/cascading-location-selects';
 import { useInventoryStatsSummary } from '@/hooks/use-inventory-stats-summary';
 
 const ACTION_BTN =
@@ -326,7 +328,9 @@ export default function InventoryPage() {
   const [duplicateForm, setDuplicateForm] = useState({
     serial_number: '',
     holder_user_id: '',
-    location: '',
+    location_room: '',
+    location_cabinet: '',
+    location_rack: '',
   });
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [addMoreItem, setAddMoreItem] = useState<InventoryItem | null>(null);
@@ -334,7 +338,9 @@ export default function InventoryPage() {
   const [addMoreForm, setAddMoreForm] = useState({
     serial_number: '',
     holder_user_id: '',
-    location: '',
+    location_room: '',
+    location_cabinet: '',
+    location_rack: '',
   });
   const [issueTarget, setIssueTarget] = useState<{
     item: InventoryItem;
@@ -593,16 +599,14 @@ export default function InventoryPage() {
           : undefined;
     const holderId =
       instance?.holder_user_id ?? resolveInventoryHolderId(item) ?? undefined;
-    const location =
-      instance?.location?.trim() ||
-      (item.location?.trim() && item.location !== '—' ? item.location.trim() : '') ||
-      '';
-
+    const locationSource = instance ?? item;
     setDuplicateTarget({ item, instanceId });
     setDuplicateForm({
       serial_number: '',
       holder_user_id: holderId != null ? String(holderId) : '',
-      location,
+      location_room: locationSource.location_room?.trim() || '',
+      location_cabinet: locationSource.location_cabinet?.trim() || '',
+      location_rack: locationSource.location_rack?.trim() || '',
     });
   }
 
@@ -610,9 +614,13 @@ export default function InventoryPage() {
     if (!duplicateTarget) return;
 
     const serialNumber = duplicateForm.serial_number.trim();
-    const location = duplicateForm.location.trim();
+    const location = composeInventoryLocation(
+      duplicateForm.location_room,
+      duplicateForm.location_cabinet,
+      duplicateForm.location_rack
+    );
     if (!serialNumber || !location) {
-      toast.error('Serial number and location are required');
+      toast.error('Serial number and Room / Cabinet / Rack are required');
       return;
     }
     if (!duplicateForm.holder_user_id) {
@@ -630,6 +638,9 @@ export default function InventoryPage() {
           serialNumber,
           holderUserId,
           location,
+          locationRoom: duplicateForm.location_room,
+          locationCabinet: duplicateForm.location_cabinet,
+          locationRack: duplicateForm.location_rack,
         },
       });
       toast.success(
@@ -667,7 +678,9 @@ export default function InventoryPage() {
     setAddMoreForm({
       serial_number: nextSerial,
       holder_user_id: '',
-      location: '',
+      location_room: '',
+      location_cabinet: '',
+      location_rack: '',
     });
   }
 
@@ -675,7 +688,11 @@ export default function InventoryPage() {
     if (!addMoreItem) return;
 
     const serialNumber = addMoreForm.serial_number.trim();
-    const location = addMoreForm.location.trim();
+    const location = composeInventoryLocation(
+      addMoreForm.location_room,
+      addMoreForm.location_cabinet,
+      addMoreForm.location_rack
+    );
     if (!addMoreForm.holder_user_id) {
       toast.error('Inventory holder is required');
       return;
@@ -689,6 +706,9 @@ export default function InventoryPage() {
           serial_number: serialNumber || undefined,
           holder_user_id: holderUserId,
           location: location || undefined,
+          location_room: addMoreForm.location_room.trim() || undefined,
+          location_cabinet: addMoreForm.location_cabinet.trim() || undefined,
+          location_rack: addMoreForm.location_rack.trim() || undefined,
         });
         toastFulfillments(created.data?.fcfs_fulfillments);
       } else {
@@ -702,9 +722,12 @@ export default function InventoryPage() {
           status_id: addMoreItem.status_id,
           sku: addMoreItem.sku,
           quantity: 1,
-          serial_number: serialNumber,
+          serial_number: serialNumber || undefined,
           holder_user_id: holderUserId,
-          location,
+          location: location || undefined,
+          location_room: addMoreForm.location_room.trim() || undefined,
+          location_cabinet: addMoreForm.location_cabinet.trim() || undefined,
+          location_rack: addMoreForm.location_rack.trim() || undefined,
         });
         toastFulfillments(created.data?.fcfs_fulfillments);
       }
@@ -766,11 +789,17 @@ export default function InventoryPage() {
 
   async function handleCreate() {
     const usesInstances = inventoryUsesInstances(selectedEntityType);
+    const location = composeInventoryLocation(
+      formData.location_room,
+      formData.location_cabinet,
+      formData.location_rack,
+      formData.location
+    );
 
-    if (!formData.name.trim() || (!usesInstances && !formData.location.trim())) {
+    if (!formData.name.trim() || (!usesInstances && !location)) {
       toast.error(
         `Please fill in required fields: ${getEntityDisplayName(selectedEntityType)} category${
-          usesInstances ? '' : ' and Location'
+          usesInstances ? '' : ' and Room / Cabinet / Rack'
         }`
       );
       return;
@@ -779,8 +808,8 @@ export default function InventoryPage() {
       toast.error('Part number is required for serialized inventory');
       return;
     }
-    if (usesInstances && selectedEntityType !== 'component' && !formData.location.trim()) {
-      toast.error('Location is required for each serialized unit');
+    if (usesInstances && selectedEntityType !== 'component' && !location) {
+      toast.error('Room / Cabinet / Rack are required for each serialized unit');
       return;
     }
     if (inventorySupportsQuantity(selectedEntityType) && formData.quantity <= 0) {
@@ -819,10 +848,16 @@ export default function InventoryPage() {
   async function handleUpdate() {
     if (!editingId) return;
     const usesInstances = inventoryUsesInstances(selectedEntityType);
+    const location = composeInventoryLocation(
+      formData.location_room,
+      formData.location_cabinet,
+      formData.location_rack,
+      formData.location
+    );
 
-    if (!formData.name.trim() || (!usesInstances && !formData.location.trim())) {
+    if (!formData.name.trim() || (!usesInstances && !location)) {
       toast.error(
-        `Please fill in required fields: Name${usesInstances ? '' : ' and Location'}`
+        `Please fill in required fields: Name${usesInstances ? '' : ' and Room / Cabinet / Rack'}`
       );
       return;
     }
@@ -830,9 +865,9 @@ export default function InventoryPage() {
       usesInstances &&
       selectedEntityType !== 'component' &&
       editingInstanceId &&
-      !formData.location.trim()
+      !location
     ) {
-      toast.error('Location is required for each serialized unit');
+      toast.error('Room / Cabinet / Rack are required for each serialized unit');
       return;
     }
     if (inventorySupportsQuantity(selectedEntityType) && formData.quantity <= 0) {
@@ -906,8 +941,14 @@ export default function InventoryPage() {
 
   async function handleAddInstance() {
     if (!editingId || !editingGroup) return;
-    if (editingGroup.inventory_type !== 'component' && !formData.location.trim()) {
-      toast.error('Location is required for each serialized unit');
+    const location = composeInventoryLocation(
+      formData.location_room,
+      formData.location_cabinet,
+      formData.location_rack,
+      formData.location
+    );
+    if (editingGroup.inventory_type !== 'component' && !location) {
+      toast.error('Room / Cabinet / Rack are required for each serialized unit');
       return;
     }
 
@@ -1364,14 +1405,16 @@ export default function InventoryPage() {
           )}
         </div>
 
-        <div>
-          <Label>Location {mode === 'create' ? '*' : ''}</Label>
-          <Input
-            value={formData.location}
-            onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-            placeholder="Warehouse location"
-          />
-        </div>
+        <CascadingLocationSelects
+          tree={definitions.inventory_location_tree}
+          required={mode === 'create'}
+          value={{
+            location_room: formData.location_room,
+            location_cabinet: formData.location_cabinet,
+            location_rack: formData.location_rack,
+          }}
+          onChange={(next) => setFormData({ ...formData, ...next })}
+        />
 
         <div>
           <Label>Added Date</Label>
@@ -2489,18 +2532,24 @@ export default function InventoryPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label htmlFor="duplicate-location">Location *</Label>
-              <Input
-                id="duplicate-location"
-                value={duplicateForm.location}
-                onChange={(e) =>
-                  setDuplicateForm((prev) => ({ ...prev, location: e.target.value }))
-                }
-                placeholder="Warehouse location"
-                disabled={duplicating}
-              />
-            </div>
+            <CascadingLocationSelects
+              tree={definitions.inventory_location_tree}
+              required
+              disabled={duplicating}
+              value={{
+                location_room: duplicateForm.location_room,
+                location_cabinet: duplicateForm.location_cabinet,
+                location_rack: duplicateForm.location_rack,
+              }}
+              onChange={(next) =>
+                setDuplicateForm((prev) => ({
+                  ...prev,
+                  location_room: next.location_room,
+                  location_cabinet: next.location_cabinet,
+                  location_rack: next.location_rack,
+                }))
+              }
+            />
             <div className="flex justify-end gap-2 pt-2">
               <Button
                 variant="outline"
@@ -2566,18 +2615,24 @@ export default function InventoryPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label htmlFor="add-more-location">Location *</Label>
-              <Input
-                id="add-more-location"
-                value={addMoreForm.location}
-                onChange={(e) =>
-                  setAddMoreForm((prev) => ({ ...prev, location: e.target.value }))
-                }
-                placeholder="Warehouse location"
-                disabled={addMoreSubmitting}
-              />
-            </div>
+            <CascadingLocationSelects
+              tree={definitions.inventory_location_tree}
+              required
+              disabled={addMoreSubmitting}
+              value={{
+                location_room: addMoreForm.location_room,
+                location_cabinet: addMoreForm.location_cabinet,
+                location_rack: addMoreForm.location_rack,
+              }}
+              onChange={(next) =>
+                setAddMoreForm((prev) => ({
+                  ...prev,
+                  location_room: next.location_room,
+                  location_cabinet: next.location_cabinet,
+                  location_rack: next.location_rack,
+                }))
+              }
+            />
             <div className="flex justify-end gap-2 pt-2">
               <Button
                 variant="outline"

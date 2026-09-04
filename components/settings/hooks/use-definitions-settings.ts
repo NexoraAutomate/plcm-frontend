@@ -21,6 +21,10 @@ import {
   type TemplateNameItem,
   filterTemplateNames,
 } from '@/lib/hierarchy-template-names';
+import {
+  normalizeLocationTree,
+  type InventoryLocationTree,
+} from '@/lib/inventory-location-tree';
 
 export type AppDefinitionsDraft = Omit<AppDefinitions, 'id' | 'updated_at'>;
 
@@ -30,7 +34,11 @@ function toDraft(data: AppDefinitions): AppDefinitionsDraft {
   const merged = { ...DEFAULT_DRAFT };
   for (const key of Object.keys(merged) as (keyof AppDefinitionsDraft)[]) {
     const value = data[key as keyof AppDefinitions];
-    if (value != null && String(value).length > 0) {
+    if (key === 'inventory_location_tree') {
+      (merged as Record<string, unknown>)[key] = normalizeLocationTree(value);
+    } else if (Array.isArray(value)) {
+      (merged as Record<string, unknown>)[key] = [...value];
+    } else if (value != null && String(value).length > 0) {
       (merged as Record<string, unknown>)[key] = value;
     }
   }
@@ -128,6 +136,13 @@ export function useDefinitionsSettings() {
     };
   }, [draft, sampleEntity, selectedLevel]);
 
+  const setLocationTree = useCallback((tree: InventoryLocationTree) => {
+    setDraft((prev) => ({
+      ...prev,
+      inventory_location_tree: normalizeLocationTree(tree),
+    }));
+  }, []);
+
   return {
     draft,
     loading,
@@ -143,5 +158,6 @@ export function useDefinitionsSettings() {
     levels: HIERARCHY_ENTITY_LEVELS,
     levelLabel: (level: string, plural = false) =>
       getEntityTypeLabel(draft as AppDefinitions, level, plural),
+    setLocationTree,
   };
 }

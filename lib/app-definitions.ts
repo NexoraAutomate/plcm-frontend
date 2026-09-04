@@ -89,6 +89,7 @@ export const DEFAULT_APP_DEFINITIONS: Omit<AppDefinitions, 'id' | 'updated_at'> 
   inventory_qr_sticker_height_in: 1.25,
   inventory_barcode_sticker_width_in: 2.25,
   inventory_barcode_sticker_height_in: 0.9,
+  inventory_location_tree: [],
 };
 
 export const TEMPLATE_PLACEHOLDER_HELP =

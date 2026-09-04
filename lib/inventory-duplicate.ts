@@ -20,6 +20,9 @@ export interface DuplicateInventoryOverrides {
   serialNumber: string;
   holderUserId: number;
   location: string;
+  locationRoom?: string;
+  locationCabinet?: string;
+  locationRack?: string;
 }
 
 function resolveInstance(
@@ -73,6 +76,21 @@ function instanceCreatePayload(
     status_id: instance?.status_id ?? source.status_id,
     holder_user_id: overrides?.holderUserId ?? instance?.holder_user_id ?? source.holder_user_id,
     location,
+    location_room:
+      overrides?.locationRoom?.trim() ||
+      instance?.location_room ||
+      source.location_room ||
+      undefined,
+    location_cabinet:
+      overrides?.locationCabinet?.trim() ||
+      instance?.location_cabinet ||
+      source.location_cabinet ||
+      undefined,
+    location_rack:
+      overrides?.locationRack?.trim() ||
+      instance?.location_rack ||
+      source.location_rack ||
+      undefined,
     shelf_life_expires_at:
       instance?.shelf_life_expires_at ?? source.shelf_life_expires_at,
     original_part_number:
@@ -115,6 +133,10 @@ async function createClonedUnit(
         options.overrides?.location.trim() ||
         source.location?.trim() ||
         'Warehouse',
+      location_room: options.overrides?.locationRoom || source.location_room || undefined,
+      location_cabinet:
+        options.overrides?.locationCabinet || source.location_cabinet || undefined,
+      location_rack: options.overrides?.locationRack || source.location_rack || undefined,
       original_part_number: source.original_part_number,
       original_serial_number: newSerial,
     });

@@ -25,11 +25,13 @@ import type { HierarchyEntityLevel } from '@/lib/app-definitions';
 import { useDefinitionsSettings } from '@/components/settings/hooks/use-definitions-settings';
 import { HierarchyConfigPanel } from '@/components/settings/hierarchy-config-panel';
 import { HierarchyPanel } from '@/components/settings/hierarchy-panel';
+import { LocationTreeEditor } from '@/components/settings/location-tree-editor';
 import {
   isDefinitionsSectionId,
   type DefinitionsSectionId,
 } from '@/components/settings/settings-tabs-config';
 import { usePageDataRefresh } from '@/components/page-data-refresh';
+import { normalizeLocationTree } from '@/lib/inventory-location-tree';
 
 export type DefinitionsPanelProps = {
   embedded?: boolean;
@@ -189,6 +191,7 @@ function DefinitionsLabelsSection() {
     setSelectedLevel,
     levels,
     levelLabel,
+    setLocationTree,
   } = useDefinitionsSettings();
 
   usePageDataRefresh(reload);
@@ -389,6 +392,22 @@ function DefinitionsLabelsSection() {
           <p className="mt-4 text-xs text-muted-foreground">
             The PDF grid automatically uses these sticker dimensions. QR defaults are
             0.65 × 0.65 in; barcode defaults are 2.0 × 0.5 in.
+          </p>
+        </SettingsCard>
+      </SettingsSection>
+
+      <SettingsSection
+        title="Inventory storage locations"
+        description="Build a Room → Cabinet → Rack tree. Each Room can have many Cabinets; each Cabinet can have many Racks. Inventory Managers pick Room first, then its Cabinets, then its Racks."
+      >
+        <SettingsCard>
+          <LocationTreeEditor
+            value={normalizeLocationTree(draft.inventory_location_tree)}
+            onChange={setLocationTree}
+          />
+          <p className="mt-3 text-xs text-muted-foreground">
+            Use Add / Edit / Delete on each node. Room and Cabinet Add asks sibling or child; Rack Add
+            only creates a sibling. Save with &quot;Save definitions&quot; above.
           </p>
         </SettingsCard>
       </SettingsSection>

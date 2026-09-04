@@ -40,6 +40,9 @@ export const emptyInventoryEntityForm = {
   status_id: '',
   sku: '',
   location: '',
+  location_room: '',
+  location_cabinet: '',
+  location_rack: '',
   holder_user_id: '',
   added_date: '',
   shelf_life_expires_at: '',
@@ -50,12 +53,60 @@ export const emptyInventoryEntityForm = {
   original_serial_number: '',
 };
 
+export function composeInventoryLocation(
+  room?: string | null,
+  cabinet?: string | null,
+  rack?: string | null,
+  fallback?: string | null
+): string {
+  const parts = [room, cabinet, rack]
+    .map((part) => (part || '').trim())
+    .filter(Boolean);
+  if (parts.length > 0) return parts.join(' / ');
+  return (fallback || '').trim();
+}
+
+export function parseInventoryLocationParts(source?: {
+  location?: string | null;
+  location_room?: string | null;
+  location_cabinet?: string | null;
+  location_rack?: string | null;
+}) {
+  const room = source?.location_room?.trim() || '';
+  const cabinet = source?.location_cabinet?.trim() || '';
+  const rack = source?.location_rack?.trim() || '';
+  if (room || cabinet || rack) {
+    return {
+      location_room: room,
+      location_cabinet: cabinet,
+      location_rack: rack,
+      location: composeInventoryLocation(room, cabinet, rack, source?.location),
+    };
+  }
+  const legacy = source?.location?.trim() || '';
+  const segments = legacy
+    ? legacy.split('/').map((part) => part.trim()).filter(Boolean)
+    : [];
+  return {
+    location_room: segments[0] || '',
+    location_cabinet: segments[1] || '',
+    location_rack: segments[2] || '',
+    location: legacy,
+  };
+}
+
 export function inventoryGroupFieldsFromForm(
   formData: typeof emptyInventoryEntityForm,
   selectedEntityType: string,
   removePicture: boolean
 ) {
   const partNumber = formData.part_number.trim();
+  const location = composeInventoryLocation(
+    formData.location_room,
+    formData.location_cabinet,
+    formData.location_rack,
+    formData.location
+  );
   return {
     name: formData.name,
     inventory_type: selectedEntityType,
@@ -75,7 +126,10 @@ export function inventoryGroupFieldsFromForm(
       ? {
           serial_number: formData.serial_number,
           quantity: formData.quantity,
-          location: formData.location,
+          location,
+          location_room: formData.location_room.trim() || undefined,
+          location_cabinet: formData.location_cabinet.trim() || undefined,
+          location_rack: formData.location_rack.trim() || undefined,
           holder_user_id: formData.holder_user_id ? Number(formData.holder_user_id) : undefined,
           added_date: formData.added_date
             ? new Date(formData.added_date).toISOString()
@@ -120,13 +174,16 @@ export function buildInventoryCreatePayload(
   const entityType = selectedEntityType as HierarchyEntityType;
   const context = options?.context ?? 'inventory';
   const group = inventoryGroupFieldsFromForm(formData, entityType, removePicture);
+  const withDefaultLocation =
+    context === 'hierarchy'
+      ? {
+          ...formData,
+          location: formData.location || 'On-site',
+          location_room: formData.location_room || formData.location || 'On-site',
+        }
+      : formData;
   const instance = inventoryUsesInstances(entityType)
-    ? inventoryInstanceFieldsFromForm(
-        context === 'hierarchy'
-          ? { ...formData, location: formData.location || 'On-site' }
-          : formData,
-        removePicture
-      )
+    ? inventoryInstanceFieldsFromForm(withDefaultLocation, removePicture)
     : {};
   const quantity = inventorySupportsQuantity(entityType)
     ? formData.quantity > 0
@@ -141,11 +198,20 @@ export function inventoryInstanceFieldsFromForm(
   removePicture: boolean
 ) {
   const partNumber = formData.part_number.trim();
+  const location = composeInventoryLocation(
+    formData.location_room,
+    formData.location_cabinet,
+    formData.location_rack,
+    formData.location
+  );
   return {
     serial_number: formData.serial_number,
     configuration_item: formData.configuration_item || partNumber || undefined,
     status_id: formData.status_id ? Number(formData.status_id) : undefined,
-    location: formData.location,
+    location,
+    location_room: formData.location_room.trim() || undefined,
+    location_cabinet: formData.location_cabinet.trim() || undefined,
+    location_rack: formData.location_rack.trim() || undefined,
     holder_user_id: formData.holder_user_id ? Number(formData.holder_user_id) : undefined,
     added_date: formData.added_date ? new Date(formData.added_date).toISOString() : undefined,
     shelf_life_expires_at: formData.shelf_life_expires_at
@@ -162,6 +228,7 @@ export function inventoryInstanceFieldsFromForm(
 }
 
 export function inventoryFormFromItem(item: Inventory) {
+  const locationParts = parseInventoryLocationParts(item);
   return {
     name: item.name || '',
     inventory_type: item.inventory_type,
@@ -173,7 +240,10 @@ export function inventoryFormFromItem(item: Inventory) {
     configuration_item: item.configuration_item || '',
     status_id: item.status_id ? String(item.status_id) : '',
     sku: item.sku || '',
-    location: item.location || '',
+    location: locationParts.location,
+    location_room: locationParts.location_room,
+    location_cabinet: locationParts.location_cabinet,
+    location_rack: locationParts.location_rack,
     holder_user_id: item.holder_user_id ? String(item.holder_user_id) : '',
     added_date: item.added_date ? item.added_date.slice(0, 10) : '',
     shelf_life_expires_at: item.shelf_life_expires_at
@@ -188,12 +258,16 @@ export function inventoryFormFromItem(item: Inventory) {
 }
 
 export function inventoryFormFromInstance(instance: InventoryInstance, group: Inventory) {
+  const locationParts = parseInventoryLocationParts(instance);
   return {
     ...inventoryFormFromItem(group),
     serial_number: instance.serial_number || '',
     configuration_item: instance.configuration_item || group.configuration_item || '',
     status_id: instance.status_id ? String(instance.status_id) : group.status_id ? String(group.status_id) : '',
-    location: instance.location || '',
+    location: locationParts.location,
+    location_room: locationParts.location_room,
+    location_cabinet: locationParts.location_cabinet,
+    location_rack: locationParts.location_rack,
     holder_user_id: instance.holder_user_id ? String(instance.holder_user_id) : '',
     added_date: instance.added_date ? instance.added_date.slice(0, 10) : '',
     shelf_life_expires_at: instance.shelf_life_expires_at
