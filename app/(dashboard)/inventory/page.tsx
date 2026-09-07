@@ -35,7 +35,7 @@ import {
   inventoryPartNumber,
 } from '@/lib/inventory-entity-fields';
 import type { Inventory, InventoryInstance, User } from '@/lib/models';
-import { formatUserRef } from '@/lib/user-display';
+import { formatUserRef, displayUserName } from '@/lib/user-display';
 import { useDataStore } from '@/lib/data-store';
 import { useHierarchiesQuery } from '@/hooks/queries';
 import { fetchAllMatchingInventoryIds, fetchInventoryPage } from '@/hooks/queries/fetchers';
@@ -58,6 +58,7 @@ import {
   calculateInventoryTotalUsed,
   canSuggestInventorySerial,
   inventoryEntitiesForType,
+  allocateInventorySerials,
   suggestNextInventorySerial,
 } from '@/lib/inventory-serial';
 import {
@@ -67,6 +68,7 @@ import {
 import { getSelectableInstances, isProjectReservedInstance, needsSerialSelection } from '@/lib/inventory-install';
 import { duplicateInventoryEntity } from '@/lib/inventory-duplicate';
 import { InventorySerialSelectDialog } from '@/components/inventory-serial-select-dialog';
+import { InventoryAddMoreDialog } from '@/components/inventory-add-more-dialog';
 import { InventoryDeleteDialog } from '@/components/inventory-delete-dialog';
 import { InventoryHierarchyDialog } from '@/components/inventory-hierarchy-dialog';
 import { InventoryIssueDialog } from '@/components/inventory-issue-dialog';
@@ -97,6 +99,11 @@ import { useInventoryStatsSummary } from '@/hooks/use-inventory-stats-summary';
 
 const ACTION_BTN =
   'h-7 w-7 bg-transparent shadow-none border-0 hover:bg-transparent';
+
+/** Visible unit rows in the expanded inventory table before vertical scroll. */
+const MAX_VISIBLE_EXPANDED_UNITS = 10;
+const EXPANDED_UNITS_SCROLL_CLASS =
+  'max-h-[calc(2.5rem+10*2.75rem)] overflow-y-auto';
 
 const ACTION_ICON = {
   add: 'size-3.5 text-muted-foreground transition-colors group-hover/add:text-emerald-600',
@@ -192,6 +199,20 @@ function resolveInventoryHolderId(item: Inventory): number | undefined {
   return item.instances?.find((instance) => instance.holder_user_id)?.holder_user_id;
 }
 
+function resolveInventoryHolderLabel(item: Inventory, users: User[]): string {
+  const fromInstances = [
+    ...new Set(
+      (item.instances ?? [])
+        .map((instance) =>
+          displayUserName(users, instance.holder_user_id, instance.holder_name, '')
+        )
+        .filter(Boolean)
+    ),
+  ];
+  if (fromInstances.length > 0) return fromInstances.join(', ');
+  return displayUserName(users, item.holder_user_id, item.holder_name);
+}
+
 function resolveInventoryLocation(item: Inventory): string {
   if (item.location?.trim()) return item.location;
   const locations = (item.instances ?? [])
@@ -202,7 +223,7 @@ function resolveInventoryLocation(item: Inventory): string {
 }
 
 function instanceSerialNumber(instance: InventoryInstance): string {
-  return instance.original_serial_number?.trim() || instance.serial_number?.trim() || '';
+  return instance.serial_number?.trim() || instance.original_serial_number?.trim() || '';
 }
 
 /** Serial numbers for expandable rows: one per in-stock instance when present. */
@@ -217,9 +238,6 @@ function enrichInventoryItems(
   entityPools: HierarchyEntityPools
 ): InventoryItem[] {
   return items.map((item) => {
-    const holderId = resolveInventoryHolderId(item);
-    const holder = holderId ? users.find((user) => user.id === holderId) : undefined;
-
     const serialNumbers = getInventorySerialNumbers(item);
     const firstAvailable =
       getExpandableSerialInstances(item)
@@ -233,7 +251,7 @@ function enrichInventoryItems(
       serialNumbers,
       serialNumber: firstAvailable || '—',
       partNumber: inventoryPartNumber(item),
-      holderName: holder ? formatUserRef(holder) : '—',
+      holderName: resolveInventoryHolderLabel(item, users),
       displayLocation: resolveInventoryLocation(item),
       totalUsed: Math.max(
         item.total_used ?? 0,
@@ -355,14 +373,6 @@ export default function InventoryPage() {
   });
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [addMoreItem, setAddMoreItem] = useState<InventoryItem | null>(null);
-  const [addMoreSubmitting, setAddMoreSubmitting] = useState(false);
-  const [addMoreForm, setAddMoreForm] = useState({
-    serial_number: '',
-    holder_user_id: '',
-    location_room: '',
-    location_cabinet: '',
-    location_rack: '',
-  });
   const [issueTarget, setIssueTarget] = useState<{
     item: InventoryItem;
     instanceId?: number;
@@ -691,75 +701,72 @@ export default function InventoryPage() {
   }
 
   function openAddMore(item: InventoryItem) {
-    const relatedEntities = inventoryEntitiesForType(item.inventory_type, entityPools);
-    const nextSerial = canSuggestInventorySerial(item)
-      ? suggestNextInventorySerial(item, relatedEntities)
-      : '';
     setAddMoreItem(item);
-    setAddMoreForm({
-      serial_number: nextSerial,
-      holder_user_id: '',
-      location_room: '',
-      location_cabinet: '',
-      location_rack: '',
-    });
   }
 
-  async function handleAddMore() {
+  async function handleAddMore(payload: {
+    quantity: number;
+    location_room: string;
+    location_cabinet: string;
+    location_rack: string;
+    location: string;
+  }) {
     if (!addMoreItem) return;
 
-    const serialNumber = addMoreForm.serial_number.trim();
-    const location = composeInventoryLocation(
-      addMoreForm.location_room,
-      addMoreForm.location_cabinet,
-      addMoreForm.location_rack
-    );
-    if (!addMoreForm.holder_user_id) {
-      toast.error('Inventory holder is required');
+    const quantity = Math.floor(Number(payload.quantity) || 0);
+    if (quantity < 1) {
+      toast.error('Enter a quantity of at least 1');
+      return;
+    }
+    if (quantity > 100) {
+      toast.error('Quantity cannot exceed 100 units per restock');
+      return;
+    }
+    if (!inventoryHolderUserId) {
+      toast.error('You must be signed in as Inventory Manager to restock');
       return;
     }
 
-    const holderUserId = Number(addMoreForm.holder_user_id);
-    setAddMoreSubmitting(true);
+    const location = payload.location;
+    if (addMoreItem.inventory_type !== 'component' && !location) {
+      toast.error('Room / Cabinet / Rack are required for each serialized unit');
+      return;
+    }
+
+    const relatedEntities = inventoryEntitiesForType(addMoreItem.inventory_type, entityPools);
+    const serials = allocateInventorySerials(addMoreItem, quantity, relatedEntities);
+
+    const holderUserId = Number(inventoryHolderUserId);
     try {
-      if (inventoryUsesInstances(addMoreItem.inventory_type as EntityType)) {
-        const created = await api.inventory.createInstance(addMoreItem.id, {
-          serial_number: serialNumber || undefined,
-          holder_user_id: holderUserId,
-          location: location || undefined,
-          location_room: addMoreForm.location_room.trim() || undefined,
-          location_cabinet: addMoreForm.location_cabinet.trim() || undefined,
-          location_rack: addMoreForm.location_rack.trim() || undefined,
-        });
-        toastFulfillments(created.data?.fcfs_fulfillments);
-      } else {
-        const created = await api.inventory.create({
-          name: addMoreItem.name,
-          inventory_type: addMoreItem.inventory_type,
-          description: addMoreItem.description,
-          oem_name: addMoreItem.oem_name,
-          part_number: addMoreItem.part_number,
-          configuration_item: addMoreItem.configuration_item,
-          status_id: addMoreItem.status_id,
-          sku: addMoreItem.sku,
-          quantity: 1,
-          serial_number: serialNumber || undefined,
-          holder_user_id: holderUserId,
-          location: location || undefined,
-          location_room: addMoreForm.location_room.trim() || undefined,
-          location_cabinet: addMoreForm.location_cabinet.trim() || undefined,
-          location_rack: addMoreForm.location_rack.trim() || undefined,
-        });
-        toastFulfillments(created.data?.fcfs_fulfillments);
-      }
-      toast.success(`Added another ${addMoreItem.name} to inventory`);
-      setAddMoreItem(null);
+      const created = await api.inventory.create({
+        name: addMoreItem.name,
+        inventory_type: addMoreItem.inventory_type,
+        description: addMoreItem.description,
+        oem_name: addMoreItem.oem_name,
+        part_number: addMoreItem.part_number,
+        configuration_item: addMoreItem.configuration_item,
+        status_id: addMoreItem.status_id,
+        sku: addMoreItem.sku,
+        quantity,
+        serial_number: serials[0],
+        original_serial_number: serials[0],
+        holder_user_id: holderUserId,
+        location: location || undefined,
+        location_room: payload.location_room.trim() || undefined,
+        location_cabinet: payload.location_cabinet.trim() || undefined,
+        location_rack: payload.location_rack.trim() || undefined,
+      });
+      toastFulfillments(created.data?.fcfs_fulfillments);
+      toast.success(
+        quantity === 1
+          ? `Added another ${addMoreItem.name} to inventory`
+          : `Added ${quantity} ${addMoreItem.name} units to inventory`
+      );
       pagination.invalidate();
     } catch (err) {
       console.error('Failed to add more inventory:', err);
-      toast.error('Failed to add inventory unit');
-    } finally {
-      setAddMoreSubmitting(false);
+      toast.error('Failed to add inventory units');
+      throw err;
     }
   }
 
@@ -986,7 +993,8 @@ export default function InventoryPage() {
       const created = await api.inventory.createInstance(editingId, {
         ...buildInstancePayload(),
         serial_number: nextSerial,
-        original_serial_number: formData.original_serial_number.trim() || nextSerial,
+        original_serial_number: nextSerial,
+        holder_user_id: inventoryHolderUserId ? Number(inventoryHolderUserId) : undefined,
       });
       if (created.data?.id) {
         await syncMedia('inventory_instance', created.data.id);
@@ -999,18 +1007,7 @@ export default function InventoryPage() {
         setEditingGroup(refreshed.data);
       }
       if (created.data) {
-        loadInstanceIntoForm(created.data, refreshed.data ?? undefined);
-      }
-      const suggested = suggestNextInventorySerial(
-        { ...(refreshed.data ?? editingGroup), instances: nextInstances },
-        relatedEntities
-      );
-      if (suggested) {
-        setFormData((prev) => ({
-          ...prev,
-          serial_number: suggested,
-          original_serial_number: suggested,
-        }));
+        loadInstanceIntoForm(created.data, refreshed.data ?? editingGroup);
       }
       toast.success('Serialized unit added');
       pagination.invalidate();
@@ -1413,7 +1410,7 @@ export default function InventoryPage() {
               onValueChange={(value) => setFormData({ ...formData, holder_user_id: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select custodian" />
+                <SelectValue placeholder="Select inventory holder" />
               </SelectTrigger>
               <SelectContent>
                 {users.map((user) => (
@@ -1939,20 +1936,21 @@ export default function InventoryPage() {
                   <TableHead className="w-10" />
                   <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Category</SortableTableHead>
                   <SortableTableHead column="inventory_type" sort={sort} onSort={cycleSort}>Type</SortableTableHead>
-                  <SortableTableHead column="part_number" sort={sort} onSort={cycleSort}>Part Number</SortableTableHead>
                   <TableHead title="Units of this part number already installed into entities">
                     Total Used
                   </TableHead>
                   <SortableTableHead column="quantity" sort={sort} onSort={cycleSort}>Quantity</SortableTableHead>
                   <SortableTableHead column="holder_user_id" sort={sort} onSort={cycleSort}>Inventory Holder</SortableTableHead>
                   <SortableTableHead column="location" sort={sort} onSort={cycleSort}>Location</SortableTableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="sticky right-0 z-20 bg-slate-200 text-right dark:bg-black">
+                    Actions
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {inventory.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={inventoryManager ? 10 : 9} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={inventoryManager ? 9 : 8} className="text-center text-muted-foreground py-8">
                       No inventory items found
                     </TableCell>
                   </TableRow>
@@ -1966,7 +1964,11 @@ export default function InventoryPage() {
                     return (
                       <Fragment key={item.id}>
                         <TableRow
-                          className={cn(isExpanded && 'bg-muted/30', isSelected && 'bg-muted/50')}
+                          className={cn(
+                            'group',
+                            isExpanded && 'bg-muted/30',
+                            isSelected && 'bg-muted/50'
+                          )}
                           data-state={isSelected ? 'selected' : undefined}
                         >
                           {inventoryManager ? (
@@ -2024,7 +2026,6 @@ export default function InventoryPage() {
                               '—'
                             )}
                           </TableCell>
-                          <TableCell>{item.partNumber || '—'}</TableCell>
                           <TableCell>{item.totalUsed ?? 0}</TableCell>
                           <TableCell>
                             <div className="flex flex-col gap-0.5">
@@ -2048,8 +2049,13 @@ export default function InventoryPage() {
                           </TableCell>
                           <TableCell>{item.holderName || '—'}</TableCell>
                           <TableCell>{item.displayLocation || '—'}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex gap-0.5 justify-end">
+                          <TableCell
+                            className={cn(
+                              'sticky right-0 z-20 text-right group-hover:bg-muted/50',
+                              isSelected ? 'bg-muted/50' : isExpanded ? 'bg-muted/30' : 'bg-background'
+                            )}
+                          >
+                            <div className="flex shrink-0 justify-end gap-0.5">
                               {item.quantity >= 0 && canAddStock ? (
                                 <Button
                                   size="icon-sm"
@@ -2223,72 +2229,90 @@ export default function InventoryPage() {
                         </TableRow>
                         {isExpanded && isExpandable ? (
                           <TableRow className="bg-muted/20 hover:bg-muted/20">
-                            <TableCell colSpan={inventoryManager ? 10 : 9} className="p-0">
+                            <TableCell colSpan={inventoryManager ? 9 : 8} className="p-0">
                               <div className="px-6 py-3">
-                                <p className="mb-2 text-xs font-medium text-muted-foreground">
-                                  All units for part {item.partNumber || item.entityName || '—'}
-                                </p>
-                                <div className="overflow-x-auto rounded-md border bg-background">
-                                  <Table>
-                                    <TableHeader>
-                                      <TableRow>
-                                        <TableHead>Unit Identity</TableHead>
-                                        <TableHead>Inventory Holder</TableHead>
-                                        <TableHead>Location</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead className="w-15" />
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {serialInstances.map((instance, index) => {
-                                        const holder = instance.holder_user_id
-                                          ? users.find((user) => user.id === instance.holder_user_id)
-                                          : undefined;
-                                        return (
-                                          <TableRow key={instance.id}>
-                                            <TableCell className="font-mono text-sm">
-                                              {isProjectReservedInstance(instance) ? (
-                                                <button
-                                                  type="button"
-                                                  className="cursor-pointer underline-offset-2 hover:underline"
-                                                  onClick={() =>
-                                                    setReservationHoldInstance(instance)
-                                                  }
-                                                  title="View reservation details"
-                                                >
-                                                  {instanceSerialNumber(instance) || `Unit ${index + 1}`}
-                                                </button>
-                                              ) : (
-                                                instanceSerialNumber(instance) || `Unit ${index + 1}`
-                                              )}
-                                            </TableCell>
-                                            <TableCell>
-                                              {holder ? formatUserRef(holder) : '—'}
-                                            </TableCell>
-                                            <TableCell>{instance.location?.trim() || '—'}</TableCell>
-                                            <TableCell>
-                                              {instance.is_reserved ? (
-                                                <StatusBadge
-                                                  status={
-                                                    instance.status_name || 'ISSUED'
-                                                  }
-                                                />
-                                              ) : isProjectReservedInstance(instance) ? (
-                                                <button
-                                                  type="button"
-                                                  className="cursor-pointer rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                                  onClick={() =>
-                                                    setReservationHoldInstance(instance)
-                                                  }
-                                                  title="View reservation details"
-                                                >
-                                                  <StatusBadge status="RESERVED" />
-                                                </button>
-                                              ) : (
-                                                <StatusBadge status="AVAILABLE" />
-                                              )}
-                                            </TableCell>
-                                            <TableCell>
+                                <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                                  <h4 className="text-sm font-semibold">
+                                    Part Number{' '}
+                                    <span className="font-mono">
+                                      {item.partNumber || '—'}
+                                    </span>
+                                  </h4>
+                                  <span className="text-xs text-muted-foreground">
+                                    {serialInstances.length} unit
+                                    {serialInstances.length === 1 ? '' : 's'}
+                                  </span>
+                                </div>
+                                <Table
+                                  containerClassName={cn(
+                                    'rounded-md border bg-background',
+                                    serialInstances.length > MAX_VISIBLE_EXPANDED_UNITS &&
+                                      EXPANDED_UNITS_SCROLL_CLASS
+                                  )}
+                                >
+                                  <TableHeader className="sticky top-0 z-10">
+                                    <TableRow>
+                                      <TableHead>Unit Identity</TableHead>
+                                      <TableHead>Inventory Holder</TableHead>
+                                      <TableHead>Location</TableHead>
+                                      <TableHead>Status</TableHead>
+                                      <TableHead className="sticky right-0 z-20 w-[1%] bg-slate-200 text-right dark:bg-black">
+                                        Actions
+                                      </TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {serialInstances.map((instance, index) => {
+                                      return (
+                                        <TableRow key={instance.id}>
+                                          <TableCell className="font-mono text-sm">
+                                            {isProjectReservedInstance(instance) ? (
+                                              <button
+                                                type="button"
+                                                className="cursor-pointer underline-offset-2 hover:underline"
+                                                onClick={() =>
+                                                  setReservationHoldInstance(instance)
+                                                }
+                                                title="View reservation details"
+                                              >
+                                                {instanceSerialNumber(instance) || `Unit ${index + 1}`}
+                                              </button>
+                                            ) : (
+                                              instanceSerialNumber(instance) || `Unit ${index + 1}`
+                                            )}
+                                          </TableCell>
+                                          <TableCell>
+                                            {displayUserName(
+                                              users,
+                                              instance.holder_user_id,
+                                              instance.holder_name
+                                            )}
+                                          </TableCell>
+                                          <TableCell>{instance.location?.trim() || '—'}</TableCell>
+                                          <TableCell>
+                                            {instance.is_reserved ? (
+                                              <StatusBadge
+                                                status={
+                                                  instance.status_name || 'ISSUED'
+                                                }
+                                              />
+                                            ) : isProjectReservedInstance(instance) ? (
+                                              <button
+                                                type="button"
+                                                className="cursor-pointer rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                onClick={() =>
+                                                  setReservationHoldInstance(instance)
+                                                }
+                                                title="View reservation details"
+                                              >
+                                                <StatusBadge status="RESERVED" />
+                                              </button>
+                                            ) : (
+                                              <StatusBadge status="AVAILABLE" />
+                                            )}
+                                          </TableCell>
+                                          <TableCell className="sticky right-0 z-20 bg-background text-right">
+                                            <div className="flex shrink-0 justify-end gap-0.5">
                                               <Can permission={[P.inventory_label_generate, P.inventory_label_print]}>
                                                 <Button
                                                   size="icon-sm"
@@ -2375,13 +2399,13 @@ export default function InventoryPage() {
                                                   Pending
                                                 </span>
                                               ) : null}
-                                            </TableCell>
-                                          </TableRow>
-                                        );
-                                      })}
-                                    </TableBody>
-                                  </Table>
-                                </div>
+                                            </div>
+                                          </TableCell>
+                                        </TableRow>
+                                      );
+                                    })}
+                                  </TableBody>
+                                </Table>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -2542,7 +2566,7 @@ export default function InventoryPage() {
                 disabled={duplicating}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select custodian" />
+                  <SelectValue placeholder="Select inventory holder" />
                 </SelectTrigger>
                 <SelectContent>
                   {users.map((user) => (
@@ -2587,88 +2611,21 @@ export default function InventoryPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog
+      <InventoryAddMoreDialog
+        item={addMoreItem}
         open={addMoreItem != null}
+        holderLabel={inventoryHolderLabel}
+        locationTree={definitions.inventory_location_tree}
+        relatedEntities={
+          addMoreItem
+            ? inventoryEntitiesForType(addMoreItem.inventory_type, entityPools)
+            : []
+        }
         onOpenChange={(open) => {
-          if (!open && !addMoreSubmitting) setAddMoreItem(null);
+          if (!open) setAddMoreItem(null);
         }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add More Stock</DialogTitle>
-            <DialogDescription>
-              {addMoreItem
-                ? `Add another ${addMoreItem.name} (${addMoreItem.inventory_type}). Serial number is suggested as one greater than the last existing unit.`
-                : 'Add another unit of this inventory item.'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="add-more-serial">Serial Number *</Label>
-              <Input
-                id="add-more-serial"
-                value={addMoreForm.serial_number}
-                onChange={(e) =>
-                  setAddMoreForm((prev) => ({ ...prev, serial_number: e.target.value }))
-                }
-                placeholder="Auto-suggested from last serial"
-                disabled={addMoreSubmitting}
-              />
-            </div>
-            <div>
-              <Label>Inventory Holder *</Label>
-              <Select
-                value={addMoreForm.holder_user_id || ''}
-                onValueChange={(value) =>
-                  setAddMoreForm((prev) => ({ ...prev, holder_user_id: value }))
-                }
-                disabled={addMoreSubmitting}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select custodian" />
-                </SelectTrigger>
-                <SelectContent>
-                  {users.map((user) => (
-                    <SelectItem key={user.id} value={String(user.id)}>
-                      {user.full_name || user.username}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <CascadingLocationSelects
-              tree={definitions.inventory_location_tree}
-              required
-              disabled={addMoreSubmitting}
-              value={{
-                location_room: addMoreForm.location_room,
-                location_cabinet: addMoreForm.location_cabinet,
-                location_rack: addMoreForm.location_rack,
-              }}
-              onChange={(next) =>
-                setAddMoreForm((prev) => ({
-                  ...prev,
-                  location_room: next.location_room,
-                  location_cabinet: next.location_cabinet,
-                  location_rack: next.location_rack,
-                }))
-              }
-            />
-            <div className="flex justify-end gap-2 pt-2">
-              <Button
-                variant="outline"
-                onClick={() => setAddMoreItem(null)}
-                disabled={addMoreSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleAddMore} disabled={addMoreSubmitting}>
-                {addMoreSubmitting ? 'Adding…' : 'Add'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+        onConfirm={handleAddMore}
+      />
 
       <InventoryDeleteDialog
         item={deleteTarget}

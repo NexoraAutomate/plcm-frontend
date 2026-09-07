@@ -14,6 +14,29 @@ export function formatUserRef(value: UserRef, fallback = 'Unknown'): string {
   return fallback;
 }
 
+export function findUserById(
+  users: User[],
+  id?: number | string | null
+): User | undefined {
+  if (id == null || id === '') return undefined;
+  const numericId = Number(id);
+  if (!Number.isFinite(numericId)) return undefined;
+  return users.find((user) => Number(user.id) === numericId);
+}
+
+/** Prefer an API-provided display name, then a loaded user record. */
+export function displayUserName(
+  users: User[],
+  userId?: number | string | null,
+  providedName?: string | null,
+  fallback = '—'
+): string {
+  const named = providedName?.trim();
+  if (named) return named;
+  const user = findUserById(users, userId);
+  return user ? formatUserRef(user) : fallback;
+}
+
 /** Normalize a role that may be a string or `{ name }` object. */
 export function roleName(role: RoleRef): string {
   if (role == null) return '';

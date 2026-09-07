@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,7 @@ import {
   getSelectableInstances,
   needsSerialSelection,
 } from '@/lib/inventory-install';
-import { formatUserRef } from '@/lib/user-display';
+import { displayUserName } from '@/lib/user-display';
 import { InventorySerialSelectDialog } from '@/components/inventory-serial-select-dialog';
 import { InventoryHierarchyDialog } from '@/components/inventory-hierarchy-dialog';
 import type { Inventory } from '@/lib/models';
@@ -32,11 +32,6 @@ interface EntityInventorySearchProps {
   inventoryType: HierarchyEntityType;
   allowedInventoryNames: string[];
   onUseInventory: (item: Inventory, instanceId?: number) => Promise<Inventory | void>;
-}
-
-function resolveInventoryHolderId(item: Inventory): number | undefined {
-  if (item.holder_user_id) return item.holder_user_id;
-  return item.instances?.find((instance) => instance.holder_user_id)?.holder_user_id;
 }
 
 function resolveInventoryLocation(item: Inventory): string {
@@ -81,12 +76,18 @@ export function EntityInventorySearch({
 
   const inventoryTypeLabel = getInventoryTypeLabel(inventoryType);
 
-  const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
-
   function getHolderName(item: Inventory): string {
-    const holderId = resolveInventoryHolderId(item);
-    const holder = holderId != null ? usersById.get(holderId) : undefined;
-    return holder ? formatUserRef(holder) : '—';
+    const fromInstances = [
+      ...new Set(
+        (item.instances ?? [])
+          .map((instance) =>
+            displayUserName(users, instance.holder_user_id, instance.holder_name, '')
+          )
+          .filter(Boolean)
+      ),
+    ];
+    if (fromInstances.length > 0) return fromInstances.join(', ');
+    return displayUserName(users, item.holder_user_id, item.holder_name);
   }
 
   const fetchInventory = useCallback(

@@ -1020,6 +1020,7 @@ export interface InventoryInstance extends HierarchyInstallFields {
   configuration_item?: string
   status_id?: number
   holder_user_id?: number
+  holder_name?: string | null
   location?: string
   location_room?: string | null
   location_cabinet?: string | null
@@ -1125,6 +1126,7 @@ export interface Inventory extends HierarchyInstallFields {
   oem_name?: string
   entity_id?: number
   holder_user_id?: number
+  holder_name?: string | null
   added_date?: string
   shelf_life_expires_at?: string
   created_at?: string

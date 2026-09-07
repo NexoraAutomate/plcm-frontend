@@ -1,6 +1,5 @@
 import { inventoryPartNumber } from '@/lib/inventory-entity-fields';
 import {
-  getInventorySerialNumbers,
   inventoryUsesInstances,
   type HierarchyEntityType,
 } from '@/lib/entity-hierarchy';
@@ -44,7 +43,47 @@ export function incrementSerialNumber(serial: string): string {
 }
 
 function entitySerial(entity: PartNumberEntity): string {
-  return entity.original_serial_number?.trim() || entity.serial_number?.trim() || '';
+  return entity.serial_number?.trim() || entity.original_serial_number?.trim() || '';
+}
+
+function instanceIdentityValues(item: Inventory): string[] {
+  const values: string[] = [];
+  for (const instance of item.instances ?? []) {
+    const serial = instance.serial_number?.trim();
+    const original = instance.original_serial_number?.trim();
+    if (serial) values.push(serial);
+    if (original) values.push(original);
+  }
+  const fallbackSerial = item.serial_number?.trim();
+  const fallbackOriginal = item.original_serial_number?.trim();
+  if (values.length === 0 && fallbackSerial) values.push(fallbackSerial);
+  if (values.length === 0 && fallbackOriginal) values.push(fallbackOriginal);
+  return values;
+}
+
+function occupiedInventorySerials(
+  item: Inventory,
+  entities: PartNumberEntity[] = []
+): Set<string> {
+  const occupied = new Set<string>();
+  for (const serial of instanceIdentityValues(item)) {
+    occupied.add(serial.toLowerCase());
+  }
+  for (const serial of getUsedEntitySerials(item, entities)) {
+    occupied.add(serial.toLowerCase());
+  }
+  return occupied;
+}
+
+function nextUnusedSerial(start: string, occupied: Set<string>): string {
+  let candidate = start.trim();
+  if (!candidate) return '';
+  if (!occupied.has(candidate.toLowerCase())) return candidate;
+  candidate = incrementSerialNumber(candidate);
+  while (occupied.has(candidate.toLowerCase())) {
+    candidate = incrementSerialNumber(candidate);
+  }
+  return candidate;
 }
 
 function entityMatchesPart(entity: PartNumberEntity, partNumber: string): boolean {
@@ -86,13 +125,16 @@ export function calculateInventoryTotalUsed(
 /**
  * Next serial for a new unit: one greater than the highest existing serial
  * among remaining inventory instances and already-used entity serials.
+ * Occupied identities (serial_number and original_serial_number) are skipped
+ * so a copied original cannot cause a 409 on the unique serial column.
  */
 export function suggestNextInventorySerial(
   item: Inventory,
   entities: PartNumberEntity[] = []
 ): string {
+  const occupied = occupiedInventorySerials(item, entities);
   const candidates = [
-    ...getInventorySerialNumbers(item),
+    ...instanceIdentityValues(item),
     ...getUsedEntitySerials(item, entities),
   ];
 
@@ -109,12 +151,35 @@ export function suggestNextInventorySerial(
 
   if (!bestSerial) {
     const fallback =
-      item.original_serial_number?.trim() || item.serial_number?.trim() || '';
-    if (fallback) return incrementSerialNumber(fallback);
+      item.serial_number?.trim() || item.original_serial_number?.trim() || '';
+    if (fallback) return nextUnusedSerial(incrementSerialNumber(fallback), occupied);
     return '';
   }
 
-  return incrementSerialNumber(bestSerial);
+  return nextUnusedSerial(incrementSerialNumber(bestSerial), occupied);
+}
+
+/** Sequential unique identities for restocking `count` units. */
+export function allocateInventorySerials(
+  item: Inventory,
+  count: number,
+  entities: PartNumberEntity[] = []
+): string[] {
+  const quantity = Math.max(0, Math.floor(count));
+  if (quantity === 0) return [];
+
+  const occupied = occupiedInventorySerials(item, entities);
+  const serials: string[] = [];
+  let next = suggestNextInventorySerial(item, entities);
+  for (let index = 0; index < quantity; index += 1) {
+    if (!next) break;
+    const serial = nextUnusedSerial(next, occupied);
+    if (!serial) break;
+    serials.push(serial);
+    occupied.add(serial.toLowerCase());
+    next = incrementSerialNumber(serial);
+  }
+  return serials;
 }
 
 export function inventoryEntitiesForType(

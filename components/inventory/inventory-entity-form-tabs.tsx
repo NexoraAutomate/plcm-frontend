@@ -401,7 +401,7 @@ export function InventoryEntityFormTabs({
                 onValueChange={(value) => onFormDataChange({ ...formData, holder_user_id: value })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select custodian" />
+                  <SelectValue placeholder="Select inventory holder" />
                 </SelectTrigger>
                 <SelectContent>
                   {users.map((user) => (

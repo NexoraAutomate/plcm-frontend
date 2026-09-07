@@ -41,12 +41,12 @@ export function getInventorySerialNumbers(item: Inventory): string[] {
   const serials = (item.instances ?? [])
     .map(
       (instance) =>
-        instance.original_serial_number?.trim() || instance.serial_number?.trim()
+        instance.serial_number?.trim() || instance.original_serial_number?.trim()
     )
     .filter((serial): serial is string => Boolean(serial));
   if (serials.length > 0) return serials;
   const fallback =
-    item.original_serial_number?.trim() || item.serial_number?.trim();
+    item.serial_number?.trim() || item.original_serial_number?.trim();
   return fallback ? [fallback] : [];
 }
 
@@ -61,11 +61,11 @@ export function serialNumberFromInventory(
   fallbackInstance = 1
 ): string {
   const fromInstance =
-    instance?.original_serial_number?.trim() || instance?.serial_number?.trim();
+    instance?.serial_number?.trim() || instance?.original_serial_number?.trim();
   if (fromInstance) return fromInstance;
 
   const fromItem =
-    item.original_serial_number?.trim() || item.serial_number?.trim();
+    item.serial_number?.trim() || item.original_serial_number?.trim();
   if (fromItem) {
     return fallbackInstance > 1 ? `${fromItem}-${fallbackInstance}` : fromItem;
   }
