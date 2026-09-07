@@ -229,6 +229,108 @@ function layoutLocationGraph(
   return { nodes: laidOut, edges };
 }
 
+export function findSiblingNameConflict(
+  tree: InventoryLocationTree,
+  options: {
+    mode: 'root-room' | 'edit' | 'sibling' | 'child';
+    name: string;
+    nodeData?: LocationTreeNodeData | null;
+    excludeId?: string;
+  }
+): string | null {
+  const name = options.name.trim();
+  if (!name) return 'Name is required';
+  const key = name.toLowerCase();
+
+  if (options.mode === 'root-room') {
+    if (tree.some((room) => room.name.toLowerCase() === key)) {
+      return `A Room named "${name}" already exists`;
+    }
+    return null;
+  }
+
+  const data = options.nodeData;
+  if (!data) return 'Location node not found';
+
+  if (options.mode === 'edit') {
+    if (data.level === 'room') {
+      if (
+        tree.some(
+          (room) => room.id !== data.roomId && room.name.toLowerCase() === key
+        )
+      ) {
+        return `A Room named "${name}" already exists`;
+      }
+      return null;
+    }
+    const room = findRoom(tree, data.roomId);
+    if (!room) return 'Room not found';
+    if (data.level === 'cabinet') {
+      if (
+        room.cabinets.some(
+          (cabinet) =>
+            cabinet.id !== data.cabinetId && cabinet.name.toLowerCase() === key
+        )
+      ) {
+        return `A Cabinet named "${name}" already exists under "${room.name}"`;
+      }
+      return null;
+    }
+    const cabinet = room.cabinets.find((item) => item.id === data.cabinetId);
+    if (!cabinet) return 'Cabinet not found';
+    if (
+      cabinet.racks.some(
+        (rack) => rack.id !== data.rackId && rack.name.toLowerCase() === key
+      )
+    ) {
+      return `A Rack named "${name}" already exists under "${cabinet.name}"`;
+    }
+    return null;
+  }
+
+  if (options.mode === 'sibling') {
+    if (data.level === 'room') {
+      if (tree.some((room) => room.name.toLowerCase() === key)) {
+        return `A Room named "${name}" already exists`;
+      }
+      return null;
+    }
+    const room = findRoom(tree, data.roomId);
+    if (!room) return 'Room not found';
+    if (data.level === 'cabinet') {
+      if (room.cabinets.some((cabinet) => cabinet.name.toLowerCase() === key)) {
+        return `A Cabinet named "${name}" already exists under "${room.name}"`;
+      }
+      return null;
+    }
+    const cabinet = room.cabinets.find((item) => item.id === data.cabinetId);
+    if (!cabinet) return 'Cabinet not found';
+    if (cabinet.racks.some((rack) => rack.name.toLowerCase() === key)) {
+      return `A Rack named "${name}" already exists under "${cabinet.name}"`;
+    }
+    return null;
+  }
+
+  // child
+  const room = findRoom(tree, data.roomId);
+  if (!room) return 'Room not found';
+  if (data.level === 'room') {
+    if (room.cabinets.some((cabinet) => cabinet.name.toLowerCase() === key)) {
+      return `A Cabinet named "${name}" already exists under "${room.name}"`;
+    }
+    return null;
+  }
+  if (data.level === 'cabinet') {
+    const cabinet = room.cabinets.find((item) => item.id === data.cabinetId);
+    if (!cabinet) return 'Cabinet not found';
+    if (cabinet.racks.some((rack) => rack.name.toLowerCase() === key)) {
+      return `A Rack named "${name}" already exists under "${cabinet.name}"`;
+    }
+    return null;
+  }
+  return 'Racks cannot have children';
+}
+
 export function renameLocationNode(
   tree: InventoryLocationTree,
   data: LocationTreeNodeData,
@@ -236,6 +338,13 @@ export function renameLocationNode(
 ): InventoryLocationTree {
   const name = nextName.trim();
   if (!name) return tree;
+  const conflict = findSiblingNameConflict(tree, {
+    mode: 'edit',
+    name,
+    nodeData: data,
+  });
+  if (conflict) throw new Error(conflict);
+
   const next = cloneTree(tree);
   const room = findRoom(next, data.roomId);
   if (!room) return tree;
@@ -283,6 +392,13 @@ export function addSiblingLocation(
 ): InventoryLocationTree {
   const trimmed = name.trim();
   if (!trimmed) return tree;
+  const conflict = findSiblingNameConflict(tree, {
+    mode: 'sibling',
+    name: trimmed,
+    nodeData: data,
+  });
+  if (conflict) throw new Error(conflict);
+
   const next = cloneTree(tree);
 
   if (data.level === 'room') {
@@ -311,6 +427,13 @@ export function addChildLocation(
 ): InventoryLocationTree {
   const trimmed = name.trim();
   if (!trimmed) return tree;
+  const conflict = findSiblingNameConflict(tree, {
+    mode: 'child',
+    name: trimmed,
+    nodeData: data,
+  });
+  if (conflict) throw new Error(conflict);
+
   const next = cloneTree(tree);
   const room = findRoom(next, data.roomId);
   if (!room) return tree;
@@ -333,6 +456,8 @@ export function addChildLocation(
 export function addRootRoom(tree: InventoryLocationTree, name: string): InventoryLocationTree {
   const trimmed = name.trim();
   if (!trimmed) return tree;
+  const conflict = findSiblingNameConflict(tree, { mode: 'root-room', name: trimmed });
+  if (conflict) throw new Error(conflict);
   return [...cloneTree(tree), { id: newLocationId('room'), name: trimmed, cabinets: [] }];
 }
 

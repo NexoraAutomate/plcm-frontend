@@ -12,7 +12,6 @@ import { Input } from '@/components/ui/input';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { ListContentSuspense } from '@/components/list-content-suspense';
 import { PageRefreshButton } from '@/components/page-data-refresh';
-import { useDataStore } from '@/lib/data-store';
 
 function groupLabel(date: Date): string {
   if (isToday(date)) return 'Today';
@@ -23,7 +22,6 @@ function groupLabel(date: Date): string {
 export default function NotificationsPage() {
   const { isInventoryManager } = useAuth();
   const inventoryManager = isInventoryManager();
-  const { refreshLightweight } = useDataStore();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 250);
   const {
@@ -36,15 +34,16 @@ export default function NotificationsPage() {
     handleNotificationActivate,
     refreshReturnNotices,
     refreshInstallerNotices,
+    refreshAppNotices,
   } = useAppNotifications({ search: debouncedSearch });
 
   const refresh = useCallback(async () => {
     await Promise.all([
-      refreshLightweight(),
       refreshReturnNotices(),
       refreshInstallerNotices(),
+      refreshAppNotices(),
     ]);
-  }, [refreshInstallerNotices, refreshLightweight, refreshReturnNotices]);
+  }, [refreshAppNotices, refreshInstallerNotices, refreshReturnNotices]);
 
   const grouped = useMemo(() => {
     const groups = new Map<string, typeof notifications>();
@@ -72,8 +71,8 @@ export default function NotificationsPage() {
           <h1 className="text-2xl font-bold tracking-tight">Notifications</h1>
           <p className="text-sm text-muted-foreground">
             {inventoryManager
-              ? 'Full notification history — search across all inventory notices and system alerts'
-              : 'Your notification history — inventory issued to you and return decisions'}
+              ? 'Role-targeted history — inventory notices plus events for your roles'
+              : 'Your notification history — assigned work, inventory issued to you, and events for your roles'}
           </p>
         </div>
         <PageRefreshButton onRefresh={refresh} />
@@ -137,6 +136,7 @@ export default function NotificationsPage() {
         onDecided={() => {
           void refreshReturnNotices();
           void refreshInstallerNotices();
+          void refreshAppNotices();
         }}
       />
     </div>

@@ -1268,4 +1268,18 @@ export const backup = {
   },
 };
 
+export const notifications = {
+  list: (options?: { unreadOnly?: boolean; search?: string }) =>
+    api.get<Models.AppNotificationRecord[]>('/notifications/', {
+      params: {
+        unread_only: options?.unreadOnly ?? false,
+        search: options?.search || undefined,
+      },
+    }),
+  markRead: (noticeId: number) =>
+    api.post<Models.AppNotificationRecord>(`/notifications/${noticeId}/read/`),
+  markAllRead: () =>
+    api.post<{ ok: boolean; marked: number }>('/notifications/read-all/'),
+};
+
 export default api;

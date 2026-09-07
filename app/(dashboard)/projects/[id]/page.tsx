@@ -1,7 +1,7 @@
 'use client';
 
 import { useAppDefinitions } from '@/lib/app-definitions-context';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useDataStore } from '@/lib/data-store';
 import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
@@ -52,6 +52,8 @@ export default function ProjectDetailPage() {
   const { entityLabel } = useAppDefinitions();
 
   const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const projectId = params.id as string;
   const { pageLoading } = useEntityHierarchyGate();
   const {
@@ -78,6 +80,30 @@ export default function ProjectDetailPage() {
     Number.isFinite(Number(projectId)) ? Number(projectId) : null
   );
   const { showStats, setShowStats } = useListStatsVisibility();
+  const tabParam = searchParams.get('tab');
+  const activeTab =
+    tabParam === 'workflow' ||
+    tabParam === 'hierarchy' ||
+    tabParam === 'reservations' ||
+    tabParam === 'bottlenecks'
+      ? tabParam
+      : 'workflow';
+
+  function setActiveTab(next: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === 'workflow') params.delete('tab');
+    else params.set('tab', next);
+    const qs = params.toString();
+    router.replace(qs ? `/projects/${projectId}?${qs}` : `/projects/${projectId}`, {
+      scroll: false,
+    });
+  }
+
+  const highlightShortageParam = Number(searchParams.get('shortage'));
+  const highlightShortageId =
+    Number.isFinite(highlightShortageParam) && highlightShortageParam > 0
+      ? highlightShortageParam
+      : undefined;
 
   const project =
     workflowProject && String(workflowProject.id) === projectId
@@ -455,7 +481,7 @@ export default function ProjectDetailPage() {
         />
       ) : null}
 
-      <Tabs defaultValue="workflow" className="gap-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-4">
         <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
           <TabsTrigger value="workflow" className="gap-1.5">
             <Workflow className="h-4 w-4" />
@@ -492,10 +518,10 @@ export default function ProjectDetailPage() {
 
         <TabsContent value="reservations" className="mt-0 space-y-4">
           <ProjectReservationsPanel project={project} />
-          {project.status_name === 'READY_FOR_INVENTORY' ? (
+          {project.status_name === 'READY_FOR_INVENTORY' || highlightShortageId != null ? (
             <div
               className={`space-y-2 rounded-lg border p-4 ${
-                hasProjectShortages === false ? 'hidden' : ''
+                hasProjectShortages === false && highlightShortageId == null ? 'hidden' : ''
               }`}
             >
               <div>
@@ -507,6 +533,7 @@ export default function ProjectDetailPage() {
               <ShortageListPanel
                 projectId={project.id}
                 pollMs={12_000}
+                highlightId={highlightShortageId}
                 onRowsChange={handleProjectShortagesChange}
               />
             </div>

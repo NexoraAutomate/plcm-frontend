@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { AlertTriangle } from 'lucide-react';
 import { ShortageListPanel } from '@/components/shortages/shortage-list-panel';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +9,9 @@ import { PageDataRefreshProvider, PageRefreshButton } from '@/components/page-da
 import type { InventoryShortage } from '@/lib/models';
 
 export default function ShortagesPage() {
+  const searchParams = useSearchParams();
+  const highlightParam = Number(searchParams.get('shortage'));
+  const highlightId = Number.isFinite(highlightParam) && highlightParam > 0 ? highlightParam : undefined;
   const [hasShortages, setHasShortages] = useState<boolean | null>(null);
   const handleShortagesChange = useCallback((rows: InventoryShortage[]) => {
     setHasShortages(rows.length > 0);
@@ -41,6 +45,7 @@ export default function ShortagesPage() {
             <ShortageListPanel
               inventoryScope
               pollMs={12_000}
+              highlightId={highlightId}
               onRowsChange={handleShortagesChange}
             />
           </CardContent>

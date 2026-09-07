@@ -1,19 +1,15 @@
-import { CaseStatus, FaultyEntityStatus } from '@/lib/models';
-import { getCaseStatusMeta, mapCaseStatusFromApi } from '@/lib/maintenance-workflow';
-import type { Customer, FaultyEntity, InventoryInstallerNotice, InventoryReservationExpiryNotice, InventoryReturnNotice, InventoryShortageNotice, MaintenanceCase, Project } from '@/lib/models';
+import type {
+  AppNotificationRecord,
+  InventoryInstallerNotice,
+  InventoryReservationExpiryNotice,
+  InventoryReturnNotice,
+  InventoryShortageNotice,
+} from '@/lib/models';
 import { parseApiDate } from '@/lib/parse-api-date';
 
+export const APP_NOTICE_ID_PREFIX = 'app-';
+
 export type AppNotificationType =
-  | 'open_maintenance_case'
-  | 'confirmed_fault'
-  | 'identified_fault'
-  | 'suspected_fault'
-  | 'under_inspection_fault'
-  | 'case_resolved'
-  | 'project_completed'
-  | 'customer_status_change'
-  | 'order_updated'
-  | 'project_updated'
   | 'inventory_returned'
   | 'inventory_issued'
   | 'inventory_return_accepted'
@@ -22,7 +18,8 @@ export type AppNotificationType =
   | 'inventory_shortage_fulfilled'
   | 'inventory_shortage_partial'
   | 'reservation_idle_reminder'
-  | 'reservation_auto_released';
+  | 'reservation_auto_released'
+  | (string & {});
 
 export interface AppNotification {
   id: string;
@@ -32,11 +29,18 @@ export interface AppNotification {
   href: string;
   timestamp: string;
   priority: 'high' | 'medium' | 'low';
-  /** Backend notice id for inventory returns / installer notices. */
+  /** Backend notice id for inventory returns / installer / unified app notices. */
   metaId?: number;
   /** Issuance id for inventory return accept/reject. */
   metaIssuanceId?: number;
-  /** Server-backed inventory notice already marked read (stays in history). */
+  projectId?: number;
+  entityType?: string | null;
+  entityId?: number;
+  shortageId?: number;
+  reservationId?: number;
+  partNumber?: string | null;
+  serialNumber?: string | null;
+  /** Server-backed notice already marked read (stays in history). */
   serverRead?: boolean;
   /** Persist in history — not removable by Clear all. */
   persistent?: boolean;
@@ -44,173 +48,58 @@ export interface AppNotification {
   searchText?: string;
 }
 
-const OPEN_CASE_STATUSES: string[] = [
-  CaseStatus.Open,
-  CaseStatus.UnderInspection,
-  CaseStatus.UnderRepair,
-];
+function normalizePriority(value?: string | null): AppNotification['priority'] {
+  if (value === 'high' || value === 'low' || value === 'medium') return value;
+  return 'medium';
+}
 
-const RECENT_MS = 7 * 24 * 60 * 60 * 1000;
+export function isServerAppNotificationId(id: string): boolean {
+  return id.startsWith(APP_NOTICE_ID_PREFIX);
+}
 
-function isRecent(isoDate?: string | null): boolean {
-  if (!isoDate) return false;
-  const ts = parseApiDate(isoDate).getTime();
-  if (Number.isNaN(ts)) return false;
-  return Date.now() - ts <= RECENT_MS;
+export function parseServerAppNotificationId(id: string): number | undefined {
+  if (!isServerAppNotificationId(id)) return undefined;
+  const n = Number(id.slice(APP_NOTICE_ID_PREFIX.length));
+  return Number.isFinite(n) ? n : undefined;
+}
+
+export function mapServerAppNotification(row: AppNotificationRecord): AppNotification {
+  return {
+    id: `${APP_NOTICE_ID_PREFIX}${row.id}`,
+    type: row.event_type,
+    title: row.title,
+    message: row.message,
+    href: row.href || '/notifications',
+    timestamp: row.created_at,
+    priority: normalizePriority(row.priority),
+    metaId: row.id,
+    projectId: row.project_id ?? undefined,
+    entityType: row.entity_type,
+    entityId: row.entity_id ?? undefined,
+    shortageId: row.entity_type === 'shortage' ? row.entity_id ?? undefined : undefined,
+    reservationId:
+      row.entity_type === 'inventory_reservation' ? row.entity_id ?? undefined : undefined,
+    serverRead: Boolean(row.read_at),
+    persistent: true,
+    searchText: [row.event_type, row.entity_type, row.entity_id].filter(Boolean).join(' '),
+  };
 }
 
 export function buildAppNotifications(input: {
-  maintenanceCases: MaintenanceCase[];
-  faultyEntities: FaultyEntity[];
-  projects: Project[];
-  customers: Customer[];
   inventoryReturnNotices?: InventoryReturnNotice[];
   inventoryInstallerNotices?: InventoryInstallerNotice[];
   inventoryShortageNotices?: InventoryShortageNotice[];
   inventoryReservationExpiryNotices?: InventoryReservationExpiryNotice[];
+  serverAppNotifications?: AppNotificationRecord[];
 }): AppNotification[] {
   const {
-    maintenanceCases,
-    faultyEntities,
-    projects,
-    customers,
     inventoryReturnNotices = [],
     inventoryInstallerNotices = [],
     inventoryShortageNotices = [],
     inventoryReservationExpiryNotices = [],
+    serverAppNotifications = [],
   } = input;
   const notifications: AppNotification[] = [];
-
-  for (const mc of maintenanceCases) {
-    if (OPEN_CASE_STATUSES.includes(mc.status)) {
-      notifications.push({
-        id: `case-open-${mc.id}`,
-        type: 'open_maintenance_case',
-        title: 'Open maintenance case',
-        message: `${mc.case_number} — ${getCaseStatusMeta(mapCaseStatusFromApi(mc.status)).label}`,
-        href: `/maintenance/cases/${mc.id}`,
-        timestamp: mc.reported_at ?? mc.created_at ?? new Date().toISOString(),
-        priority: mc.status === CaseStatus.Open ? 'high' : 'medium',
-      });
-    }
-    if (
-      (mc.status === CaseStatus.Resolved || mc.status === CaseStatus.Closed) &&
-      isRecent(mc.updated_at ?? mc.reported_at)
-    ) {
-      notifications.push({
-        id: `case-resolved-${mc.id}`,
-        type: 'case_resolved',
-        title: 'Maintenance case resolved',
-        message: `${mc.case_number} marked ${mc.status}`,
-        href: `/maintenance/cases/${mc.id}`,
-        timestamp: mc.updated_at ?? mc.reported_at ?? new Date().toISOString(),
-        priority: 'low',
-      });
-    }
-  }
-
-  for (const fe of faultyEntities) {
-    const openCase = maintenanceCases.some(
-      (mc) =>
-        mc.id === fe.case_id &&
-        mc.status !== CaseStatus.Resolved &&
-        mc.status !== CaseStatus.Closed
-    );
-    if (!openCase) continue;
-
-    const label = fe.entity_name ?? fe.part_number ?? 'Entity';
-    const base = {
-      href: `/maintenance/cases/${fe.case_id}`,
-      timestamp: fe.updated_at ?? fe.identified_at ?? new Date().toISOString(),
-    };
-
-    if (fe.status === FaultyEntityStatus.CONFIRMED_FAULTY) {
-      notifications.push({
-        id: `fault-confirmed-${fe.id}-${fe.status}`,
-        type: 'confirmed_fault',
-        title: 'Confirmed fault',
-        message: `${label} requires attention`,
-        priority: 'high',
-        ...base,
-      });
-    } else if (fe.status === FaultyEntityStatus.IDENTIFIED) {
-      notifications.push({
-        id: `fault-identified-${fe.id}-${fe.status}`,
-        type: 'identified_fault',
-        title: 'Fault identified',
-        message: `${label} flagged for inspection`,
-        priority: 'medium',
-        ...base,
-      });
-    } else if (fe.status === FaultyEntityStatus.UNDER_INSPECTION) {
-      notifications.push({
-        id: `fault-inspection-${fe.id}-${fe.status}`,
-        type: 'under_inspection_fault',
-        title: 'Under inspection',
-        message: `${label} is being inspected`,
-        priority: 'medium',
-        ...base,
-      });
-    } else if (
-      fe.status === FaultyEntityStatus.SUSPECTED ||
-      fe.status === ('suspected' as FaultyEntityStatus)
-    ) {
-      notifications.push({
-        id: `fault-potentially-affected-${fe.id}-${fe.status}`,
-        type: 'suspected_fault',
-        title: 'Potentially affected',
-        message: `${label} may be affected by an upstream fault`,
-        priority: 'medium',
-        ...base,
-      });
-    }
-  }
-
-  for (const project of projects) {
-    if (isRecent(project.updated_at)) {
-      notifications.push({
-        id: `project-updated-${project.id}-${project.updated_at}`,
-        type: 'project_updated',
-        title: 'Project updated',
-        message: `${project.name} — ${project.status_name ?? 'status changed'}`,
-        href: `/projects/${project.id}`,
-        timestamp: project.updated_at,
-        priority: 'low',
-      });
-    }
-    const completed =
-      project.status_name === 'Completed' || (project.progress ?? 0) >= 100;
-    if (completed && isRecent(project.updated_at)) {
-      notifications.push({
-        id: `project-completed-${project.id}`,
-        type: 'project_completed',
-        title: 'Project completed',
-        message: `${project.name} reached 100% progress`,
-        href: `/projects/${project.id}`,
-        timestamp: project.updated_at,
-        priority: 'low',
-      });
-    }
-  }
-
-  for (const customer of customers) {
-    if (
-      customer.updated_at &&
-      customer.created_at &&
-      customer.updated_at !== customer.created_at &&
-      isRecent(customer.updated_at)
-    ) {
-      notifications.push({
-        id: `customer-status-${customer.id}-${customer.updated_at}`,
-        type: 'customer_status_change',
-        title: 'Customer status updated',
-        message: `${customer.name} — ${customer.status_name}`,
-        href: `/customers/${customer.id}`,
-        timestamp: customer.updated_at,
-        priority: 'medium',
-      });
-    }
-  }
 
   for (const notice of inventoryReturnNotices) {
     const itemLabel =
@@ -359,7 +248,7 @@ export function buildAppNotifications(input: {
     const sdls = notice.sdls_code || notice.sdls_name || 'SDLS';
     const lru = notice.lru_name || 'item';
     const pn = notice.part_number || '—';
-    const href = notice.project_id ? `/projects/${notice.project_id}` : '/shortages';
+    const href = '/shortages';
     const isRead = Boolean(notice.read_at);
     const searchText = [
       pn,
@@ -387,6 +276,9 @@ export function buildAppNotifications(input: {
         timestamp: notice.created_at,
         priority: isRead ? 'low' : 'medium',
         metaId: notice.id,
+        projectId: notice.project_id ?? undefined,
+        shortageId: notice.shortage_id,
+        partNumber: notice.part_number,
         serverRead: isRead,
         persistent: true,
         searchText,
@@ -401,6 +293,9 @@ export function buildAppNotifications(input: {
         timestamp: notice.created_at,
         priority: isRead ? 'low' : 'medium',
         metaId: notice.id,
+        projectId: notice.project_id ?? undefined,
+        shortageId: notice.shortage_id,
+        partNumber: notice.part_number,
         serverRead: isRead,
         persistent: true,
         searchText,
@@ -415,6 +310,9 @@ export function buildAppNotifications(input: {
         timestamp: notice.created_at,
         priority: isRead ? 'low' : 'high',
         metaId: notice.id,
+        projectId: notice.project_id ?? undefined,
+        shortageId: notice.shortage_id,
+        partNumber: notice.part_number,
         serverRead: isRead,
         persistent: true,
         searchText,
@@ -426,7 +324,7 @@ export function buildAppNotifications(input: {
     const flight = notice.flight_code || notice.flight_name || 'Flight';
     const sdls = notice.sdls_code || notice.sdls_name || 'SDLS';
     const item = notice.inventory_name || notice.serial_number || 'unit';
-    const href = notice.project_id ? `/projects/${notice.project_id}` : '/projects';
+    const href = '/inventory?stock=reserved';
     const isRead = Boolean(notice.read_at);
     const searchText = [
       notice.part_number,
@@ -452,10 +350,18 @@ export function buildAppNotifications(input: {
       timestamp: notice.created_at,
       priority: isRead ? 'low' : autoReleased ? 'medium' : 'high',
       metaId: notice.id,
+      projectId: notice.project_id ?? undefined,
+      reservationId: notice.reservation_id,
+      partNumber: notice.part_number,
+      serialNumber: notice.serial_number,
       serverRead: isRead,
       persistent: true,
       searchText,
     });
+  }
+
+  for (const row of serverAppNotifications) {
+    notifications.push(mapServerAppNotification(row));
   }
 
   return notifications.sort(

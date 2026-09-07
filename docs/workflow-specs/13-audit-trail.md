@@ -148,4 +148,4 @@ Although last in the delivery sequence for **full audit UX**, each prior spec sh
 
 ## Handoff
 
-No further workflow specs remain. Optional follow-ups (not in drawio): reporting, notifications preferences, external integrations.
+Next: [14-notifications.md](./14-notifications.md) — role-targeted notification catalog (not in drawio). Optional further follow-ups: reporting preferences, external integrations.

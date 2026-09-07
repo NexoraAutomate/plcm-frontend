@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Edit, Trash2, Search, Layers, Network, Copy, ChevronDown, PackageMinus, ListOrdered, Undo2, RefreshCw, Download, Upload, FileText, AlertCircle, CheckCircle2, Tag, ScanLine, QrCode } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -117,6 +117,10 @@ const STOCK_FILTERS: { value: StockFilter; label: string }[] = [
   { value: 'reserved', label: 'Reserved' },
   { value: 'out_of_stock', label: 'Out of Stock' },
 ];
+
+function isStockFilter(value: string | null): value is StockFilter {
+  return STOCK_FILTERS.some((filter) => filter.value === value);
+}
 
 const ENTITY_TYPE_FILTER_STYLES: {
   value: EntityType | 'all';
@@ -243,6 +247,7 @@ export default function InventoryPage() {
   const { definitions, entityLabel } = useAppDefinitions();
   const { showStats, setShowStats } = useListStatsVisibility();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, can, isInventoryManager } = useAuth();
   const inventoryManager = isInventoryManager();
   const canCreateInventory = inventoryManager && can(P.create_inventory);
@@ -267,6 +272,22 @@ export default function InventoryPage() {
   const [entityTypeFilter, setEntityTypeFilter] = useState<EntityType | 'all'>('all');
   const [stockFilter, setStockFilter] = useState<StockFilter>('all');
   const { sort, cycleSort, listFilterPatch } = useTableSorting();
+
+  useEffect(() => {
+    const stock = searchParams.get('stock');
+    if (isStockFilter(stock)) setStockFilter(stock);
+    const q = searchParams.get('q');
+    if (q) setSearch(q);
+  }, [searchParams]);
+
+  function applyStockFilter(value: StockFilter) {
+    setStockFilter(value);
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === 'all') params.delete('stock');
+    else params.set('stock', value);
+    const qs = params.toString();
+    router.replace(qs ? `/inventory?${qs}` : '/inventory', { scroll: false });
+  }
   const inventoryTypeParam = entityTypeFilter !== 'all' ? entityTypeFilter : undefined;
   const listFilters = useMemo(
     () =>
@@ -1809,7 +1830,7 @@ export default function InventoryPage() {
               <button
                 key={value}
                 type="button"
-                onClick={() => setStockFilter(value)}
+                onClick={() => applyStockFilter(value)}
                 className={cn(
                   'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
                   stockFilter === value

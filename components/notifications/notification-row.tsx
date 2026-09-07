@@ -7,7 +7,7 @@ import type { AppNotification } from '@/lib/app-notifications';
 import { parseApiDate } from '@/lib/parse-api-date';
 import { cn } from '@/lib/utils';
 
-const TYPE_ICON: Record<AppNotification['type'], typeof Bell> = {
+const TYPE_ICON: Record<string, typeof Bell> = {
   open_maintenance_case: Wrench,
   confirmed_fault: AlertTriangle,
   identified_fault: AlertTriangle,
@@ -29,6 +29,67 @@ const TYPE_ICON: Record<AppNotification['type'], typeof Bell> = {
   reservation_auto_released: Unlock,
 };
 
+function iconForType(type: string): typeof Bell {
+  if (TYPE_ICON[type]) return TYPE_ICON[type];
+  if (
+    type.startsWith('project') ||
+    type.includes('hierarchy') ||
+    type.startsWith('hm_') ||
+    type.includes('progress') ||
+    type.includes('config')
+  ) {
+    return Rocket;
+  }
+  if (
+    type.includes('customer') ||
+    type.includes('user_') ||
+    type.includes('signup') ||
+    type.includes('role') ||
+    type.includes('password')
+  ) {
+    return Users;
+  }
+  if (
+    type.includes('inventory') ||
+    type.includes('reservation') ||
+    type.includes('shortage') ||
+    type.includes('item_') ||
+    type.includes('label') ||
+    type.includes('issued')
+  ) {
+    return Package;
+  }
+  if (
+    type.includes('fail') ||
+    type.includes('fault') ||
+    type.includes('recall') ||
+    type.includes('reject') ||
+    type.includes('cascade') ||
+    type.includes('cancelled')
+  ) {
+    return AlertTriangle;
+  }
+  if (
+    type.includes('pass') ||
+    type.includes('verified') ||
+    type.includes('approved') ||
+    type.includes('complete') ||
+    type.includes('resolved')
+  ) {
+    return CheckCircle2;
+  }
+  if (
+    type.includes('maintenance') ||
+    type.includes('case') ||
+    type.includes('repair') ||
+    type.includes('inspect') ||
+    type.includes('delivery')
+  ) {
+    return Wrench;
+  }
+  return Bell;
+}
+
 interface NotificationRowProps {
   item: AppNotification;
   isRead?: boolean;
@@ -43,13 +104,9 @@ export function NotificationRow({
   onMarkRead,
   onActivate,
 }: NotificationRowProps) {
-  const Icon = TYPE_ICON[item.type];
+  const Icon = iconForType(item.type);
   const isReturnDecision = item.type === 'inventory_returned' && onActivate != null;
-  const isPersistentActivate =
-    onActivate != null &&
-    (item.type === 'inventory_issued' ||
-      item.type === 'inventory_return_accepted' ||
-      item.type === 'inventory_return_rejected');
+  const isPersistentActivate = onActivate != null && Boolean(item.persistent) && !isReturnDecision;
 
   const content = (
     <>

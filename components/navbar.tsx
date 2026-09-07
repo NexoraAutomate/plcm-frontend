@@ -115,7 +115,7 @@ export function Navbar() {
             <div className="border-b px-4 py-3">
               <p className="text-sm font-semibold">Notifications</p>
               <p className="text-xs text-muted-foreground">
-                Maintenance, faults, projects, and customer updates
+                Maintenance, inventory, and role-targeted project alerts
               </p>
             </div>
             <ScrollArea className="h-80">

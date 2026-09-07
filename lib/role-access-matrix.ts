@@ -102,6 +102,40 @@ export const TOGGLE_SECTIONS: ToggleSectionDef[] = [
       { code: 'view_hierarchy_dashboard', label: 'Hierarchy Dashboard view' },
       { code: 'view_reports', label: 'Reporting' },
       { code: 'view_notifications', label: 'Notifications' },
+      {
+        code: 'view_my_assignments',
+        label: 'My assignments',
+        description: 'Sidebar and page for assigned install work, handover requests, and recall returns',
+      },
+    ],
+  },
+  {
+    key: 'workflow',
+    label: 'Workflow actions',
+    description: 'Spec 00–12 actions used on assignments, inventory, and project workflows',
+    permissions: [
+      { code: 'item.request', label: 'Request item handover', description: 'Developer asks IM to issue reserved stock' },
+      { code: 'item.install_test', label: 'Install & test items', description: 'Record install and Pass/Fail on issued items' },
+      { code: 'item.verify', label: 'Verify installations' },
+      { code: 'hierarchy.assign_developer', label: 'Assign developer to hierarchy work' },
+      { code: 'inventory.reserve', label: 'Reserve inventory' },
+      { code: 'inventory.release', label: 'Release reservations' },
+      { code: 'inventory.receive', label: 'Receive stock' },
+      { code: 'inventory.issue', label: 'Issue inventory (workflow)' },
+      { code: 'item.inspect', label: 'Inspect returned items' },
+      { code: 'project.create_draft', label: 'Create draft project' },
+      { code: 'project.approve', label: 'Approve project' },
+      { code: 'project.assign_hm', label: 'Assign hierarchy manager' },
+      { code: 'project.cancel', label: 'Cancel project / recall' },
+      { code: 'hierarchy.generate', label: 'Generate hierarchy' },
+      { code: 'hierarchy_config.manage', label: 'Manage hierarchy configurations' },
+      { code: 'config_change.request', label: 'Request configuration change' },
+      { code: 'config_change.approve', label: 'Approve configuration change' },
+      { code: 'audit.read', label: 'Read audit trail' },
+      { code: 'inventory.label.generate', label: 'Generate labels' },
+      { code: 'inventory.label.print', label: 'Print labels' },
+      { code: 'inventory.label.scan', label: 'Scan labels' },
+      { code: 'inventory.label.manage', label: 'Manage labels' },
     ],
   },
   {
@@ -173,7 +207,7 @@ export function matrixKnownCodes(): Set<string> {
 
 export function humanizePermissionCode(code: string): string {
   return code
-    .split('_')
+    .split(/[._]/)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
 }

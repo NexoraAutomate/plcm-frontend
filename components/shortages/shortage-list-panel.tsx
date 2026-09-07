@@ -11,6 +11,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Can } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
+import { useAuth } from '@/lib/auth-context';
+import { canUseProjectDetail } from '@/lib/notification-href';
+import { cn } from '@/lib/utils';
 import * as api from '@/lib/api';
 import type { InventoryShortage } from '@/lib/models';
 import { parseApiDate } from '@/lib/parse-api-date';
@@ -21,6 +24,7 @@ type Props = {
   /** IM all-open list when true */
   inventoryScope?: boolean;
   pollMs?: number;
+  highlightId?: number;
   onRowsChange?: (rows: InventoryShortage[]) => void;
 };
 
@@ -47,8 +51,11 @@ export function ShortageListPanel({
   projectId,
   inventoryScope = false,
   pollMs = 12_000,
+  highlightId,
   onRowsChange,
 }: Props) {
+  const { can, user } = useAuth();
+  const showProjectLink = canUseProjectDetail(user?.roles) && can(P.view_projects);
   const [rows, setRows] = useState<InventoryShortage[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [receiveTarget, setReceiveTarget] = useState<InventoryShortage | null>(null);
@@ -94,6 +101,12 @@ export function ShortageListPanel({
       window.removeEventListener('focus', onFocus);
     };
   }, [pollMs, refresh]);
+
+  useEffect(() => {
+    if (highlightId == null) return;
+    const el = document.getElementById(`shortage-${highlightId}`);
+    el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [highlightId, rows]);
 
   async function handleCancel(row: InventoryShortage) {
     setBusyId(row.id);
@@ -165,7 +178,11 @@ export function ShortageListPanel({
         {rows.map((row) => (
           <li
             key={row.id}
-            className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 px-3 py-2"
+            id={`shortage-${row.id}`}
+            className={cn(
+              'flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 px-3 py-2',
+              highlightId === row.id && 'border-primary ring-2 ring-primary/30'
+            )}
           >
             <div>
               <div className="flex flex-wrap items-center gap-2 font-medium">
@@ -183,9 +200,13 @@ export function ShortageListPanel({
                 {inventoryScope && row.project_name ? (
                   <>
                     {' · '}
-                    <Link className="underline" href={`/projects/${row.project_id}`}>
-                      {row.project_name}
-                    </Link>
+                    {showProjectLink && row.project_id != null ? (
+                      <Link className="underline" href={`/projects/${row.project_id}?tab=reservations`}>
+                        {row.project_name}
+                      </Link>
+                    ) : (
+                      row.project_name
+                    )}
                   </>
                 ) : null}
                 {' · '}

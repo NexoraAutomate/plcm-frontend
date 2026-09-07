@@ -116,6 +116,7 @@ export const P = {
   view_audit_logs: 'view_audit_logs',
   manage_notifications: 'manage_notifications',
   view_notifications: 'view_notifications',
+  view_my_assignments: 'view_my_assignments',
   approve_configuration_changes: 'approve_configuration_changes',
 
   // Roles
@@ -175,6 +176,14 @@ export const P = {
 
 export type PermissionCode = (typeof P)[keyof typeof P];
 
+/** Any of these grants the My assignments page (sidebar + route). */
+export const MY_ASSIGNMENTS_PERMISSIONS: PermissionCode[] = [
+  P.view_my_assignments,
+  P.item_request,
+  P.item_install_test,
+  P.hierarchy_assign_developer,
+];
+
 /** Human-readable labels for tooltips (e.g. disabled export). */
 export const PERMISSION_LABELS: Record<string, string> = {
   [P.export_reports]: 'Export Reports',
@@ -193,6 +202,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [P.generate_maintenance_dossier]: 'Generate Maintenance Dossier',
   [P.view_executive_dashboard]: 'Executive Dashboard View',
   [P.view_hierarchy_dashboard]: 'Hierarchy Dashboard View',
+  [P.view_my_assignments]: 'My assignments',
   [P.view_inventory_issuances]: 'Inventory Issuances',
   [P.confirm_faults]: 'Confirm Faults',
   [P.cascade_faults]: 'Cascade Faults',
@@ -239,7 +249,7 @@ export const NAV_PERMISSIONS: Record<string, PermissionCode | PermissionCode[]> 
   '/inspect-queue': P.item_inspect,
   '/config-changes': [P.config_change_approve, P.config_change_request],
   '/audit': P.audit_read,
-  '/my-assignments': [P.item_request, P.item_install_test],
+  '/my-assignments': MY_ASSIGNMENTS_PERMISSIONS,
   '/verify-queue': P.item_verify,
   '/maintenance': P.view_maintenance_cases,
   '/notifications': P.view_notifications,
@@ -297,7 +307,7 @@ export const LANDING_CANDIDATES: Array<{
   { href: '/executive-dashboard', permission: P.view_executive_dashboard },
   { href: '/hierarchy-dashboard', permission: P.view_hierarchy_dashboard },
   { href: '/inventory', permission: P.view_inventory },
-  { href: '/my-assignments', permission: [P.item_request, P.item_install_test] },
+  { href: '/my-assignments', permission: MY_ASSIGNMENTS_PERMISSIONS },
   { href: '/projects', permission: P.view_projects },
   { href: '/maintenance', permission: P.view_maintenance_cases },
   { href: '/systems', permission: P.view_systems },
@@ -322,7 +332,7 @@ export const ROLE_LANDING: Array<{
   {
     role: 'DEV',
     href: '/my-assignments',
-    permission: [P.item_request, P.item_install_test],
+    permission: MY_ASSIGNMENTS_PERMISSIONS,
   },
 ];
 

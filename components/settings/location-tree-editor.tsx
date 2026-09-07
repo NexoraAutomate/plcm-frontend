@@ -16,6 +16,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Plus } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -39,6 +40,7 @@ import {
   addSiblingLocation,
   buildLocationFlowGraph,
   deleteLocationNode,
+  findSiblingNameConflict,
   normalizeLocationTree,
   renameLocationNode,
   type InventoryLocationTree,
@@ -155,26 +157,48 @@ function LocationTreeEditorInner({ value, onChange, readOnly = false }: Props) {
     const trimmed = nameValue.trim();
     if (!trimmed) return;
 
-    if (nameDialog.mode === 'root-room') {
-      applyTree(addRootRoom(tree, trimmed));
-      setNameDialog(null);
-      return;
-    }
+    try {
+      if (nameDialog.mode === 'root-room') {
+        const conflict = findSiblingNameConflict(tree, {
+          mode: 'root-room',
+          name: trimmed,
+        });
+        if (conflict) {
+          toast.error(conflict);
+          return;
+        }
+        applyTree(addRootRoom(tree, trimmed));
+        setNameDialog(null);
+        return;
+      }
 
-    const data = findNodeData(nameDialog.nodeId);
-    if (!data) {
-      setNameDialog(null);
-      return;
-    }
+      const data = findNodeData(nameDialog.nodeId);
+      if (!data) {
+        setNameDialog(null);
+        return;
+      }
 
-    if (nameDialog.mode === 'edit') {
-      applyTree(renameLocationNode(tree, data, trimmed));
-    } else if (nameDialog.mode === 'sibling') {
-      applyTree(addSiblingLocation(tree, data, trimmed));
-    } else {
-      applyTree(addChildLocation(tree, data, trimmed));
+      const conflict = findSiblingNameConflict(tree, {
+        mode: nameDialog.mode,
+        name: trimmed,
+        nodeData: data,
+      });
+      if (conflict) {
+        toast.error(conflict);
+        return;
+      }
+
+      if (nameDialog.mode === 'edit') {
+        applyTree(renameLocationNode(tree, data, trimmed));
+      } else if (nameDialog.mode === 'sibling') {
+        applyTree(addSiblingLocation(tree, data, trimmed));
+      } else {
+        applyTree(addChildLocation(tree, data, trimmed));
+      }
+      setNameDialog(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not update location');
     }
-    setNameDialog(null);
   }
 
   const dialogTitle = useMemo(() => {
@@ -281,7 +305,9 @@ function LocationTreeEditorInner({ value, onChange, readOnly = false }: Props) {
             <DialogHeader>
               <DialogTitle>{dialogTitle}</DialogTitle>
               <DialogDescription>
-                Names must be unique among siblings under the same parent.
+                Names must be unique among siblings (case-insensitive). Duplicate Rooms, or
+                duplicate Cabinets under the same Room, or duplicate Racks under the same Cabinet
+                are not allowed.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-2">

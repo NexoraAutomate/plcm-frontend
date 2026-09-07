@@ -736,6 +736,23 @@ export interface InventoryReservationExpiryNotice {
   read_at?: string | null
 }
 
+/** Spec 14 — unified per-user app notification (gap events; not inventory specialized tables). */
+export interface AppNotificationRecord {
+  id: number
+  user_id: number
+  event_type: string
+  title: string
+  message: string
+  href: string
+  priority: string
+  entity_type?: string | null
+  entity_id?: number | null
+  actor_user_id?: number | null
+  project_id?: number | null
+  created_at: string
+  read_at?: string | null
+}
+
 export interface FCFSFulfillment {
   shortage_id: number
   reservation_id?: number | null

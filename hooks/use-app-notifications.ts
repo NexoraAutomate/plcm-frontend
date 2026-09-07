@@ -2,17 +2,25 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { useDataStore } from '@/lib/data-store';
 import {
   buildAppNotifications,
   filterAppNotifications,
+  isServerAppNotificationId,
+  parseServerAppNotificationId,
   type AppNotification,
 } from '@/lib/app-notifications';
+import { resolveNotificationHref } from '@/lib/notification-href';
 import { useNotificationState } from '@/hooks/use-notification-state';
 import { useAuth } from '@/lib/auth-context';
 import * as api from '@/lib/api';
 import { P } from '@/lib/permission-codes';
-import type { InventoryInstallerNotice, InventoryReservationExpiryNotice, InventoryReturnNotice, InventoryShortageNotice } from '@/lib/models';
+import type {
+  AppNotificationRecord,
+  InventoryInstallerNotice,
+  InventoryReservationExpiryNotice,
+  InventoryReturnNotice,
+  InventoryShortageNotice,
+} from '@/lib/models';
 import {
   readAlertSettings,
   type AlertSettingsState,
@@ -69,10 +77,10 @@ function showDesktopNotification(title: string, body?: string) {
 
 export function useAppNotifications(options?: { search?: string }) {
   const search = options?.search ?? '';
-  const { maintenanceCases, faultyEntities, projects, customers, loading } = useDataStore();
   const { isInventoryManager, can, user } = useAuth();
   const inventoryManager = isInventoryManager();
   const canViewInventory = can(P.view_inventory);
+  const canViewNotifications = can(P.view_notifications);
   const canListAllInstallerNotices = (user?.roles ?? []).some((role) => {
     const name = role.toLowerCase();
     return name === 'admin' || name === 'subadmin';
@@ -89,6 +97,8 @@ export function useAppNotifications(options?: { search?: string }) {
   const [installerNotices, setInstallerNotices] = useState<InventoryInstallerNotice[]>([]);
   const [shortageNotices, setShortageNotices] = useState<InventoryShortageNotice[]>([]);
   const [expiryNotices, setExpiryNotices] = useState<InventoryReservationExpiryNotice[]>([]);
+  const [serverAppNotices, setServerAppNotices] = useState<AppNotificationRecord[]>([]);
+  const [feedsReady, setFeedsReady] = useState(false);
   const [returnDialogNotice, setReturnDialogNotice] = useState<InventoryReturnNotice | null>(
     null
   );
@@ -101,6 +111,8 @@ export function useAppNotifications(options?: { search?: string }) {
   const shortageToastReady = useRef(false);
   const seenExpiryIds = useRef<Set<number>>(new Set());
   const expiryToastReady = useRef(false);
+  const seenAppIds = useRef<Set<number>>(new Set());
+  const appToastReady = useRef(false);
 
   useEffect(() => {
     const onChange = () => setAlertSettings(readAlertSettings());
@@ -244,49 +256,86 @@ export function useAppNotifications(options?: { search?: string }) {
     }
   }, [inAppEnabled, announceNewNotice]);
 
+  const loadAppNotices = useCallback(async () => {
+    if (!inAppEnabled || !canViewNotifications) {
+      setServerAppNotices([]);
+      return;
+    }
+    try {
+      const res = await api.notifications.list();
+      const rows = res.data ?? [];
+      const unread = rows.filter((r) => !r.read_at);
+      if (appToastReady.current) {
+        for (const row of unread) {
+          if (seenAppIds.current.has(row.id)) continue;
+          seenAppIds.current.add(row.id);
+          announceNewNotice(row.title || 'Notification', row.message || undefined);
+        }
+      } else {
+        for (const row of rows) seenAppIds.current.add(row.id);
+        appToastReady.current = true;
+      }
+      setServerAppNotices(rows);
+    } catch {
+      setServerAppNotices([]);
+    }
+  }, [inAppEnabled, canViewNotifications, announceNewNotice]);
+
   useEffect(() => {
-    void loadReturnNotices();
-    void loadInstallerNotices();
-    void loadShortageNotices();
-    void loadExpiryNotices();
-    if (!inAppEnabled) return;
+    let cancelled = false;
+    const loadAll = async () => {
+      await Promise.all([
+        loadReturnNotices(),
+        loadInstallerNotices(),
+        loadShortageNotices(),
+        loadExpiryNotices(),
+        loadAppNotices(),
+      ]);
+      if (!cancelled) setFeedsReady(true);
+    };
+    void loadAll();
+    if (!inAppEnabled) {
+      setFeedsReady(true);
+      return () => {
+        cancelled = true;
+      };
+    }
     const id = window.setInterval(() => {
       void loadReturnNotices();
       void loadInstallerNotices();
       void loadShortageNotices();
       void loadExpiryNotices();
+      void loadAppNotices();
     }, 60_000);
-    return () => window.clearInterval(id);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
   }, [
     loadReturnNotices,
     loadInstallerNotices,
     loadShortageNotices,
     loadExpiryNotices,
+    loadAppNotices,
     inAppEnabled,
   ]);
 
   const allNotifications = useMemo(() => {
     if (!inAppEnabled) return [];
     return buildAppNotifications({
-      maintenanceCases,
-      faultyEntities,
-      projects,
-      customers,
       inventoryReturnNotices: returnNotices,
       inventoryInstallerNotices: installerNotices,
       inventoryShortageNotices: shortageNotices,
       inventoryReservationExpiryNotices: expiryNotices,
+      serverAppNotifications: serverAppNotices,
     });
   }, [
     inAppEnabled,
-    maintenanceCases,
-    faultyEntities,
-    projects,
-    customers,
     returnNotices,
     installerNotices,
     shortageNotices,
     expiryNotices,
+    serverAppNotices,
   ]);
 
   const notifications = useMemo(() => {
@@ -296,8 +345,14 @@ export function useAppNotifications(options?: { search?: string }) {
           return !isCleared(n.id);
         })
       : allNotifications;
-    return filterAppNotifications(base, search);
-  }, [allNotifications, hydrated, isCleared, search]);
+    return filterAppNotifications(base, search).map((item) => ({
+      ...item,
+      href: resolveNotificationHref(item, {
+        can,
+        roleNames: user?.roles,
+      }),
+    }));
+  }, [allNotifications, hydrated, isCleared, search, can, user?.roles]);
 
   const isNotificationRead = useCallback(
     (id: string) => {
@@ -411,10 +466,34 @@ export function useAppNotifications(options?: { search?: string }) {
     }
   }, []);
 
+  const markAppNotice = useCallback(async (noticeId?: number) => {
+    if (noticeId == null) return;
+    try {
+      const res = await api.notifications.markRead(noticeId);
+      const updated = res.data;
+      setServerAppNotices((prev) =>
+        prev.map((n) =>
+          n.id === noticeId
+            ? {
+                ...n,
+                read_at: updated?.read_at ?? new Date().toISOString(),
+              }
+            : n
+        )
+      );
+    } catch {
+      // Keep unread state if mark-read fails.
+    }
+  }, []);
+
   const handleNotificationActivate = useCallback(
     (item: AppNotification) => {
       if (item.type === 'inventory_returned' && item.metaId != null) {
         openReturnDecision(item.metaId);
+        return;
+      }
+      if (isServerAppNotificationId(item.id) && !item.serverRead) {
+        void markAppNotice(parseServerAppNotificationId(item.id) ?? item.metaId);
         return;
       }
       if (INSTALLER_NOTICE_TYPES.has(item.type) && !item.serverRead) {
@@ -430,7 +509,14 @@ export function useAppNotifications(options?: { search?: string }) {
         markLocalRead(item.id);
       }
     },
-    [openReturnDecision, markInstallerNotice, markShortageNotice, markExpiryNotice, markLocalRead]
+    [
+      openReturnDecision,
+      markAppNotice,
+      markInstallerNotice,
+      markShortageNotice,
+      markExpiryNotice,
+      markLocalRead,
+    ]
   );
 
   const markAsRead = useCallback(
@@ -439,6 +525,10 @@ export function useAppNotifications(options?: { search?: string }) {
         notifications.find((x) => x.id === id) ?? allNotifications.find((x) => x.id === id);
       if (n?.type === 'inventory_returned') {
         if (n.metaId != null) openReturnDecision(n.metaId);
+        return;
+      }
+      if (n && isServerAppNotificationId(n.id) && !n.serverRead) {
+        void markAppNotice(parseServerAppNotificationId(n.id) ?? n.metaId);
         return;
       }
       if (n && INSTALLER_NOTICE_TYPES.has(n.type) && !n.serverRead) {
@@ -462,6 +552,7 @@ export function useAppNotifications(options?: { search?: string }) {
       notifications,
       allNotifications,
       openReturnDecision,
+      markAppNotice,
       markInstallerNotice,
       markShortageNotice,
       markExpiryNotice,
@@ -473,33 +564,67 @@ export function useAppNotifications(options?: { search?: string }) {
       .filter((n) => !n.persistent && !isCleared(n.id))
       .map((n) => n.id);
     markLocalAllRead(localIds);
+
+    const ignoreMarkAllError = () => {
+      // Role-scoped feeds may 403; do not surface an unhandled Axios overlay.
+    };
+
+    if (canViewInventory) {
+      void api.inventory
+        .markAllInstallerNoticesRead({ allUsers: canListAllInstallerNotices })
+        .then(() => {
+          setInstallerNotices((prev) =>
+            prev.map((n) => ({
+              ...n,
+              read_at: n.read_at ?? new Date().toISOString(),
+            }))
+          );
+        })
+        .catch(ignoreMarkAllError);
+    }
     void api.inventory
-      .markAllInstallerNoticesRead({ allUsers: inventoryManager })
+      .markAllShortageNoticesRead()
       .then(() => {
-        setInstallerNotices((prev) =>
+        setShortageNotices((prev) =>
           prev.map((n) => ({
             ...n,
             read_at: n.read_at ?? new Date().toISOString(),
           }))
         );
-      });
-    void api.inventory.markAllShortageNoticesRead().then(() => {
-      setShortageNotices((prev) =>
-        prev.map((n) => ({
-          ...n,
-          read_at: n.read_at ?? new Date().toISOString(),
-        }))
-      );
-    });
-    void api.inventory.markAllReservationExpiryNoticesRead().then(() => {
-      setExpiryNotices((prev) =>
-        prev.map((n) => ({
-          ...n,
-          read_at: n.read_at ?? new Date().toISOString(),
-        }))
-      );
-    });
-  }, [markLocalAllRead, allNotifications, isCleared, inventoryManager]);
+      })
+      .catch(ignoreMarkAllError);
+    void api.inventory
+      .markAllReservationExpiryNoticesRead()
+      .then(() => {
+        setExpiryNotices((prev) =>
+          prev.map((n) => ({
+            ...n,
+            read_at: n.read_at ?? new Date().toISOString(),
+          }))
+        );
+      })
+      .catch(ignoreMarkAllError);
+    if (canViewNotifications) {
+      void api.notifications
+        .markAllRead()
+        .then(() => {
+          setServerAppNotices((prev) =>
+            prev.map((n) => ({
+              ...n,
+              read_at: n.read_at ?? new Date().toISOString(),
+            }))
+          );
+        })
+        .catch(ignoreMarkAllError);
+    }
+  }, [
+    markLocalAllRead,
+    allNotifications,
+    isCleared,
+    canViewInventory,
+    canListAllInstallerNotices,
+    canViewNotifications,
+  ]);
 
   const clearAll = useCallback(() => {
     // Only clear ephemeral (non-persistent) notifications from the local UI.
@@ -514,7 +639,7 @@ export function useAppNotifications(options?: { search?: string }) {
     notifications,
     unreadCount,
     highPriorityCount,
-    loading: loading || !hydrated,
+    loading: !hydrated || !feedsReady,
     inAppEnabled,
     isRead: isNotificationRead,
     markAsRead,
@@ -522,6 +647,7 @@ export function useAppNotifications(options?: { search?: string }) {
     clearAll,
     refreshReturnNotices: loadReturnNotices,
     refreshInstallerNotices: loadInstallerNotices,
+    refreshAppNotices: loadAppNotices,
     returnDialogNotice,
     setReturnDialogOpen: closeReturnDialog,
     handleNotificationActivate,

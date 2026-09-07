@@ -28,6 +28,7 @@
 | 11 | [11-inventory-recall.md](./11-inventory-recall.md) | Page 05 — recall side process | Yes |
 | 12 | [12-configuration-change.md](./12-configuration-change.md) | Page 02 — CC workflow | Yes |
 | 13 | [13-audit-trail.md](./13-audit-trail.md) | Page 06 — Section 7 | Last full UX; hooks noted earlier |
+| 14 | [14-notifications.md](./14-notifications.md) | Cross-cutting (Specs 01–13 + CRUD) | Catalog first; engine later |
 
 ---
 
