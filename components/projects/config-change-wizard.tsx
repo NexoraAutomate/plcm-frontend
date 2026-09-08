@@ -31,6 +31,7 @@ import {
   configChangeStepIndex,
 } from '@/lib/config-change';
 import { cn } from '@/lib/utils';
+import { validateConfigChangeForm } from '@/lib/form-validation';
 
 type Props = {
   project: Project;
@@ -183,8 +184,14 @@ export function ConfigChangeWizard({
   }
 
   async function handleSubmit() {
-    if (!change || !targetConfigId || !productType || !reason.trim()) {
-      toast.error('Select a target configuration, product type, and enter a reason');
+    if (!change) return;
+    const validationError = validateConfigChangeForm({
+      targetConfigId: targetConfigId,
+      productType,
+      reason,
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
     setBusy(true);

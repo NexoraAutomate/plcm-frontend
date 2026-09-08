@@ -63,6 +63,7 @@ import {
   type TemplateNodeLevel,
 } from '@/lib/hierarchy-config';
 import { isEntityAssigned } from '@/lib/config-tree-layout';
+import { validateHierarchyConfigForm } from '@/lib/form-validation';
 
 export type HierarchyConfigPanelProps = {
   embedded?: boolean;
@@ -447,32 +448,25 @@ export function HierarchyConfigPanel({
         ? input.description.trim()
         : (draft.description ?? '').trim();
 
-    if (!name) {
-      toast.error('Configuration name is required');
-      return false;
-    }
-    if (isConfigNameTaken(configs, name, draft.id)) {
-      toast.error(`Configuration name “${name}” already exists`);
-      return false;
-    }
-    if ((draft.nodes ?? []).length === 0) {
-      toast.error('Add at least one hierarchy node before saving');
-      return false;
-    }
-    const unassigned = (draft.nodes ?? []).filter((n) => !isEntityAssigned(n));
-    if (unassigned.length > 0) {
-      toast.error(
-        `Assign an entity to every node before saving (${unassigned.length} unassigned)`
-      );
-      return false;
-    }
-
     const withMeta: Draft = {
       ...draft,
       name,
       description,
     };
     const payload = draftToExportPayload(withMeta);
+    const unassigned = (draft.nodes ?? []).filter((n) => !isEntityAssigned(n));
+    const validationError = validateHierarchyConfigForm({
+      name,
+      code: payload.code,
+      productTypeCount: payload.product_types.length,
+      nodeCount: (draft.nodes ?? []).length,
+      unassignedCount: unassigned.length,
+      nameTaken: isConfigNameTaken(configs, name, draft.id),
+    });
+    if (validationError) {
+      toast.error(validationError);
+      return false;
+    }
 
     setSaving(true);
     try {
@@ -508,26 +502,6 @@ export function HierarchyConfigPanel({
     description: string;
   }): Promise<boolean> {
     const name = input.name.trim();
-    if (!name) {
-      toast.error('Configuration name is required');
-      return false;
-    }
-    if (isConfigNameTaken(configs, name)) {
-      toast.error(`Configuration name “${name}” already exists`);
-      return false;
-    }
-    if ((draft.nodes ?? []).length === 0) {
-      toast.error('Add at least one hierarchy node before duplicating');
-      return false;
-    }
-    const unassigned = (draft.nodes ?? []).filter((n) => !isEntityAssigned(n));
-    if (unassigned.length > 0) {
-      toast.error(
-        `Assign an entity to every node before duplicating (${unassigned.length} unassigned)`
-      );
-      return false;
-    }
-
     const named: Draft = {
       ...draft,
       id: undefined,
@@ -537,6 +511,20 @@ export function HierarchyConfigPanel({
       is_available: true,
     };
     const payload = draftToExportPayload(named);
+    const unassigned = (draft.nodes ?? []).filter((n) => !isEntityAssigned(n));
+    const validationError = validateHierarchyConfigForm({
+      name,
+      code: payload.code,
+      productTypeCount: payload.product_types.length,
+      nodeCount: (draft.nodes ?? []).length,
+      unassignedCount: unassigned.length,
+      nameTaken: isConfigNameTaken(configs, name),
+      action: 'duplicating',
+    });
+    if (validationError) {
+      toast.error(validationError);
+      return false;
+    }
 
     setSaving(true);
     try {

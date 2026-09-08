@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Edit, Search } from 'lucide-react';
 import { toast } from 'sonner';
+import { validateHardwareForm } from '@/lib/form-validation';
 import { StatusBadge } from '@/components/status-badge';
 import Link from 'next/link';
 import * as api from '@/lib/api';
@@ -177,8 +178,13 @@ export default function ModulesPage() {
   }, [statusFilterParam, parentFilterParam]);
 
   async function handleCreate() {
-    if (!formData.name.trim() || !formData.subsystem_id) {
-      toast.error('Please fill in all required fields');
+    const validationError = validateHardwareForm({
+      name: formData.name,
+      parentId: formData.subsystem_id,
+      parentLabel: 'Subsystem',
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
     try {
@@ -193,8 +199,13 @@ export default function ModulesPage() {
 
   async function handleUpdate() {
     if (!editingId) return;
-    if (!formData.name.trim() || !formData.subsystem_id) {
-      toast.error('Please fill in all required fields');
+    const validationError = validateHardwareForm({
+      name: formData.name,
+      parentId: formData.subsystem_id,
+      parentLabel: 'Subsystem',
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
     try {

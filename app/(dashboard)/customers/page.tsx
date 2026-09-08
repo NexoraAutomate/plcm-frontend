@@ -36,6 +36,8 @@ import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
+import { RequiredMark } from '@/components/ui/required-mark';
+import { validateCustomerForm } from '@/lib/form-validation';
 import {
   ListStatsVisibilityControls,
   useListStatsVisibility,
@@ -152,8 +154,13 @@ export default function CustomersPage() {
     [statusFilter, statuses]
   );
   async function handleCreate() {
-   if (!formData.name.trim() || !formData.status_id) {
-      toast.error('Please fill in all required fields');
+   const validationError = validateCustomerForm({
+     name: formData.name,
+     statusId: formData.status_id,
+     email: formData.email,
+   });
+   if (validationError) {
+      toast.error(validationError);
       return;
     }
     try {
@@ -207,8 +214,13 @@ export default function CustomersPage() {
   async function handleUpdate() {
     if (!editingId) return;
 
-    if (!formData.name.trim()) {
-      toast.error('Please fill in all fields');
+    const validationError = validateCustomerForm({
+      name: formData.name,
+      statusId: formData.status_id,
+      email: formData.email,
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
 
@@ -339,7 +351,7 @@ export default function CustomersPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
 {/* Customer Name */}
                 <div>
-                  <Label htmlFor="name">Customer Name</Label>
+                  <Label htmlFor="name">Customer Name<RequiredMark /></Label>
                   <Input
                     id="name"
                     value={formData.name}
@@ -434,7 +446,7 @@ export default function CustomersPage() {
                 </div>
 {/* Status */}
                 <div>
-                  <Label htmlFor="status">Status</Label>
+                  <Label htmlFor="status">Status<RequiredMark /></Label>
                   <Select
                     value={formData.status_id?.toString()}
                     onValueChange={(v) =>
@@ -654,7 +666,7 @@ export default function CustomersPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
           <div>
-            <Label htmlFor="edit-name">Customer Name</Label>
+            <Label htmlFor="edit-name">Customer Name<RequiredMark /></Label>
             <Input
               id="edit-name"
               value={formData.name}
@@ -735,7 +747,7 @@ export default function CustomersPage() {
           </div>
 
           <div>
-            <Label htmlFor="edit-status">Status</Label>
+            <Label htmlFor="edit-status">Status<RequiredMark /></Label>
             {/* <select
               id="edit-status"
               value={formData.status || "active"}

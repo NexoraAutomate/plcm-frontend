@@ -12,6 +12,7 @@ import { Plus, Edit, Trash2, Search, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { validateUserCreateForm, validateUserEditForm } from '@/lib/form-validation';
 
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
@@ -51,8 +52,14 @@ export default function UsersPage() {
   }
 
   async function handleCreate() {
-    if (!formData.username.trim() || !formData.password.trim() || !formData.full_name.trim()) {
-      toast.error('Please fill in all required fields');
+    const validationError = validateUserCreateForm({
+      username: formData.username,
+      password: formData.password,
+      fullName: formData.full_name,
+      email: formData.email,
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
     try {
@@ -66,8 +73,13 @@ export default function UsersPage() {
 
   async function handleUpdate() {
     if (!editingId) return;
-    if (!formData.full_name.trim()) {
-      toast.error('Name is required');
+    const validationError = validateUserEditForm({
+      fullName: formData.full_name,
+      email: formData.email,
+      password: formData.password,
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
     try {

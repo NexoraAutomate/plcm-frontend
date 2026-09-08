@@ -28,6 +28,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useDataStore } from "@/lib/data-store";
 import { useAppDefinitions } from "@/lib/app-definitions-context";
+import { validateStatusForm } from "@/lib/form-validation";
 import { usePageDataRefresh } from "@/components/page-data-refresh";
 
 function getStatusTypes(entityLabel: (level: string, plural?: boolean) => string) {
@@ -222,17 +223,14 @@ export function StatusesPanel({ embedded = false }: StatusesPanelProps) {
   };
 
   const handleCreateStatus = async () => {
-    if (!newName.trim()) {
-      toast.error("Status name is required");
-      return;
-    }
-    if (!newStatusType) {
-      toast.error("Category is required");
-      return;
-    }
     const color = normalizeStatusColor(newColor);
-    if (!color) {
-      toast.error("Select a valid color from the palette (e.g. #059669)");
+    const validationError = validateStatusForm({
+      name: newName,
+      statusType: newStatusType,
+      colorValid: Boolean(color),
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
 
@@ -242,7 +240,7 @@ export function StatusesPanel({ embedded = false }: StatusesPanelProps) {
         status_name: newName.trim(),
         description: newDescription.trim(),
         status_type: newStatusType,
-        color,
+        color: color ?? undefined,
       });
       setNewName("");
       setNewDescription("");
@@ -271,17 +269,14 @@ export function StatusesPanel({ embedded = false }: StatusesPanelProps) {
   const handleEditSave = async () => {
     if (!editTarget) return;
 
-    if (!editName.trim()) {
-      toast.error("Status name cannot be empty");
-      return;
-    }
-    if (!editStatusType) {
-      toast.error("Category is required");
-      return;
-    }
     const color = normalizeStatusColor(editColor);
-    if (!color) {
-      toast.error("Select a valid color from the palette (e.g. #059669)");
+    const validationError = validateStatusForm({
+      name: editName,
+      statusType: editStatusType,
+      colorValid: Boolean(color),
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
 
@@ -290,7 +285,7 @@ export function StatusesPanel({ embedded = false }: StatusesPanelProps) {
         status_name: editName.trim(),
         description: editDescription.trim(),
         status_type: editStatusType,
-        color,
+        color: color ?? undefined,
       });
       setEditOpen(false);
       setEditTarget(null);

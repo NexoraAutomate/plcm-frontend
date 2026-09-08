@@ -52,6 +52,8 @@ import {
 import * as api from '@/lib/api';
 import type { HierarchyConfigurationSummary } from '@/lib/models';
 import { useAppDefinitions } from '@/lib/app-definitions-context';
+import { RequiredMark } from '@/components/ui/required-mark';
+import { validateProjectCreateForm, validateProjectEditForm } from '@/lib/form-validation';
 
 export default function ProjectsPage(){
   const router = useRouter();
@@ -289,15 +291,16 @@ export default function ProjectsPage(){
     const sdlsCounts = formData.sdls_counts_by_flight
       .slice(0, Number(formData.flight_count))
       .map((count) => Number(count));
-    if (
-      !formData.name.trim() ||
-      !formData.hierarchy_config_id ||
-      !formData.order_id ||
-      !formData.flight_count ||
-      sdlsCounts.length !== Number(formData.flight_count) ||
-      sdlsCounts.some((count) => count < 1)
-    ) {
-      toast.error('Name, order, configuration, and scope counts are required');
+    const validationError = validateProjectCreateForm({
+      name: formData.name,
+      hierarchyConfigId: formData.hierarchy_config_id,
+      orderId: formData.order_id,
+      productType: formData.product_type,
+      flightCount: Number(formData.flight_count),
+      sdlsCountsByFlight: sdlsCounts,
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
     setIsCreating(true);
@@ -342,8 +345,16 @@ export default function ProjectsPage(){
 
   async function handleUpdate() {
     if (!editingId) return;
-    if (!formData.name.trim() || !formData.owner_id || !formData.status_id || !formData.order_id || !formData.start_date || !formData.end_date) {
-      toast.error('Please fill in all required fields');
+    const validationError = validateProjectEditForm({
+      name: formData.name,
+      ownerId: formData.owner_id,
+      statusId: formData.status_id,
+      orderId: formData.order_id,
+      startDate: formData.start_date,
+      endDate: formData.end_date,
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
     try {
@@ -538,6 +549,30 @@ export default function ProjectsPage(){
                   </SelectContent>
                 </Select>
               </div>
+              {formData.hierarchy_config_id ? (
+                <div>
+                  <Label>Product Type <RequiredMark /></Label>
+                  <Select
+                    value={formData.product_type}
+                    onValueChange={(v) => setFormData({ ...formData, product_type: v })}
+                    disabled={isCreating}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select product type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(
+                        availableConfigs.find((c) => c.id === formData.hierarchy_config_id)
+                          ?.product_type_codes ?? []
+                      ).map((code) => (
+                        <SelectItem key={code} value={code}>
+                          {code}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
               <div>
                 <Label>Flight count *</Label>
                 <Input
@@ -809,7 +844,7 @@ export default function ProjectsPage(){
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>{entityLabel('project')} Name</Label>
+              <Label>{entityLabel('project')} Name<RequiredMark /></Label>
               <Input
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -826,7 +861,7 @@ export default function ProjectsPage(){
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Start Date</Label>
+                <Label>Start Date<RequiredMark /></Label>
                 <Input
                   type="date"
                   value={formData.start_date}
@@ -834,7 +869,7 @@ export default function ProjectsPage(){
                 />
               </div>
               <div>
-                <Label>End Date</Label>
+                <Label>End Date<RequiredMark /></Label>
                 <Input
                   type="date"
                   value={formData.end_date}
@@ -843,7 +878,7 @@ export default function ProjectsPage(){
               </div>
             </div>
             <div>
-              <Label>Owner</Label>
+              <Label>Owner<RequiredMark /></Label>
               <Select
                 value={formData.owner_id.toString()}
                 onValueChange={(v) => setFormData({ ...formData, owner_id: parseInt(v) })}
@@ -861,7 +896,7 @@ export default function ProjectsPage(){
               </Select>
             </div>
             <div>
-              <Label>Status</Label>
+              <Label>Status<RequiredMark /></Label>
               <Select
                 value={formData.status_id.toString()}
                 onValueChange={(v) => setFormData({ ...formData, status_id: parseInt(v) })}

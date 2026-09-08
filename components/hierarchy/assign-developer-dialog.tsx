@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
+import { validateAssignDeveloperForm } from '@/lib/form-validation';
 import type { User } from '@/lib/models';
 import { formatUserRef } from '@/lib/user-display';
 import { hasWorkflowRole } from '@/lib/workflow-roles';
@@ -69,8 +70,9 @@ export function AssignDeveloperDialog({
       return;
     }
     const id = Number(developerId);
-    if (!Number.isFinite(id) || id <= 0) {
-      toast.error('Select a developer');
+    const validationError = validateAssignDeveloperForm(id);
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
     setSubmitting(true);

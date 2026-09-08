@@ -25,8 +25,8 @@ import type { ReactNode } from 'react';
 import type { PasswordPolicyPublic } from '@/lib/models';
 import {
   passwordPolicyHint,
-  validatePasswordAgainstPolicy,
 } from '@/lib/password-policy';
+import { validateChangePasswordForm } from '@/lib/form-validation';
 
 function formatDateTime(value?: string | null) {
   if (!value) return '—';
@@ -70,17 +70,14 @@ export function ProfilePage() {
   }, []);
 
   async function handleChangePassword() {
-    if (!oldPassword || !newPassword) {
-      toast.error('Enter your current and new password');
-      return;
-    }
-    const policyError = validatePasswordAgainstPolicy(newPassword, passwordPolicy);
-    if (policyError) {
-      toast.error(policyError);
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      toast.error('New passwords do not match');
+    const validationError = validateChangePasswordForm({
+      oldPassword,
+      newPassword,
+      confirmPassword,
+      passwordPolicy,
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
     setSavingPassword(true);

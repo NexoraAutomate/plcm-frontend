@@ -22,6 +22,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Eye, Search } from 'lucide-react';
 import { toast } from 'sonner';
+import { validateMaintenanceLogForm } from '@/lib/form-validation';
 
 export default function MaintenancePage() {
   const { users, createMaintenanceLog } = useDataStore();
@@ -62,8 +63,14 @@ export default function MaintenancePage() {
   );
 
   async function handleCreate() {
-    if (!formData.entity_id || !formData.performed_by || !formData.notes.trim()) {
-      toast.error('Please fill in all required fields');
+    const validationError = validateMaintenanceLogForm({
+      serialNumber: formData.serial_number,
+      entityId: formData.entity_id,
+      performedBy: formData.performed_by,
+      notes: formData.notes,
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
     try {

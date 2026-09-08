@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { validateLoginForm } from '@/lib/form-validation';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -28,14 +29,14 @@ export default function LoginPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!username || !password) {
+    if (validateLoginForm(username, password)) {
       toast.error('Please enter username and password');
       return;
     }
 
     setIsLoading(true);
     try {
-      await login(username, password);
+      await login(username.trim(), password);
       toast.success('Logged in successfully');
       const stored = localStorage.getItem('sat-user');
       let destination = '/executive-dashboard';

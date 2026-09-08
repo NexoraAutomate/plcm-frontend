@@ -6,6 +6,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from 'sonner';
+import { validateResolveFaultForm } from '@/lib/form-validation';
 import * as api from '@/lib/api';
 import { filterInventoryForReplacementByPartNumber } from '@/lib/inventory-filter';
 import { inventoryPartNumber } from '@/lib/inventory-entity-fields';
@@ -184,7 +186,18 @@ export function ResolveFaultDialog({
   );
 
   const handleSubmit = async () => {
-    if (!entity || !resolutionType) return;
+    if (!entity) return;
+    const validationError = validateResolveFaultForm({
+      resolutionType,
+      requiresReplacement,
+      hasStock: stockRows.length > 0,
+      replacementSelected: Boolean(selectedRow),
+    });
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+    if (!resolutionType) return;
 
     const replacement = selectedRow
       ? {

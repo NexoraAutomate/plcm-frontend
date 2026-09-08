@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
+import { validateIssueInventoryForm } from '@/lib/form-validation';
 import type { Inventory, InventoryInstance, ItemIssueRequest, User } from '@/lib/models';
 import { inventoryUsesInstances } from '@/lib/entity-hierarchy';
 import { formatUserRef } from '@/lib/user-display';
@@ -115,36 +116,25 @@ export function InventoryIssueDialog({
   const handleSubmit = async () => {
     if (!item) return;
     const signed = signature.payload();
-    if (!signed) {
-      toast.error('Signature is required to issue');
+    const developerId = Number(issuedToUserId);
+    const qty = Math.max(1, Number(quantity) || 1);
+    const resolvedInstanceId = usesInstances ? Number(instanceId) : undefined;
+    const validationError = validateIssueInventoryForm({
+      signaturePresent: Boolean(signed),
+      developerId,
+      usesInstances,
+      instanceId: resolvedInstanceId,
+      quantity: qty,
+      availableQuantity: item.available_quantity ?? item.quantity ?? 0,
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
+    if (!signed) return;
     if (usesInstances && reservedHold && !matchingRequest) {
       toast.error('Developer must request this reserved item before it can be issued');
       return;
-    }
-
-    const developerId = Number(issuedToUserId);
-    if (!Number.isFinite(developerId) || developerId <= 0) {
-      toast.error('Select a developer');
-      return;
-    }
-
-    const qty = Math.max(1, Number(quantity) || 1);
-    let resolvedInstanceId: number | undefined;
-
-    if (usesInstances) {
-      resolvedInstanceId = Number(instanceId);
-      if (!Number.isFinite(resolvedInstanceId) || resolvedInstanceId <= 0) {
-        toast.error('Select a serial number to issue');
-        return;
-      }
-    } else {
-      const avail = item.available_quantity ?? item.quantity ?? 0;
-      if (qty > avail) {
-        toast.error(`Only ${avail} unit(s) available to issue`);
-        return;
-      }
     }
 
     setSubmitting(true);

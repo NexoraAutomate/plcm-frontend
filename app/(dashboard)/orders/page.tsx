@@ -37,6 +37,8 @@ import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
+import { RequiredMark } from '@/components/ui/required-mark';
+import { validateOrderForm } from '@/lib/form-validation';
 import {
   ListStatsVisibilityControls,
   useListStatsVisibility,
@@ -67,7 +69,7 @@ const emptyOrderForm: OrderForm = {
   order_date: '',
   delivery_date: '',
   total_value: null,
-  currency: '',
+  currency: 'PKR',
   project_manager: '',
   remarks: '',
   customer_id: undefined,
@@ -149,13 +151,15 @@ export default function OrdersPage() {
   );
 
   async function handleCreate() {
-    if (
-      !formData.title.trim() ||
-      !formData.order_date ||
-      !formData.currency.trim() ||
-      !formData.status_id
-    ) {
-      toast.error('Please fill in all required fields');
+    const validationError = validateOrderForm({
+      title: formData.title,
+      orderDate: formData.order_date,
+      currency: formData.currency,
+      statusId: formData.status_id,
+      customerId: formData.customer_id,
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
 
@@ -175,13 +179,15 @@ export default function OrdersPage() {
   async function handleUpdate() {
     if (!editingId) return;
 
-    if (
-      !formData.title.trim() ||
-      !formData.order_date ||
-      !formData.currency.trim() ||
-      !formData.status_id
-    ) {
-      toast.error('Please fill in all required fields');
+    const validationError = validateOrderForm({
+      title: formData.title,
+      orderDate: formData.order_date,
+      currency: formData.currency,
+      statusId: formData.status_id,
+      customerId: formData.customer_id,
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
 
@@ -346,7 +352,7 @@ export default function OrdersPage() {
             <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
               <div className="grid gap-5 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="customer">Customer</Label>
+                  <Label htmlFor="customer">Customer<RequiredMark /></Label>
                   <Select
                     value={formData.customer_id?.toString() ?? ""}
                     onValueChange={(v) =>
@@ -373,7 +379,7 @@ export default function OrdersPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
+                  <Label htmlFor="status">Status<RequiredMark /></Label>
                   <Select
                     value={formData.status_id?.toString()}
                     onValueChange={(v) =>
@@ -394,7 +400,7 @@ export default function OrdersPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="title">Title</Label>
+                  <Label htmlFor="title">Title<RequiredMark /></Label>
                   <Input
                     id="title"
                     value={formData.title}
@@ -443,7 +449,7 @@ export default function OrdersPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="order_date">Order Date</Label>
+                  <Label htmlFor="order_date">Order Date<RequiredMark /></Label>
                   <Input
                     id="order_date"
                     type="date"
@@ -485,7 +491,7 @@ export default function OrdersPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="currency">Currency</Label>
+                  <Label htmlFor="currency">Currency<RequiredMark /></Label>
                   <Input
                     id="currency"
                     value={formData.currency}
@@ -706,7 +712,7 @@ export default function OrdersPage() {
 
               {/* Customer */}
               <div className="space-y-2">
-                <Label htmlFor="edit_customer">Customer</Label>
+                <Label htmlFor="edit_customer">Customer<RequiredMark /></Label>
 
                 <Select
                   value={formData.customer_id?.toString() ?? ""}
@@ -764,7 +770,7 @@ export default function OrdersPage() {
                 </Select>
               </div> */}
               <div>
-            <Label htmlFor="edit-status">Status</Label>
+            <Label htmlFor="edit-status">Status<RequiredMark /></Label>
             {/* <select
               id="edit-status"
               value={formData.status || "active"}
@@ -823,7 +829,7 @@ export default function OrdersPage() {
 
               {/* Title */}
               <div className="space-y-2">
-                <Label>Title</Label>
+                <Label>Title<RequiredMark /></Label>
 
                 <Input
                   value={formData.title}
@@ -884,7 +890,7 @@ export default function OrdersPage() {
 
               {/* Order Date */}
               <div className="space-y-2">
-                <Label>Order Date</Label>
+                <Label>Order Date<RequiredMark /></Label>
 
                 <Input
                   type="date"
@@ -935,7 +941,7 @@ export default function OrdersPage() {
 
               {/* Currency */}
               <div className="space-y-2">
-                <Label>Currency</Label>
+                <Label>Currency<RequiredMark /></Label>
 
                 <Input
                   value={formData.currency}

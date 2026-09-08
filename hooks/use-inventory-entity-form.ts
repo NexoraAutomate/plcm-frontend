@@ -28,6 +28,7 @@ import type { PendingAttachmentUpload } from '@/components/entity-attachments-se
 import type { HierarchyEntityType } from '@/lib/entity-hierarchy';
 import type { Inventory } from '@/lib/models';
 import { formatUserRef } from '@/lib/user-display';
+import { validateInventoryForm } from '@/lib/form-validation';
 import * as api from '@/lib/api';
 
 export type InventoryEntityFormType = HierarchyEntityType;
@@ -176,32 +177,17 @@ export function useInventoryEntityForm(options: {
   );
 
   const validateCreate = useCallback((): string | null => {
-    const usesInstances = inventoryUsesInstances(selectedEntityType);
-    const isHierarchy = context === 'hierarchy';
-    if (!formData.name.trim() || (!isHierarchy && !usesInstances && !formData.location.trim())) {
-      return `Please fill in required fields: ${entityLabel(selectedEntityType)} category${
-        usesInstances || isHierarchy ? '' : ' and Location'
-      }`;
-    }
-    if (usesInstances && !formData.part_number.trim()) {
-      return 'Part number is required for serialized inventory';
-    }
-    if (
-      !isHierarchy &&
-      usesInstances &&
-      selectedEntityType !== 'component' &&
-      !formData.location.trim()
-    ) {
-      return 'Location is required for each serialized unit';
-    }
-    if (
-      !isHierarchy &&
-      inventorySupportsQuantity(selectedEntityType) &&
-      formData.quantity <= 0
-    ) {
-      return 'Please enter a quantity greater than 0 for component inventory';
-    }
-    return null;
+    return validateInventoryForm({
+      name: formData.name,
+      partNumber: formData.part_number,
+      location: formData.location,
+      quantity: formData.quantity,
+      usesInstances: inventoryUsesInstances(selectedEntityType),
+      supportsQuantity: inventorySupportsQuantity(selectedEntityType),
+      isHierarchy: context === 'hierarchy',
+      isComponent: selectedEntityType === 'component',
+      entityCategoryLabel: entityLabel(selectedEntityType),
+    });
   }, [context, entityLabel, formData, selectedEntityType]);
 
   return {

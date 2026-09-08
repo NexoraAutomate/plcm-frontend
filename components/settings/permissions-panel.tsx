@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { Plus, Edit, Trash2, Search, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
+import { validatePermissionName } from '@/lib/form-validation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -119,8 +120,9 @@ export function PermissionsPanel({ embedded = false }: PermissionsPanelProps) {
   }
 
   async function handleCreate() {
-    if (!formName.trim()) {
-      toast.error('Permission name is required');
+    const validationError = validatePermissionName(formName);
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
     setSaving(true);
@@ -145,8 +147,9 @@ export function PermissionsPanel({ embedded = false }: PermissionsPanelProps) {
 
   async function handleUpdate() {
     if (!editing) return;
-    if (!formName.trim()) {
-      toast.error('Permission name is required');
+    const validationError = validatePermissionName(formName);
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
     setSaving(true);

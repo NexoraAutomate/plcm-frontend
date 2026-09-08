@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { validateIssuanceRemarks } from '@/lib/form-validation';
 
 export type IssuanceRemarksAction = 'return' | 'accept' | 'reject';
 
@@ -67,7 +68,8 @@ export function IssuanceRemarksDialog({
 
   const submit = async () => {
     const cleaned = notes.trim();
-    if (!cleaned) return;
+    const validationError = validateIssuanceRemarks(cleaned);
+    if (validationError) return;
     await onConfirm(cleaned);
   };
 

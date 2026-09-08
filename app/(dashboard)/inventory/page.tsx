@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState, useMemo, useEffect, useRef } from 'react';
+import { Fragment, useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -82,6 +82,7 @@ import { cn } from '@/lib/utils';
 import { Can } from '@/components/auth/can';
 import { useAuth } from '@/lib/auth-context';
 import { useAppDefinitions } from '@/lib/app-definitions-context';
+import { validateInventoryForm } from '@/lib/form-validation';
 import {
   buildEntityIdentifiersFromDefinitions,
   nextInventorySequences,
@@ -103,7 +104,17 @@ const ACTION_BTN =
 /** Visible unit rows in the expanded inventory table before vertical scroll. */
 const MAX_VISIBLE_EXPANDED_UNITS = 10;
 const EXPANDED_UNITS_SCROLL_CLASS =
-  'max-h-[calc(2.5rem+10*2.75rem)] overflow-y-auto';
+  'max-h-[calc(2.5rem+10*2.75rem)] overflow-y-auto overflow-x-hidden';
+const EXPANDED_CELL_TRUNCATE = 'max-w-0 truncate';
+/** Sticky offset so a frost band can sit above the stuck header. */
+const STUCK_HEADER_TOP_PX = 12;
+const STUCK_HEADER_FROST =
+  'bg-slate-200/90 backdrop-blur-xl backdrop-saturate-150 dark:bg-zinc-950/90';
+const STUCK_HEADER_BAND =
+  '[&_th]:overflow-visible ' +
+  '[&_th]:before:pointer-events-none [&_th]:before:absolute [&_th]:before:inset-x-0 [&_th]:before:-top-3 [&_th]:before:h-3 [&_th]:before:bg-slate-200/90 [&_th]:before:backdrop-blur-xl [&_th]:before:backdrop-saturate-150 [&_th]:before:content-[\'\'] ' +
+  '[&_th]:after:pointer-events-none [&_th]:after:absolute [&_th]:after:inset-x-0 [&_th]:after:top-full [&_th]:after:h-4 [&_th]:after:bg-slate-200/90 [&_th]:after:backdrop-blur-xl [&_th]:after:backdrop-saturate-150 [&_th]:after:content-[\'\'] ' +
+  'dark:[&_th]:before:bg-zinc-950/90 dark:[&_th]:after:bg-zinc-950/90';
 
 const ACTION_ICON = {
   add: 'size-3.5 text-muted-foreground transition-colors group-hover/add:text-emerald-600',
@@ -372,6 +383,8 @@ export default function InventoryPage() {
     location_rack: '',
   });
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  const [headerStuck, setHeaderStuck] = useState(false);
+  const tableHeaderRef = useRef<HTMLTableSectionElement | null>(null);
   const [addMoreItem, setAddMoreItem] = useState<InventoryItem | null>(null);
   const [issueTarget, setIssueTarget] = useState<{
     item: InventoryItem;
@@ -430,6 +443,27 @@ export default function InventoryPage() {
     setSelectingAll(false);
     setSelectedIds(new Set());
   }, [debouncedSearch, entityTypeFilter, stockFilter]);
+
+  useLayoutEffect(() => {
+    const header = tableHeaderRef.current;
+    if (!header) return;
+    const scroller = header.closest('main');
+    if (!(scroller instanceof HTMLElement)) return;
+
+    const updateStuck = () => {
+      const headerTop = header.getBoundingClientRect().top;
+      const scrollerTop = scroller.getBoundingClientRect().top;
+      setHeaderStuck(headerTop <= scrollerTop + STUCK_HEADER_TOP_PX + 1);
+    };
+
+    updateStuck();
+    scroller.addEventListener('scroll', updateStuck, { passive: true });
+    window.addEventListener('resize', updateStuck);
+    return () => {
+      scroller.removeEventListener('scroll', updateStuck);
+      window.removeEventListener('resize', updateStuck);
+    };
+  }, [loading, inventory.length]);
 
   function toggleRowSelected(id: number, checked: boolean) {
     setSelectedIds((prev) => {
@@ -824,24 +858,19 @@ export default function InventoryPage() {
       formData.location
     );
 
-    if (!formData.name.trim() || (!usesInstances && !location)) {
-      toast.error(
-        `Please fill in required fields: ${getEntityDisplayName(selectedEntityType)} category${
-          usesInstances ? '' : ' and Room / Cabinet / Rack'
-        }`
-      );
-      return;
-    }
-    if (usesInstances && !formData.part_number.trim()) {
-      toast.error('Part number is required for serialized inventory');
-      return;
-    }
-    if (usesInstances && selectedEntityType !== 'component' && !location) {
-      toast.error('Room / Cabinet / Rack are required for each serialized unit');
-      return;
-    }
-    if (inventorySupportsQuantity(selectedEntityType) && formData.quantity <= 0) {
-      toast.error('Please enter a quantity greater than 0 for component inventory');
+    const validationError = validateInventoryForm({
+      name: formData.name,
+      partNumber: formData.part_number,
+      location,
+      quantity: formData.quantity,
+      usesInstances,
+      supportsQuantity: inventorySupportsQuantity(selectedEntityType),
+      isComponent: selectedEntityType === 'component',
+      entityCategoryLabel: getEntityDisplayName(selectedEntityType),
+      locationLabel: 'Room / Cabinet / Rack',
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
 
@@ -883,23 +912,19 @@ export default function InventoryPage() {
       formData.location
     );
 
-    if (!formData.name.trim() || (!usesInstances && !location)) {
-      toast.error(
-        `Please fill in required fields: Name${usesInstances ? '' : ' and Room / Cabinet / Rack'}`
-      );
-      return;
-    }
-    if (
-      usesInstances &&
-      selectedEntityType !== 'component' &&
-      editingInstanceId &&
-      !location
-    ) {
-      toast.error('Room / Cabinet / Rack are required for each serialized unit');
-      return;
-    }
-    if (inventorySupportsQuantity(selectedEntityType) && formData.quantity <= 0) {
-      toast.error('Please enter a quantity greater than 0 for component inventory');
+    const validationError = validateInventoryForm({
+      name: formData.name,
+      partNumber: formData.part_number,
+      location,
+      quantity: formData.quantity,
+      usesInstances,
+      supportsQuantity: inventorySupportsQuantity(selectedEntityType),
+      isComponent: selectedEntityType === 'component' || (usesInstances && !editingInstanceId),
+      entityCategoryLabel: getEntityDisplayName(selectedEntityType),
+      locationLabel: 'Room / Cabinet / Rack',
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
 
@@ -1911,9 +1936,32 @@ export default function InventoryPage() {
         </CardHeader>
         <CardContent>
           <ListContentSuspense loading={pagination.fetching}>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
+          <div
+            aria-hidden
+            className={cn(
+              'pointer-events-none -mb-18 h-18',
+              headerStuck
+                ? cn('sticky top-0 z-10', STUCK_HEADER_FROST)
+                : 'relative z-0 bg-transparent'
+            )}
+          />
+          <Table
+            className="table-fixed"
+            containerClassName="relative z-20 overflow-x-visible overflow-y-visible rounded-md border"
+          >
+              <TableHeader
+                ref={tableHeaderRef}
+                className={cn(
+                  '[&_th]:sticky [&_th]:top-3 [&_th]:z-40',
+                  headerStuck &&
+                    cn(
+                      STUCK_HEADER_BAND,
+                      '[&_tr]:bg-slate-200/90! [&_tr]:hover:bg-slate-200/90! dark:[&_tr]:bg-zinc-950/90! dark:[&_tr]:hover:bg-zinc-950/90!',
+                      '[&_th]:bg-slate-200/90! [&_th]:backdrop-blur-xl [&_th]:backdrop-saturate-150 [&_th]:hover:bg-slate-200/90!',
+                      'dark:[&_th]:bg-zinc-950/90! dark:[&_th]:hover:bg-zinc-950/90!'
+                    )
+                )}
+              >
                 <TableRow>
                   {inventoryManager ? (
                     <TableHead className="w-10 pl-2">
@@ -1935,14 +1983,19 @@ export default function InventoryPage() {
                   ) : null}
                   <TableHead className="w-10" />
                   <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Category</SortableTableHead>
-                  <SortableTableHead column="inventory_type" sort={sort} onSort={cycleSort}>Type</SortableTableHead>
-                  <TableHead title="Units of this part number already installed into entities">
+                  <SortableTableHead className="w-28" column="inventory_type" sort={sort} onSort={cycleSort}>Type</SortableTableHead>
+                  <TableHead className="w-24" title="Units of this part number already installed into entities">
                     Total Used
                   </TableHead>
-                  <SortableTableHead column="quantity" sort={sort} onSort={cycleSort}>Quantity</SortableTableHead>
+                  <SortableTableHead className="w-28" column="quantity" sort={sort} onSort={cycleSort}>Quantity</SortableTableHead>
                   <SortableTableHead column="holder_user_id" sort={sort} onSort={cycleSort}>Inventory Holder</SortableTableHead>
                   <SortableTableHead column="location" sort={sort} onSort={cycleSort}>Location</SortableTableHead>
-                  <TableHead className="sticky right-0 z-20 bg-slate-200 text-right dark:bg-black">
+                  <TableHead
+                    className={cn(
+                      'sticky right-0 top-3 z-50 w-64 overflow-visible text-right',
+                      headerStuck ? STUCK_HEADER_FROST : 'bg-slate-200 dark:bg-black'
+                    )}
+                  >
                     Actions
                   </TableHead>
                 </TableRow>
@@ -2013,7 +2066,9 @@ export default function InventoryPage() {
                               </Button>
                             ) : null}
                           </TableCell>
-                          <TableCell className="font-medium">{item.entityName || 'N/A'}</TableCell>
+                          <TableCell className="max-w-0 truncate font-medium" title={item.entityName || 'N/A'}>
+                            {item.entityName || 'N/A'}
+                          </TableCell>
                           <TableCell>
                             {item.inventory_type ? (
                               <StatusBadge
@@ -2047,11 +2102,15 @@ export default function InventoryPage() {
                               ) : null}
                             </div>
                           </TableCell>
-                          <TableCell>{item.holderName || '—'}</TableCell>
-                          <TableCell>{item.displayLocation || '—'}</TableCell>
+                          <TableCell className="max-w-0 truncate" title={item.holderName || '—'}>
+                            {item.holderName || '—'}
+                          </TableCell>
+                          <TableCell className="max-w-0 truncate" title={item.displayLocation || '—'}>
+                            {item.displayLocation || '—'}
+                          </TableCell>
                           <TableCell
                             className={cn(
-                              'sticky right-0 z-20 text-right group-hover:bg-muted/50',
+                              'sticky right-0 z-10 w-64 text-right group-hover:bg-muted/50',
                               isSelected ? 'bg-muted/50' : isExpanded ? 'bg-muted/30' : 'bg-background'
                             )}
                           >
@@ -2229,8 +2288,8 @@ export default function InventoryPage() {
                         </TableRow>
                         {isExpanded && isExpandable ? (
                           <TableRow className="bg-muted/20 hover:bg-muted/20">
-                            <TableCell colSpan={inventoryManager ? 9 : 8} className="p-0">
-                              <div className="px-6 py-3">
+                            <TableCell colSpan={inventoryManager ? 9 : 8} className="min-w-0 overflow-x-hidden p-0">
+                              <div className="min-w-0 overflow-x-hidden px-4 py-3">
                                 <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
                                   <h4 className="text-sm font-semibold">
                                     Part Number{' '}
@@ -2244,52 +2303,79 @@ export default function InventoryPage() {
                                   </span>
                                 </div>
                                 <Table
+                                  className="table-fixed"
                                   containerClassName={cn(
-                                    'rounded-md border bg-background',
+                                    'min-w-0 rounded-md border bg-background overflow-x-hidden',
                                     serialInstances.length > MAX_VISIBLE_EXPANDED_UNITS &&
                                       EXPANDED_UNITS_SCROLL_CLASS
                                   )}
                                 >
-                                  <TableHeader className="sticky top-0 z-10">
+                                  <colgroup>
+                                    <col style={{ width: '30%' }} />
+                                    <col style={{ width: '26%' }} />
+                                    <col />
+                                    <col style={{ width: '7rem' }} />
+                                    <col style={{ width: '11rem' }} />
+                                  </colgroup>
+                                  <TableHeader
+                                    className={
+                                      serialInstances.length > MAX_VISIBLE_EXPANDED_UNITS
+                                        ? 'sticky top-0 z-10'
+                                        : undefined
+                                    }
+                                  >
                                     <TableRow>
                                       <TableHead>Unit Identity</TableHead>
                                       <TableHead>Inventory Holder</TableHead>
                                       <TableHead>Location</TableHead>
-                                      <TableHead>Status</TableHead>
-                                      <TableHead className="sticky right-0 z-20 w-[1%] bg-slate-200 text-right dark:bg-black">
-                                        Actions
-                                      </TableHead>
+                                      <TableHead className="w-28">Status</TableHead>
+                                      <TableHead className="w-44 text-right">Actions</TableHead>
                                     </TableRow>
                                   </TableHeader>
                                   <TableBody>
                                     {serialInstances.map((instance, index) => {
+                                      const serialLabel =
+                                        instanceSerialNumber(instance) || `Unit ${index + 1}`;
+                                      const holderLabel = displayUserName(
+                                        users,
+                                        instance.holder_user_id,
+                                        instance.holder_name
+                                      );
+                                      const locationLabel = instance.location?.trim() || '—';
                                       return (
                                         <TableRow key={instance.id}>
-                                          <TableCell className="font-mono text-sm">
+                                          <TableCell
+                                            className={cn(EXPANDED_CELL_TRUNCATE, 'font-mono text-sm')}
+                                            title={serialLabel}
+                                          >
                                             {isProjectReservedInstance(instance) ? (
                                               <button
                                                 type="button"
-                                                className="cursor-pointer underline-offset-2 hover:underline"
+                                                className="block w-full truncate text-left cursor-pointer underline-offset-2 hover:underline"
                                                 onClick={() =>
                                                   setReservationHoldInstance(instance)
                                                 }
                                                 title="View reservation details"
                                               >
-                                                {instanceSerialNumber(instance) || `Unit ${index + 1}`}
+                                                {serialLabel}
                                               </button>
                                             ) : (
-                                              instanceSerialNumber(instance) || `Unit ${index + 1}`
+                                              serialLabel
                                             )}
                                           </TableCell>
-                                          <TableCell>
-                                            {displayUserName(
-                                              users,
-                                              instance.holder_user_id,
-                                              instance.holder_name
-                                            )}
+                                          <TableCell
+                                            className={EXPANDED_CELL_TRUNCATE}
+                                            title={holderLabel}
+                                          >
+                                            {holderLabel}
                                           </TableCell>
-                                          <TableCell>{instance.location?.trim() || '—'}</TableCell>
-                                          <TableCell>
+                                          <TableCell
+                                            className={EXPANDED_CELL_TRUNCATE}
+                                            title={locationLabel}
+                                          >
+                                            {locationLabel}
+                                          </TableCell>
+                                          <TableCell className="w-28 overflow-hidden">
                                             {instance.is_reserved ? (
                                               <StatusBadge
                                                 status={
@@ -2311,8 +2397,8 @@ export default function InventoryPage() {
                                               <StatusBadge status="AVAILABLE" />
                                             )}
                                           </TableCell>
-                                          <TableCell className="sticky right-0 z-20 bg-background text-right">
-                                            <div className="flex shrink-0 justify-end gap-0.5">
+                                          <TableCell className="w-44 p-1 text-right">
+                                            <div className="flex flex-nowrap justify-end">
                                               <Can permission={[P.inventory_label_generate, P.inventory_label_print]}>
                                                 <Button
                                                   size="icon-sm"
@@ -2348,7 +2434,7 @@ export default function InventoryPage() {
                                                     variant="ghost"
                                                     className={cn(ACTION_BTN, 'group/edit')}
                                                     title="Edit this unit"
-                                                    aria-label={`Edit ${instanceSerialNumber(instance) || `unit ${index + 1}`}`}
+                                                    aria-label={`Edit ${serialLabel}`}
                                                     onClick={() => void openEdit(item, instance.id)}
                                                   >
                                                     <Edit className={ACTION_ICON.edit} />
@@ -2362,7 +2448,7 @@ export default function InventoryPage() {
                                                     variant="ghost"
                                                     className={cn(ACTION_BTN, 'group/delete')}
                                                     title="Delete this unit"
-                                                    aria-label={`Delete ${instanceSerialNumber(instance) || `unit ${index + 1}`}`}
+                                                    aria-label={`Delete ${serialLabel}`}
                                                     onClick={() =>
                                                       setInstanceDeleteTarget({ item, instance })
                                                     }
@@ -2416,7 +2502,6 @@ export default function InventoryPage() {
                 )}
               </TableBody>
             </Table>
-          </div>
           </ListContentSuspense>
           <EntityListPagination
             page={pagination.page}

@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { EntityPicture } from '@/components/entity-picture';
 import { isExternalPictureUrl } from '@/lib/picture-url';
+import { isBlank } from '@/lib/form-validation';
 
 export interface FormField {
   name: string;
@@ -92,7 +93,7 @@ export function EntityForm({
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
     fields.forEach((field) => {
-      if (field.required && !formData[field.name]) {
+      if (field.required && isBlank(formData[field.name])) {
         newErrors[field.name] = `${field.label} is required`;
       }
     });

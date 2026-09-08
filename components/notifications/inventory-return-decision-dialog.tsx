@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
+import { validateIssuanceRemarks } from '@/lib/form-validation';
 import type { InventoryReturnNotice } from '@/lib/models';
 import { Button } from '@/components/ui/button';
 import {
@@ -52,8 +53,9 @@ export function InventoryReturnDecisionDialog({
   const handleDecide = async (action: 'accept' | 'reject') => {
     if (!notice) return;
     const cleaned = notes.trim();
-    if (!cleaned) {
-      toast.error('Admin remarks are required');
+    const validationError = validateIssuanceRemarks(cleaned);
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
     setBusy(action);

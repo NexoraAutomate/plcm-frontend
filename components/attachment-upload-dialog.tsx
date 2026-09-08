@@ -21,6 +21,8 @@ import {
 } from '@/components/ui/select';
 import { ATTACHMENT_TYPES, type AttachmentType } from '@/lib/attachment-types';
 import type { EntityAttachment, EntityAttachmentMetadata } from '@/lib/models';
+import { toast } from 'sonner';
+import { validateAttachmentForm } from '@/lib/form-validation';
 
 interface AttachmentUploadDialogProps {
   open: boolean;
@@ -59,7 +61,11 @@ export function AttachmentUploadDialog({
   }, [open, initialValues, attachment]);
 
   const handleSubmit = async () => {
-    if (requireFile && !file) return;
+    const validationError = validateAttachmentForm({ requireFile, file });
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
 
     setSubmitting(true);
     try {

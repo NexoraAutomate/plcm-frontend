@@ -16,8 +16,8 @@ import { toast } from 'sonner';
 import type { PasswordPolicyPublic } from '@/lib/models';
 import {
   passwordPolicyHint,
-  validatePasswordAgainstPolicy,
 } from '@/lib/password-policy';
+import { validateSignupForm } from '@/lib/form-validation';
 
 function signupErrorMessage(err: unknown): string {
   if (axios.isAxiosError(err)) {
@@ -61,17 +61,16 @@ export default function SignupPage() {
     const trimmedUsername = username.trim();
     const trimmedEmail = email.trim();
 
-    if (!trimmedName || !trimmedUsername || !password) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-    if (password !== confirmPassword) {
-      toast.error('Passwords do not match');
-      return;
-    }
-    const policyError = validatePasswordAgainstPolicy(password, passwordPolicy);
-    if (policyError) {
-      toast.error(policyError);
+    const validationError = validateSignupForm({
+      fullName,
+      username,
+      password,
+      confirmPassword,
+      email,
+      passwordPolicy,
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
 

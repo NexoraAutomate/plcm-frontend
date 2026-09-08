@@ -49,8 +49,8 @@ import * as api from '@/lib/api';
 import type * as Models from '@/lib/models';
 import {
   passwordPolicyHint,
-  validatePasswordAgainstPolicy,
 } from '@/lib/password-policy';
+import { validateUserCreateForm, validateUserEditForm } from '@/lib/form-validation';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { fetchUsersPage } from '@/hooks/queries/fetchers';
@@ -211,13 +211,15 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
   }, [refreshStats]);
 
   async function handleCreate() {
-    if (!formData.username.trim() || !formData.password.trim() || !formData.full_name.trim()) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-    const policyError = validatePasswordAgainstPolicy(formData.password, passwordPolicy);
-    if (policyError) {
-      toast.error(policyError);
+    const validationError = validateUserCreateForm({
+      username: formData.username,
+      password: formData.password,
+      fullName: formData.full_name,
+      email: formData.email,
+      passwordPolicy,
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
     try {
@@ -253,8 +255,14 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
 
   async function handleUpdate() {
     if (!editingId) return;
-    if (!editFormData.full_name.trim()) {
-      toast.error('Name is required');
+    const validationError = validateUserEditForm({
+      fullName: editFormData.full_name,
+      email: editFormData.email,
+      password: editFormData.password,
+      passwordPolicy,
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
     try {
@@ -264,14 +272,6 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
         is_active: editFormData.is_active,
       };
       if (editFormData.password) {
-        const policyError = validatePasswordAgainstPolicy(
-          editFormData.password,
-          passwordPolicy
-        );
-        if (policyError) {
-          toast.error(policyError);
-          return;
-        }
         userData.password = editFormData.password;
       }
       await api.users.update(editingId, userData);

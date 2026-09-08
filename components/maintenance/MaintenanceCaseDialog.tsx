@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { validateMaintenanceCaseForm } from '@/lib/form-validation';
 import type { MaintenanceCase, CreateMaintenanceCasePayload, UpdateMaintenanceCasePayload } from '@/lib/models';
 import {
   CASE_STATUS_META,
@@ -98,8 +99,14 @@ export function MaintenanceCaseDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.project_id.trim() || !formData.description.trim()) {
-      toast.error('Please fill in all required fields');
+    const validationError = validateMaintenanceCaseForm({
+      isEdit: Boolean(editingCase),
+      projectId: formData.project_id,
+      description: formData.description,
+      status: formData.status,
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
 

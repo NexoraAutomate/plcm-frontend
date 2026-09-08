@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { validateShortageReceiveForm } from '@/lib/form-validation';
 import { AlertTriangle, Ban, PackagePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -131,15 +132,15 @@ export function ShortageListPanel({
 
   async function handleReceive() {
     if (!receiveTarget) return;
+    const validationError = validateShortageReceiveForm({
+      quantity: receiveQuantity,
+      partNumber: receivePartNumber,
+    });
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
     const quantity = Number(receiveQuantity);
-    if (!Number.isInteger(quantity) || quantity < 1) {
-      toast.error('Enter a quantity of at least 1');
-      return;
-    }
-    if (!receivePartNumber.trim()) {
-      toast.error('Part number is required');
-      return;
-    }
 
     setBusyId(receiveTarget.id);
     try {

@@ -24,9 +24,13 @@ function Table({
   )
 }
 
-function TableHeader({ className, ...props }: React.ComponentProps<'thead'>) {
+const TableHeader = React.forwardRef<
+  HTMLTableSectionElement,
+  React.ComponentProps<'thead'>
+>(function TableHeader({ className, ...props }, ref) {
   return (
     <thead
+      ref={ref}
       data-slot="table-header"
       className={cn(
         '[&_tr]:border-b [&_tr]:bg-slate-200 [&_tr]:hover:bg-slate-200 dark:[&_tr]:bg-black dark:[&_tr]:hover:bg-black',
@@ -35,7 +39,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<'thead'>) {
       {...props}
     />
   )
-}
+})
 
 function TableBody({ className, ...props }: React.ComponentProps<'tbody'>) {
   return (

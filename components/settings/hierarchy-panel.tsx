@@ -41,6 +41,7 @@ import { useTableSorting } from "@/hooks/use-table-sorting";
 import { EntityListPagination } from "@/components/entity-list-pagination";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { cn } from "@/lib/utils";
+import { validateEntityListName } from "@/lib/form-validation";
 
 const HIERARCHY_LEVEL_KEYS = [
   "system",
@@ -262,8 +263,9 @@ export function HierarchyPanel({
   };
 
   const handleCreate = async () => {
-    if (!newName.trim()) {
-      setValidationResult({ valid: false, message: "Name is required." });
+    const nameError = validateEntityListName(newName);
+    if (nameError) {
+      setValidationResult({ valid: false, message: nameError });
       return;
     }
     if (selectedLevel !== "system" && !currentParentId) {
@@ -402,7 +404,9 @@ export function HierarchyPanel({
   };
 
   const handleEditSave = async () => {
-    if (!editTarget || !editName.trim()) { toast.error("Name cannot be empty"); return; }
+    if (!editTarget) return;
+    const nameError = validateEntityListName(editName);
+    if (nameError) { toast.error("Name cannot be empty"); return; }
     try {
       await api.hierarchies.update(editTarget.id, {
         name: editName.trim(),

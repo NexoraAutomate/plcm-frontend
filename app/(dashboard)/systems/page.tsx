@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Edit, Search } from 'lucide-react';
 import { toast } from 'sonner';
+import { validateHardwareForm } from '@/lib/form-validation';
 import { StatusBadge } from '@/components/status-badge';
 import Link from 'next/link';
 import * as api from '@/lib/api';
@@ -160,8 +161,15 @@ export default function SystemsPage() {
   };
 
   async function handleCreate() {
-    if (!formData.name.trim() || !formData.project_id || !formData.status_id) {
-      toast.error('Please fill in all required fields');
+    const validationError = validateHardwareForm({
+      name: formData.name,
+      parentId: formData.project_id,
+      parentLabel: 'Project',
+      statusId: formData.status_id,
+      requireStatus: true,
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
     try {
@@ -189,8 +197,15 @@ export default function SystemsPage() {
 
   async function handleUpdate() {
     if (!editingId) return;
-    if (!formData.name.trim() || !formData.project_id || !formData.status_id) {
-      toast.error('Please fill in all required fields');
+    const validationError = validateHardwareForm({
+      name: formData.name,
+      parentId: formData.project_id,
+      parentLabel: 'Project',
+      statusId: formData.status_id,
+      requireStatus: true,
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
     try {
