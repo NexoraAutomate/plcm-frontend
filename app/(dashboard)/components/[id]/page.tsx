@@ -6,14 +6,9 @@ import Link from 'next/link';
 import { useDataStore } from '@/lib/data-store';
 import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
 import { PageLoader } from '@/components/page-loader';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar, Layers, Code2 } from 'lucide-react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
-import { StatusBadge } from '@/components/status-badge';
-import { EntityStatusHistorySheet } from '@/components/entity-status-history-sheet';
 import { EntityInstallMetadataCard } from '@/components/entity-install-metadata-card';
-import { resolveStatusName } from '@/lib/entity-status';
 import { HierarchyEntityHeader } from '@/components/hierarchy-entity-header';
 import {
   resolveCurrentInstallEntity,
@@ -23,6 +18,7 @@ import {
 } from '@/lib/entity-replacement';
 import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
 import { isProjectReadOnly } from '@/lib/workflow-status';
+import { isExistingProject } from '@/lib/project-existing';
 
 export default function ComponentDetailPage() {
   const { entityLabel } = useAppDefinitions();
@@ -37,7 +33,6 @@ export default function ComponentDetailPage() {
     subsystems,
     systems,
     projects,
-    statuses,
     updateComponent,
   } = useDataStore();
   
@@ -57,6 +52,7 @@ export default function ComponentDetailPage() {
   const hierarchyReadOnly = isProjectReadOnly(
     project?.status_name
   );
+  const isExisting = isExistingProject(project);
   const systemId = component
     ? resolveSystemIdForHardwareEntity('component', component.id, {
         subsystems,
@@ -132,67 +128,13 @@ export default function ComponentDetailPage() {
         }
       />
 
-      {/* Component Info Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="shadow-sm">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Code2 className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Component ID</p>
-              <p className="text-sm font-medium">{component.id}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Layers className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Unit</p>
-              <p className="text-sm font-medium">{unit?.name || 'N/A'}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Layers className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Module</p>
-              <p className="text-sm font-medium">{module?.name || 'N/A'}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Calendar className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Status</p>
-              <div className="flex items-center gap-1">
-                <StatusBadge status={resolveStatusName(component, statuses)} />
-                <EntityStatusHistorySheet
-                  entityType="component"
-                  entityPk={component.id}
-                  entityName={component.name}
-                  triggerVariant="icon"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       <EntityInstallMetadataCard
         ownerType="component"
         entity={component}
         onUpdate={(data) => updateComponent(component.id, data)}
         projectId={projectId ?? undefined}
+        parentId={unit?.id}
+        isExistingProject={isExisting}
         allowReplace={!hierarchyReadOnly}
         hierarchyHref={hierarchyHref}
       />

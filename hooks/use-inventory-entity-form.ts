@@ -111,6 +111,36 @@ export function useInventoryEntityForm(options: {
     if (open) resetForm();
   }, [open, resetForm]);
 
+  // Hierarchy edit forms start from entity shells (no oem_name). Fill vendor/OEM from stock.
+  useEffect(() => {
+    if (!open || context !== 'hierarchy') return;
+    if (formData.oem_name.trim()) return;
+
+    const part = formData.part_number.trim().toLowerCase();
+    const name = formData.name.trim().toLowerCase();
+    if (!part && !name) return;
+
+    const match = inventoryItems.find((item) => {
+      if (!item.oem_name?.trim()) return false;
+      if (item.inventory_type && item.inventory_type !== selectedEntityType) return false;
+      const pn = (item.part_number || '').trim().toLowerCase();
+      const itemName = (item.name || '').trim().toLowerCase();
+      return (part !== '' && pn === part) || (name !== '' && itemName === name);
+    });
+    const oem = match?.oem_name?.trim();
+    if (!oem) return;
+
+    setFormData((prev) => (prev.oem_name.trim() ? prev : { ...prev, oem_name: oem }));
+  }, [
+    open,
+    context,
+    inventoryItems,
+    selectedEntityType,
+    formData.part_number,
+    formData.name,
+    formData.oem_name,
+  ]);
+
   const findExistingStockGroup = useCallback(
     (type: InventoryEntityFormType, name: string): Inventory | undefined => {
       const normalized = name.trim().toLowerCase();
@@ -145,6 +175,7 @@ export function useInventoryEntityForm(options: {
           name,
           part_number: partNumber,
           serial_number,
+          oem_name: existing.oem_name?.trim() || prev.oem_name,
           configuration_item: existing.configuration_item || partNumber || prev.configuration_item,
           sku: type === 'component' ? existing.sku || prev.sku : prev.sku,
         };

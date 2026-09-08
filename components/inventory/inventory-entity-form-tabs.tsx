@@ -356,22 +356,13 @@ export function InventoryEntityFormTabs({
             <Input
               value={formData.oem_name}
               onChange={(e) => {
-                const vendor = e.target.value;
-                if (mode === 'create' && formData.name && onApplyDefinitionIdentifiers) {
-                  onFormDataChange(
-                    onApplyDefinitionIdentifiers(selectedEntityType, formData.name, vendor, {
-                      ...formData,
-                      oem_name: vendor,
-                    })
-                  );
-                } else {
-                  onFormDataChange({ ...formData, oem_name: vendor });
-                }
+                onFormDataChange({ ...formData, oem_name: e.target.value });
               }}
               placeholder="Short acronym for {vendor} token, e.g. AMP"
             />
             <p className="text-xs text-muted-foreground">
-              Fills the {'{vendor}'} placeholder in Definitions SN/PN templates when stocking.
+              Used as the {'{vendor}'} token when Part # / Serial # are generated from the name.
+              Changing it later does not rewrite existing Part # or Serial #.
             </p>
           </div>
       </TabsContent>

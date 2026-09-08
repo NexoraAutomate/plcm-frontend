@@ -9,7 +9,7 @@ import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, FileText, Calendar, Layers, Network, Ban, GitBranch, Package, AlertTriangle, Workflow } from 'lucide-react';
+import { ArrowLeft, FileText, Calendar, Layers, Network, Ban, GitBranch, Package, AlertTriangle, Workflow, ChevronDown } from 'lucide-react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
@@ -41,13 +41,18 @@ import { useProjectProgressQuery } from '@/hooks/queries';
 import { ConfigChangeBanner } from '@/components/projects/config-change-banner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { ProjectWorkflowStatus, isProjectReadOnly, workflowStatusLabel } from '@/lib/workflow-status';
 import { isCurrentInstallEntity } from '@/lib/entity-replacement';
 import {
   ListStatsVisibilityControls,
   useListStatsVisibility,
 } from '@/components/list-stats-visibility';
-
+import { cn } from '@/lib/utils';
 export default function ProjectDetailPage() {
   const { entityLabel } = useAppDefinitions();
 
@@ -80,6 +85,7 @@ export default function ProjectDetailPage() {
     Number.isFinite(Number(projectId)) ? Number(projectId) : null
   );
   const { showStats, setShowStats } = useListStatsVisibility();
+  const [tabsOpen, setTabsOpen] = useState(true);
   const tabParam = searchParams.get('tab');
   const activeTab =
     tabParam === 'workflow' ||
@@ -399,12 +405,6 @@ export default function ProjectDetailPage() {
           onRefresh={() => progressQuery.refetch()}
           checkboxLabel="Show KPIs"
         />
-        <Button variant="outline" className="gap-2 shrink-0" asChild>
-          <Link href={`/hierarchy-dashboard?project_id=${projectId}`}>
-            <Network className="h-4 w-4" />
-            Hierarchy
-          </Link>
-        </Button>
       </div>
 
       <ConfigChangeBanner project={project} />
@@ -481,72 +481,109 @@ export default function ProjectDetailPage() {
         />
       ) : null}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-4">
-        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
-          <TabsTrigger value="workflow" className="gap-1.5">
-            <Workflow className="h-4 w-4" />
-            Workflow
-          </TabsTrigger>
-          <TabsTrigger value="hierarchy" className="gap-1.5">
-            <GitBranch className="h-4 w-4" />
-            Generated Hierarchy
-          </TabsTrigger>
-          <TabsTrigger value="reservations" className="gap-1.5">
-            <Package className="h-4 w-4" />
-            Inventory Reservations
-          </TabsTrigger>
-          <TabsTrigger value="bottlenecks" className="gap-1.5">
-            <AlertTriangle className="h-4 w-4" />
-            Bottlenecks
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="workflow" className="mt-0">
-          <ProjectWorkflowActions
-            project={project}
-            users={users}
-            onUpdated={(next) => setWorkflowProject(next)}
-          />
-        </TabsContent>
-
-        <TabsContent value="hierarchy" className="mt-0">
-          <GeneratedHierarchyCard
-            project={project}
-            configurationLabel={configurationLabel}
-          />
-        </TabsContent>
-
-        <TabsContent value="reservations" className="mt-0 space-y-4">
-          <ProjectReservationsPanel project={project} />
-          {project.status_name === 'READY_FOR_INVENTORY' || highlightShortageId != null ? (
-            <div
-              className={`space-y-2 rounded-lg border p-4 ${
-                hasProjectShortages === false && highlightShortageId == null ? 'hidden' : ''
-              }`}
-            >
-              <div>
-                <h3 className="text-sm font-medium">Shortages</h3>
-                <p className="text-xs text-muted-foreground">
-                  Waiting demand for this project. Matching receipts auto-reserve FCFS.
-                </p>
-              </div>
-              <ShortageListPanel
-                projectId={project.id}
-                pollMs={12_000}
-                highlightId={highlightShortageId}
-                onRowsChange={handleProjectShortagesChange}
+      <Collapsible open={tabsOpen} onOpenChange={setTabsOpen} className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-sm font-medium">Project workflow</h2>
+            <p className="text-xs text-muted-foreground">
+              Workflow, hierarchy, reservations, and bottlenecks
+            </p>
+          </div>
+          <CollapsibleTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-1.5 shrink-0">
+              {tabsOpen ? 'Collapse' : 'Expand'}
+              <ChevronDown
+                className={cn(
+                  'h-4 w-4 transition-transform',
+                  tabsOpen && 'rotate-180'
+                )}
               />
-            </div>
-          ) : null}
-        </TabsContent>
+            </Button>
+          </CollapsibleTrigger>
+        </div>
 
-        <TabsContent value="bottlenecks" className="mt-0">
-          <ProjectBottlenecksPanel
-            data={progressQuery.data}
-            loading={progressQuery.isLoading}
-          />
-        </TabsContent>
-      </Tabs>
+        <CollapsibleContent>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-4">
+            <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
+              <TabsTrigger value="workflow" className="gap-1.5">
+                <Workflow className="h-4 w-4" />
+                Workflow
+              </TabsTrigger>
+              <TabsTrigger value="hierarchy" className="gap-1.5">
+                <GitBranch className="h-4 w-4" />
+                Generated Hierarchy
+              </TabsTrigger>
+              <TabsTrigger value="reservations" className="gap-1.5">
+                <Package className="h-4 w-4" />
+                Inventory Reservations
+              </TabsTrigger>
+              <TabsTrigger value="bottlenecks" className="gap-1.5">
+                <AlertTriangle className="h-4 w-4" />
+                Bottlenecks
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="workflow" className="mt-0">
+              <ProjectWorkflowActions
+                project={project}
+                users={users}
+                onUpdated={(next) => setWorkflowProject(next)}
+              />
+            </TabsContent>
+
+            <TabsContent value="hierarchy" className="mt-0">
+              <GeneratedHierarchyCard
+                project={project}
+                configurationLabel={configurationLabel}
+              />
+            </TabsContent>
+
+            <TabsContent value="reservations" className="mt-0 space-y-4">
+              <ProjectReservationsPanel project={project} />
+              {project.status_name === 'READY_FOR_INVENTORY' || highlightShortageId != null ? (
+                <div
+                  className={`space-y-2 rounded-lg border p-4 ${
+                    hasProjectShortages === false && highlightShortageId == null ? 'hidden' : ''
+                  }`}
+                >
+                  <div>
+                    <h3 className="text-sm font-medium">Shortages</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Waiting demand for this project. Matching receipts auto-reserve FCFS.
+                    </p>
+                  </div>
+                  <ShortageListPanel
+                    projectId={project.id}
+                    pollMs={12_000}
+                    highlightId={highlightShortageId}
+                    onRowsChange={handleProjectShortagesChange}
+                  />
+                </div>
+              ) : null}
+            </TabsContent>
+
+            <TabsContent value="bottlenecks" className="mt-0">
+              <ProjectBottlenecksPanel
+                data={progressQuery.data}
+                loading={progressQuery.isLoading}
+              />
+            </TabsContent>
+          </Tabs>
+        </CollapsibleContent>
+      </Collapsible>
+
+      <div className="flex justify-center">
+        <Button
+          size="lg"
+          className="h-12 gap-2 border-[3px] border-[oklch(0.78_0.1_250)] px-8 text-base font-semibold shadow-none"
+          asChild
+        >
+          <Link href={`/hierarchy-dashboard?project_id=${projectId}`}>
+            <Network className="h-5 w-5" />
+            Hierarchy View
+          </Link>
+        </Button>
+      </div>
 
       {/* Systems Cards */}
       <EntityCards
@@ -571,6 +608,7 @@ export default function ProjectDetailPage() {
         editPermission={P.edit_systems}
         deletePermission={P.delete_systems}
         readOnly={hierarchyReadOnly}
+        isExistingProject={isExisting}
         projectId={Number.isFinite(Number(projectId)) ? Number(projectId) : null}
       />
 

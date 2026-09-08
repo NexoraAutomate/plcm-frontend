@@ -242,6 +242,7 @@ export const NAV_PERMISSIONS: Record<string, PermissionCode | PermissionCode[]> 
   '/orders': P.view_orders,
   '/projects': P.view_projects,
   '/inventory': P.view_inventory,
+  '/inventory/storage-locations': [P.edit_inventory, P.manage_settings],
   '/inventory/issuances': P.view_inventory_issuances,
   '/scan': [P.view_inventory, P.inventory_label_scan],
   '/shortages': [P.view_inventory, P.inventory_receive],
@@ -369,6 +370,12 @@ export function routePermissionForPath(pathname: string): PermissionCode | Permi
   }
   // Nested maintenance case detail
   if (normalized.startsWith('/maintenance/')) return P.view_maintenance_cases;
+  if (
+    normalized === '/inventory/storage-locations' ||
+    normalized.startsWith('/inventory/storage-locations/')
+  ) {
+    return NAV_PERMISSIONS['/inventory/storage-locations'];
+  }
   if (normalized === '/inventory/issuances' || normalized.startsWith('/inventory/issuances/')) {
     return P.view_inventory_issuances;
   }

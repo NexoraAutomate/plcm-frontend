@@ -188,36 +188,36 @@ export function resolveProjectIdForHardwareEntity(
   entityType: HierarchyEntityType,
   entityId: number,
   context: {
-    systems: Array<{ id: number; project_id: number }>;
-    subsystems: Array<{ id: number; system_id: number }>;
-    modules: Array<{ id: number; subsystem_id: number }>;
-    units: Array<{ id: number; module_id: number }>;
-    components: Array<{ id: number; unit_id: number }>;
+    systems: Array<{ id: number; project_id: number } & HardwareEntityWithSlot>;
+    subsystems: Array<{ id: number; system_id: number } & HardwareEntityWithSlot>;
+    modules: Array<{ id: number; subsystem_id: number } & HardwareEntityWithSlot>;
+    units: Array<{ id: number; module_id: number } & HardwareEntityWithSlot>;
+    components: Array<{ id: number; unit_id: number } & HardwareEntityWithSlot>;
   }
 ): number | null {
   if (entityType === 'system') {
-    return context.systems.find((item) => item.id === entityId)?.project_id ?? null;
+    return resolveCurrentInstallEntity(entityId, context.systems)?.project_id ?? null;
   }
 
   if (entityType === 'subsystem') {
-    const subsystem = context.subsystems.find((item) => item.id === entityId);
+    const subsystem = resolveCurrentInstallEntity(entityId, context.subsystems);
     if (!subsystem) return null;
     return resolveProjectIdForHardwareEntity('system', subsystem.system_id, context);
   }
 
   if (entityType === 'module') {
-    const module = context.modules.find((item) => item.id === entityId);
+    const module = resolveCurrentInstallEntity(entityId, context.modules);
     if (!module) return null;
     return resolveProjectIdForHardwareEntity('subsystem', module.subsystem_id, context);
   }
 
   if (entityType === 'unit') {
-    const unit = context.units.find((item) => item.id === entityId);
+    const unit = resolveCurrentInstallEntity(entityId, context.units);
     if (!unit) return null;
     return resolveProjectIdForHardwareEntity('module', unit.module_id, context);
   }
 
-  const component = context.components.find((item) => item.id === entityId);
+  const component = resolveCurrentInstallEntity(entityId, context.components);
   if (!component) return null;
   return resolveProjectIdForHardwareEntity('unit', component.unit_id, context);
 }

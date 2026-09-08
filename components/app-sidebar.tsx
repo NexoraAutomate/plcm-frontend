@@ -34,6 +34,7 @@ import {
   ChevronRight,
   Settings,
   PackageCheck,
+  MapPinned,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -134,6 +135,12 @@ const NAV_BY_HREF: Record<string, NavItem> = {
     icon: PackageCheck,
     permission: NAV_PERMISSIONS["/inventory/issuances"] as PermissionCode,
   },
+  "/inventory/storage-locations": {
+    label: "Storage Locations",
+    href: "/inventory/storage-locations",
+    icon: MapPinned,
+    permission: NAV_PERMISSIONS["/inventory/storage-locations"] as PermissionCode[],
+  },
   "/inspect-queue": {
     label: "Inspect Queue",
     href: "/inspect-queue",
@@ -185,6 +192,7 @@ const inventorySystemItems: NavItem[] = [
   NAV_BY_HREF["/issue-queue"],
   NAV_BY_HREF["/inventory/issuances"],
   NAV_BY_HREF["/inspect-queue"],
+  NAV_BY_HREF["/inventory/storage-locations"],
 ];
 
 const administrationItems: NavItem[] = [

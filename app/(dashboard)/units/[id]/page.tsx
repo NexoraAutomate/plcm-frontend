@@ -7,11 +7,8 @@ import { useDataStore } from '@/lib/data-store';
 import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
 import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Calendar, Layers } from 'lucide-react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
-import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
 import { P } from '@/lib/permission-codes';
 import { workflowStatusLabel } from '@/lib/workflow-status';
@@ -23,7 +20,6 @@ import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import { listTemplateNames } from '@/lib/hierarchy-template-names';
 import * as Models from '@/lib/models';
-import { EntityStatusHistorySheet } from '@/components/entity-status-history-sheet';
 import { EntityInstallMetadataCard } from '@/components/entity-install-metadata-card';
 import {
   ReplaceFromInventoryDialog,
@@ -38,7 +34,6 @@ import {
 } from '@/lib/entity-replacement';
 import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
 import { isProjectReadOnly } from '@/lib/workflow-status';
-import { resolveStatusName } from '@/lib/entity-status';
 import { HierarchyEntityHeader } from '@/components/hierarchy-entity-header';
 
 export default function UnitDetailPage() {
@@ -274,57 +269,13 @@ export default function UnitDetailPage() {
         }
       />
 
-      {/* Unit Info Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="shadow-sm">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Layers className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Module</p>
-              <p className="text-sm font-medium">{module?.name || 'N/A'}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Calendar className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Status</p>
-              <div className="flex items-center gap-1">
-                <StatusBadge status={resolveStatusName(unit, statuses)} />
-                <EntityStatusHistorySheet
-                  entityType="unit"
-                  entityPk={unit.id}
-                  entityName={unit.name}
-                  statuses={statuses}
-                  triggerVariant="icon"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Layers className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Components</p>
-              <p className="text-sm font-medium">{unitComponents.length}</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       <EntityInstallMetadataCard
         ownerType="unit"
         entity={unit}
         onUpdate={(data) => updateUnit(unit.id, data)}
         projectId={projectId ?? undefined}
+        parentId={module?.id}
+        isExistingProject={isExisting}
         allowReplace
         hierarchyHref={hierarchyHref}
       />
@@ -363,6 +314,7 @@ export default function UnitDetailPage() {
         editPermission={P.edit_components}
         deletePermission={P.delete_components}
         readOnly={hierarchyReadOnly}
+        isExistingProject={isExisting}
         projectId={projectId}
       />
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -22,10 +22,14 @@ import {
   buildUpdateEntityByType,
 } from '@/lib/inventory-child-install';
 import { createHierarchyEntityWithInventoryForm } from '@/lib/hierarchy-inventory-create';
-import { hierarchyEntityToFormData } from '@/lib/inventory-entity-fields';
+import {
+  emptyInventoryEntityForm,
+  hierarchyEntityToFormData,
+} from '@/lib/inventory-entity-fields';
 import { syncEntityPicture } from '@/lib/entity-picture-upload';
 import { useDataStore } from '@/lib/data-store';
 import { useAppDefinitions } from '@/lib/app-definitions-context';
+import * as api from '@/lib/api';
 
 export interface HierarchyEntityInventoryDialogProps {
   open: boolean;
@@ -45,6 +49,42 @@ export interface HierarchyEntityInventoryDialogProps {
   description?: string;
   onSaved?: (entityId: number) => void | Promise<void>;
   extraPayload?: Record<string, unknown>;
+}
+
+async function resolveOemNameForEntity(options: {
+  entityType: HierarchyEntityType;
+  entityId?: number;
+  name?: string | null;
+  partNumber?: string | null;
+}): Promise<string> {
+  const { entityType, entityId, name, partNumber } = options;
+
+  if (entityId) {
+    try {
+      const byEntity = await api.inventory.listByEntity(entityId);
+      const linked = (byEntity.data ?? []).find((item) => item.oem_name?.trim());
+      if (linked?.oem_name?.trim()) return linked.oem_name.trim();
+    } catch {
+      // fall through to part/name match
+    }
+  }
+
+  const part = partNumber?.trim().toLowerCase() || '';
+  const entityName = name?.trim().toLowerCase() || '';
+  if (!part && !entityName) return '';
+
+  try {
+    const byType = await api.inventory.list(0, 1000, entityType);
+    const match = (byType.data ?? []).find((item) => {
+      if (!item.oem_name?.trim()) return false;
+      const pn = (item.part_number || '').trim().toLowerCase();
+      const itemName = (item.name || '').trim().toLowerCase();
+      return (part !== '' && pn === part) || (entityName !== '' && itemName === entityName);
+    });
+    return match?.oem_name?.trim() || '';
+  } catch {
+    return '';
+  }
 }
 
 export function HierarchyEntityInventoryDialog({
@@ -74,11 +114,34 @@ export function HierarchyEntityInventoryDialog({
     runSilentEntityBatch,
   } = useDataStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [initialFormData, setInitialFormData] = useState<
+    Partial<typeof emptyInventoryEntityForm> | undefined
+  >(undefined);
 
-  const initialFormData = useMemo(
-    () => (entity ? hierarchyEntityToFormData(entity, entityType) : undefined),
-    [entity, entityType]
-  );
+  useEffect(() => {
+    if (!open || !entity) {
+      setInitialFormData(undefined);
+      return;
+    }
+
+    const base = hierarchyEntityToFormData(entity, entityType);
+    setInitialFormData(base);
+
+    let cancelled = false;
+    void resolveOemNameForEntity({
+      entityType,
+      entityId,
+      name: entity.name,
+      partNumber: entity.part_number,
+    }).then((oemName) => {
+      if (cancelled || !oemName) return;
+      setInitialFormData((prev) => ({ ...(prev ?? base), oem_name: oemName }));
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, entity, entityId, entityType]);
 
   const form = useInventoryEntityForm({
     entityType,

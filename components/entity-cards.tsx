@@ -89,6 +89,11 @@ interface EntityCardsProps {
   deletePermission?: string | string[];
   /** Hide add/edit/delete/assign/revert — cancelled projects stay view-only. */
   readOnly?: boolean;
+  /**
+   * Existing-project (Add as Existing Project) cards keep View / Edit / Delete.
+   * Generated projects only show Assign Developer (or Verify Installation) + Hierarchy.
+   */
+  isExistingProject?: boolean;
 }
 
 export function EntityCards({
@@ -111,6 +116,7 @@ export function EntityCards({
   editPermission,
   deletePermission,
   readOnly = false,
+  isExistingProject = false,
 }: EntityCardsProps) {
   const { can, user, isInventoryManager } = useAuth();
   const { ensureHierarchyLoaded, markLocalInstallReverted, users, patchHierarchyEntity } =
@@ -363,69 +369,99 @@ export function EntityCards({
                     </Link>
 
                     <div className="space-y-2 pt-2">
-                      <div className="flex gap-2 flex-wrap">
-                        <Link href={detailPath(entity.id)} className="flex-1 min-w-22" onClick={(e) => e.stopPropagation()}>
-                          <Button variant="outline" size="sm" className="w-full gap-1.5">
-                            View
-                            <ArrowRight className="h-3 w-3" />
-                          </Button>
-                        </Link>
-                        {canVerifyItem ? (
-                          <WorkflowCan role={['HM', 'ADMIN']} permission={P.item_verify}>
+                      {isExistingProject ? (
+                        <div className="flex gap-2 flex-wrap">
+                          <Link
+                            href={detailPath(entity.id)}
+                            className="flex-1 min-w-22"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Button variant="outline" size="sm" className="w-full gap-1.5">
+                              View
+                              <ArrowRight className="h-3 w-3" />
+                            </Button>
+                          </Link>
+                          {canVerifyItem ? (
+                            <WorkflowCan role={['HM', 'ADMIN']} permission={P.item_verify}>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1 min-w-22 gap-1.5"
+                                disabled={verifyingId === entity.id}
+                                onClick={() =>
+                                  void handleVerifyInstallation(
+                                    entity.id,
+                                    assignment.issuance_id as number
+                                  )
+                                }
+                              >
+                                <CheckCircle2 className="h-3 w-3" />
+                                {verifyingId === entity.id
+                                  ? 'Verifying…'
+                                  : 'Verify Item Installation'}
+                              </Button>
+                            </WorkflowCan>
+                          ) : null}
+                          {onEdit && canEdit && !readOnly ? (
                             <Button
                               variant="outline"
                               size="sm"
                               className="flex-1 min-w-22 gap-1.5"
-                              disabled={verifyingId === entity.id}
+                              onClick={() => onEdit(entity.id)}
+                            >
+                              <Pencil className="h-3 w-3" />
+                              Edit
+                            </Button>
+                          ) : null}
+                          {onReplace && ownsInstall && !readOnly ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 min-w-22 gap-1.5"
+                              onClick={() => onReplace(entity)}
+                            >
+                              <Replace className="h-3 w-3" />
+                              Replace
+                            </Button>
+                          ) : null}
+                          {onDelete && canDelete && !readOnly ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 min-w-22 gap-1.5 text-destructive hover:text-destructive"
                               onClick={() =>
-                                void handleVerifyInstallation(
-                                  entity.id,
-                                  assignment.issuance_id as number
-                                )
+                                setDeleteTarget({ id: entity.id, name: entity.name })
                               }
                             >
-                              <CheckCircle2 className="h-3 w-3" />
-                              {verifyingId === entity.id
-                                ? 'Verifying…'
-                                : 'Verify Item Installation'}
+                              <Trash2 className="h-3 w-3" />
+                              Delete
                             </Button>
-                          </WorkflowCan>
-                        ) : null}
-                        {onEdit && canEdit && !readOnly ? (
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {!readOnly && childEntityType && canVerifyItem && !isExistingProject ? (
+                        <WorkflowCan role={['HM', 'ADMIN']} permission={P.item_verify}>
                           <Button
                             variant="outline"
                             size="sm"
-                            className="flex-1 min-w-22 gap-1.5"
-                            onClick={() => onEdit(entity.id)}
+                            className="w-full gap-1.5"
+                            disabled={verifyingId === entity.id}
+                            onClick={() =>
+                              void handleVerifyInstallation(
+                                entity.id,
+                                assignment.issuance_id as number
+                              )
+                            }
                           >
-                            <Pencil className="h-3 w-3" />
-                            Edit
+                            <CheckCircle2 className="h-3 w-3" />
+                            {verifyingId === entity.id ? 'Verifying…' : 'Verify Installation'}
                           </Button>
-                        ) : null}
-                        {onReplace && ownsInstall && !readOnly ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1 min-w-22 gap-1.5"
-                            onClick={() => onReplace(entity)}
-                          >
-                            <Replace className="h-3 w-3" />
-                            Replace
-                          </Button>
-                        ) : null}
-                        {onDelete && canDelete && !readOnly ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1 min-w-22 gap-1.5 text-destructive hover:text-destructive"
-                            onClick={() => setDeleteTarget({ id: entity.id, name: entity.name })}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                            Delete
-                          </Button>
-                        ) : null}
-                      </div>
-                      {!readOnly && childEntityType ? (
+                        </WorkflowCan>
+                      ) : null}
+                      {!readOnly &&
+                      childEntityType &&
+                      !isExistingProject &&
+                      !canVerifyItem ? (
                         <WorkflowCan role={['HM', 'ADMIN']} permission={P.hierarchy_assign_developer}>
                           <Button
                             variant="outline"
@@ -450,7 +486,7 @@ export function EntityCards({
                           </Button>
                         </WorkflowCan>
                       ) : null}
-                      {!readOnly && canRevert && childEntityType ? (
+                      {isExistingProject && !readOnly && canRevert && childEntityType ? (
                         <RevertToInventoryButton
                           entityType={childEntityType}
                           entityId={entity.id}

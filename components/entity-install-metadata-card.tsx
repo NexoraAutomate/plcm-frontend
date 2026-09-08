@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronDown, Pencil, Upload, Trash2, Replace, Network } from 'lucide-react';
+import { ChevronDown, ImagePlus, Pencil, Upload, Trash2, Replace, Network } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,20 +12,11 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AttachmentUploadDialog } from '@/components/attachment-upload-dialog';
-import { EntityForm } from '@/components/entity-form';
 import { useDataStore } from '@/lib/data-store';
-import { hierarchyInstallFormFields, parseHierarchyInstallPayload, hierarchyInstallInitialValues } from '@/lib/hierarchy-install-fields';
-import { syncEntityPicture } from '@/lib/entity-picture-upload';
 import { attachmentDisplayTitle, attachmentTypeLabel } from '@/lib/attachment-types';
-import type { EntityAttachment, HierarchyInstallFields } from '@/lib/models';
+import type { EntityAttachment, EntityReplacementChainItem, HierarchyInstallFields } from '@/lib/models';
 import * as api from '@/lib/api';
 import { formatUserRef } from '@/lib/user-display';
 import { toast } from 'sonner';
@@ -34,7 +25,7 @@ import {
   ReplaceFromInventoryDialog,
   type ReplaceFromInventoryTarget,
 } from '@/components/replace-from-inventory-dialog';
-import type { HierarchyEntityType } from '@/lib/entity-hierarchy';
+import { HierarchyEntityInventoryDialog } from '@/components/hierarchy/hierarchy-entity-inventory-create-dialog';
 import { HARDWARE_ENTITY_DETAIL_PATH } from '@/lib/entity-replacement';
 import { useAuth } from '@/lib/auth-context';
 import { WorkflowCan } from '@/components/auth';
@@ -52,6 +43,16 @@ import {
 } from '@/lib/entity-lifecycle-style';
 import { EntityInventoryHoldDetails } from '@/components/entity-inventory-hold-details';
 import type { HierarchyAssignmentStatus } from '@/lib/models';
+import { useAppDefinitions } from '@/lib/app-definitions-context';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { StatusBadge } from '@/components/status-badge';
 
 type HardwareOwnerType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
 
@@ -77,23 +78,26 @@ interface EntityInstallMetadataCardProps {
   entity: HierarchyInstallFields & {
     id: number;
     name: string;
+    description?: string | null;
     part_number?: string;
     serial_number?: string;
     configuration_item?: string;
     oem_name?: string;
     sku?: string;
+    status_id?: number | null;
     replacement_sequence?: number;
     is_current_install?: boolean;
   };
   onUpdate: (data: Partial<HierarchyInstallFields>) => Promise<void>;
   projectId?: number;
+  /** Parent id for existing-project inventory edit dialog (project/system/subsystem/…). */
+  parentId?: number;
+  /** When true, Edit opens the same inventory dialog as entity cards. */
+  isExistingProject?: boolean;
   allowReplace?: boolean;
   hierarchyHref?: string;
   onReverted?: () => void;
-}
-
-function normalizeInstallPayload(data: Record<string, unknown>) {
-  return parseHierarchyInstallPayload(data);
+  onExistingSaved?: () => void | Promise<void>;
 }
 
 export function EntityInstallMetadataCard({
@@ -101,11 +105,15 @@ export function EntityInstallMetadataCard({
   entity,
   onUpdate,
   projectId,
+  parentId,
+  isExistingProject = false,
   allowReplace = false,
   hierarchyHref,
   onReverted,
+  onExistingSaved,
 }: EntityInstallMetadataCardProps) {
-  const { users, projects } = useDataStore();
+  const { entityLabel } = useAppDefinitions();
+  const { users, projects, inventory } = useDataStore();
   const { can, user, isInventoryManager } = useAuth();
   const queryClient = useQueryClient();
   const inventoryManager = isInventoryManager();
@@ -121,8 +129,10 @@ export function EntityInstallMetadataCard({
     currentUserId: user?.id,
     installedById: entity.installed_by_id,
   });
-  const canEdit =
+  const canMutateInstall =
     can(EDIT_PERMISSION_BY_OWNER_TYPE[ownerType]) && ownsInstall && !cancelled;
+  const canEdit =
+    isExistingProject && parentId != null && canMutateInstall;
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
   const [replaceOpen, setReplaceOpen] = useState(false);
@@ -132,13 +142,129 @@ export function EntityInstallMetadataCard({
   const [uploadOpen, setUploadOpen] = useState(false);
   const [editingAttachment, setEditingAttachment] = useState<EntityAttachment | null>(null);
   const [verifying, setVerifying] = useState(false);
+  const [pictureUploading, setPictureUploading] = useState(false);
+  const pictureInputRef = useRef<HTMLInputElement>(null);
+  const [replacementChain, setReplacementChain] = useState<EntityReplacementChainItem[]>([]);
+  const [replacementLoading, setReplacementLoading] = useState(false);
+  const [detailsTab, setDetailsTab] = useState('hardware');
 
-  const oemName = entity.oem_name?.trim() || linkedOemName;
   const inventoryFlags = useProjectInventoryFlags(projectId);
   const flagKey = inventoryFlagKey(ownerType, entity.id);
   const reservation = inventoryFlags.reservationsByKey[flagKey];
   const shortage = inventoryFlags.shortagesByKey[flagKey];
   const [assignment, setAssignment] = useState<HierarchyAssignmentStatus | null>(null);
+
+  const resolveOemByPartNumber = useCallback(
+    (partNumber?: string) => {
+      const trimmed = partNumber?.trim();
+      if (!trimmed) return undefined;
+      const normalized = trimmed.toLowerCase();
+      const match = inventory.find((item) => {
+        if (!item.oem_name?.trim()) return false;
+        if (item.inventory_type && item.inventory_type !== ownerType) return false;
+        const pn = item.part_number?.trim().toLowerCase() || '';
+        const opn = item.original_part_number?.trim().toLowerCase() || '';
+        return pn === normalized || opn === normalized;
+      });
+      return match?.oem_name?.trim() || undefined;
+    },
+    [inventory, ownerType]
+  );
+
+  const currentPartNumber = useMemo(() => {
+    const candidates = [entity.part_number, reservation?.part_number];
+    for (const candidate of candidates) {
+      const trimmed = candidate?.trim();
+      if (trimmed) return trimmed;
+    }
+    return undefined;
+  }, [entity.part_number, reservation?.part_number]);
+
+  const currentSerialNumber = useMemo(() => {
+    const candidates = [entity.serial_number, reservation?.serial_number];
+    for (const candidate of candidates) {
+      const trimmed = candidate?.trim();
+      if (trimmed) return trimmed;
+    }
+    return undefined;
+  }, [entity.serial_number, reservation?.serial_number]);
+
+  const gen0Install = useMemo(() => {
+    if (!replacementChain.length) return undefined;
+    return (
+      replacementChain.find((row) => (row.replacement_sequence ?? 0) === 0) ??
+      replacementChain[0]
+    );
+  }, [replacementChain]);
+
+  const isOriginalInstall = (entity.replacement_sequence ?? 0) === 0;
+
+  /** Gen #0 identity for Original Build Identification. */
+  const originalBuildPartNumber = useMemo(() => {
+    const candidates = [
+      gen0Install?.part_number,
+      entity.original_part_number,
+      isOriginalInstall ? currentPartNumber : undefined,
+    ];
+    for (const candidate of candidates) {
+      const trimmed = candidate?.trim();
+      if (trimmed) return trimmed;
+    }
+    return undefined;
+  }, [
+    gen0Install?.part_number,
+    entity.original_part_number,
+    isOriginalInstall,
+    currentPartNumber,
+  ]);
+
+  const originalBuildSerialNumber = useMemo(() => {
+    const candidates = [
+      gen0Install?.serial_number,
+      entity.original_serial_number,
+      isOriginalInstall ? currentSerialNumber : undefined,
+    ];
+    for (const candidate of candidates) {
+      const trimmed = candidate?.trim();
+      if (trimmed) return trimmed;
+    }
+    return undefined;
+  }, [
+    gen0Install?.serial_number,
+    entity.original_serial_number,
+    isOriginalInstall,
+    currentSerialNumber,
+  ]);
+
+  const storeOemName = useMemo(
+    () => resolveOemByPartNumber(currentPartNumber),
+    [resolveOemByPartNumber, currentPartNumber]
+  );
+
+  const oemName = entity.oem_name?.trim() || linkedOemName || storeOemName;
+
+  const originalStoreOemName = useMemo(
+    () => resolveOemByPartNumber(originalBuildPartNumber),
+    [resolveOemByPartNumber, originalBuildPartNumber]
+  );
+
+  const originalOemName = useMemo(() => {
+    if (
+      isOriginalInstall ||
+      (originalBuildPartNumber &&
+        currentPartNumber &&
+        originalBuildPartNumber.toLowerCase() === currentPartNumber.toLowerCase())
+    ) {
+      return oemName || originalStoreOemName;
+    }
+    return originalStoreOemName;
+  }, [
+    isOriginalInstall,
+    originalBuildPartNumber,
+    currentPartNumber,
+    oemName,
+    originalStoreOemName,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -179,11 +305,6 @@ export function EntityInstallMetadataCard({
     return user ? formatUserRef(user) : `User #${entity.installed_by_id}`;
   }, [entity.installed_by_id, users]);
 
-  const formFields = useMemo(
-    () => hierarchyInstallFormFields({ users, ownerType, ownerId: entity.id }),
-    [users, ownerType, entity.id]
-  );
-
   const loadAttachments = useCallback(async () => {
     try {
       const res = await api.attachments.list(ownerType, entity.id);
@@ -198,7 +319,40 @@ export function EntityInstallMetadataCard({
   }, [loadAttachments]);
 
   useEffect(() => {
-    if (entity.oem_name?.trim()) {
+    if (!sectionOpen) return;
+
+    let cancelled = false;
+    setReplacementLoading(true);
+    void api.entities
+      .getReplacementChain(ownerType, entity.id)
+      .then((res) => {
+        if (cancelled) return;
+        const rows = [...(res.data ?? [])].sort(
+          (a, b) => (a.replacement_sequence ?? 0) - (b.replacement_sequence ?? 0)
+        );
+        setReplacementChain(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setReplacementChain([]);
+      })
+      .finally(() => {
+        if (!cancelled) setReplacementLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sectionOpen, ownerType, entity.id]);
+
+  const hasReplacementHistory = useMemo(
+    () =>
+      replacementChain.length > 1 ||
+      replacementChain.some((row) => (row.replacement_sequence ?? 0) > 0 || !row.is_current_install),
+    [replacementChain]
+  );
+
+  useEffect(() => {
+    if (entity.oem_name?.trim() || storeOemName) {
       setLinkedOemName(undefined);
       return;
     }
@@ -206,8 +360,27 @@ export function EntityInstallMetadataCard({
     let cancelled = false;
     void (async () => {
       try {
-        const res = await api.inventory.listByEntity(entity.id);
-        const match = (res.data ?? []).find((item) => item.oem_name?.trim());
+        const byEntity = await api.inventory.listByEntity(entity.id);
+        let match = (byEntity.data ?? []).find((item) => item.oem_name?.trim());
+
+        if (!match?.oem_name?.trim() && currentPartNumber) {
+          const byType = await api.inventory.list(0, 1000, ownerType);
+          const normalized = currentPartNumber.toLowerCase();
+          match = (byType.data ?? []).find((item) => {
+            if (!item.oem_name?.trim()) return false;
+            const pn = item.part_number?.trim().toLowerCase() || '';
+            const opn = item.original_part_number?.trim().toLowerCase() || '';
+            return pn === normalized || opn === normalized;
+          });
+        }
+
+        if (!match?.oem_name?.trim() && reservation?.inventory_id) {
+          const reserved = await api.inventory.get(reservation.inventory_id);
+          if (reserved.data?.oem_name?.trim()) {
+            match = reserved.data;
+          }
+        }
+
         if (!cancelled) {
           setLinkedOemName(match?.oem_name?.trim() || undefined);
         }
@@ -221,24 +394,14 @@ export function EntityInstallMetadataCard({
     return () => {
       cancelled = true;
     };
-  }, [entity.id, entity.oem_name]);
-
-  const handleSave = async (data: Record<string, unknown>) => {
-    try {
-      const payload = normalizeInstallPayload(data);
-      const pictureResult = await syncEntityPicture(ownerType, entity.id, data);
-      if (pictureResult === null) {
-        payload.picture_url = null;
-      } else if (typeof pictureResult === 'string') {
-        payload.picture_url = pictureResult;
-      }
-      await onUpdate(payload);
-      toast.success('Installation metadata saved');
-      setEditOpen(false);
-    } catch {
-      toast.error('Failed to save installation metadata');
-    }
-  };
+  }, [
+    entity.id,
+    entity.oem_name,
+    ownerType,
+    currentPartNumber,
+    reservation?.inventory_id,
+    storeOemName,
+  ]);
 
   const handleRemovePicture = async () => {
     try {
@@ -247,6 +410,22 @@ export function EntityInstallMetadataCard({
       toast.success('Photo removed');
     } catch {
       toast.error('Failed to remove photo');
+    }
+  };
+
+  const handleUploadPicture = async (file: File) => {
+    setPictureUploading(true);
+    try {
+      const res = await api.pictures.upload(ownerType, entity.id, file);
+      await onUpdate({ picture_url: res.data.picture_url });
+      toast.success('Photo added');
+    } catch {
+      toast.error('Failed to upload photo');
+    } finally {
+      setPictureUploading(false);
+      if (pictureInputRef.current) {
+        pictureInputRef.current.value = '';
+      }
     }
   };
 
@@ -327,7 +506,7 @@ export function EntityInstallMetadataCard({
   const replaceTarget = useMemo<ReplaceFromInventoryTarget | null>(() => {
     if (!allowReplace || !projectId || cancelled) return null;
     return {
-      entityType: ownerType as HierarchyEntityType,
+      entityType: ownerType,
       entityId: entity.id,
       entityName: entity.name,
       partNumber: entity.part_number,
@@ -354,7 +533,7 @@ export function EntityInstallMetadataCard({
                 className="min-w-0 flex-1 rounded-md text-left outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <div className="flex flex-wrap items-center gap-2">
-                  <CardTitle className="text-base">Installation & Media</CardTitle>
+                  <CardTitle className="text-base">Item Details</CardTitle>
                   <ChevronDown
                     className={cn(
                       'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
@@ -363,7 +542,7 @@ export function EntityInstallMetadataCard({
                   />
                 </div>
                 <CardDescription>
-                  Install date, custodian, original identifiers, and attachments for {entity.name}
+                  Part numbers, who installed this item, and related files for {entity.name}
                   {showOwnInstallChrome ? ' — installed by you' : ''}
                 </CardDescription>
               </button>
@@ -390,7 +569,7 @@ export function EntityInstallMetadataCard({
                   </Button>
                 </WorkflowCan>
               ) : null}
-              {allowReplace && projectId && canEdit ? (
+              {allowReplace && projectId && canMutateInstall ? (
                 <Button type="button" variant="outline" size="sm" onClick={() => setReplaceOpen(true)}>
                   <Replace className="mr-2 h-4 w-4" />
                   Replace
@@ -429,160 +608,304 @@ export function EntityInstallMetadataCard({
                 />
               ) : null}
 
-              <div className="space-y-3">
-                <p className="text-sm font-medium">Hardware Identification</p>
-                <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
-                  <MetadataField
-                    label="Part Number"
-                    value={entity.part_number || reservation?.part_number}
-                  />
-                  <MetadataField
-                    label="Serial Number"
-                    value={entity.serial_number || reservation?.serial_number}
-                  />
-                  <MetadataField label="Configuration Item" value={entity.configuration_item} />
-                  <MetadataField label="OEM Name" value={oemName} />
-                  {ownerType === 'component' || entity.sku?.trim() ? (
-                    <MetadataField label="SKU" value={entity.sku} />
-                  ) : null}
-                </div>
-              </div>
+              <Tabs
+                value={detailsTab}
+                onValueChange={setDetailsTab}
+                className="gap-4"
+              >
+                <TabsList className="grid h-auto w-full grid-cols-2 sm:grid-cols-4">
+                  <TabsTrigger value="hardware">Original Build Identification</TabsTrigger>
+                  <TabsTrigger value="replacement">Installation/ Maintenance History</TabsTrigger>
+                  <TabsTrigger value="picture">Picture</TabsTrigger>
+                  <TabsTrigger value="attachments">Attachments</TabsTrigger>
+                </TabsList>
 
-              <div className="space-y-3">
-                <p className="text-sm font-medium">Installation Details</p>
-                <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
-                  <MetadataField
-                    label="Installation Date"
-                    value={
-                      entity.installation_date
-                        ? new Date(entity.installation_date).toLocaleDateString()
-                        : undefined
-                    }
-                  />
-                  <MetadataField label="Installed By" value={installerLabel} />
-                  <MetadataField label="Original Part #" value={entity.original_part_number} />
-                  <MetadataField label="Original Serial #" value={entity.original_serial_number} />
-                  {(entity.replacement_sequence ?? 0) > 0 ? (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Install Generation</p>
-                      <p className="font-medium text-primary">
-                        Current replacement #{entity.replacement_sequence}
-                      </p>
+                <TabsContent value="hardware" className="mt-0">
+                  <div className="space-y-3 rounded-lg border bg-muted/70 p-4 dark:bg-muted/40">
+                    <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+                      <MetadataField label="Part Number" value={originalBuildPartNumber} />
+                      <MetadataField label="Serial Number" value={originalBuildSerialNumber} />
+                      <MetadataField label="OEM Name" value={originalOemName} />
+                      {ownerType === 'component' || entity.sku?.trim() ? (
+                        <MetadataField label="SKU" value={entity.sku} />
+                      ) : null}
                     </div>
-                  ) : null}
-                </div>
-              </div>
-
-              {entity.picture_url ? (
-                <div>
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-xs text-muted-foreground">Primary Photo</p>
-                    {canEdit ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void handleRemovePicture()}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Remove
-                      </Button>
-                    ) : null}
                   </div>
-                  <EntityPicture
-                    src={entity.picture_url}
-                    ownerType={ownerType}
-                    ownerId={entity.id}
-                    alt={`${entity.name} photo`}
-                    className="max-h-40 rounded-md border object-cover"
-                  />
-                </div>
-              ) : null}
+                </TabsContent>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium">Attachments</p>
-                  {!cancelled ? (
-                  <Button type="button" variant="outline" size="sm" onClick={() => setUploadOpen(true)}>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload
-                  </Button>
-                  ) : null}
-                </div>
-                {attachments.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No attachments yet.</p>
-                ) : (
-                  <ul className="space-y-2">
-                    {attachments.map((attachment) => (
-                      <li
-                        key={attachment.id}
-                        className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <button
-                            type="button"
-                            className="truncate text-left font-medium text-primary hover:underline"
-                            onClick={() =>
-                              void api.attachments.download(attachment.id, attachment.file_name)
-                            }
-                          >
-                            {attachmentDisplayTitle(attachment)}
-                          </button>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {attachmentTypeLabel(attachment.attachment_type)} · {attachment.file_name}
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-1">
-                          {!cancelled ? (
-                            <>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => setEditingAttachment(attachment)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => void handleDeleteAttachment(attachment.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                            </>
+                <TabsContent value="picture" className="mt-0">
+                  <div className="space-y-3 rounded-lg border bg-muted/70 p-4 dark:bg-muted/40">
+                    <input
+                      ref={pictureInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) void handleUploadPicture(file);
+                      }}
+                    />
+                    {entity.picture_url ? (
+                      <>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium">Primary photo</p>
+                          {canMutateInstall ? (
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={pictureUploading}
+                                onClick={() => pictureInputRef.current?.click()}
+                              >
+                                <ImagePlus className="mr-2 h-4 w-4" />
+                                {pictureUploading ? 'Uploading…' : 'Replace'}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => void handleRemovePicture()}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Remove
+                              </Button>
+                            </div>
                           ) : null}
                         </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+                        <EntityPicture
+                          src={entity.picture_url}
+                          ownerType={ownerType}
+                          ownerId={entity.id}
+                          alt={`${entity.name} photo`}
+                          className="max-h-56 rounded-md border object-cover"
+                        />
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+                        <p className="text-sm text-muted-foreground">
+                          No picture added for this item yet.
+                        </p>
+                        {canMutateInstall ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={pictureUploading}
+                            onClick={() => pictureInputRef.current?.click()}
+                          >
+                            <ImagePlus className="mr-2 h-4 w-4" />
+                            {pictureUploading ? 'Uploading…' : 'Add picture'}
+                          </Button>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="attachments" className="mt-0">
+                  <div className="space-y-2 rounded-lg border bg-muted/70 p-4 dark:bg-muted/40">
+                    {attachments.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+                        <p className="text-sm text-muted-foreground">No attachments yet.</p>
+                        {!cancelled ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setUploadOpen(true)}
+                          >
+                            <Upload className="mr-2 h-4 w-4" />
+                            Upload
+                          </Button>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium">Files</p>
+                          {!cancelled ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setUploadOpen(true)}
+                            >
+                              <Upload className="mr-2 h-4 w-4" />
+                              Upload
+                            </Button>
+                          ) : null}
+                        </div>
+                        <ul className="space-y-2">
+                          {attachments.map((attachment) => (
+                            <li
+                              key={attachment.id}
+                              className="flex items-center justify-between gap-2 rounded-md border bg-background/60 px-3 py-2 text-sm"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <button
+                                  type="button"
+                                  className="truncate text-left font-medium text-primary hover:underline"
+                                  onClick={() =>
+                                    void api.attachments.download(
+                                      attachment.id,
+                                      attachment.file_name
+                                    )
+                                  }
+                                >
+                                  {attachmentDisplayTitle(attachment)}
+                                </button>
+                                <p className="truncate text-xs text-muted-foreground">
+                                  {attachmentTypeLabel(attachment.attachment_type)} ·{' '}
+                                  {attachment.file_name}
+                                </p>
+                              </div>
+                              <div className="flex shrink-0 items-center gap-1">
+                                {!cancelled ? (
+                                  <>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      onClick={() => setEditingAttachment(attachment)}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      onClick={() => void handleDeleteAttachment(attachment.id)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </>
+                                ) : null}
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="replacement" className="mt-0 space-y-4">
+                  <div className="space-y-3 rounded-lg border bg-muted/70 p-4 dark:bg-muted/40">
+                    <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+                      <MetadataField
+                        label="Current Installation Date"
+                        value={
+                          entity.installation_date
+                            ? new Date(entity.installation_date).toLocaleDateString()
+                            : undefined
+                        }
+                      />
+                      <MetadataField label="Current Installed By" value={installerLabel} />
+                      <MetadataField label="Part Number" value={currentPartNumber} />
+                      <MetadataField label="OEM Name" value={oemName} />
+                      <MetadataField label="Serial Number" value={currentSerialNumber} />
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border bg-muted/70 p-4 dark:bg-muted/40">
+                    {replacementLoading ? (
+                      <p className="py-8 text-center text-sm text-muted-foreground">
+                        Loading replacement history…
+                      </p>
+                    ) : !hasReplacementHistory ? (
+                      <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+                        <p className="text-sm text-muted-foreground">
+                          No replacements recorded for this item yet.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto rounded-md border bg-background/60">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/50">
+                              <TableHead className="whitespace-nowrap">Gen</TableHead>
+                              <TableHead>Part #</TableHead>
+                              <TableHead>Serial #</TableHead>
+                              <TableHead className="whitespace-nowrap">Installed</TableHead>
+                              <TableHead>Installed By</TableHead>
+                              <TableHead className="whitespace-nowrap">Replaced</TableHead>
+                              <TableHead>Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {replacementChain.map((row) => {
+                              const installer = row.installed_by_id
+                                ? users.find((user) => user.id === row.installed_by_id)
+                                : undefined;
+                              return (
+                                <TableRow key={row.id}>
+                                  <TableCell className="whitespace-nowrap text-sm font-medium">
+                                    #{row.replacement_sequence ?? 0}
+                                  </TableCell>
+                                  <TableCell className="text-sm">
+                                    {row.part_number?.trim() || '—'}
+                                  </TableCell>
+                                  <TableCell className="text-sm">
+                                    {row.serial_number?.trim() || '—'}
+                                  </TableCell>
+                                  <TableCell className="whitespace-nowrap text-sm">
+                                    {row.installation_date
+                                      ? new Date(row.installation_date).toLocaleDateString()
+                                      : '—'}
+                                  </TableCell>
+                                  <TableCell className="text-sm">
+                                    {installer
+                                      ? formatUserRef(installer)
+                                      : row.installed_by_id
+                                        ? `User #${row.installed_by_id}`
+                                        : '—'}
+                                  </TableCell>
+                                  <TableCell className="whitespace-nowrap text-sm">
+                                    {row.replaced_at
+                                      ? new Date(row.replaced_at).toLocaleDateString()
+                                      : '—'}
+                                  </TableCell>
+                                  <TableCell>
+                                    <StatusBadge
+                                      status={
+                                        row.is_current_install ? 'Current install' : 'Superseded'
+                                      }
+                                    />
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </CollapsibleContent>
         </Card>
       </Collapsible>
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Installation Metadata</DialogTitle>
-            <DialogDescription>Update install details for {entity.name}</DialogDescription>
-          </DialogHeader>
-          <EntityForm
-            fields={formFields}
-            initialValues={{
-              ...hierarchyInstallInitialValues(entity),
-            }}
-            onSubmit={handleSave}
-            onCancel={() => setEditOpen(false)}
-            submitLabel="Save"
-          />
-        </DialogContent>
-      </Dialog>
+      {canEdit && parentId != null ? (
+        <HierarchyEntityInventoryDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          entityType={ownerType}
+          entityId={entity.id}
+          entity={entity}
+          parentId={parentId}
+          title={`Edit ${entityLabel(ownerType)}`}
+          description={`Register details for ${entity.name}`}
+          onSaved={async () => {
+            await onExistingSaved?.();
+            router.refresh();
+          }}
+        />
+      ) : null}
 
       <AttachmentUploadDialog
         open={uploadOpen}
