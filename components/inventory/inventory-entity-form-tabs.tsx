@@ -204,9 +204,9 @@ export function InventoryEntityFormTabs({
             </Select>
           </div>
 
-          {inventorySupportsQuantity(selectedEntityType) && !isHierarchy ? (
+          {inventorySupportsQuantity(selectedEntityType) && !isHierarchy && mode === 'create' ? (
             <div>
-              <Label>Quantity {mode === 'create' ? '*' : ''}</Label>
+              <Label>Quantity *</Label>
               <Input
                 type="number"
                 min="1"
@@ -229,7 +229,9 @@ export function InventoryEntityFormTabs({
                 disabled
               />
               <p className="text-xs text-muted-foreground">
-                Quantity is the total number of serialized units sharing this part number.
+                {inventorySupportsQuantity(selectedEntityType)
+                  ? 'Quantity cannot be changed here. Use Add Stock to increase it.'
+                  : 'Quantity is the total number of serialized units sharing this part number.'}
               </p>
             </div>
           ) : null}

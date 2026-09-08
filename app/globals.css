@@ -37,6 +37,7 @@
   --sidebar-accent-foreground: oklch(0.3 0.04 250);
   --sidebar-border: oklch(0.91 0.01 250);
   --sidebar-ring: oklch(0.52 0.14 250);
+  --sidebar-submenu: oklch(0.99 0.01 250);
 }
 .breadcrumb {
   --s: 30px; /* control the shape */
@@ -81,6 +82,7 @@
   --sidebar-accent-foreground: oklch(0.93 0.01 250);
   --sidebar-border: oklch(0.28 0.03 250);
   --sidebar-ring: oklch(0.60 0.16 250);
+  --sidebar-submenu: oklch(0.26 0.025 250);
 }
 
 
@@ -123,6 +125,7 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-submenu: var(--sidebar-submenu);
 }
 
 @layer base {

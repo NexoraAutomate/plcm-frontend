@@ -918,7 +918,8 @@ export default function InventoryPage() {
       location,
       quantity: formData.quantity,
       usesInstances,
-      supportsQuantity: inventorySupportsQuantity(selectedEntityType),
+      // Quantity is not editable on edit (including components); only create / Add Stock.
+      supportsQuantity: false,
       isComponent: selectedEntityType === 'component' || (usesInstances && !editingInstanceId),
       entityCategoryLabel: getEntityDisplayName(selectedEntityType),
       locationLabel: 'Room / Cabinet / Rack',
@@ -1241,9 +1242,9 @@ export default function InventoryPage() {
           </Select>
         </div>
 
-        {inventorySupportsQuantity(selectedEntityType) ? (
+        {inventorySupportsQuantity(selectedEntityType) && mode === 'create' ? (
           <div>
-            <Label>Quantity {mode === 'create' ? '*' : ''}</Label>
+            <Label>Quantity *</Label>
             <Input
               type="number"
               min="1"
@@ -1266,7 +1267,9 @@ export default function InventoryPage() {
               disabled
             />
             <p className="text-xs text-muted-foreground">
-              Quantity is the total number of serialized units sharing this part number.
+              {inventorySupportsQuantity(selectedEntityType)
+                ? 'Quantity cannot be changed here. Use Add Stock to increase it.'
+                : 'Quantity is the total number of serialized units sharing this part number.'}
             </p>
           </div>
         )}
@@ -2348,10 +2351,19 @@ export default function InventoryPage() {
                                             className={cn(EXPANDED_CELL_TRUNCATE, 'font-mono text-sm')}
                                             title={serialLabel}
                                           >
-                                            {isProjectReservedInstance(instance) ? (
+                                            {canEditInventory ? (
                                               <button
                                                 type="button"
-                                                className="block w-full truncate text-left cursor-pointer underline-offset-2 hover:underline"
+                                                className="block w-full truncate text-left cursor-pointer"
+                                                onClick={() => void openEdit(item, instance.id)}
+                                                title={`Edit ${serialLabel}`}
+                                              >
+                                                {serialLabel}
+                                              </button>
+                                            ) : isProjectReservedInstance(instance) ? (
+                                              <button
+                                                type="button"
+                                                className="block w-full truncate text-left cursor-pointer"
                                                 onClick={() =>
                                                   setReservationHoldInstance(instance)
                                                 }

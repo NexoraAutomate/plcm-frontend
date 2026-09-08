@@ -33,6 +33,7 @@ import {
   ChevronDown,
   ChevronRight,
   Settings,
+  PackageCheck,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -127,6 +128,12 @@ const NAV_BY_HREF: Record<string, NavItem> = {
     icon: ClipboardPen,
     permission: NAV_PERMISSIONS["/issue-queue"] as PermissionCode[],
   },
+  "/inventory/issuances": {
+    label: "Issuances",
+    href: "/inventory/issuances",
+    icon: PackageCheck,
+    permission: NAV_PERMISSIONS["/inventory/issuances"] as PermissionCode,
+  },
   "/inspect-queue": {
     label: "Inspect Queue",
     href: "/inspect-queue",
@@ -176,6 +183,7 @@ const inventorySystemItems: NavItem[] = [
   NAV_BY_HREF["/scan"],
   NAV_BY_HREF["/shortages"],
   NAV_BY_HREF["/issue-queue"],
+  NAV_BY_HREF["/inventory/issuances"],
   NAV_BY_HREF["/inspect-queue"],
 ];
 
@@ -540,22 +548,25 @@ export function AppSidebar() {
     );
   };
 
-  const renderChildLinks = (items: NavItem[]) =>
-    items.map((item) => (
-      <Link
-        key={item.href}
-        href={item.href}
-        className={cn(
-          "ml-4 mr-1 flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
-          pathMatchesItem(pathname, item.href)
-            ? "border-sidebar-primary bg-sidebar-primary/20 text-sidebar-primary"
-            : "border-transparent text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-        )}
-      >
-        <item.icon className="h-3.5 w-3.5 shrink-0" />
-        <span className="truncate">{item.label}</span>
-      </Link>
-    ));
+  const renderChildLinks = (items: NavItem[]) => (
+    <div className="ml-3 mr-1 mt-0.5 space-y-0.5 rounded-md bg-sidebar-submenu p-1">
+      {items.map((item) => (
+        <Link
+          key={item.href}
+          href={item.href}
+          className={cn(
+            "flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
+            pathMatchesItem(pathname, item.href)
+              ? "border-sidebar-primary bg-sidebar-primary/20 text-sidebar-primary"
+              : "border-transparent text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          )}
+        >
+          <item.icon className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">{item.label}</span>
+        </Link>
+      ))}
+    </div>
+  );
 
   const renderCollapsibleGroup = ({
     id,

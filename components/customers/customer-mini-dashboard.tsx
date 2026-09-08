@@ -140,18 +140,18 @@ export function CustomerMiniDashboard({
   const orderValueData = useMemo(
     () =>
       [...orders]
-        .filter((o) => o.total_value != null && o.total_value > 0)
-        .sort((a, b) => (b.total_value ?? 0) - (a.total_value ?? 0))
+        .filter((o) => o.total_value != null && Number(o.total_value) > 0)
+        .sort((a, b) => Number(b.total_value ?? 0) - Number(a.total_value ?? 0))
         .slice(0, 6)
         .map((o) => ({
           name: o.order_number?.slice(0, 12) ?? `Order ${o.id}`,
-          value: o.total_value ?? 0,
+          value: Number(o.total_value ?? 0),
           id: o.id,
         })),
     [orders]
   );
 
-  const totalValue = orders.reduce((sum, o) => sum + (o.total_value ?? 0), 0);
+  const totalValue = orders.reduce((sum, o) => sum + Number(o.total_value ?? 0), 0);
   const currency = orders.find((o) => o.currency)?.currency ?? '';
 
   const handleOrderSliceClick = (entry: { statusId?: number; name: string }) => {

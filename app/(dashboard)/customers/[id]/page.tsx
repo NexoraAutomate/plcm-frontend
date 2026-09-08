@@ -27,6 +27,10 @@ import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
 import { RequiredMark } from '@/components/ui/required-mark';
 import { validateOrderForm } from '@/lib/form-validation';
+import {
+  ListStatsVisibilityControls,
+  useListStatsVisibility,
+} from '@/components/list-stats-visibility';
 
 type OrderForm = {
   order_number?: string
@@ -66,6 +70,7 @@ export default function CustomerDetailPage(){
     const router = useRouter();
     const customerID = params.id as string;
     const { customers, projects, deleteOrder, updateOrder, createOrder, systems, orders, loading, createSystem, deleteSystem, updateSystem } = useDataStore();
+    const { showStats, setShowStats } = useListStatsVisibility();
     const customer = customers.find((c) => String(c.id) === customerID);
     const customerOrders = customer? orders.filter((o) => o.customer_id === customer.id): [];
     const orderIds = new Set(customerOrders.map((o) => o.id));
@@ -241,31 +246,37 @@ export default function CustomerDetailPage(){
         </Breadcrumb>
 
         <div className="flex flex-col justify-between gap-4">
-            <div className='flex  justify-between items-center'>
+            <div className='flex flex-wrap justify-between items-center gap-3'>
 
                 <div className=''>
                     <h1 className="text-3xl font-bold tracking-tight">{customer.name}</h1>
                     <p className="text-sm text-muted-foreground mt-1">Manage Customer Orders</p>
                 </div>
-                
-                <Link href="/customers" className='flex  w-1/12'>
-                    <Button variant="ghost" size="icon" className=" w-full bg-mist-100">
-                       <CircleArrowLeft className="flex " />Back
-                    </Button>
-                </Link>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <ListStatsVisibilityControls
+                    showStats={showStats}
+                    onShowStatsChange={setShowStats}
+                  />
+                  <Link href="/customers" className='flex'>
+                      <Button variant="ghost" size="icon" className="w-auto px-3 bg-mist-100">
+                         <CircleArrowLeft className="flex " />Back
+                      </Button>
+                  </Link>
+                </div>
 
             </div>
-            
-               
 
-            <CustomerMiniDashboard
-              customer={customer}
-              orders={customerOrders}
-              projects={customerProjects}
-              orderStatuses={statuses}
-              activeOrderStatusId={statusFilter}
-              onOrderStatusFilter={setStatusFilter}
-            />
+            {showStats && (
+              <CustomerMiniDashboard
+                customer={customer}
+                orders={customerOrders}
+                projects={customerProjects}
+                orderStatuses={statuses}
+                activeOrderStatusId={statusFilter}
+                onOrderStatusFilter={setStatusFilter}
+              />
+            )}
 
             <div className="space-y-8">
             {/* <div>
