@@ -123,6 +123,75 @@ export async function copyInventoryAssetsToEntity(
   }
 }
 
+/**
+ * For reserved hierarchy shells that never received inventory media (legacy reserves),
+ * copy catalog/instance picture + attachments onto the entity when it has none.
+ */
+export async function syncReservedInventoryMediaToEntity({
+  entityType,
+  entityId,
+  inventoryId,
+  inventoryInstanceId,
+  hasPicture,
+  hasAttachments,
+}: {
+  entityType: HierarchyEntityType;
+  entityId: number;
+  inventoryId: number;
+  inventoryInstanceId?: number | null;
+  hasPicture: boolean;
+  hasAttachments: boolean;
+}): Promise<{ pictureUrl?: string | null }> {
+  if (hasPicture && hasAttachments) {
+    return {};
+  }
+
+  const sources: InventoryAssetSource[] = [
+    { ownerType: 'inventory', ownerId: inventoryId },
+  ];
+  if (inventoryInstanceId) {
+    sources.push({ ownerType: 'inventory_instance', ownerId: inventoryInstanceId });
+  }
+
+  let pictureUrl: string | null | undefined;
+  let pictureFound = hasPicture;
+  const shouldCopyAttachments = !hasAttachments;
+
+  for (const source of sources) {
+    if (shouldCopyAttachments) {
+      try {
+        await api.attachments.copy(
+          source.ownerType,
+          source.ownerId,
+          entityType,
+          entityId
+        );
+      } catch {
+        // Source may have no attachments — ignore.
+      }
+    }
+
+    if (!pictureFound) {
+      try {
+        const res = await api.pictures.copy(
+          source.ownerType,
+          source.ownerId,
+          entityType,
+          entityId
+        );
+        if (res.data?.picture_url) {
+          pictureUrl = res.data.picture_url;
+          pictureFound = true;
+        }
+      } catch {
+        // Source may not have a picture — ignore.
+      }
+    }
+  }
+
+  return { pictureUrl };
+}
+
 export async function installEntityFromInventory({
   inventoryItem,
   instanceId,

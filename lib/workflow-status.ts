@@ -45,6 +45,10 @@ export function isProjectReadOnly(statusName?: string | null): boolean {
   return isProjectCancelled(statusName) || isProjectSuperseded(statusName);
 }
 
+export function isProjectCompleted(statusName?: string | null): boolean {
+  return statusName === ProjectWorkflowStatus.COMPLETED;
+}
+
 export const ITEM_STATUS_LABELS: Record<ItemStatusCode, string> = {
   AVAILABLE: 'Available',
   RESERVED: 'Reserved',

@@ -264,6 +264,7 @@ export const projects = {
   assignHm: (id: number, hmUserId: number) =>
     api.post<Models.Project>(`/projects/${id}/assign-hm/`, { hm_user_id: hmUserId }),
   approve: (id: number) => api.post<Models.Project>(`/projects/${id}/approve/`),
+  complete: (id: number) => api.post<Models.Project>(`/projects/${id}/complete/`),
   generateHierarchy: (id: number) =>
     api.post<{
       ok: boolean;

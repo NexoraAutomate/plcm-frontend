@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   InventoryEntityFormTabs,
-  inventoryEntityDialogClassName,
+  hierarchyEntityDialogClassName,
 } from '@/components/inventory/inventory-entity-form-tabs';
 import { useInventoryEntityForm } from '@/hooks/use-inventory-entity-form';
 import type { HierarchyEntityType } from '@/lib/entity-hierarchy';
@@ -22,11 +22,7 @@ import {
   buildUpdateEntityByType,
 } from '@/lib/inventory-child-install';
 import { createHierarchyEntityWithInventoryForm } from '@/lib/hierarchy-inventory-create';
-import {
-  emptyInventoryEntityForm,
-  hierarchyEntityToFormData,
-} from '@/lib/inventory-entity-fields';
-import { syncEntityPicture } from '@/lib/entity-picture-upload';
+import { hierarchyEntityToFormData } from '@/lib/inventory-entity-fields';
 import { useDataStore } from '@/lib/data-store';
 import { useAppDefinitions } from '@/lib/app-definitions-context';
 import * as api from '@/lib/api';
@@ -44,47 +40,15 @@ export interface HierarchyEntityInventoryDialogProps {
     part_number?: string | null;
     serial_number?: string | null;
     status_id?: number | null;
+    oem_name?: string | null;
+    installation_date?: string | null;
+    installed_by_id?: number | null;
+    picture_url?: string | null;
   };
   title: string;
   description?: string;
   onSaved?: (entityId: number) => void | Promise<void>;
   extraPayload?: Record<string, unknown>;
-}
-
-async function resolveOemNameForEntity(options: {
-  entityType: HierarchyEntityType;
-  entityId?: number;
-  name?: string | null;
-  partNumber?: string | null;
-}): Promise<string> {
-  const { entityType, entityId, name, partNumber } = options;
-
-  if (entityId) {
-    try {
-      const byEntity = await api.inventory.listByEntity(entityId);
-      const linked = (byEntity.data ?? []).find((item) => item.oem_name?.trim());
-      if (linked?.oem_name?.trim()) return linked.oem_name.trim();
-    } catch {
-      // fall through to part/name match
-    }
-  }
-
-  const part = partNumber?.trim().toLowerCase() || '';
-  const entityName = name?.trim().toLowerCase() || '';
-  if (!part && !entityName) return '';
-
-  try {
-    const byType = await api.inventory.list(0, 1000, entityType);
-    const match = (byType.data ?? []).find((item) => {
-      if (!item.oem_name?.trim()) return false;
-      const pn = (item.part_number || '').trim().toLowerCase();
-      const itemName = (item.name || '').trim().toLowerCase();
-      return (part !== '' && pn === part) || (entityName !== '' && itemName === entityName);
-    });
-    return match?.oem_name?.trim() || '';
-  } catch {
-    return '';
-  }
 }
 
 export function HierarchyEntityInventoryDialog({
@@ -101,6 +65,7 @@ export function HierarchyEntityInventoryDialog({
 }: HierarchyEntityInventoryDialogProps) {
   const { entityLabel } = useAppDefinitions();
   const {
+    users,
     createSystem,
     createSubsystem,
     createModule,
@@ -114,34 +79,11 @@ export function HierarchyEntityInventoryDialog({
     runSilentEntityBatch,
   } = useDataStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [initialFormData, setInitialFormData] = useState<
-    Partial<typeof emptyInventoryEntityForm> | undefined
-  >(undefined);
 
-  useEffect(() => {
-    if (!open || !entity) {
-      setInitialFormData(undefined);
-      return;
-    }
-
-    const base = hierarchyEntityToFormData(entity, entityType);
-    setInitialFormData(base);
-
-    let cancelled = false;
-    void resolveOemNameForEntity({
-      entityType,
-      entityId,
-      name: entity.name,
-      partNumber: entity.part_number,
-    }).then((oemName) => {
-      if (cancelled || !oemName) return;
-      setInitialFormData((prev) => ({ ...(prev ?? base), oem_name: oemName }));
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [open, entity, entityId, entityType]);
+  const initialFormData = useMemo(() => {
+    if (!open || !entity) return undefined;
+    return hierarchyEntityToFormData(entity, entityType);
+  }, [open, entity, entityType]);
 
   const form = useInventoryEntityForm({
     entityType,
@@ -191,14 +133,29 @@ export function HierarchyEntityInventoryDialog({
           extraPayload,
           removePicture: form.removePicture,
           pendingPictureFile: form.pendingPictureFile,
+          pendingPictureFiles: form.pendingPictureFiles,
           pendingAttachments: form.pendingAttachments,
           formData: form.formData,
         })
       );
 
       const targetId = entityId ?? saved.id;
-      if (entityType === 'system') {
-        await syncEntityPicture('system', targetId, form.formData);
+      const pictureFiles =
+        form.pendingPictureFiles.length > 0
+          ? form.pendingPictureFiles
+          : form.pendingPictureFile
+            ? [form.pendingPictureFile]
+            : [];
+      if (form.removePicture) {
+        await api.pictures.remove(entityType, targetId);
+      } else if (pictureFiles.length > 0) {
+        await api.pictures.upload(entityType, targetId, pictureFiles[0]);
+        for (const file of pictureFiles.slice(1)) {
+          await api.attachments.upload(entityType, targetId, file, {
+            attachment_type: 'photo',
+            description: file.name,
+          });
+        }
       }
 
       toast.success(
@@ -231,8 +188,8 @@ export function HierarchyEntityInventoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={inventoryEntityDialogClassName}>
-        <DialogHeader className="space-y-1.5 border-b px-6 py-5 text-left">
+      <DialogContent className={hierarchyEntityDialogClassName}>
+        <DialogHeader className="space-y-1 border-b px-5 py-4 text-left">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
             {description ??
@@ -257,12 +214,16 @@ export function HierarchyEntityInventoryDialog({
             onPendingAttachmentsChange={form.setPendingAttachments}
             pendingPictureFile={form.pendingPictureFile}
             onPendingPictureFileChange={form.setPendingPictureFile}
+            pendingPictureFiles={form.pendingPictureFiles}
+            onPendingPictureFilesChange={form.setPendingPictureFiles}
             removePicture={form.removePicture}
             onRemovePictureChange={form.setRemovePicture}
             onApplyDefinitionIdentifiers={form.applyDefinitionIdentifiers}
+            users={users}
+            entityId={entityId}
           />
 
-          <div className="flex justify-end gap-3 border-t px-6 py-4">
+          <div className="flex justify-end gap-3 border-t px-5 py-3">
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
               Cancel
             </Button>

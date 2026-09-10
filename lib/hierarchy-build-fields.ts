@@ -4,12 +4,14 @@ export interface OriginalBuildDisplayFields {
   partNumber?: string;
   serialNumber?: string;
   configurationItem?: string;
+  oemName?: string;
 }
 
 type BuildSource = HierarchyInstallFields & {
   part_number?: string;
   serial_number?: string;
   configuration_item?: string;
+  oem_name?: string | null;
 };
 
 export function getOriginalBuildDisplayFields(entity: BuildSource): OriginalBuildDisplayFields {
@@ -19,8 +21,9 @@ export function getOriginalBuildDisplayFields(entity: BuildSource): OriginalBuil
     entity.original_serial_number?.trim() || entity.serial_number?.trim() || undefined;
   const configurationItem =
     entity.configuration_item?.trim() || partNumber || undefined;
+  const oemName = entity.oem_name?.trim() || undefined;
 
-  return { partNumber, serialNumber, configurationItem };
+  return { partNumber, serialNumber, configurationItem, oemName };
 }
 
 export function applyOriginalBuildToNodeFields<

@@ -1,12 +1,15 @@
 'use client';
 
-import { Trash2 } from 'lucide-react';
+import { Trash2, Upload } from 'lucide-react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EntityAttachmentsSection, type PendingAttachmentUpload } from '@/components/entity-attachments-section';
+import { EntityPicture } from '@/components/entity-picture';
 import {
   inventorySupportsQuantity,
   inventoryUsesInstances,
@@ -38,6 +41,8 @@ export interface InventoryEntityFormTabsProps {
   onPendingAttachmentsChange: (attachments: PendingAttachmentUpload[]) => void;
   pendingPictureFile: File | null;
   onPendingPictureFileChange: (file: File | null) => void;
+  pendingPictureFiles?: File[];
+  onPendingPictureFilesChange?: (files: File[]) => void;
   removePicture: boolean;
   onRemovePictureChange: (remove: boolean) => void;
   onApplyDefinitionIdentifiers?: (
@@ -52,6 +57,8 @@ export interface InventoryEntityFormTabsProps {
   /** inventory = full form; hierarchy = hide quantity and holder tab on project pages */
   context?: 'inventory' | 'hierarchy';
   lockEntityName?: boolean;
+  /** Hierarchy entity id — used to load the existing primary photo. */
+  entityId?: number;
 }
 
 export function InventoryEntityFormTabs({
@@ -70,6 +77,8 @@ export function InventoryEntityFormTabs({
   onPendingAttachmentsChange,
   pendingPictureFile,
   onPendingPictureFileChange,
+  pendingPictureFiles = [],
+  onPendingPictureFilesChange,
   removePicture,
   onRemovePictureChange,
   onApplyDefinitionIdentifiers,
@@ -78,25 +87,45 @@ export function InventoryEntityFormTabs({
   editingInstanceId = null,
   context = 'inventory',
   lockEntityName = false,
+  entityId,
 }: InventoryEntityFormTabsProps) {
   const getEntityDisplayName = (entityType: InventoryEntityFormType) => entityLabel(entityType);
   const isHierarchy = context === 'hierarchy';
+  /** Existing-project edit: no General tab; Description lives on Part Number. */
+  const hideGeneralTab = isHierarchy;
+  const pictureInputRef = useRef<HTMLInputElement>(null);
+  const pendingFile = pendingPictureFiles[0] ?? pendingPictureFile ?? null;
+  const selectedPictures = pendingFile ? [pendingFile] : [];
+  const pendingPreviewSrc = useMemo(() => {
+    return pendingFile ? URL.createObjectURL(pendingFile) : null;
+  }, [pendingFile]);
+
+  useEffect(() => {
+    return () => {
+      if (pendingPreviewSrc) URL.revokeObjectURL(pendingPreviewSrc);
+    };
+  }, [pendingPreviewSrc]);
+
+  const hasExistingPicture = Boolean(formData.picture_url?.trim()) && !removePicture;
+  const showHierarchyPicture = Boolean(pendingPreviewSrc || hasExistingPicture);
 
   return (
     <Tabs value={formTab} onValueChange={onFormTabChange} className="w-full">
       <div className="border-b bg-muted/30 px-6 pt-2 pb-0">
         <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 rounded-none bg-transparent p-0">
-          <TabsTrigger
-            value="general"
-            className="rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
-          >
-            General
-          </TabsTrigger>
+          {!hideGeneralTab ? (
+            <TabsTrigger
+              value="general"
+              className="rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
+              General
+            </TabsTrigger>
+          ) : null}
           <TabsTrigger
             value="part-number"
             className="rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
           >
-            Part Number
+            {hideGeneralTab ? 'Item Details' : 'Part Number'}
           </TabsTrigger>
           {!isHierarchy ? (
             <TabsTrigger
@@ -129,7 +158,8 @@ export function InventoryEntityFormTabs({
         </TabsList>
       </div>
 
-      <div className="px-6 py-6">
+      <div className={hideGeneralTab ? 'px-6 py-4' : 'px-6 py-6'}>
+        {!hideGeneralTab ? (
         <TabsContent value="general" className={formTabClassName}>
           <div>
             <Label>Inventory Type {mode === 'create' ? '*' : ''}</Label>
@@ -279,93 +309,206 @@ export function InventoryEntityFormTabs({
             />
           </div>
         </TabsContent>
+        ) : null}
 
-        <TabsContent value="part-number" className={formTabClassName}>
-          <div>
-            <Label>
-              Serial Number
-              {inventoryUsesInstances(selectedEntityType) &&
-              selectedEntityType !== 'component' &&
-              mode === 'create'
-                ? ' *'
-                : ''}
-            </Label>
-            <Input
-              value={formData.serial_number}
-              onChange={(e) => onFormDataChange({ ...formData, serial_number: e.target.value })}
-              placeholder="e.g., SN-2024-001"
-            />
-            {inventoryUsesInstances(selectedEntityType) ? (
-              <p className="text-xs text-muted-foreground">
-                Each unit gets its own identity. Leave blank to generate one automatically.
-              </p>
-            ) : null}
-          </div>
-
-          <div>
-            <Label>
-              Part Number
-              {inventoryUsesInstances(selectedEntityType) ? ' *' : ''}
-            </Label>
-            <Input
-              value={formData.part_number}
-              onChange={(e) => onFormDataChange({ ...formData, part_number: e.target.value })}
-              placeholder="e.g., MPN-12345"
-            />
-          </div>
-
-          {mode === 'edit' && selectedEntityType === 'component' ? (
-            <div>
-              <Label>SKU</Label>
-              <Input
-                value={formData.sku}
-                onChange={(e) => onFormDataChange({ ...formData, sku: e.target.value })}
-                placeholder="Component SKU"
-              />
-            </div>
-          ) : null}
-
-          {mode === 'edit' ? (
+        <TabsContent
+          value="part-number"
+          className={hideGeneralTab ? 'mt-0 space-y-3 p-0' : formTabClassName}
+        >
+          {hideGeneralTab ? (
             <>
-              <div>
-                <Label>Original Part Number</Label>
-                <Input
-                  value={formData.original_part_number}
-                  onChange={(e) =>
-                    onFormDataChange({ ...formData, original_part_number: e.target.value })
-                  }
-                  placeholder="Original part number from manufacturer"
-                />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Card className="gap-3 py-3 shadow-none">
+                  <CardHeader className="px-4 pb-0 pt-0">
+                    <CardTitle className="text-sm font-semibold">Part Number Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 gap-3 px-4 [&>div]:space-y-1.5">
+                    <div>
+                      <Label className="text-xs">Part Number</Label>
+                      <Input
+                        className="h-8"
+                        value={formData.part_number}
+                        onChange={(e) =>
+                          onFormDataChange({ ...formData, part_number: e.target.value })
+                        }
+                        placeholder="e.g., MPN-12345"
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-xs">Serial Number</Label>
+                      <Input
+                        className="h-8"
+                        value={formData.serial_number}
+                        onChange={(e) =>
+                          onFormDataChange({ ...formData, serial_number: e.target.value })
+                        }
+                        placeholder="e.g., SN-2024-001"
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-xs">OEM Name</Label>
+                      <Input
+                        className="h-8"
+                        value={formData.oem_name}
+                        onChange={(e) => {
+                          onFormDataChange({ ...formData, oem_name: e.target.value });
+                        }}
+                        placeholder="e.g. AMP"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="gap-3 py-3 shadow-none">
+                  <CardHeader className="px-4 pb-0 pt-0">
+                    <CardTitle className="text-sm font-semibold">Installation Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 gap-3 px-4 [&>div]:space-y-1.5">
+                    <div>
+                      <Label className="text-xs">Installation Date</Label>
+                      <Input
+                        className="h-8"
+                        type="date"
+                        value={formData.installation_date}
+                        onChange={(e) =>
+                          onFormDataChange({ ...formData, installation_date: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Installed By</Label>
+                      <Select
+                        value={formData.installed_by_id || ''}
+                        onValueChange={(value) =>
+                          onFormDataChange({ ...formData, installed_by_id: value })
+                        }
+                      >
+                        <SelectTrigger className="h-8">
+                          <SelectValue placeholder="Select installer" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {users.map((user) => (
+                            <SelectItem key={user.id} value={String(user.id)}>
+                              {user.full_name || user.username}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
 
-              <div>
-                <Label>Original Serial Number</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Notes</Label>
                 <Input
-                  value={formData.original_serial_number}
+                  className="h-8"
+                  value={formData.description}
                   onChange={(e) =>
-                    onFormDataChange({ ...formData, original_serial_number: e.target.value })
+                    onFormDataChange({ ...formData, description: e.target.value })
                   }
-                  placeholder="Original serial number"
+                  placeholder="Optional notes"
                 />
               </div>
             </>
-          ) : null}
+          ) : (
+            <>
+              <div>
+                <Label>
+                  Serial Number
+                  {inventoryUsesInstances(selectedEntityType) &&
+                  selectedEntityType !== 'component' &&
+                  mode === 'create'
+                    ? ' *'
+                    : ''}
+                </Label>
+                <Input
+                  value={formData.serial_number}
+                  onChange={(e) =>
+                    onFormDataChange({ ...formData, serial_number: e.target.value })
+                  }
+                  placeholder="e.g., SN-2024-001"
+                />
+                {inventoryUsesInstances(selectedEntityType) ? (
+                  <p className="text-xs text-muted-foreground">
+                    Each unit gets its own identity. Leave blank to generate one automatically.
+                  </p>
+                ) : null}
+              </div>
 
-          <div className={mode === 'edit' ? undefined : 'sm:col-span-2'}>
-            <Label>Vendor / OEM acronym</Label>
-            <Input
-              value={formData.oem_name}
-              onChange={(e) => {
-                onFormDataChange({ ...formData, oem_name: e.target.value });
-              }}
-              placeholder="Short acronym for {vendor} token, e.g. AMP"
-            />
-            <p className="text-xs text-muted-foreground">
-              Used as the {'{vendor}'} token when Part # / Serial # are generated from the name.
-              Changing it later does not rewrite existing Part # or Serial #.
-            </p>
-          </div>
-      </TabsContent>
+              <div>
+                <Label>
+                  Part Number
+                  {inventoryUsesInstances(selectedEntityType) ? ' *' : ''}
+                </Label>
+                <Input
+                  value={formData.part_number}
+                  onChange={(e) =>
+                    onFormDataChange({ ...formData, part_number: e.target.value })
+                  }
+                  placeholder="e.g., MPN-12345"
+                />
+              </div>
+
+              {mode === 'edit' && selectedEntityType === 'component' ? (
+                <div>
+                  <Label>SKU</Label>
+                  <Input
+                    value={formData.sku}
+                    onChange={(e) => onFormDataChange({ ...formData, sku: e.target.value })}
+                    placeholder="Component SKU"
+                  />
+                </div>
+              ) : null}
+
+              {mode === 'edit' ? (
+                <>
+                  <div>
+                    <Label>Original Part Number</Label>
+                    <Input
+                      value={formData.original_part_number}
+                      onChange={(e) =>
+                        onFormDataChange({ ...formData, original_part_number: e.target.value })
+                      }
+                      placeholder="Original part number from manufacturer"
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Original Serial Number</Label>
+                    <Input
+                      value={formData.original_serial_number}
+                      onChange={(e) =>
+                        onFormDataChange({
+                          ...formData,
+                          original_serial_number: e.target.value,
+                        })
+                      }
+                      placeholder="Original serial number"
+                    />
+                  </div>
+                </>
+              ) : null}
+
+              <div className={mode === 'edit' ? undefined : 'sm:col-span-2'}>
+                <Label>Vendor / OEM acronym</Label>
+                <Input
+                  value={formData.oem_name}
+                  onChange={(e) => {
+                    onFormDataChange({ ...formData, oem_name: e.target.value });
+                  }}
+                  placeholder="Short acronym for {vendor} token, e.g. AMP"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Used as the {'{vendor}'} token when Part # / Serial # are generated from the
+                  name. Changing it later does not rewrite existing Part # or Serial #.
+                </p>
+              </div>
+            </>
+          )}
+        </TabsContent>
 
       {!isHierarchy ? (
       <TabsContent value="holder" className={formTabClassName}>
@@ -473,48 +616,143 @@ export function InventoryEntityFormTabs({
           </TabsContent>
         ) : null}
 
-        <TabsContent value="picture" className={formTabClassName}>
-          <div>
-            <Label>Picture</Label>
-            <Input
-              value={formData.picture_url}
-              onChange={(e) => {
-                onFormDataChange({ ...formData, picture_url: e.target.value });
-                onRemovePictureChange(false);
-              }}
-              placeholder="Path or URL to item photo"
-            />
-          </div>
-
-          <div>
-            <Label>Or Upload Photo</Label>
-            <Input
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                onPendingPictureFileChange(e.target.files?.[0] ?? null);
-                onRemovePictureChange(false);
-              }}
-            />
-          </div>
-
-          {(formData.picture_url || pendingPictureFile) && !removePicture ? (
-            <div className="sm:col-span-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  onFormDataChange({ ...formData, picture_url: '' });
-                  onPendingPictureFileChange(null);
-                  onRemovePictureChange(true);
+        <TabsContent
+          value="picture"
+          className={
+            hideGeneralTab
+              ? 'mt-0 flex min-h-[220px] flex-col items-center justify-center gap-4 p-1'
+              : formTabClassName
+          }
+        >
+          {hideGeneralTab ? (
+            <>
+              <input
+                ref={pictureInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  onPendingPictureFilesChange?.(files);
+                  onPendingPictureFileChange(files[0] ?? null);
+                  onRemovePictureChange(false);
+                  e.target.value = '';
                 }}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Remove photo
-              </Button>
-            </div>
-          ) : null}
+              />
+              {showHierarchyPicture ? (
+                <div className="flex w-full max-w-md flex-col items-center gap-3">
+                  {pendingPreviewSrc ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={pendingPreviewSrc}
+                      alt="Selected primary photo"
+                      className="max-h-48 rounded-md border object-cover"
+                    />
+                  ) : (
+                    <EntityPicture
+                      src={formData.picture_url}
+                      ownerType={selectedEntityType}
+                      ownerId={entityId}
+                      alt={`${formData.name || 'Entity'} photo`}
+                      className="max-h-48 rounded-md border object-cover"
+                    />
+                  )}
+                  {selectedPictures[0] ? (
+                    <p className="max-w-full truncate text-sm text-muted-foreground">
+                      {selectedPictures[0].name}
+                    </p>
+                  ) : null}
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => pictureInputRef.current?.click()}
+                    >
+                      <Upload className="h-4 w-4" />
+                      {hasExistingPicture || selectedPictures.length > 0
+                        ? 'Replace Picture'
+                        : 'Upload Picture'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive"
+                      onClick={() => {
+                        onPendingPictureFilesChange?.([]);
+                        onPendingPictureFileChange(null);
+                        onFormDataChange({ ...formData, picture_url: '' });
+                        onRemovePictureChange(true);
+                      }}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => pictureInputRef.current?.click()}
+                  >
+                    <Upload className="h-4 w-4" />
+                    Upload Picture
+                  </Button>
+                  <p className="text-sm text-muted-foreground">
+                    Select the primary photo of this entity
+                  </p>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <div>
+                <Label>Picture</Label>
+                <Input
+                  value={formData.picture_url}
+                  onChange={(e) => {
+                    onFormDataChange({ ...formData, picture_url: e.target.value });
+                    onRemovePictureChange(false);
+                  }}
+                  placeholder="Path or URL to item photo"
+                />
+              </div>
+
+              <div>
+                <Label>Or Upload Photo</Label>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    onPendingPictureFileChange(e.target.files?.[0] ?? null);
+                    onRemovePictureChange(false);
+                  }}
+                />
+              </div>
+
+              {(formData.picture_url || pendingPictureFile) && !removePicture ? (
+                <div className="sm:col-span-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      onFormDataChange({ ...formData, picture_url: '' });
+                      onPendingPictureFileChange(null);
+                      onRemovePictureChange(true);
+                    }}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Remove photo
+                  </Button>
+                </div>
+              ) : null}
+            </>
+          )}
         </TabsContent>
 
         <TabsContent value="attachments" className={formTabSingleClassName}>
@@ -532,3 +770,6 @@ export function InventoryEntityFormTabs({
 
 export const inventoryEntityDialogClassName =
   'top-[4vh] max-h-[92vh] w-[min(100vw-1.5rem,56rem)] translate-y-0 gap-0 overflow-y-auto p-0 sm:max-w-4xl';
+
+export const hierarchyEntityDialogClassName =
+  'top-[6vh] max-h-[88vh] w-[min(100vw-1.5rem,52rem)] translate-y-0 gap-0 overflow-y-auto p-0 sm:max-w-3xl';

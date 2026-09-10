@@ -17,16 +17,31 @@ async function syncInventoryMedia(
   options: {
     removePicture: boolean;
     pendingPictureFile?: File | null;
+    pendingPictureFiles?: File[];
     pendingAttachments?: PendingAttachmentUpload[];
   }
 ) {
+  const pictureFiles =
+    options.pendingPictureFiles && options.pendingPictureFiles.length > 0
+      ? options.pendingPictureFiles
+      : options.pendingPictureFile
+        ? [options.pendingPictureFile]
+        : [];
+
   if (options.removePicture) {
     await api.pictures.remove(ownerType, ownerId);
-  } else if (options.pendingPictureFile) {
-    await api.pictures.upload(ownerType, ownerId, options.pendingPictureFile);
+  } else if (pictureFiles[0]) {
+    await api.pictures.upload(ownerType, ownerId, pictureFiles[0]);
   }
-  if (options.pendingAttachments?.length) {
-    for (const attachment of options.pendingAttachments) {
+
+  const photoAttachments = pictureFiles.slice(1).map((file) => ({
+    file,
+    attachment_type: 'photo',
+    description: file.name,
+  }));
+  const allAttachments = [...(options.pendingAttachments ?? []), ...photoAttachments];
+  if (allAttachments.length) {
+    for (const attachment of allAttachments) {
       await api.attachments.upload(ownerType, ownerId, attachment.file, {
         attachment_type: attachment.attachment_type,
         description: attachment.description,
@@ -46,6 +61,7 @@ export async function createHierarchyEntityWithInventoryForm(options: {
   extraPayload?: Record<string, unknown>;
   removePicture?: boolean;
   pendingPictureFile?: File | null;
+  pendingPictureFiles?: File[];
   pendingAttachments?: PendingAttachmentUpload[];
   formData: {
     name: string;
@@ -55,6 +71,7 @@ export async function createHierarchyEntityWithInventoryForm(options: {
     sku: string;
     installed_by_id: string;
     installation_date: string;
+    oem_name: string;
   };
 }) {
   const usesInstances = inventoryUsesInstances(options.selectedEntityType);
@@ -72,6 +89,7 @@ export async function createHierarchyEntityWithInventoryForm(options: {
     await syncInventoryMedia(mediaOwnerType, mediaOwnerId, {
       removePicture: options.removePicture ?? false,
       pendingPictureFile: options.pendingPictureFile,
+      pendingPictureFiles: options.pendingPictureFiles,
       pendingAttachments: options.pendingAttachments,
     });
   }
@@ -88,6 +106,7 @@ export async function createHierarchyEntityWithInventoryForm(options: {
     sku: options.formData.sku,
     installed_by_id: options.formData.installed_by_id,
     installation_date: options.formData.installation_date,
+    oem_name: options.formData.oem_name,
     ...(instanceId != null ? { inventory_instance_id: String(instanceId) } : {}),
   };
 

@@ -74,6 +74,8 @@ interface DataStoreContextType {
   getProject: (id: number) => Promise<Models.Project>;
   createProject: (data: Partial<Models.Project>) => Promise<Models.Project>;
   updateProject: (id: number, data: Partial<Models.Project>) => Promise<Models.Project>;
+  /** Merge a project payload into local store state (no API call). */
+  mergeProjectLocal: (project: Models.Project) => void;
   deleteProject: (id: number) => Promise<void>;
   getProjectSystems: (projectId: number) => Promise<Models.System[]>;
 
@@ -750,6 +752,14 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       toast.error('Failed to update project');
       throw err;
     }
+  };
+
+  const mergeProjectLocal = (project: Models.Project) => {
+    setProjects((prev) => {
+      const idx = prev.findIndex((p) => p.id === project.id);
+      if (idx < 0) return [...prev, project];
+      return prev.map((p) => (p.id === project.id ? { ...p, ...project } : p));
+    });
   };
 
   const deleteProject = async (id: number) => {
@@ -1626,6 +1636,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     getProject,
     createProject,
     updateProject,
+    mergeProjectLocal,
     deleteProject,
     getProjectSystems,
     getSystem,

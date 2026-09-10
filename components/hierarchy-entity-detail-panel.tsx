@@ -379,7 +379,7 @@ export function HierarchyEntityDetailPanel({
               />
               <DetailRow
                 label="OEM"
-                value={inventoryMatch?.oem_name}
+                value={originalBuild?.oemName || inventoryMatch?.oem_name}
               />
               <DetailRow label="Location" value={inventoryMatch?.location} />
               {'sku' in entity && entity.sku ? (

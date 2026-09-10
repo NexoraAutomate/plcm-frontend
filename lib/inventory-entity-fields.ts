@@ -150,9 +150,21 @@ export function hierarchyEntityToFormData(
     part_number?: string | null;
     serial_number?: string | null;
     status_id?: number | null;
+    oem_name?: string | null;
+    installation_date?: string | null;
+    installed_by_id?: number | null;
+    picture_url?: string | null;
   },
   entityType: HierarchyEntityType
 ) {
+  let installationDate = '';
+  if (entity.installation_date) {
+    const date = new Date(entity.installation_date);
+    if (!Number.isNaN(date.getTime())) {
+      installationDate = date.toISOString().slice(0, 10);
+    }
+  }
+
   return {
     ...emptyInventoryEntityForm,
     inventory_type: entityType,
@@ -161,6 +173,10 @@ export function hierarchyEntityToFormData(
     part_number: entity.part_number || '',
     serial_number: entity.serial_number || '',
     status_id: entity.status_id ? String(entity.status_id) : '',
+    oem_name: entity.oem_name?.trim() || '',
+    installation_date: installationDate,
+    installed_by_id: entity.installed_by_id ? String(entity.installed_by_id) : '',
+    picture_url: entity.picture_url || '',
   };
 }
 

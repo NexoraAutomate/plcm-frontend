@@ -14,7 +14,7 @@ import { P } from '@/lib/permission-codes';
 import { workflowStatusLabel } from '@/lib/workflow-status';
 import { EntityForm } from '@/components/entity-form';
 import { HierarchyEntityInventoryDialog } from '@/components/hierarchy/hierarchy-entity-inventory-create-dialog';
-import { isExistingProject } from '@/lib/project-existing';
+import { isExistingProject, projectAllowsReplace } from '@/lib/project-existing';
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
@@ -74,6 +74,7 @@ export default function ModuleDetailPage() {
     project?.status_name
   );
   const isExisting = isExistingProject(project);
+  const allowReplace = projectAllowsReplace(project);
   const systemId = module
     ? resolveSystemIdForHardwareEntity('module', module.id, {
         subsystems,
@@ -255,6 +256,7 @@ export default function ModuleDetailPage() {
         name={module.name}
         description={module.description}
         backHref={subsystem ? `/subsystems/${subsystem.id}` : '/modules'}
+        projectId={projectId}
         projectName={project?.name}
         systemName={
           module && systemId != null
@@ -275,7 +277,7 @@ export default function ModuleDetailPage() {
         projectId={projectId ?? undefined}
         parentId={subsystem?.id}
         isExistingProject={isExisting}
-        allowReplace
+        allowReplace={allowReplace}
         hierarchyHref={hierarchyHref}
       />
 
@@ -285,17 +287,21 @@ export default function ModuleDetailPage() {
         description={`Manage units for ${module.name}`}
         entities={moduleUnits}
         onEdit={openEditUnit}
-        onReplace={(entity) => {
-          setReplaceTarget({
-            entityType: 'unit',
-            entityId: entity.id,
-            entityName: entity.name,
-            partNumber: entity.part_number,
-            serialNumber: entity.serial_number,
-            replacementSequence: entity.replacement_sequence,
-          });
-          setReplaceOpen(true);
-        }}
+        onReplace={
+          allowReplace
+            ? (entity) => {
+                setReplaceTarget({
+                  entityType: 'unit',
+                  entityId: entity.id,
+                  entityName: entity.name,
+                  partNumber: entity.part_number,
+                  serialNumber: entity.serial_number,
+                  replacementSequence: entity.replacement_sequence,
+                });
+                setReplaceOpen(true);
+              }
+            : undefined
+        }
         onDelete={handleDeleteUnit}
         detailPath={(id) => `/units/${id}`}
         secondaryPath={
@@ -314,6 +320,7 @@ export default function ModuleDetailPage() {
         deletePermission={P.delete_units}
         readOnly={hierarchyReadOnly}
         isExistingProject={isExisting}
+        allowReplace={allowReplace}
         projectId={projectId}
       />
 

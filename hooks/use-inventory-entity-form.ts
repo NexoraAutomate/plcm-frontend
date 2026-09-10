@@ -10,6 +10,7 @@ import {
   emptyInventoryEntityForm,
   inventoryPartNumber,
 } from '@/lib/inventory-entity-fields';
+import { toDateInputValue } from '@/lib/hierarchy-install-fields';
 import {
   inventorySupportsQuantity,
   inventoryUsesInstances,
@@ -59,6 +60,7 @@ export function useInventoryEntityForm(options: {
   const [formData, setFormData] = useState({ ...emptyInventoryEntityForm });
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachmentUpload[]>([]);
   const [pendingPictureFile, setPendingPictureFile] = useState<File | null>(null);
+  const [pendingPictureFiles, setPendingPictureFiles] = useState<File[]>([]);
   const [removePicture, setRemovePicture] = useState(false);
   const [formTab, setFormTab] = useState('general');
   const [inventoryItems, setInventoryItems] = useState<Inventory[]>([]);
@@ -94,52 +96,33 @@ export function useInventoryEntityForm(options: {
   }, [open, selectedEntityType]);
 
   const resetForm = useCallback(() => {
-    setFormData({
+    const today = toDateInputValue(new Date().toISOString());
+    const merged = {
       ...emptyInventoryEntityForm,
       holder_user_id: inventoryHolderUserId,
       inventory_type: entityType,
       ...initialFormData,
-    });
+    };
+    if (context === 'hierarchy') {
+      if (!merged.installation_date?.trim()) {
+        merged.installation_date = today;
+      }
+      if (!merged.installed_by_id?.trim() && inventoryHolderUserId) {
+        merged.installed_by_id = inventoryHolderUserId;
+      }
+    }
+    setFormData(merged);
     setPendingAttachments([]);
     setPendingPictureFile(null);
+    setPendingPictureFiles([]);
     setRemovePicture(false);
-    setFormTab('general');
+    setFormTab(context === 'hierarchy' ? 'part-number' : 'general');
     setSelectedEntityType(entityType);
-  }, [entityType, initialFormData, inventoryHolderUserId]);
+  }, [context, entityType, initialFormData, inventoryHolderUserId]);
 
   useEffect(() => {
     if (open) resetForm();
   }, [open, resetForm]);
-
-  // Hierarchy edit forms start from entity shells (no oem_name). Fill vendor/OEM from stock.
-  useEffect(() => {
-    if (!open || context !== 'hierarchy') return;
-    if (formData.oem_name.trim()) return;
-
-    const part = formData.part_number.trim().toLowerCase();
-    const name = formData.name.trim().toLowerCase();
-    if (!part && !name) return;
-
-    const match = inventoryItems.find((item) => {
-      if (!item.oem_name?.trim()) return false;
-      if (item.inventory_type && item.inventory_type !== selectedEntityType) return false;
-      const pn = (item.part_number || '').trim().toLowerCase();
-      const itemName = (item.name || '').trim().toLowerCase();
-      return (part !== '' && pn === part) || (name !== '' && itemName === name);
-    });
-    const oem = match?.oem_name?.trim();
-    if (!oem) return;
-
-    setFormData((prev) => (prev.oem_name.trim() ? prev : { ...prev, oem_name: oem }));
-  }, [
-    open,
-    context,
-    inventoryItems,
-    selectedEntityType,
-    formData.part_number,
-    formData.name,
-    formData.oem_name,
-  ]);
 
   const findExistingStockGroup = useCallback(
     (type: InventoryEntityFormType, name: string): Inventory | undefined => {
@@ -170,12 +153,17 @@ export function useInventoryEntityForm(options: {
         const serial_number = canSuggestInventorySerial(existing)
           ? suggestNextInventorySerial(existing, relatedEntities)
           : prev.serial_number;
+        // Hierarchy OEM is per-entity; do not copy from unrelated stock groups that share a name.
+        const oem_name =
+          context === 'hierarchy'
+            ? prev.oem_name
+            : existing.oem_name?.trim() || prev.oem_name;
         return {
           ...prev,
           name,
           part_number: partNumber,
           serial_number,
-          oem_name: existing.oem_name?.trim() || prev.oem_name,
+          oem_name,
           configuration_item: existing.configuration_item || partNumber || prev.configuration_item,
           sku: type === 'component' ? existing.sku || prev.sku : prev.sku,
         };
@@ -199,7 +187,7 @@ export function useInventoryEntityForm(options: {
         sku: type === 'component' ? ids.sku : prev.sku,
       };
     },
-    [definitions, entityListNames, entityPools, findExistingStockGroup, inventoryItems]
+    [context, definitions, entityListNames, entityPools, findExistingStockGroup, inventoryItems]
   );
 
   const buildInventoryPayload = useCallback(
@@ -232,7 +220,15 @@ export function useInventoryEntityForm(options: {
     pendingAttachments,
     setPendingAttachments,
     pendingPictureFile,
-    setPendingPictureFile,
+    setPendingPictureFile: (file: File | null) => {
+      setPendingPictureFile(file);
+      setPendingPictureFiles(file ? [file] : []);
+    },
+    pendingPictureFiles,
+    setPendingPictureFiles: (files: File[]) => {
+      setPendingPictureFiles(files);
+      setPendingPictureFile(files[0] ?? null);
+    },
     removePicture,
     setRemovePicture,
     formTab,

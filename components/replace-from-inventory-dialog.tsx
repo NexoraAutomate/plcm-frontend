@@ -128,7 +128,7 @@ export function ReplaceFromInventoryDialog({
     const query = search.trim().toLowerCase();
     if (!query) return stockRows;
     return stockRows.filter((row) =>
-      [row.name, row.partNumber, row.serialNumber, row.configurationItem, row.oemName]
+      [row.partNumber, row.serialNumber, row.oemName]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(query))
     );
@@ -171,7 +171,7 @@ export function ReplaceFromInventoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Replace className="h-5 w-5" />
@@ -180,9 +180,9 @@ export function ReplaceFromInventoryDialog({
           <DialogDescription>
             {target ? (
               <>
-                Select a replacement <strong>{target.entityType}</strong> for{' '}
-                <strong>{target.entityName}</strong>. A maintenance case will be created and closed
-                automatically. The original install is preserved for build history.
+                Select a replacement <strong>{target.entityType}</strong> from stock. A maintenance
+                case will be created and closed automatically. The original install is preserved for
+                build history.
               </>
             ) : (
               'Select a replacement part from inventory.'
@@ -192,14 +192,18 @@ export function ReplaceFromInventoryDialog({
 
         {target ? (
           <div className="rounded-md border bg-muted/30 p-3 text-sm">
-            <div className="grid gap-2 md:grid-cols-2">
+            <div className="mb-3">
+              <p className="text-xs text-muted-foreground">Name</p>
+              <p className="font-medium">{target.entityName}</p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
               <div>
                 <p className="text-xs text-muted-foreground">Current Part #</p>
-                <p className="font-medium">{target.partNumber || '—'}</p>
+                <p className="font-medium break-all">{target.partNumber || '—'}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Current Serial #</p>
-                <p className="font-medium">{target.serialNumber || '—'}</p>
+                <p className="font-medium break-all">{target.serialNumber || '—'}</p>
               </div>
             </div>
             {(target.replacementSequence ?? 0) > 0 ? (
@@ -210,9 +214,9 @@ export function ReplaceFromInventoryDialog({
           </div>
         ) : null}
 
-        <div className="space-y-3">
+        <div className="min-w-0 space-y-3">
           <Input
-            placeholder="Search part number, serial, name, OEM..."
+            placeholder="Search part number, serial, OEM..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -224,15 +228,20 @@ export function ReplaceFromInventoryDialog({
               No matching items in stock for this category.
             </p>
           ) : (
-            <div className="overflow-x-auto rounded-md border">
-              <Table>
+            <div className="min-w-0 overflow-x-hidden rounded-md border">
+              <Table className="table-fixed w-full">
+                <colgroup>
+                  <col className="w-12" />
+                  <col />
+                  <col />
+                  <col className="w-[5.5rem]" />
+                  <col className="w-[5.5rem]" />
+                </colgroup>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-14">Sr.</TableHead>
-                    <TableHead>Name</TableHead>
+                    <TableHead>Sr.</TableHead>
                     <TableHead>Part #</TableHead>
                     <TableHead>Serial #</TableHead>
-                    <TableHead>Config Item</TableHead>
                     <TableHead>OEM</TableHead>
                     <TableHead className="text-right">Select</TableHead>
                   </TableRow>
@@ -250,11 +259,15 @@ export function ReplaceFromInventoryDialog({
                         className={isSelected ? 'bg-primary/5' : undefined}
                       >
                         <TableCell>{row.srNo}</TableCell>
-                        <TableCell className="font-medium">{row.name}</TableCell>
-                        <TableCell>{row.partNumber}</TableCell>
-                        <TableCell>{row.serialNumber}</TableCell>
-                        <TableCell>{row.configurationItem || '—'}</TableCell>
-                        <TableCell>{row.oemName || '—'}</TableCell>
+                        <TableCell className="truncate" title={row.partNumber}>
+                          {row.partNumber}
+                        </TableCell>
+                        <TableCell className="truncate font-mono text-sm" title={row.serialNumber}>
+                          {row.serialNumber}
+                        </TableCell>
+                        <TableCell className="truncate" title={row.oemName || undefined}>
+                          {row.oemName || '—'}
+                        </TableCell>
                         <TableCell className="text-right">
                           <Button
                             type="button"
@@ -274,7 +287,7 @@ export function ReplaceFromInventoryDialog({
           )}
 
           {selectedRow ? (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground break-all">
               Selected: {selectedRow.partNumber} · {selectedRow.serialNumber}
             </p>
           ) : null}

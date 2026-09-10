@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { useDataStore } from '@/lib/data-store';
 import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
 import { PageLoader } from '@/components/page-loader';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { EntityInstallMetadataCard } from '@/components/entity-install-metadata-card';
 import { HierarchyEntityHeader } from '@/components/hierarchy-entity-header';
@@ -18,7 +17,7 @@ import {
 } from '@/lib/entity-replacement';
 import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
 import { isProjectReadOnly } from '@/lib/workflow-status';
-import { isExistingProject } from '@/lib/project-existing';
+import { isExistingProject, projectAllowsReplace } from '@/lib/project-existing';
 
 export default function ComponentDetailPage() {
   const { entityLabel } = useAppDefinitions();
@@ -53,6 +52,7 @@ export default function ComponentDetailPage() {
     project?.status_name
   );
   const isExisting = isExistingProject(project);
+  const allowReplace = projectAllowsReplace(project);
   const systemId = component
     ? resolveSystemIdForHardwareEntity('component', component.id, {
         subsystems,
@@ -115,6 +115,7 @@ export default function ComponentDetailPage() {
         name={component.name}
         description={component.description}
         backHref={unit ? `/units/${unit.id}` : '/components'}
+        projectId={projectId}
         projectName={project?.name}
         systemName={
           component && systemId != null
@@ -135,47 +136,9 @@ export default function ComponentDetailPage() {
         projectId={projectId ?? undefined}
         parentId={unit?.id}
         isExistingProject={isExisting}
-        allowReplace={!hierarchyReadOnly}
+        allowReplace={allowReplace && !hierarchyReadOnly}
         hierarchyHref={hierarchyHref}
       />
-
-      {/* Component Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Component Details</CardTitle>
-          <CardDescription>Full information about this component</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Name</p>
-                <p className="text-base font-medium mt-1">{component.name}</p>
-              </div>
-            </div>
-            {component.description && (
-              <div>
-                <p className="text-sm text-muted-foreground">Description</p>
-                <p className="text-base mt-1">{component.description}</p>
-              </div>
-            )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
-              <div>
-                <p className="text-sm text-muted-foreground">Unit</p>
-                <Link href={`/units/${unit?.id}`}>
-                  <p className="text-base font-medium text-primary underline mt-1">{unit?.name}</p>
-                </Link>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Module (Parent)</p>
-                <Link href={`/modules/${module?.id}`}>
-                  <p className="text-base font-medium text-primary underline mt-1">{module?.name}</p>
-                </Link>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

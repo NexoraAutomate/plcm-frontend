@@ -65,7 +65,7 @@ import {
   canAddInventoryChildren,
   resolveInventoryInstanceSerial,
 } from '@/lib/inventory-child-install';
-import { getSelectableInstances, isProjectReservedInstance, needsSerialSelection } from '@/lib/inventory-install';
+import { getAvailableInstances, getSelectableInstances, isProjectReservedInstance, needsSerialSelection } from '@/lib/inventory-install';
 import { duplicateInventoryEntity } from '@/lib/inventory-duplicate';
 import { InventorySerialSelectDialog } from '@/components/inventory-serial-select-dialog';
 import { InventoryAddMoreDialog } from '@/components/inventory-add-more-dialog';
@@ -237,21 +237,31 @@ function instanceSerialNumber(instance: InventoryInstance): string {
   return instance.serial_number?.trim() || instance.original_serial_number?.trim() || '';
 }
 
-/** Serial numbers for expandable rows: one per in-stock instance when present. */
-function getExpandableSerialInstances(item: Inventory): InventoryInstance[] {
+/** Serial numbers for expandable rows, optionally scoped to the active stock quick-filter. */
+function getExpandableSerialInstances(
+  item: Inventory,
+  stockFilter: StockFilter = 'all'
+): InventoryInstance[] {
   const all = (item.instances ?? []).filter((instance) => Boolean(instance?.id));
+  if (stockFilter === 'reserved') {
+    return all.filter(isProjectReservedInstance);
+  }
+  if (stockFilter === 'available') {
+    return getAvailableInstances(item);
+  }
   return all;
 }
 
 function enrichInventoryItems(
   items: Inventory[],
   users: User[],
-  entityPools: HierarchyEntityPools
+  entityPools: HierarchyEntityPools,
+  stockFilter: StockFilter = 'all'
 ): InventoryItem[] {
   return items.map((item) => {
     const serialNumbers = getInventorySerialNumbers(item);
     const firstAvailable =
-      getExpandableSerialInstances(item)
+      getExpandableSerialInstances(item, stockFilter)
         .map(instanceSerialNumber)
         .find(Boolean) || serialNumbers[0];
     const relatedEntities = inventoryEntitiesForType(item.inventory_type, entityPools);
@@ -344,8 +354,8 @@ export default function InventoryPage() {
     [systems, subsystems, modules, units, components]
   );
   const inventory = useMemo(
-    () => enrichInventoryItems(pagination.items, users, entityPools),
-    [pagination.items, users, entityPools]
+    () => enrichInventoryItems(pagination.items, users, entityPools, stockFilter),
+    [pagination.items, users, entityPools, stockFilter]
   );
   const loading = pagination.loading;
 
@@ -2003,7 +2013,7 @@ export default function InventoryPage() {
                   </TableRow>
                 ) : (
                   inventory.map((item) => {
-                    const serialInstances = getExpandableSerialInstances(item);
+                    const serialInstances = getExpandableSerialInstances(item, stockFilter);
                     const isExpandable = serialInstances.length >= 1;
                     const isExpanded = expandedRows.has(item.id);
                     const isSelected = selectedIds.has(item.id);

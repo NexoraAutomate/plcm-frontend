@@ -53,6 +53,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { StatusBadge } from '@/components/status-badge';
+import { syncReservedInventoryMediaToEntity } from '@/lib/inventory-install';
+import type { HierarchyEntityType } from '@/lib/entity-hierarchy';
 
 type HardwareOwnerType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
 
@@ -113,7 +115,7 @@ export function EntityInstallMetadataCard({
   onExistingSaved,
 }: EntityInstallMetadataCardProps) {
   const { entityLabel } = useAppDefinitions();
-  const { users, projects, inventory } = useDataStore();
+  const { users, projects } = useDataStore();
   const { can, user, isInventoryManager } = useAuth();
   const queryClient = useQueryClient();
   const inventoryManager = isInventoryManager();
@@ -147,6 +149,10 @@ export function EntityInstallMetadataCard({
   const [replacementChain, setReplacementChain] = useState<EntityReplacementChainItem[]>([]);
   const [replacementLoading, setReplacementLoading] = useState(false);
   const [detailsTab, setDetailsTab] = useState('hardware');
+  const [editPreparing, setEditPreparing] = useState(false);
+  const [syncedPictureUrl, setSyncedPictureUrl] = useState<string | null>(null);
+  const reservedMediaSyncKeyRef = useRef<string | null>(null);
+  const reservedMediaSyncPromiseRef = useRef<Promise<void> | null>(null);
 
   const inventoryFlags = useProjectInventoryFlags(projectId);
   const flagKey = inventoryFlagKey(ownerType, entity.id);
@@ -159,23 +165,6 @@ export function EntityInstallMetadataCard({
       setDetailsTab('hardware');
     }
   }, [reservation, detailsTab]);
-
-  const resolveOemByPartNumber = useCallback(
-    (partNumber?: string) => {
-      const trimmed = partNumber?.trim();
-      if (!trimmed) return undefined;
-      const normalized = trimmed.toLowerCase();
-      const match = inventory.find((item) => {
-        if (!item.oem_name?.trim()) return false;
-        if (item.inventory_type && item.inventory_type !== ownerType) return false;
-        const pn = item.part_number?.trim().toLowerCase() || '';
-        const opn = item.original_part_number?.trim().toLowerCase() || '';
-        return pn === normalized || opn === normalized;
-      });
-      return match?.oem_name?.trim() || undefined;
-    },
-    [inventory, ownerType]
-  );
 
   const currentPartNumber = useMemo(() => {
     const candidates = [entity.part_number, reservation?.part_number];
@@ -242,17 +231,8 @@ export function EntityInstallMetadataCard({
     currentSerialNumber,
   ]);
 
-  const storeOemName = useMemo(
-    () => resolveOemByPartNumber(currentPartNumber),
-    [resolveOemByPartNumber, currentPartNumber]
-  );
-
-  const oemName = entity.oem_name?.trim() || linkedOemName || storeOemName;
-
-  const originalStoreOemName = useMemo(
-    () => resolveOemByPartNumber(originalBuildPartNumber),
-    [resolveOemByPartNumber, originalBuildPartNumber]
-  );
+  const effectivePictureUrl = entity.picture_url?.trim() || syncedPictureUrl;
+  const oemName = entity.oem_name?.trim() || linkedOemName;
 
   const originalOemName = useMemo(() => {
     if (
@@ -261,16 +241,10 @@ export function EntityInstallMetadataCard({
         currentPartNumber &&
         originalBuildPartNumber.toLowerCase() === currentPartNumber.toLowerCase())
     ) {
-      return oemName || originalStoreOemName;
+      return oemName;
     }
-    return originalStoreOemName;
-  }, [
-    isOriginalInstall,
-    originalBuildPartNumber,
-    currentPartNumber,
-    oemName,
-    originalStoreOemName,
-  ]);
+    return undefined;
+  }, [isOriginalInstall, originalBuildPartNumber, currentPartNumber, oemName]);
 
   useEffect(() => {
     let cancelled = false;
@@ -311,18 +285,90 @@ export function EntityInstallMetadataCard({
     return user ? formatUserRef(user) : `User #${entity.installed_by_id}`;
   }, [entity.installed_by_id, users]);
 
+  const onUpdateRef = useRef(onUpdate);
+  onUpdateRef.current = onUpdate;
+  const entityPictureRef = useRef(entity.picture_url);
+  entityPictureRef.current = entity.picture_url;
+
   const loadAttachments = useCallback(async () => {
     try {
       const res = await api.attachments.list(ownerType, entity.id);
       setAttachments(res.data ?? []);
+      return res.data ?? [];
     } catch {
       setAttachments([]);
+      return [];
     }
   }, [ownerType, entity.id]);
+
+  const ensureReservedInventoryMedia = useCallback(async () => {
+    if (!reservation?.inventory_id) return;
+
+    const syncKey = `${ownerType}:${entity.id}:${reservation.inventory_id}:${reservation.inventory_instance_id ?? ''}`;
+    if (reservedMediaSyncKeyRef.current === syncKey) {
+      if (reservedMediaSyncPromiseRef.current) {
+        await reservedMediaSyncPromiseRef.current;
+      }
+      return;
+    }
+    reservedMediaSyncKeyRef.current = syncKey;
+
+    const syncPromise = (async () => {
+      try {
+        const currentAttachments = await loadAttachments();
+        const hasPicture = Boolean(entityPictureRef.current?.trim());
+        const result = await syncReservedInventoryMediaToEntity({
+          entityType: ownerType as HierarchyEntityType,
+          entityId: entity.id,
+          inventoryId: reservation.inventory_id,
+          inventoryInstanceId: reservation.inventory_instance_id,
+          hasPicture,
+          hasAttachments: currentAttachments.length > 0,
+        });
+
+        if (result.pictureUrl && result.pictureUrl !== entityPictureRef.current) {
+          setSyncedPictureUrl(result.pictureUrl);
+          await onUpdateRef.current({ picture_url: result.pictureUrl });
+        }
+        if (!currentAttachments.length) {
+          await loadAttachments();
+        }
+      } catch {
+        reservedMediaSyncKeyRef.current = null;
+      } finally {
+        if (reservedMediaSyncPromiseRef.current === syncPromise) {
+          reservedMediaSyncPromiseRef.current = null;
+        }
+      }
+    })();
+
+    reservedMediaSyncPromiseRef.current = syncPromise;
+    await syncPromise;
+  }, [
+    reservation?.inventory_id,
+    reservation?.inventory_instance_id,
+    ownerType,
+    entity.id,
+    loadAttachments,
+  ]);
 
   useEffect(() => {
     void loadAttachments();
   }, [loadAttachments]);
+
+  useEffect(() => {
+    void ensureReservedInventoryMedia();
+  }, [ensureReservedInventoryMedia]);
+
+  const handleOpenEdit = useCallback(async () => {
+    setEditPreparing(true);
+    try {
+      await ensureReservedInventoryMedia();
+      setEditOpen(true);
+    } finally {
+      setEditPreparing(false);
+    }
+  }, [ensureReservedInventoryMedia]);
 
   useEffect(() => {
     if (!sectionOpen) return;
@@ -358,7 +404,7 @@ export function EntityInstallMetadataCard({
   );
 
   useEffect(() => {
-    if (entity.oem_name?.trim() || storeOemName) {
+    if (entity.oem_name?.trim()) {
       setLinkedOemName(undefined);
       return;
     }
@@ -368,17 +414,6 @@ export function EntityInstallMetadataCard({
       try {
         const byEntity = await api.inventory.listByEntity(entity.id);
         let match = (byEntity.data ?? []).find((item) => item.oem_name?.trim());
-
-        if (!match?.oem_name?.trim() && currentPartNumber) {
-          const byType = await api.inventory.list(0, 1000, ownerType);
-          const normalized = currentPartNumber.toLowerCase();
-          match = (byType.data ?? []).find((item) => {
-            if (!item.oem_name?.trim()) return false;
-            const pn = item.part_number?.trim().toLowerCase() || '';
-            const opn = item.original_part_number?.trim().toLowerCase() || '';
-            return pn === normalized || opn === normalized;
-          });
-        }
 
         if (!match?.oem_name?.trim() && reservation?.inventory_id) {
           const reserved = await api.inventory.get(reservation.inventory_id);
@@ -400,18 +435,12 @@ export function EntityInstallMetadataCard({
     return () => {
       cancelled = true;
     };
-  }, [
-    entity.id,
-    entity.oem_name,
-    ownerType,
-    currentPartNumber,
-    reservation?.inventory_id,
-    storeOemName,
-  ]);
+  }, [entity.id, entity.oem_name, reservation?.inventory_id]);
 
   const handleRemovePicture = async () => {
     try {
       await api.pictures.remove(ownerType, entity.id);
+      setSyncedPictureUrl(null);
       await onUpdate({ picture_url: null });
       toast.success('Photo removed');
     } catch {
@@ -423,6 +452,7 @@ export function EntityInstallMetadataCard({
     setPictureUploading(true);
     try {
       const res = await api.pictures.upload(ownerType, entity.id, file);
+      setSyncedPictureUrl(res.data.picture_url);
       await onUpdate({ picture_url: res.data.picture_url });
       toast.success('Photo added');
     } catch {
@@ -596,9 +626,15 @@ export function EntityInstallMetadataCard({
                 />
               ) : null}
               {canEdit ? (
-                <Button type="button" variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={editPreparing}
+                  onClick={() => void handleOpenEdit()}
+                >
                   <Pencil className="mr-2 h-4 w-4" />
-                  Edit
+                  {editPreparing ? 'Loading…' : 'Edit'}
                 </Button>
               ) : null}
             </div>
@@ -687,7 +723,7 @@ export function EntityInstallMetadataCard({
                         if (file) void handleUploadPicture(file);
                       }}
                     />
-                    {entity.picture_url ? (
+                    {effectivePictureUrl ? (
                       <>
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-sm font-medium">Primary photo</p>
@@ -716,7 +752,7 @@ export function EntityInstallMetadataCard({
                           ) : null}
                         </div>
                         <EntityPicture
-                          src={entity.picture_url}
+                          src={effectivePictureUrl}
                           ownerType={ownerType}
                           ownerId={entity.id}
                           alt={`${entity.name} photo`}
@@ -938,7 +974,10 @@ export function EntityInstallMetadataCard({
           onOpenChange={setEditOpen}
           entityType={ownerType}
           entityId={entity.id}
-          entity={entity}
+          entity={{
+            ...entity,
+            picture_url: effectivePictureUrl,
+          }}
           parentId={parentId}
           title={`Edit ${entityLabel(ownerType)}`}
           description={`Register details for ${entity.name}`}

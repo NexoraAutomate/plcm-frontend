@@ -14,7 +14,7 @@ import { P } from '@/lib/permission-codes';
 import { workflowStatusLabel } from '@/lib/workflow-status';
 import { EntityForm } from '@/components/entity-form';
 import { HierarchyEntityInventoryDialog } from '@/components/hierarchy/hierarchy-entity-inventory-create-dialog';
-import { isExistingProject } from '@/lib/project-existing';
+import { isExistingProject, projectAllowsReplace } from '@/lib/project-existing';
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
@@ -75,6 +75,7 @@ export default function UnitDetailPage() {
     project?.status_name
   );
   const isExisting = isExistingProject(project);
+  const allowReplace = projectAllowsReplace(project);
   const systemId = unit
     ? resolveSystemIdForHardwareEntity('unit', unit.id, {
         subsystems,
@@ -256,6 +257,7 @@ export default function UnitDetailPage() {
         name={unit.name}
         description={unit.description}
         backHref={module ? `/modules/${module.id}` : '/units'}
+        projectId={projectId}
         projectName={project?.name}
         systemName={
           unit && systemId != null
@@ -276,7 +278,7 @@ export default function UnitDetailPage() {
         projectId={projectId ?? undefined}
         parentId={module?.id}
         isExistingProject={isExisting}
-        allowReplace
+        allowReplace={allowReplace}
         hierarchyHref={hierarchyHref}
       />
 
@@ -286,17 +288,21 @@ export default function UnitDetailPage() {
         description={`Manage components for ${unit.name}`}
         entities={unitComponents}
         onEdit={openEditComponent}
-        onReplace={(entity) => {
-          setReplaceTarget({
-            entityType: 'component',
-            entityId: entity.id,
-            entityName: entity.name,
-            partNumber: entity.part_number,
-            serialNumber: entity.serial_number,
-            replacementSequence: entity.replacement_sequence,
-          });
-          setReplaceOpen(true);
-        }}
+        onReplace={
+          allowReplace
+            ? (entity) => {
+                setReplaceTarget({
+                  entityType: 'component',
+                  entityId: entity.id,
+                  entityName: entity.name,
+                  partNumber: entity.part_number,
+                  serialNumber: entity.serial_number,
+                  replacementSequence: entity.replacement_sequence,
+                });
+                setReplaceOpen(true);
+              }
+            : undefined
+        }
         onDelete={handleDeleteComponent}
         detailPath={(id) => `/components/${id}`}
         secondaryPath={
@@ -315,6 +321,7 @@ export default function UnitDetailPage() {
         deletePermission={P.delete_components}
         readOnly={hierarchyReadOnly}
         isExistingProject={isExisting}
+        allowReplace={allowReplace}
         projectId={projectId}
       />
 

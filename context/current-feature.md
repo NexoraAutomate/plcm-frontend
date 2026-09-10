@@ -2,15 +2,21 @@
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Populated by /feature load -->
+- Add **Mark Project as Completed** under Workflow → Administrative Actions for non-existing projects
+- Restrict button visibility to Administrator and Project Director only
+- Flag project status as `COMPLETED` via dedicated API
+- Show **Replace** on hierarchy entities only after completion (existing projects keep Replace as in-service)
 
 ## Notes
 
-<!-- Additional context from spec -->
+- Endpoint: `POST /projects/{id}/complete/` with `project.complete` (Admin + PD)
+- Enabled when status is `READY_FOR_INVENTORY`
+- Hidden entirely for `is_existing_project`
+- Replace gate: `projectAllowsReplace` → existing OR `COMPLETED`
 
 ## History
 
@@ -32,7 +38,7 @@ Spec 08: Developer records install and Pass/Fail test on issued items (`UNDER_TE
 Spec 09: weighted progress from the Smart SDLS tree and lifecycle events—no manual %. Leaf-count weights roll up Flight → SDLS → System; dashboard shows overall % plus bottlenecks. Project `COMPLETED` only when all required items are `INSTALLED_VERIFIED`; fail/open defects do not count.
 
 ### Defect / Rework Loop
-Spec 10: Fail opens a rework case; Dev remove/return; IM inspect/disposition; signed re-issue (repair same serial or replace); loop until HM verify → `INSTALLED_VERIFIED`. Attempt history preserved; open rework excluded from Spec 09 verified progress.
+Spec 10: Fail opens a rework case; Dev remove/return; IM inspects/disposition; signed re-issue (repair same serial or replace); loop until HM verify → `INSTALLED_VERIFIED`. Attempt history preserved; open rework excluded from Spec 09 verified progress.
 
 ### Inventory Recall (Project Cancelled)
 Spec 11: PD/HM cancel with confirmation sets `CANCELLED`, releases reserved stock to `AVAILABLE`, opens recall tasks for issued/in-progress units, closes shortages, and blocks reserve/issue/generate. Dev return or force-return; IM inspects Reusable → `AVAILABLE`, Repairable, or Scrapped. Hierarchy stays viewable and read-only.

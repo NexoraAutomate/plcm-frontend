@@ -1,7 +1,7 @@
 import type { Inventory, InventoryInstance } from '@/lib/models';
 import { inventoryPartNumber } from '@/lib/inventory-entity-fields';
 import { inventoryUsesInstances, type HierarchyEntityType } from '@/lib/entity-hierarchy';
-import { getSelectableInstances } from '@/lib/inventory-install';
+import { getAvailableInstances } from '@/lib/inventory-install';
 
 export const HARDWARE_ENTITY_DETAIL_PATH: Record<
   HierarchyEntityType,
@@ -149,7 +149,8 @@ export function buildReplacementStockRows(items: Inventory[]): ReplacementStockR
       continue;
     }
 
-    const instances = getSelectableInstances(item);
+    // Free stock only — exclude issued, return-pending, and project-reserved serials.
+    const instances = getAvailableInstances(item);
     // Instance-based stock: never offer catalog rows with no remaining units.
     if (instances.length === 0) continue;
 

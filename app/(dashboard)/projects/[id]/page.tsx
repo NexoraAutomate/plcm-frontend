@@ -70,6 +70,7 @@ export default function ProjectDetailPage() {
     deleteSystem,
     updateSystem,
     ensureHierarchyLoaded,
+    mergeProjectLocal,
   } = useDataStore();
   const [workflowProject, setWorkflowProject] = useState<Models.Project | null>(null);
   const [scopedSystems, setScopedSystems] = useState<Models.System[]>([]);
@@ -531,7 +532,10 @@ export default function ProjectDetailPage() {
               <ProjectWorkflowActions
                 project={project}
                 users={users}
-                onUpdated={(next) => setWorkflowProject(next)}
+                onUpdated={(next) => {
+                  setWorkflowProject(next);
+                  mergeProjectLocal(next);
+                }}
               />
             </TabsContent>
 

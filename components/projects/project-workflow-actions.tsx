@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, GitBranch, UserCog, Ban, Package, FileCog } from 'lucide-react';
+import { CheckCircle2, GitBranch, UserCog, Ban, Package, FileCog, Flag } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -37,6 +37,7 @@ import type {
   User,
 } from '@/lib/models';
 import { ProjectWorkflowStatus, isProjectReadOnly } from '@/lib/workflow-status';
+import { isExistingProject } from '@/lib/project-existing';
 import { isOpenConfigChange } from '@/lib/config-change';
 import { useDataStore } from '@/lib/data-store';
 import { useRouter } from 'next/navigation';
@@ -56,6 +57,7 @@ export function ProjectWorkflowActions({
   const { ensureHierarchyLoaded } = useDataStore();
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [completeOpen, setCompleteOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelPreview, setCancelPreview] = useState<ProjectCancelPreview | null>(null);
   const [cancelConfirmed, setCancelConfirmed] = useState(false);
@@ -94,6 +96,7 @@ export function ProjectWorkflowActions({
     status === ProjectWorkflowStatus.HIERARCHY_GENERATED;
   const isCompleted = status === ProjectWorkflowStatus.COMPLETED;
   const isCancelled = isProjectReadOnly(status);
+  const isExisting = isExistingProject(project);
   const configChangeDisabled = !isApproved || isReady || isCancelled;
   const configChangeTooltip = isReady
     ? 'Configuration change is disabled after hierarchy is generated'
@@ -109,6 +112,20 @@ export function ProjectWorkflowActions({
     !isCancelled &&
     status !== ProjectWorkflowStatus.COMPLETED &&
     status !== ProjectWorkflowStatus.READY_TO_DELIVER;
+  const canMarkComplete =
+    !isExisting &&
+    !isCompleted &&
+    !isCancelled &&
+    status === ProjectWorkflowStatus.READY_FOR_INVENTORY;
+  const markCompleteTooltip = isExisting
+    ? 'Existing projects do not use Mark as Completed'
+    : isCompleted
+      ? 'Project is already completed'
+      : isCancelled
+        ? 'Cancelled or superseded projects cannot be marked completed'
+        : status === ProjectWorkflowStatus.READY_FOR_INVENTORY
+          ? 'Flag this project as Completed to unlock Replace on entities'
+          : 'Project must be Ready For Inventory before it can be marked completed';
 
   const hmCandidates = useMemo(() => {
     return users.filter((u) => {
@@ -138,6 +155,23 @@ export function ProjectWorkflowActions({
         (error as { response?: { data?: { detail?: string } } })?.response?.data
           ?.detail || 'Approve failed';
       toast.error(typeof detail === 'string' ? detail : 'Approve failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleComplete() {
+    setBusy(true);
+    try {
+      const res = await api.projects.complete(project.id);
+      onUpdated(res.data);
+      toast.success('Project marked as completed');
+      setCompleteOpen(false);
+    } catch (error: unknown) {
+      const detail =
+        (error as { response?: { data?: { detail?: string } } })?.response?.data
+          ?.detail || 'Mark complete failed';
+      toast.error(typeof detail === 'string' ? detail : 'Mark complete failed');
     } finally {
       setBusy(false);
     }
@@ -320,6 +354,29 @@ export function ProjectWorkflowActions({
               </TooltipProvider>
             </Can>
 
+            {!isExisting ? (
+              <WorkflowCan role={['ADMIN', 'PD']}>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="block w-full">
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          disabled={busy || !canMarkComplete}
+                          onClick={() => setCompleteOpen(true)}
+                        >
+                          <Flag className="mr-1.5 h-4 w-4" />
+                          Mark Project as Completed
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{markCompleteTooltip}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </WorkflowCan>
+            ) : null}
+
             <Can permission={P.project_cancel}>
               <Button
                 variant="destructive"
@@ -432,6 +489,30 @@ export function ProjectWorkflowActions({
               }}
             >
               {busy ? 'Generating…' : 'Generate'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={completeOpen} onOpenChange={setCompleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mark project as completed?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This flags the project as Completed and unlocks Replace on hierarchy entities.
+              This cannot be undone from Workflow actions.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={busy}
+              onClick={(e) => {
+                e.preventDefault();
+                void handleComplete();
+              }}
+            >
+              {busy ? 'Marking…' : 'Mark as Completed'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

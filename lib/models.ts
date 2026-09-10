@@ -780,6 +780,8 @@ export interface HierarchyInstallFields {
   picture_url?: string | null
   original_part_number?: string
   original_serial_number?: string
+  /** Vendor / OEM acronym stored on the hierarchy entity (independent of inventory). */
+  oem_name?: string | null
   is_current_install?: boolean
   root_entity_id?: number | null
   replaced_entity_id?: number | null

@@ -314,6 +314,43 @@ function canSeeItem(
   return !item.permission || can(item.permission);
 }
 
+type CollapsibleGroupId =
+  | "inventory-system"
+  | "project-hierarchy"
+  | "administration"
+  | "reporting";
+
+function pathMatchesItem(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(href + "/");
+}
+
+function pathMatchesAny(pathname: string, items: { href: string }[]) {
+  return items.some((item) => pathMatchesItem(pathname, item.href));
+}
+
+/** All sidebar hrefs — used so parent routes don't stay active on sibling child routes. */
+const ALL_NAV_HREFS: string[] = Array.from(
+  new Set([
+    ...Object.values(NAV_BY_HREF).map((item) => item.href),
+    ...inventorySystemItems.map((item) => item.href),
+    ...administrationItems.map((item) => item.href),
+    ...hierarchyItems.map((item) => item.href),
+    reportingGroup.href,
+    ...reportingGroup.children.map((item) => item.href),
+  ])
+);
+
+/** Prefer the longest matching nav href so /inventory isn't active on /inventory/storage-locations. */
+function isNavItemActive(pathname: string, href: string) {
+  if (!pathMatchesItem(pathname, href)) return false;
+  return !ALL_NAV_HREFS.some(
+    (other) =>
+      other !== href &&
+      other.length > href.length &&
+      pathMatchesItem(pathname, other)
+  );
+}
+
 function NavLink({
   item,
   pathname,
@@ -323,8 +360,7 @@ function NavLink({
   pathname: string;
   collapsed: boolean;
 }) {
-  const isActive =
-    pathname === item.href || pathname.startsWith(item.href + "/");
+  const isActive = isNavItemActive(pathname, item.href);
 
   const link = (
     <Link
@@ -352,20 +388,6 @@ function NavLink({
       </TooltipContent>
     </Tooltip>
   );
-}
-
-type CollapsibleGroupId =
-  | "inventory-system"
-  | "project-hierarchy"
-  | "administration"
-  | "reporting";
-
-function pathMatchesItem(pathname: string, href: string) {
-  return pathname === href || pathname.startsWith(href + "/");
-}
-
-function pathMatchesAny(pathname: string, items: { href: string }[]) {
-  return items.some((item) => pathMatchesItem(pathname, item.href));
 }
 
 function CollapsibleGroupHeader({
@@ -564,7 +586,7 @@ export function AppSidebar() {
           href={item.href}
           className={cn(
             "flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
-            pathMatchesItem(pathname, item.href)
+            isNavItemActive(pathname, item.href)
               ? "border-sidebar-primary bg-sidebar-primary/20 text-sidebar-primary"
               : "border-transparent text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
           )}

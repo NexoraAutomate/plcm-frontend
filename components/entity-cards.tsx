@@ -5,8 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import {
   Plus,
-  Trash2,
-  ArrowRight,
   Network,
   Pencil,
   Replace,
@@ -17,12 +15,10 @@ import { StatusBadge } from './status-badge';
 import { resolveStatusName } from '@/lib/entity-status';
 import type { Status } from '@/lib/models';
 import Link from 'next/link';
-import { ConfirmDialog } from './confirm-dialog';
 import { EntityStatusHistorySheet } from './entity-status-history-sheet';
 import { EntityPicture } from './entity-picture';
 import type { HardwareEntityType } from '@/lib/entity-resolver';
 import { useAuth } from '@/lib/auth-context';
-import { RevertToInventoryButton } from '@/components/revert-to-inventory-button';
 import { useDataStore } from '@/lib/data-store';
 import { canManageInstall, isOwnInstall } from '@/lib/install-ownership';
 import { cn } from '@/lib/utils';
@@ -90,10 +86,12 @@ interface EntityCardsProps {
   /** Hide add/edit/delete/assign/revert — cancelled projects stay view-only. */
   readOnly?: boolean;
   /**
-   * Existing-project (Add as Existing Project) cards keep View / Edit / Delete.
-   * Generated projects only show Assign Developer (or Verify Installation) + Hierarchy.
+   * Existing-project (Add as Existing Project) cards: Edit + Hierarchy only.
+   * Generated projects show Assign Developer (or Verify Installation) + Hierarchy.
    */
   isExistingProject?: boolean;
+  /** When true, show Replace (completed normal projects or existing in-service projects). */
+  allowReplace?: boolean;
 }
 
 export function EntityCards({
@@ -103,7 +101,6 @@ export function EntityCards({
   onAdd,
   onEdit,
   onReplace,
-  onDelete,
   detailPath,
   secondaryPath,
   secondaryButtonLabel = 'Hierarchy',
@@ -114,20 +111,17 @@ export function EntityCards({
   projectId,
   createPermission,
   editPermission,
-  deletePermission,
   readOnly = false,
   isExistingProject = false,
+  allowReplace = false,
 }: EntityCardsProps) {
   const { can, user, isInventoryManager } = useAuth();
-  const { ensureHierarchyLoaded, markLocalInstallReverted, users, patchHierarchyEntity } =
-    useDataStore();
+  const { users, patchHierarchyEntity } = useDataStore();
   const queryClient = useQueryClient();
   const inventoryFlags = useProjectInventoryFlags(projectId);
   const inventoryManager = isInventoryManager();
   const canCreate = !createPermission || can(createPermission);
   const canEditPerm = !editPermission || can(editPermission);
-  const canDeletePerm = !deletePermission || can(deletePermission);
-  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const [assignTarget, setAssignTarget] = useState<{
     id: number;
     name: string;
@@ -259,17 +253,6 @@ export function EntityCards({
                 installedById: entity.installed_by_id,
               });
               const canEdit = canEditPerm && ownsInstall;
-              const canDelete = canDeletePerm && ownsInstall;
-              const canRevert =
-                Boolean(childEntityType) &&
-                ownsInstall &&
-                entity.is_current_install !== false &&
-                Boolean(
-                  entity.installation_date ||
-                    entity.installed_by_id ||
-                    entity.part_number ||
-                    entity.serial_number
-                );
               const canVerifyItem = Boolean(
                 assignment?.issuance_id &&
                   assignment.complete_reported &&
@@ -370,74 +353,46 @@ export function EntityCards({
 
                     <div className="space-y-2 pt-2">
                       {isExistingProject ? (
-                        <div className="flex gap-2 flex-wrap">
-                          <Link
-                            href={detailPath(entity.id)}
-                            className="flex-1 min-w-22"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Button variant="outline" size="sm" className="w-full gap-1.5">
-                              View
-                              <ArrowRight className="h-3 w-3" />
-                            </Button>
-                          </Link>
-                          {canVerifyItem ? (
-                            <WorkflowCan role={['HM', 'ADMIN']} permission={P.item_verify}>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="flex-1 min-w-22 gap-1.5"
-                                disabled={verifyingId === entity.id}
-                                onClick={() =>
-                                  void handleVerifyInstallation(
-                                    entity.id,
-                                    assignment.issuance_id as number
-                                  )
-                                }
-                              >
-                                <CheckCircle2 className="h-3 w-3" />
-                                {verifyingId === entity.id
-                                  ? 'Verifying…'
-                                  : 'Verify Item Installation'}
-                              </Button>
-                            </WorkflowCan>
-                          ) : null}
+                        <div className="flex gap-2">
                           {onEdit && canEdit && !readOnly ? (
                             <Button
                               variant="outline"
                               size="sm"
-                              className="flex-1 min-w-22 gap-1.5"
+                              className="flex-1 gap-1.5"
                               onClick={() => onEdit(entity.id)}
                             >
                               <Pencil className="h-3 w-3" />
                               Edit
                             </Button>
                           ) : null}
-                          {onReplace && ownsInstall && !readOnly ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="flex-1 min-w-22 gap-1.5"
-                              onClick={() => onReplace(entity)}
+                          {secondaryPath ? (
+                            <Link
+                              href={secondaryPath(entity.id)}
+                              className="flex-1"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              <Replace className="h-3 w-3" />
-                              Replace
-                            </Button>
-                          ) : null}
-                          {onDelete && canDelete && !readOnly ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="flex-1 min-w-22 gap-1.5 text-destructive hover:text-destructive"
-                              onClick={() =>
-                                setDeleteTarget({ id: entity.id, name: entity.name })
-                              }
-                            >
-                              <Trash2 className="h-3 w-3" />
-                              Delete
-                            </Button>
+                              <Button variant="outline" size="sm" className="w-full gap-1.5">
+                                <Network className="h-3 w-3" />
+                                {secondaryButtonLabel}
+                              </Button>
+                            </Link>
                           ) : null}
                         </div>
+                      ) : null}
+                      {!isExistingProject &&
+                      allowReplace &&
+                      onReplace &&
+                      ownsInstall &&
+                      !readOnly ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full gap-1.5"
+                          onClick={() => onReplace(entity)}
+                        >
+                          <Replace className="h-3 w-3" />
+                          Replace
+                        </Button>
                       ) : null}
                       {!readOnly && childEntityType && canVerifyItem && !isExistingProject ? (
                         <WorkflowCan role={['HM', 'ADMIN']} permission={P.item_verify}>
@@ -486,22 +441,7 @@ export function EntityCards({
                           </Button>
                         </WorkflowCan>
                       ) : null}
-                      {isExistingProject && !readOnly && canRevert && childEntityType ? (
-                        <RevertToInventoryButton
-                          entityType={childEntityType}
-                          entityId={entity.id}
-                          partNumber={entity.part_number}
-                          serialNumber={entity.serial_number}
-                          installedById={entity.installed_by_id}
-                          isCurrentInstall={entity.is_current_install !== false}
-                          className="w-full"
-                          onReverted={() => {
-                            markLocalInstallReverted(childEntityType, entity.id);
-                            void ensureHierarchyLoaded({ force: true });
-                          }}
-                        />
-                      ) : null}
-                      {secondaryPath ? (
+                      {!isExistingProject && secondaryPath ? (
                         <Link href={secondaryPath(entity.id)} onClick={(e) => e.stopPropagation()}>
                           <Button variant="outline" size="sm" className="w-full gap-2">
                             <Network className="h-3 w-3" />
@@ -520,18 +460,6 @@ export function EntityCards({
       </CardContent>
     </Card>
 
-    <ConfirmDialog
-      open={deleteTarget !== null}
-      onOpenChange={(open) => !open && setDeleteTarget(null)}
-      title={`Delete ${deleteTarget?.name ?? 'entity'}`}
-      description="This action cannot be undone."
-      onConfirm={() => {
-        if (deleteTarget && onDelete) {
-          onDelete(deleteTarget.id);
-          setDeleteTarget(null);
-        }
-      }}
-    />
     {!readOnly && childEntityType ? (
       <AssignDeveloperDialog
         open={assignTarget !== null}

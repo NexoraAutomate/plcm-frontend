@@ -23,6 +23,7 @@ export function inventoryToHierarchyCreatePayload(
     part_number: partNumber,
     serial_number: serialNumber,
     configuration_item: item.configuration_item || partNumber || item.name,
+    oem_name: item.oem_name || undefined,
     original_part_number: item.original_part_number || partNumber,
     original_serial_number: item.original_serial_number || serialNumber,
     installation_date: item.installation_date || new Date().toISOString(),
