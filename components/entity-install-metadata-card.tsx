@@ -154,6 +154,12 @@ export function EntityInstallMetadataCard({
   const shortage = inventoryFlags.shortagesByKey[flagKey];
   const [assignment, setAssignment] = useState<HierarchyAssignmentStatus | null>(null);
 
+  useEffect(() => {
+    if (!reservation && detailsTab === 'reservation') {
+      setDetailsTab('hardware');
+    }
+  }, [reservation, detailsTab]);
+
   const resolveOemByPartNumber = useCallback(
     (partNumber?: string) => {
       const trimmed = partNumber?.trim();
@@ -599,10 +605,9 @@ export function EntityInstallMetadataCard({
           </CardHeader>
           <CollapsibleContent>
             <CardContent className="space-y-4">
-              {reservation || shortage ? (
+              {shortage ? (
                 <EntityInventoryHoldDetails
                   tone={tone}
-                  reservation={reservation}
                   shortage={shortage}
                   entity={entity}
                 />
@@ -613,11 +618,19 @@ export function EntityInstallMetadataCard({
                 onValueChange={setDetailsTab}
                 className="gap-4"
               >
-                <TabsList className="grid h-auto w-full grid-cols-2 sm:grid-cols-4">
+                <TabsList
+                  className={cn(
+                    'grid h-auto w-full grid-cols-2',
+                    reservation ? 'sm:grid-cols-5' : 'sm:grid-cols-4'
+                  )}
+                >
                   <TabsTrigger value="hardware">Original Build Identification</TabsTrigger>
                   <TabsTrigger value="replacement">Installation/ Maintenance History</TabsTrigger>
                   <TabsTrigger value="picture">Picture</TabsTrigger>
                   <TabsTrigger value="attachments">Attachments</TabsTrigger>
+                  {reservation ? (
+                    <TabsTrigger value="reservation">Reservation</TabsTrigger>
+                  ) : null}
                 </TabsList>
 
                 <TabsContent value="hardware" className="mt-0">
@@ -632,6 +645,35 @@ export function EntityInstallMetadataCard({
                     </div>
                   </div>
                 </TabsContent>
+
+                {reservation ? (
+                  <TabsContent value="reservation" className="mt-0">
+                    <div className="space-y-3 rounded-lg border bg-muted/70 p-4 dark:bg-muted/40">
+                      <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+                        <MetadataField
+                          label="Reserved By"
+                          value={reservation.reserved_by_name}
+                        />
+                        <MetadataField
+                          label="Reserved At"
+                          value={
+                            reservation.reserved_at
+                              ? new Date(reservation.reserved_at).toLocaleString()
+                              : undefined
+                          }
+                        />
+                        <MetadataField
+                          label="Expires"
+                          value={
+                            reservation.expires_at
+                              ? new Date(reservation.expires_at).toLocaleString()
+                              : undefined
+                          }
+                        />
+                      </div>
+                    </div>
+                  </TabsContent>
+                ) : null}
 
                 <TabsContent value="picture" className="mt-0">
                   <div className="space-y-3 rounded-lg border bg-muted/70 p-4 dark:bg-muted/40">
@@ -804,9 +846,9 @@ export function EntityInstallMetadataCard({
                         }
                       />
                       <MetadataField label="Current Installed By" value={installerLabel} />
-                      <MetadataField label="Part Number" value={currentPartNumber} />
-                      <MetadataField label="OEM Name" value={oemName} />
-                      <MetadataField label="Serial Number" value={currentSerialNumber} />
+                      <MetadataField label="Current Installed Part Number" value={currentPartNumber} />
+                      <MetadataField label="Current Installed OEM Name" value={oemName} />
+                      <MetadataField label="Current Serial Number" value={currentSerialNumber} />
                     </div>
                   </div>
 

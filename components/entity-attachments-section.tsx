@@ -146,46 +146,55 @@ export function EntityAttachmentsSection({
 
   if (!canManage) {
     return (
-      <div className="space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-medium">Attachments</p>
-          {onPendingAttachmentsChange && canUpload ? (
-            <Button type="button" variant="outline" size="sm" onClick={() => setQueueOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add
-            </Button>
-          ) : null}
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Queue attachments now — they will upload when you save the item.
-        </p>
+      <div className="space-y-2 rounded-lg border bg-muted/70 p-4 dark:bg-muted/40">
         {pendingAttachments.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No attachments queued.</p>
+          <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              No attachments queued. They will upload when you save the item.
+            </p>
+            {onPendingAttachmentsChange && canUpload ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => setQueueOpen(true)}>
+                <Upload className="mr-2 h-4 w-4" />
+                Upload
+              </Button>
+            ) : null}
+          </div>
         ) : (
-          <ul className="space-y-2">
-            {pendingAttachments.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{pendingLabel(item)}</p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {attachmentTypeLabel(item.attachment_type)} · {item.file.name}
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 shrink-0"
-                  onClick={() => removePending(item.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
+          <>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium">Queued files</p>
+              {onPendingAttachmentsChange && canUpload ? (
+                <Button type="button" variant="outline" size="sm" onClick={() => setQueueOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add
                 </Button>
-              </li>
-            ))}
-          </ul>
+              ) : null}
+            </div>
+            <ul className="space-y-2">
+              {pendingAttachments.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex items-center justify-between gap-2 rounded-md border bg-background/60 px-3 py-2 text-sm"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{pendingLabel(item)}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {attachmentTypeLabel(item.attachment_type)} · {item.file.name}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => removePending(item.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
 
         <AttachmentUploadDialog
@@ -198,68 +207,80 @@ export function EntityAttachmentsSection({
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium">Attachments</p>
-        {canUpload ? (
-          <Button type="button" variant="outline" size="sm" onClick={() => setUploadOpen(true)}>
-            <Upload className="mr-2 h-4 w-4" />
-            Upload
-          </Button>
-        ) : null}
-      </div>
+    <div className="space-y-2 rounded-lg border bg-muted/70 p-4 dark:bg-muted/40">
       {attachments.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No attachments yet.</p>
+        <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+          <p className="text-sm text-muted-foreground">No attachments yet.</p>
+          {canUpload ? (
+            <Button type="button" variant="outline" size="sm" onClick={() => setUploadOpen(true)}>
+              <Upload className="mr-2 h-4 w-4" />
+              Upload
+            </Button>
+          ) : null}
+        </div>
       ) : (
-        <ul className="space-y-2">
-          {attachments.map((attachment) => (
-            <li
-              key={attachment.id}
-              className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
-            >
-              <div className="min-w-0 flex-1">
-                {canDownload ? (
-                  <button
-                    type="button"
-                    className="truncate text-left font-medium text-primary hover:underline"
-                    onClick={() => void api.attachments.download(attachment.id, attachment.file_name)}
-                  >
-                    {attachmentDisplayTitle(attachment)}
-                  </button>
-                ) : (
-                  <p className="truncate font-medium">{attachmentDisplayTitle(attachment)}</p>
-                )}
-                <p className="truncate text-xs text-muted-foreground">
-                  {attachmentTypeLabel(attachment.attachment_type)} · {attachment.file_name}
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                {canUpload ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setEditingAttachment(attachment)}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                ) : null}
-                {canDelete ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => void handleDeleteAttachment(attachment.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                ) : null}
-              </div>
-            </li>
-          ))}
-        </ul>
+        <>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium">Files</p>
+            {canUpload ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => setUploadOpen(true)}>
+                <Upload className="mr-2 h-4 w-4" />
+                Upload
+              </Button>
+            ) : null}
+          </div>
+          <ul className="space-y-2">
+            {attachments.map((attachment) => (
+              <li
+                key={attachment.id}
+                className="flex items-center justify-between gap-2 rounded-md border bg-background/60 px-3 py-2 text-sm"
+              >
+                <div className="min-w-0 flex-1">
+                  {canDownload ? (
+                    <button
+                      type="button"
+                      className="truncate text-left font-medium text-primary hover:underline"
+                      onClick={() =>
+                        void api.attachments.download(attachment.id, attachment.file_name)
+                      }
+                    >
+                      {attachmentDisplayTitle(attachment)}
+                    </button>
+                  ) : (
+                    <p className="truncate font-medium">{attachmentDisplayTitle(attachment)}</p>
+                  )}
+                  <p className="truncate text-xs text-muted-foreground">
+                    {attachmentTypeLabel(attachment.attachment_type)} · {attachment.file_name}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {canUpload ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setEditingAttachment(attachment)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  ) : null}
+                  {canDelete ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => void handleDeleteAttachment(attachment.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
 
       <AttachmentUploadDialog

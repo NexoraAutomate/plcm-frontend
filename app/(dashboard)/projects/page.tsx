@@ -53,6 +53,8 @@ import * as api from '@/lib/api';
 import type { HierarchyConfigurationSummary } from '@/lib/models';
 import { useAppDefinitions } from '@/lib/app-definitions-context';
 import { RequiredMark } from '@/components/ui/required-mark';
+import { ExistingProjectBadge } from '@/components/projects/existing-project-badge';
+import { isExistingProject } from '@/lib/project-existing';
 import { validateProjectCreateForm, validateProjectEditForm } from '@/lib/form-validation';
 
 export default function ProjectsPage(){
@@ -219,12 +221,15 @@ export default function ProjectsPage(){
         onClick={() => router.push(`/projects/${project.id}`)}
       >
         <TableCell className={cn('font-medium', options?.indented && 'pl-10')}>
-          <EntityNameWithFault
-            name={project.name}
-            entityType="project"
-            entityId={project.id}
-            faultMap={faultMap}
-          />
+          <div className="flex items-center gap-2">
+            <EntityNameWithFault
+              name={project.name}
+              entityType="project"
+              entityId={project.id}
+              faultMap={faultMap}
+            />
+            {isExistingProject(project) ? <ExistingProjectBadge /> : null}
+          </div>
         </TableCell>
         <TableCell>{owner?.full_name || 'N/A'}</TableCell>
         <TableCell>
@@ -549,30 +554,6 @@ export default function ProjectsPage(){
                   </SelectContent>
                 </Select>
               </div>
-              {formData.hierarchy_config_id ? (
-                <div>
-                  <Label>Product Type <RequiredMark /></Label>
-                  <Select
-                    value={formData.product_type}
-                    onValueChange={(v) => setFormData({ ...formData, product_type: v })}
-                    disabled={isCreating}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select product type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(
-                        availableConfigs.find((c) => c.id === formData.hierarchy_config_id)
-                          ?.product_type_codes ?? []
-                      ).map((code) => (
-                        <SelectItem key={code} value={code}>
-                          {code}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : null}
               <div>
                 <Label>Flight count *</Label>
                 <Input

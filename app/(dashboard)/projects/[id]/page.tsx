@@ -16,6 +16,7 @@ import { EntityCards } from '@/components/entity-cards';
 import { EntityForm } from '@/components/entity-form';
 import { HierarchyEntityInventoryDialog } from '@/components/hierarchy/hierarchy-entity-inventory-create-dialog';
 import { isExistingProject } from '@/lib/project-existing';
+import { ExistingProjectBadge } from '@/components/projects/existing-project-badge';
 import { P } from '@/lib/permission-codes';
 import { useCallback, useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
@@ -396,7 +397,10 @@ export default function ProjectDetailPage() {
           </Button>
         </Link>
         <div className="flex-1 min-w-0">
-          <h1 className="text-3xl font-bold tracking-tight">{project.name}</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-3xl font-bold tracking-tight">{project.name}</h1>
+            {isExisting ? <ExistingProjectBadge /> : null}
+          </div>
           <p className="text-sm text-muted-foreground mt-1">Manage {entityLabel('system', true).toLowerCase()} and hierarchy</p>
         </div>
         <ListStatsVisibilityControls
