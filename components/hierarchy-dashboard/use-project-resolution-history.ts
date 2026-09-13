@@ -9,6 +9,7 @@ import {
   type ProjectResolutionHistoryData,
 } from '@/lib/resolution-history-matching';
 import type { SubtreeEntityRef } from '@/lib/project-hierarchy-dashboard';
+import { LruMap } from '@/lib/lru-map';
 
 const EMPTY_DATA: ProjectResolutionHistoryData = {
   records: [],
@@ -18,10 +19,12 @@ const EMPTY_DATA: ProjectResolutionHistoryData = {
   nodesWithHistory: new Set(),
 };
 
-const projectCache = new Map<
+/** Keep a few project histories in memory; evict least-recently used. */
+const PROJECT_CACHE_MAX = 8;
+const projectCache = new LruMap<
   number,
-  { version: number; data: ProjectResolutionHistoryData }
->();
+  { version: number; fingerprint: string; data: ProjectResolutionHistoryData }
+>(PROJECT_CACHE_MAX);
 
 export function invalidateProjectResolutionCache(projectId?: number) {
   if (projectId != null) {
@@ -53,6 +56,11 @@ export function useProjectResolutionHistory({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const loadInFlightRef = useRef<number | null>(null);
+  const dataRef = useRef(data);
+  dataRef.current = data;
+
+  const hierarchyRef = useRef({ systems, subsystems, modules, units, components });
+  hierarchyRef.current = { systems, subsystems, modules, units, components };
 
   const hardwareFingerprint = useMemo(() => {
     if (!projectId) return '';
@@ -76,8 +84,14 @@ export function useProjectResolutionHistory({
     }
 
     const cached = projectCache.get(projectId);
-    if (cached && cached.version === PROJECT_RESOLUTION_CACHE_VERSION) {
-      setData(cached.data);
+    if (
+      cached &&
+      cached.version === PROJECT_RESOLUTION_CACHE_VERSION &&
+      cached.fingerprint === hardwareFingerprint
+    ) {
+      if (dataRef.current !== cached.data) {
+        setData(cached.data);
+      }
       setLoading(false);
       setErrorMessage(null);
       return;
@@ -92,18 +106,27 @@ export function useProjectResolutionHistory({
     setLoading(true);
     setErrorMessage(null);
 
+    const {
+      systems: systemsSnapshot,
+      subsystems: subsystemsSnapshot,
+      modules: modulesSnapshot,
+      units: unitsSnapshot,
+      components: componentsSnapshot,
+    } = hierarchyRef.current;
+
     void loadResolutionHistoryForProject(
       projectId,
-      systems,
-      subsystems,
-      modules,
-      units,
-      components
+      systemsSnapshot,
+      subsystemsSnapshot,
+      modulesSnapshot,
+      unitsSnapshot,
+      componentsSnapshot
     )
       .then((result) => {
         if (cancelled) return;
         projectCache.set(projectId, {
           version: PROJECT_RESOLUTION_CACHE_VERSION,
+          fingerprint: hardwareFingerprint,
           data: result,
         });
         setData(result);
@@ -114,19 +137,28 @@ export function useProjectResolutionHistory({
         setErrorMessage('Unable to load resolution history.');
       })
       .finally(() => {
-        if (cancelled) return;
         if (loadInFlightRef.current === projectId) {
           loadInFlightRef.current = null;
         }
+        if (cancelled) return;
         setLoading(false);
       });
 
     return () => {
       cancelled = true;
+      if (loadInFlightRef.current === projectId) {
+        loadInFlightRef.current = null;
+      }
     };
-  }, [projectId, hardwareFingerprint, systems, subsystems, modules, units, components, refreshKey]);
+    // Hierarchy arrays are read via hierarchyRef; fingerprint covers structural changes.
+  }, [projectId, hardwareFingerprint, refreshKey]);
 
-  const refresh = () => setRefreshKey((key) => key + 1);
+  const refresh = () => {
+    if (projectId != null) {
+      invalidateProjectResolutionCache(projectId);
+    }
+    setRefreshKey((key) => key + 1);
+  };
 
   return {
     records: data.records as ConfigurationHistory[],

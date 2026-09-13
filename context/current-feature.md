@@ -1,29 +1,30 @@
-# Current Feature: HM Installation Accept / Reject
+# Current Feature: Frontend OOM — Resolution History (Phase 1)
 
 ## Status
 
-In Progress
+Complete
 
 ## Goals
 
-- Rename HM **Verify** action to **Accept** on Verify Installations and related UI
-- Add HM **Reject** beside Accept; open **Reject Installation** dialog with required reason
-- On reject: set item status to **Installation Rejected**, clear complete/test so developer can Pass/Fail again
-- Developer sees **Rejection Reasons** (history of reasons) and can Pass → Report complete again
-- Persist rejection history via issuance events + workflow audit
+- Stop resolution-history fan-out that can OOM the browser tab and pressure the Next.js server
+- Server-filter maintenance cases by `project_id` (no full-table client scan)
+- Remove `loadAllConfigurationHistory` (up to 10k rows) from the project/subtree load path
+- Cap concurrent lookups / per-case / per-entity fetches
+- LRU-bound `projectCache` and entity `lookupCache`
+- Stabilize hook deps so store refreshes do not re-trigger full loads; keep refresh working
+- Preserve existing resolution-history matching and UI behavior
 
 ## Notes
 
-- Endpoint: `POST /item-verifications/{issuance_id}/reject/` with required `notes`
-- New status: `INSTALLATION_REJECTED`
-- Accept keeps existing verify endpoint (label-only rename in UI)
+- Frontend-only Phase 1; no backend API changes required (`project_id` already supported on maintenance cases list)
+- Do not change DataStore / chart code-splitting yet (Phases 2–3)
 
 ## History
 
 <!-- Completed features (append only) -->
 
 ### Shortage Handling & FCFS Auto-Reserve
-Spec 05: create shortages on unavailable reserve, notify HM and IM (PN, Qty, Flight, SDLS, LRU), keep an open list, and FCFS auto-reserve on IM receipt into Spec 04 `RESERVED` lock. Partial receipts decrement remaining qty; auto-reserve is audited as shortage fulfillment.
+Spec 05: create shortages on unavailable reserve, notify HM and IM (PN, Qty, Flight, SDLS), keep an open list, and FCFS auto-reserve on IM receipt into Spec 04 `RESERVED` lock. Partial receipts decrement remaining qty; auto-reserve is audited as shortage fulfillment.
 
 ### Reservation Expiry (Deadlock Prevention)
 Spec 06: idle `RESERVED` stock reminds the reserving HM after 30 days, then auto-releases to `AVAILABLE` after a 7-day grace with reason `AUTO_RELEASE_EXPIRY`. Issued units are skipped. Inventory serials show Reserved with hold details; IM can still Issue reserved stock. List search returns matches on page 1 with in-content loading.
@@ -48,3 +49,6 @@ Spec 12: HM requests a CR after hierarchy or reservation without editing config 
 
 ### Audit Trail (System-Wide)
 Spec 13: append-only workflow audit (who, role, when, IP/device, old→new) for hierarchy and inventory actions. Admin list/CSV with actor, entity, action, role, project, and date filters; entity History drawer; `audit.read`; system actor for jobs. APIs and DB grants cannot update or delete rows.
+
+### HM Installation Accept / Reject
+Rename Verify → Accept; add Reject with reason; status `INSTALLATION_REJECTED`; rejection history for Dev/HM/Admin; merged to main.

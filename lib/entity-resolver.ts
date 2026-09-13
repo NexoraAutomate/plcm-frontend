@@ -1,5 +1,6 @@
 import * as api from '@/lib/api';
 import type { Entity } from '@/lib/models';
+import { LruMap } from '@/lib/lru-map';
 
 /** Matches backend ENTITY_CONFIG display_name values (e.g. "System", "Subsystem"). */
 export const ENTITY_TYPE_DB_LABELS: Record<string, string> = {
@@ -19,8 +20,9 @@ export function toDbEntityType(entityType: string): string {
   return ENTITY_TYPE_DB_LABELS[entityType.toLowerCase()] ?? entityType;
 }
 
-/** Per (type, pk) cache — never page the full /entities list (can be tens of thousands). */
-const lookupCache = new Map<string, Promise<Entity | null>>();
+/** Bound lookup cache — avoids unbounded growth when resolving large subtrees. */
+const LOOKUP_CACHE_MAX = 1_000;
+const lookupCache = new LruMap<string, Promise<Entity | null>>(LOOKUP_CACHE_MAX);
 
 function cacheKey(entityType: string, entityPk: number): string {
   return `${entityType.toLowerCase()}:${entityPk}`;

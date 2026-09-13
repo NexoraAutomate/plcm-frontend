@@ -23,9 +23,13 @@ import {
 } from '@/lib/project-hierarchy-dashboard';
 import type { HierarchyEntityType } from '@/lib/system-hierarchy-graph';
 import * as api from '@/lib/api';
-import { ABSOLUTE_FETCH_CAP, fetchCappedPages } from '@/lib/data-loading';
+import { mapPool } from '@/lib/async-pool';
+import { ABSOLUTE_FETCH_CAP } from '@/lib/data-loading';
 import { resolveEntityId } from '@/lib/entity-resolver';
 import { formatUserRef } from '@/lib/user-display';
+
+/** Cap parallel network work for resolution-history loads (avoids request storms). */
+const RESOLUTION_FETCH_CONCURRENCY = 8;
 
 export interface SubtreeMatchContext {
   refs: SubtreeEntityRef[];
@@ -56,7 +60,7 @@ export interface LifecycleTimelineEvent {
 const FAULTY_ENTITY_ID_OFFSET = 1_000_000_000;
 const MAINTENANCE_CASE_ID_OFFSET = 2_000_000_000;
 
-export const PROJECT_RESOLUTION_CACHE_VERSION = 10;
+export const PROJECT_RESOLUTION_CACHE_VERSION = 11;
 
 const ENTITY_TYPE_ORDER: Record<HierarchyEntityType, number> = {
   system: 0,
@@ -434,8 +438,10 @@ export async function loadResolutionHistoryForProject(
     components
   );
 
-  const entityIdEntries = await Promise.all(
-    matchContext.refs.map(async (ref) => {
+  const entityIdEntries = await mapPool(
+    matchContext.refs,
+    RESOLUTION_FETCH_CONCURRENCY,
+    async (ref) => {
       const rootPk = ref.root_entity_id ?? ref.pk;
       const slotEntityId = await resolveEntityId(ref.type, rootPk);
       const currentEntityId =
@@ -447,7 +453,7 @@ export async function loadResolutionHistoryForProject(
         mappings.push([currentEntityId, ref]);
       }
       return mappings;
-    })
+    }
   );
 
   const subtreeByEntityId = new Map<number, SubtreeEntityRef>();
@@ -715,24 +721,17 @@ function maintenanceCaseToHistoryRecord(
   };
 }
 
-export async function loadAllConfigurationHistory() {
-  return fetchCappedPages(
-    (skip, limit) => api.configurationHistory.list(skip, limit),
-    { pageSize: 500, maxItems: ABSOLUTE_FETCH_CAP }
-  );
-}
-
 async function loadMaintenanceCasesForProject(projectId: number) {
   const matched: MaintenanceCase[] = [];
-  const pageSize = 500;
+  const pageSize = 100;
   let skip = 0;
 
   while (skip < ABSOLUTE_FETCH_CAP) {
     const remaining = ABSOLUTE_FETCH_CAP - skip;
     const limit = Math.min(pageSize, remaining);
-    const res = await api.maintenanceCases.list(skip, limit);
-    const page = res.data ?? [];
-    matched.push(...page.filter((maintenanceCase) => maintenanceCase.project_id === projectId));
+    const res = await api.maintenanceCases.list(skip, limit, { project_id: projectId });
+    const page = Array.isArray(res.data) ? res.data : [];
+    matched.push(...page);
     if (page.length < limit) break;
     skip += page.length;
   }
@@ -740,52 +739,44 @@ async function loadMaintenanceCasesForProject(projectId: number) {
   return matched;
 }
 
-async function loadConfigurationHistoryForProjectCases(projectId?: number) {
-  if (!projectId) return [];
+async function loadConfigurationHistoryForCases(cases: MaintenanceCase[]) {
+  if (cases.length === 0) return [] as ConfigurationHistory[];
 
-  const cases = await loadMaintenanceCasesForProject(projectId);
-
-  const pages = await Promise.all(
-    cases.map(async (maintenanceCase) => {
-      try {
-        const res = await api.configurationHistory.listByCaseId(maintenanceCase.id, 0, 500);
-        return res.data ?? [];
-      } catch {
-        return [];
-      }
-    })
-  );
+  const pages = await mapPool(cases, RESOLUTION_FETCH_CONCURRENCY, async (maintenanceCase) => {
+    try {
+      const res = await api.configurationHistory.listByCaseId(maintenanceCase.id, 0, 500);
+      return res.data ?? [];
+    } catch {
+      return [] as ConfigurationHistory[];
+    }
+  });
 
   return pages.flat();
 }
 
 async function loadProjectMaintenanceFromCases(
-  projectId: number | undefined,
+  cases: MaintenanceCase[],
   context: SubtreeMatchContext
 ) {
-  if (!projectId) {
-    return {
-      pendingFaultyEntities: [] as Array<{ faultyEntity: FaultyEntity; ref: SubtreeEntityRef }>,
-      caseRecords: [] as ConfigurationHistory[],
-      caseIdsTouchingSubtree: new Set<number>(),
-    };
-  }
-
-  const cases = await loadMaintenanceCasesForProject(projectId);
-
   const pendingFaultyEntities: Array<{ faultyEntity: FaultyEntity; ref: SubtreeEntityRef }> = [];
   const caseRecords: ConfigurationHistory[] = [];
   const caseIdsTouchingSubtree = new Set<number>();
 
-  const entitiesByCase = await Promise.all(
-    cases.map(async (maintenanceCase) => {
+  if (cases.length === 0) {
+    return { pendingFaultyEntities, caseRecords, caseIdsTouchingSubtree };
+  }
+
+  const entitiesByCase = await mapPool(
+    cases,
+    RESOLUTION_FETCH_CONCURRENCY,
+    async (maintenanceCase) => {
       try {
         const res = await api.faultyEntities.listByCaseId(maintenanceCase.id, 0, 500);
         return { maintenanceCase, faultyEntities: res.data ?? [] };
       } catch {
         return { maintenanceCase, faultyEntities: [] as FaultyEntity[] };
       }
-    })
+    }
   );
 
   for (const { maintenanceCase, faultyEntities } of entitiesByCase) {
@@ -866,30 +857,26 @@ export async function loadConfigurationHistoryForSubtree(
   projectId?: number,
   subtreeByEntityId?: Map<number, SubtreeEntityRef>
 ) {
-  const projectMaintenance = await loadProjectMaintenanceFromCases(projectId, context);
-  const { caseIdsTouchingSubtree } = projectMaintenance;
+  const cases = projectId ? await loadMaintenanceCasesForProject(projectId) : [];
+  const resolvedIds = [...resolvedEntityIds];
 
-  const [allRecords, projectCaseRecords, supplementalPages] = await Promise.all([
-    loadAllConfigurationHistory().catch(() => []),
-    loadConfigurationHistoryForProjectCases(projectId),
-    Promise.all(
-      [...resolvedEntityIds].map(async (entityId) => {
-        try {
-          const res = await api.configurationHistory.listByEntityID(entityId, 0, 500);
-          return res.data ?? [];
-        } catch {
-          return [];
-        }
-      })
-    ),
+  const [projectMaintenance, projectCaseRecords, supplementalPages] = await Promise.all([
+    loadProjectMaintenanceFromCases(cases, context),
+    loadConfigurationHistoryForCases(cases),
+    mapPool(resolvedIds, RESOLUTION_FETCH_CONCURRENCY, async (entityId) => {
+      try {
+        const res = await api.configurationHistory.listByEntityID(entityId, 0, 500);
+        return res.data ?? [];
+      } catch {
+        return [] as ConfigurationHistory[];
+      }
+    }),
   ]);
 
+  const { caseIdsTouchingSubtree } = projectMaintenance;
+
   const byId = new Map<number, ConfigurationHistory>();
-  for (const record of [
-    ...allRecords,
-    ...projectCaseRecords,
-    ...supplementalPages.flat(),
-  ]) {
+  for (const record of [...projectCaseRecords, ...supplementalPages.flat()]) {
     byId.set(record.id, record);
   }
 

@@ -15,6 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { resolveEntityId } from '@/lib/entity-resolver';
+import { mapPool } from '@/lib/async-pool';
 import { formatMaintenanceApiError } from '@/services/maintenance';
 import {
   collectSubtreeEntities,
@@ -101,12 +102,10 @@ export function ResolutionHistoryPanel({
       setErrorMessage(null);
 
       try {
-        const entityIdEntries = await Promise.all(
-          subtree.map(async (ref) => {
-            const entityId = await resolveEntityId(ref.type, ref.pk);
-            return entityId ? ([entityId, ref] as const) : null;
-          })
-        );
+        const entityIdEntries = await mapPool(subtree, 8, async (ref) => {
+          const entityId = await resolveEntityId(ref.type, ref.pk);
+          return entityId ? ([entityId, ref] as const) : null;
+        });
 
         const entityIdMap = new Map<number, SubtreeEntityRef>();
         const resolvedEntityIds = new Set<number>();
@@ -124,7 +123,8 @@ export function ResolutionHistoryPanel({
         const filtered = await loadConfigurationHistoryForSubtree(
           matchContext,
           resolvedEntityIds,
-          resolvedProjectId
+          resolvedProjectId,
+          entityIdMap
         );
 
         if (!cancelled) {
