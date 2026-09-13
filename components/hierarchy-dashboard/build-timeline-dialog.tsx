@@ -19,7 +19,7 @@ import {
 } from '@/lib/resolution-history-matching';
 import type { ConfigurationHistory, MaintenanceDelivery } from '@/lib/models';
 import type { SubtreeEntityRef } from '@/lib/project-hierarchy-dashboard';
-import { useDataStore } from '@/lib/data-store';
+import { useDataStoreDomain } from '@/lib/data-store';
 import { formatUserRef } from '@/lib/user-display';
 import { TimelineEventRow } from '@/components/hierarchy-dashboard/resolution-history-timeline-dialog';
 import { ReplacementHistoryDialog } from '@/components/hierarchy-dashboard/replacement-history-dialog';
@@ -51,7 +51,7 @@ export function BuildTimelineDialog({
   deliveries = [],
   onHistoryRefresh,
 }: BuildTimelineDialogProps) {
-  const { users } = useDataStore();
+  const { users } = useDataStoreDomain();
   const [replacementOpen, setReplacementOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{
     type: HierarchyEntityType;

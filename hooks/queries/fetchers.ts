@@ -78,6 +78,56 @@ export async function fetchFaultyEntities(skip = 0, limit = LIST_PAGE_SIZE): Pro
   return unwrapListItems<FaultyEntity>(res.data);
 }
 
+export type HierarchyEntityTypeKey =
+  | 'systems'
+  | 'subsystems'
+  | 'modules'
+  | 'units'
+  | 'components';
+
+export const HIERARCHY_ENTITY_TYPE_KEYS: HierarchyEntityTypeKey[] = [
+  'systems',
+  'subsystems',
+  'modules',
+  'units',
+  'components',
+];
+
+async function loadHierarchyTypePage<T>(
+  listPage: (
+    skip: number,
+    limit: number,
+    options?: { includeTotal?: boolean }
+  ) => Promise<AxiosResponse<unknown>>
+): Promise<T[]> {
+  try {
+    return await fetchCappedPages<T>(listPage, {
+      maxItems: HIERARCHY_TYPE_CAP,
+      pageSize: LIST_BOOTSTRAP_SIZE,
+    });
+  } catch (error) {
+    if (api.isForbiddenError(error)) return [];
+    throw error;
+  }
+}
+
+export async function fetchHierarchyEntityType(
+  type: HierarchyEntityTypeKey
+): Promise<System[] | Subsystem[] | Module[] | Unit[] | Component[]> {
+  switch (type) {
+    case 'systems':
+      return loadHierarchyTypePage<System>(api.systems.list);
+    case 'subsystems':
+      return loadHierarchyTypePage<Subsystem>(api.subsystems.list);
+    case 'modules':
+      return loadHierarchyTypePage<Module>(api.modules.list);
+    case 'units':
+      return loadHierarchyTypePage<Unit>(api.units.list);
+    case 'components':
+      return loadHierarchyTypePage<Component>(api.components.list);
+  }
+}
+
 export async function fetchHierarchyEntities(): Promise<{
   systems: System[];
   subsystems: Subsystem[];
@@ -87,30 +137,18 @@ export async function fetchHierarchyEntities(): Promise<{
 }> {
   // Load sequentially to avoid overwhelming PostgreSQL with 5 concurrent scans.
   // 403 means this role cannot list that type globally — keep the rest of the tree.
-  const loadType = async <T>(
-    listPage: (
-      skip: number,
-      limit: number,
-      options?: { includeTotal?: boolean }
-    ) => Promise<AxiosResponse<unknown>>
-  ): Promise<T[]> => {
-    try {
-      return await fetchCappedPages<T>(listPage, {
-        maxItems: HIERARCHY_TYPE_CAP,
-        pageSize: LIST_BOOTSTRAP_SIZE,
-      });
-    } catch (error) {
-      if (api.isForbiddenError(error)) return [];
-      throw error;
-    }
+  const systems = await fetchHierarchyEntityType('systems');
+  const subsystems = await fetchHierarchyEntityType('subsystems');
+  const modules = await fetchHierarchyEntityType('modules');
+  const units = await fetchHierarchyEntityType('units');
+  const components = await fetchHierarchyEntityType('components');
+  return {
+    systems: systems as System[],
+    subsystems: subsystems as Subsystem[],
+    modules: modules as Module[],
+    units: units as Unit[],
+    components: components as Component[],
   };
-
-  const systems = await loadType<System>(api.systems.list);
-  const subsystems = await loadType<Subsystem>(api.subsystems.list);
-  const modules = await loadType<Module>(api.modules.list);
-  const units = await loadType<Unit>(api.units.list);
-  const components = await loadType<Component>(api.components.list);
-  return { systems, subsystems, modules, units, components };
 }
 
 export async function fetchExecutiveDashboardData(

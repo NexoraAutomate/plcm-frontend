@@ -102,7 +102,7 @@ export default function ComponentsPage() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { pageLoading } = useEntityHierarchyGate();
+  const { pageLoading } = useEntityHierarchyGate({ types: ['units'] });
   const { user, isInventoryManager } = useAuth();
   const inventoryManager = isInventoryManager();
   const { units, inventory, createComponent, updateComponent, deleteComponent, users } = useDataStore();

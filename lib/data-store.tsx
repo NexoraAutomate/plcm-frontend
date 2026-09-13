@@ -9,6 +9,7 @@ import {
   fetchCustomers,
   fetchFaultyEntities,
   fetchHierarchyEntities,
+  fetchHierarchyEntityType,
   fetchInventory,
   fetchMaintenanceCases,
   fetchMaintenanceLogs,
@@ -16,6 +17,8 @@ import {
   fetchProjects,
   fetchStatuses,
   fetchUsers,
+  HIERARCHY_ENTITY_TYPE_KEYS,
+  type HierarchyEntityTypeKey,
 } from '@/hooks/queries/fetchers';
 // import * as maintenanceApi from '@/lib/maintenance';
 import * as Models from './models';
@@ -195,11 +198,61 @@ interface DataStoreContextType {
   refreshData: (options?: { silent?: boolean }) => Promise<void>;
   refreshLightweight: () => Promise<void>;
   ensureHierarchyLoaded: (options?: { force?: boolean }) => Promise<void>;
+  /** Load only the requested hierarchy types (list pages / parent-child counts). */
+  ensureHierarchyTypesLoaded: (
+    types: HierarchyEntityTypeKey[],
+    options?: { force?: boolean }
+  ) => Promise<void>;
   /** Buffer silent entity creates and apply them in one UI update when done. */
   runSilentEntityBatch: <T,>(fn: () => Promise<T>) => Promise<T>;
 }
 
-const DataStoreContext = createContext<DataStoreContextType | undefined>(undefined);
+type DataStoreHierarchyContextType = Pick<
+  DataStoreContextType,
+  | 'systems'
+  | 'subsystems'
+  | 'modules'
+  | 'units'
+  | 'components'
+  | 'hierarchyLoading'
+  | 'hierarchyReady'
+  | 'hierarchyAttempted'
+  | 'ensureHierarchyLoaded'
+  | 'ensureHierarchyTypesLoaded'
+  | 'markLocalInstallReverted'
+  | 'patchHierarchyEntity'
+  | 'runSilentEntityBatch'
+  | 'getSystem'
+  | 'createSystem'
+  | 'updateSystem'
+  | 'deleteSystem'
+  | 'getProjectSystems'
+  | 'getSystemSubsystems'
+  | 'getSubsystem'
+  | 'createSubsystem'
+  | 'updateSubsystem'
+  | 'deleteSubsystem'
+  | 'getSubsystemModules'
+  | 'getModule'
+  | 'createModule'
+  | 'updateModule'
+  | 'deleteModule'
+  | 'getModuleUnits'
+  | 'getUnit'
+  | 'createUnit'
+  | 'updateUnit'
+  | 'deleteUnit'
+  | 'getUnitComponents'
+  | 'getComponent'
+  | 'createComponent'
+  | 'updateComponent'
+  | 'deleteComponent'
+>;
+
+type DataStoreDomainContextType = Omit<DataStoreContextType, keyof DataStoreHierarchyContextType>;
+
+const DataStoreDomainContext = createContext<DataStoreDomainContextType | undefined>(undefined);
+const DataStoreHierarchyContext = createContext<DataStoreHierarchyContextType | undefined>(undefined);
 
 export function DataStoreProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, authReady } = useAuth();
@@ -227,6 +280,8 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const [hierarchyAttempted, setHierarchyAttempted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hierarchyLoadPromiseRef = useRef<Promise<void> | null>(null);
+  const hierarchyTypesLoadPromiseRef = useRef<Promise<void> | null>(null);
+  const loadedHierarchyTypesRef = useRef<Set<HierarchyEntityTypeKey>>(new Set());
   const statusesRef = useRef(statuses);
   const hierarchyReadyRef = useRef(hierarchyReady);
   statusesRef.current = statuses;
@@ -324,9 +379,49 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       setModules(enrich(results.modules));
       setUnits(enrich(results.units));
       setComponents(enrich(results.components));
+      loadedHierarchyTypesRef.current = new Set(HIERARCHY_ENTITY_TYPE_KEYS);
       setHierarchyReady(true);
     },
     []
+  );
+
+  const applyHierarchyTypeResult = useCallback(
+    async (type: HierarchyEntityTypeKey, rows: unknown[]) => {
+      const statusList =
+        statusesRef.current.length > 0
+          ? statusesRef.current
+          : await queryClient.fetchQuery({
+              queryKey: queryKeys.statuses(),
+              queryFn: fetchStatuses,
+            });
+
+      const enrich = <T extends { status_id: number }>(items: T[]) =>
+        statusList.length > 0 ? enrichEntitiesWithStatus(items, statusList) : items;
+
+      switch (type) {
+        case 'systems':
+          setSystems(enrich(rows as Models.System[]));
+          break;
+        case 'subsystems':
+          setSubsystems(enrich(rows as Models.Subsystem[]));
+          break;
+        case 'modules':
+          setModules(enrich(rows as Models.Module[]));
+          break;
+        case 'units':
+          setUnits(enrich(rows as Models.Unit[]));
+          break;
+        case 'components':
+          setComponents(enrich(rows as Models.Component[]));
+          break;
+      }
+
+      loadedHierarchyTypesRef.current.add(type);
+      if (HIERARCHY_ENTITY_TYPE_KEYS.every((key) => loadedHierarchyTypesRef.current.has(key))) {
+        setHierarchyReady(true);
+      }
+    },
+    [queryClient]
   );
 
   const loadHierarchyData = useCallback(async () => {
@@ -348,6 +443,56 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     applyEntityResults(statusList, results);
   }, [applyEntityResults, queryClient]);
 
+  const ensureHierarchyTypesLoaded = useCallback(
+    async (types: HierarchyEntityTypeKey[], options?: { force?: boolean }) => {
+      const uniqueTypes = [...new Set(types)];
+      if (uniqueTypes.length === 0) return;
+
+      const missing = options?.force
+        ? uniqueTypes
+        : uniqueTypes.filter((type) => !loadedHierarchyTypesRef.current.has(type));
+
+      if (missing.length === 0) return;
+
+      if (hierarchyTypesLoadPromiseRef.current && !options?.force) {
+        await hierarchyTypesLoadPromiseRef.current;
+        const stillMissing = missing.filter((type) => !loadedHierarchyTypesRef.current.has(type));
+        if (stillMissing.length === 0) return;
+      }
+
+      const run = async () => {
+        setHierarchyLoading(true);
+        try {
+          for (const type of missing) {
+            if (!options?.force && loadedHierarchyTypesRef.current.has(type)) continue;
+            if (options?.force) {
+              await queryClient.invalidateQueries({
+                queryKey: queryKeys.hierarchyType(type),
+              });
+            }
+            const rows = await queryClient.fetchQuery({
+              queryKey: queryKeys.hierarchyType(type),
+              queryFn: () => fetchHierarchyEntityType(type),
+            });
+            await applyHierarchyTypeResult(type, rows);
+          }
+        } catch (err) {
+          if (!api.isForbiddenError(err)) {
+            console.warn('Failed to load hierarchy types:', err);
+          }
+        } finally {
+          setHierarchyAttempted(true);
+          setHierarchyLoading(false);
+          hierarchyTypesLoadPromiseRef.current = null;
+        }
+      };
+
+      hierarchyTypesLoadPromiseRef.current = run();
+      await hierarchyTypesLoadPromiseRef.current;
+    },
+    [applyHierarchyTypeResult, queryClient]
+  );
+
   const ensureHierarchyLoaded = useCallback(
     async (options?: { force?: boolean }) => {
       if (hierarchyReadyRef.current && !options?.force) return;
@@ -360,8 +505,12 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
         setHierarchyLoading(true);
         try {
           if (options?.force) {
+            loadedHierarchyTypesRef.current.clear();
             await queryClient.invalidateQueries({
               queryKey: queryKeys.hierarchyEntities(),
+            });
+            await queryClient.invalidateQueries({
+              queryKey: ['hierarchy', 'type'],
             });
           }
           await loadHierarchyData();
@@ -440,19 +589,15 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
 
     if (results[0].status === 'fulfilled') {
       setMaintenanceCases(results[0].value);
-      queryClient.setQueryData(queryKeys.maintenanceCases(0, limit), results[0].value);
     }
     if (results[1].status === 'fulfilled') {
       setFaultyEntities(results[1].value);
-      queryClient.setQueryData(queryKeys.faultyEntities(0, limit), results[1].value);
     }
     if (results[2].status === 'fulfilled') {
       setProjects(results[2].value);
-      queryClient.setQueryData(queryKeys.projects(0, limit), results[2].value);
     }
     if (results[3].status === 'fulfilled') {
       setCustomers(results[3].value);
-      queryClient.setQueryData(queryKeys.customers(0, limit), results[3].value);
     }
   }, [queryClient]);
 
@@ -514,26 +659,25 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       const applyResult = <T,>(
         result: PromiseSettledResult<T>,
         setter: React.Dispatch<React.SetStateAction<T>>,
-        queryKey: readonly unknown[],
         label: string
       ) => {
         if (result.status === 'fulfilled') {
+          // fetchQuery already populated the Query cache — avoid a second in-memory copy write.
           setter(result.value);
-          queryClient.setQueryData(queryKey, result.value);
         } else if (!api.isForbiddenError(result.reason)) {
           console.warn(`Failed to refresh ${label}:`, result.reason);
         }
       };
 
-      applyResult(results[0], setUsers, queryKeys.users(0, limit), 'users');
-      applyResult(results[1], setCustomers, queryKeys.customers(0, limit), 'customers');
-      applyResult(results[2], setOrders, queryKeys.orders(0, limit), 'orders');
-      applyResult(results[3], setProjects, queryKeys.projects(0, limit), 'projects');
-      applyResult(results[4], setInventory, queryKeys.inventory(0, limit), 'inventory');
-      applyResult(results[5], setStatuses, queryKeys.statuses(), 'statuses');
-      applyResult(results[6], setMaintenanceLogs, queryKeys.maintenanceLogs(0, limit), 'maintenanceLogs');
-      applyResult(results[7], setMaintenanceCases, queryKeys.maintenanceCases(0, limit), 'maintenanceCases');
-      applyResult(results[8], setFaultyEntities, queryKeys.faultyEntities(0, limit), 'faultyEntities');
+      applyResult(results[0], setUsers, 'users');
+      applyResult(results[1], setCustomers, 'customers');
+      applyResult(results[2], setOrders, 'orders');
+      applyResult(results[3], setProjects, 'projects');
+      applyResult(results[4], setInventory, 'inventory');
+      applyResult(results[5], setStatuses, 'statuses');
+      applyResult(results[6], setMaintenanceLogs, 'maintenanceLogs');
+      applyResult(results[7], setMaintenanceCases, 'maintenanceCases');
+      applyResult(results[8], setFaultyEntities, 'faultyEntities');
 
       if (results.every((r) => r.status === 'rejected')) {
         setError('Failed to load data');
@@ -1597,130 +1741,70 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const value: DataStoreContextType = useMemo(
+  const hierarchyValue = useMemo<DataStoreHierarchyContextType>(
     () => ({
-    users,
-    customers,
-    orders,
-    projects,
-    systems,
-    subsystems,
-    modules,
-    units,
-    components,
-    inventory,
-    statuses,
-    maintenanceLogs,
-    maintenanceCases,
-    faultyEntities,
-    maintenanceActions,
-    maintenanceDeliveries,
-    configurationHistory,
-    loading,
-    hierarchyLoading,
-    hierarchyReady,
-    hierarchyAttempted,
-    error,
-    getUser,
-    createUser,
-    updateUser,
-    deleteUser,
-    getCustomer,
-    createCustomer,
-    updateCustomer,
-    deleteCustomer,
-    getOrder,
-    createOrder,
-    updateOrder,
-    deleteOrder,
-    getProject,
-    createProject,
-    updateProject,
-    mergeProjectLocal,
-    deleteProject,
-    getProjectSystems,
-    getSystem,
-    createSystem,
-    updateSystem,
-    deleteSystem,
-    getSystemSubsystems,
-    getSubsystem,
-    createSubsystem,
-    updateSubsystem,
-    deleteSubsystem,
-    getSubsystemModules,
-    getModule,
-    createModule,
-    updateModule,
-    deleteModule,
-    getModuleUnits,
-    getUnit,
-    createUnit,
-    updateUnit,
-    deleteUnit,
-    getUnitComponents,
-    getComponent,
-    createComponent,
-    updateComponent,
-    deleteComponent,
-    getInventoryItem,
-    createInventoryItem,
-    updateInventoryItem,
-    deleteInventoryItem,
-    createStatus,
-    updateStatus,
-    deleteStatus,
-    refreshStatuses,
-    createMaintenanceLog,
-    getEntityMaintenanceLogs,
-    getEntityStatusHistory,
-    getMaintenanceCase,
-    createMaintenanceCase,
-    updateMaintenanceCase,
-    deleteMaintenanceCase,
-    lookupEntityBySerialNumber,
-    lookupEntityByPartNumber,
-    suspectChildren,
-    confirmFault,
-    getFaultyEntity,
-    createFaultyEntity,
-    updateFaultyEntity,
-    // update_faulty_Children,
-    deleteFaultyEntity,
-    cascadeFault,
-    getEntityMaintenanceHistory,
-    getMaintenanceAction,
-    createMaintenanceAction,
-    updateMaintenanceAction,
-    deleteMaintenanceAction,
-    getMaintenanceDelivery,
-    createMaintenanceDelivery,
-    updateMaintenanceDelivery,
-    confirmMaintenanceDelivery,
-    deleteMaintenanceDelivery,
-    getConfigurationHistory,
-    getConfigurationHistoryByEntityId,
-    getConfigurationHistoryByCaseId,
-    createConfigurationHistory,
-    updateConfigurationHistory,
-    deleteConfigurationHistory,
-    refreshData,
-    refreshLightweight,
-    ensureHierarchyLoaded,
-    markLocalInstallReverted,
-    patchHierarchyEntity,
-    runSilentEntityBatch,
-    }),
-    [
-      users,
-      customers,
-      orders,
-      projects,
       systems,
       subsystems,
       modules,
       units,
       components,
+      hierarchyLoading,
+      hierarchyReady,
+      hierarchyAttempted,
+      ensureHierarchyLoaded,
+      ensureHierarchyTypesLoaded,
+      markLocalInstallReverted,
+      patchHierarchyEntity,
+      runSilentEntityBatch,
+      getSystem,
+      createSystem,
+      updateSystem,
+      deleteSystem,
+      getProjectSystems,
+      getSystemSubsystems,
+      getSubsystem,
+      createSubsystem,
+      updateSubsystem,
+      deleteSubsystem,
+      getSubsystemModules,
+      getModule,
+      createModule,
+      updateModule,
+      deleteModule,
+      getModuleUnits,
+      getUnit,
+      createUnit,
+      updateUnit,
+      deleteUnit,
+      getUnitComponents,
+      getComponent,
+      createComponent,
+      updateComponent,
+      deleteComponent,
+    }),
+    [
+      systems,
+      subsystems,
+      modules,
+      units,
+      components,
+      hierarchyLoading,
+      hierarchyReady,
+      hierarchyAttempted,
+      ensureHierarchyLoaded,
+      ensureHierarchyTypesLoaded,
+      markLocalInstallReverted,
+      patchHierarchyEntity,
+      runSilentEntityBatch,
+    ]
+  );
+
+  const domainValue = useMemo<DataStoreDomainContextType>(
+    () => ({
+      users,
+      customers,
+      orders,
+      projects,
       inventory,
       statuses,
       maintenanceLogs,
@@ -1730,30 +1814,117 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       maintenanceDeliveries,
       configurationHistory,
       loading,
-      hierarchyLoading,
-      hierarchyReady,
-      hierarchyAttempted,
+      error,
+      getUser,
+      createUser,
+      updateUser,
+      deleteUser,
+      getCustomer,
+      createCustomer,
+      updateCustomer,
+      deleteCustomer,
+      getOrder,
+      createOrder,
+      updateOrder,
+      deleteOrder,
+      getProject,
+      createProject,
+      updateProject,
+      mergeProjectLocal,
+      deleteProject,
+      getInventoryItem,
+      createInventoryItem,
+      updateInventoryItem,
+      deleteInventoryItem,
+      createStatus,
+      updateStatus,
+      deleteStatus,
+      refreshStatuses,
+      createMaintenanceLog,
+      getEntityMaintenanceLogs,
+      getEntityStatusHistory,
+      getMaintenanceCase,
+      createMaintenanceCase,
+      updateMaintenanceCase,
+      deleteMaintenanceCase,
+      lookupEntityBySerialNumber,
+      lookupEntityByPartNumber,
+      suspectChildren,
+      confirmFault,
+      getFaultyEntity,
+      createFaultyEntity,
+      updateFaultyEntity,
+      deleteFaultyEntity,
+      cascadeFault,
+      getEntityMaintenanceHistory,
+      getMaintenanceAction,
+      createMaintenanceAction,
+      updateMaintenanceAction,
+      deleteMaintenanceAction,
+      getMaintenanceDelivery,
+      createMaintenanceDelivery,
+      updateMaintenanceDelivery,
+      confirmMaintenanceDelivery,
+      deleteMaintenanceDelivery,
+      getConfigurationHistory,
+      getConfigurationHistoryByEntityId,
+      getConfigurationHistoryByCaseId,
+      createConfigurationHistory,
+      updateConfigurationHistory,
+      deleteConfigurationHistory,
+      refreshData,
+      refreshLightweight,
+    }),
+    [
+      users,
+      customers,
+      orders,
+      projects,
+      inventory,
+      statuses,
+      maintenanceLogs,
+      maintenanceCases,
+      faultyEntities,
+      maintenanceActions,
+      maintenanceDeliveries,
+      configurationHistory,
+      loading,
       error,
       refreshData,
       refreshLightweight,
-      ensureHierarchyLoaded,
-      markLocalInstallReverted,
-      patchHierarchyEntity,
-      runSilentEntityBatch,
     ]
   );
 
   return (
-    <DataStoreContext.Provider value={value}>
-      <StatusColorProvider statuses={statuses}>{children}</StatusColorProvider>
-    </DataStoreContext.Provider>
+    <DataStoreDomainContext.Provider value={domainValue}>
+      <DataStoreHierarchyContext.Provider value={hierarchyValue}>
+        <StatusColorProvider statuses={statuses}>{children}</StatusColorProvider>
+      </DataStoreHierarchyContext.Provider>
+    </DataStoreDomainContext.Provider>
   );
 }
 
-export function useDataStore() {
-  const context = useContext(DataStoreContext);
+export function useDataStoreDomain() {
+  const context = useContext(DataStoreDomainContext);
   if (!context) {
-    throw new Error('useDataStore must be used within DataStoreProvider');
+    throw new Error('useDataStoreDomain must be used within DataStoreProvider');
   }
   return context;
+}
+
+export function useDataStoreHierarchy() {
+  const context = useContext(DataStoreHierarchyContext);
+  if (!context) {
+    throw new Error('useDataStoreHierarchy must be used within DataStoreProvider');
+  }
+  return context;
+}
+
+export function useDataStore(): DataStoreContextType {
+  const domain = useDataStoreDomain();
+  const hierarchy = useDataStoreHierarchy();
+  return useMemo(
+    () => ({ ...domain, ...hierarchy }),
+    [domain, hierarchy]
+  );
 }

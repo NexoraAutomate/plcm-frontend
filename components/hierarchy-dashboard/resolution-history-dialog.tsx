@@ -9,7 +9,7 @@ import {
 } from '@/lib/resolution-history-matching';
 import type { ConfigurationHistory, MaintenanceDelivery } from '@/lib/models';
 import type { SubtreeEntityRef } from '@/lib/project-hierarchy-dashboard';
-import { useDataStore } from '@/lib/data-store';
+import { useDataStoreDomain } from '@/lib/data-store';
 import { formatUserRef } from '@/lib/user-display';
 import {
   Dialog,
@@ -49,7 +49,7 @@ export function ResolutionHistoryDialog({
   installationRefs,
   deliveries = [],
 }: ResolutionHistoryDialogProps) {
-  const { users } = useDataStore();
+  const { users } = useDataStoreDomain();
 
   const userLabelsById = useMemo(
     () => new Map(users.map((user) => [user.id, formatUserRef(user)])),

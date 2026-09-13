@@ -23,6 +23,7 @@ import { StatusBadge } from '@/components/status-badge';
 import * as Models from '@/lib/models';
 import { EntityNameWithFault } from '@/components/entity-fault-ping';
 import { useEntityFaultMap } from '@/hooks/use-entity-fault-map';
+import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
 import { useStatusesByTypeQuery } from '@/hooks/queries';
 import { fetchProjectsPage } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
@@ -66,6 +67,7 @@ export default function ProjectsPage(){
     id: null,
   });
   const searchParams = useSearchParams();
+  const { pageLoading } = useEntityHierarchyGate({ types: ['systems'] });
   const {
     users,
     orders,
@@ -74,7 +76,6 @@ export default function ProjectsPage(){
     createProject,
     updateProject,
     deleteProject,
-    ensureHierarchyLoaded,
   } = useDataStore();
   const faultMap = useEntityFaultMap();
   const [search, setSearch] = useState('');
@@ -182,6 +183,7 @@ export default function ProjectsPage(){
         ? storeProjects
         : pagination.items;
   const showLoader = useListPageLoader(pagination, {
+    pageLoading,
     debouncedSearch,
     filtersActive: statusFilter !== 'Total' || orderFilterId != null,
     hasData: projects.length > 0 || storeProjects.length > 0,

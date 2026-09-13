@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AttachmentUploadDialog } from '@/components/attachment-upload-dialog';
-import { useDataStore } from '@/lib/data-store';
+import { useDataStoreDomain } from '@/lib/data-store';
 import { attachmentDisplayTitle, attachmentTypeLabel } from '@/lib/attachment-types';
 import type { EntityAttachment, EntityReplacementChainItem, HierarchyInstallFields, ItemInstallRejection } from '@/lib/models';
 import * as api from '@/lib/api';
@@ -117,7 +117,7 @@ export function EntityInstallMetadataCard({
   onExistingSaved,
 }: EntityInstallMetadataCardProps) {
   const { entityLabel } = useAppDefinitions();
-  const { users, projects } = useDataStore();
+  const { users, projects } = useDataStoreDomain();
   const { can, user, isInventoryManager } = useAuth();
   const queryClient = useQueryClient();
   const inventoryManager = isInventoryManager();

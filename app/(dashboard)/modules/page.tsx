@@ -61,7 +61,7 @@ export default function ModulesPage() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { pageLoading } = useEntityHierarchyGate();
+  const { pageLoading } = useEntityHierarchyGate({ types: ['subsystems', 'units'] });
   const { user, isInventoryManager } = useAuth();
   const inventoryManager = isInventoryManager();
   const { subsystems, units, createModule, updateModule, deleteModule, users } = useDataStore();

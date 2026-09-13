@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useDataStore } from '@/lib/data-store';
+import { useDataStoreDomain } from '@/lib/data-store';
 import type { User } from '@/lib/models';
 import { hasWorkflowRole, ROLE } from '@/lib/workflow-roles';
 
@@ -27,7 +27,7 @@ export function ProjectManagerSelect({
   className = 'h-10',
   placeholder = 'Select project manager',
 }: ProjectManagerSelectProps) {
-  const { users } = useDataStore();
+  const { users } = useDataStoreDomain();
 
   const options = useMemo(
     () =>

@@ -61,7 +61,7 @@ export default function UnitsPage() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { pageLoading } = useEntityHierarchyGate();
+  const { pageLoading } = useEntityHierarchyGate({ types: ['modules', 'components'] });
   const { user, isInventoryManager } = useAuth();
   const inventoryManager = isInventoryManager();
   const { modules, components, createUnit, updateUnit, deleteUnit, users } = useDataStore();

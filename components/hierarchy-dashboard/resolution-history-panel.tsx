@@ -33,7 +33,7 @@ import {
 import type { ConfigurationHistory, Component, Module, Subsystem, System, Unit } from '@/lib/models';
 import { ResolutionType } from '@/lib/models';
 import { ResolutionHistoryTimelineDialog } from '@/components/hierarchy-dashboard/resolution-history-timeline-dialog';
-import { useDataStore } from '@/lib/data-store';
+import { useDataStoreDomain } from '@/lib/data-store';
 import { formatUserRef } from '@/lib/user-display';
 
 interface ResolutionHistoryPanelProps {
@@ -59,7 +59,7 @@ export function ResolutionHistoryPanel({
   units,
   components,
 }: ResolutionHistoryPanelProps) {
-  const { users } = useDataStore();
+  const { users } = useDataStoreDomain();
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [records, setRecords] = useState<ConfigurationHistory[]>([]);

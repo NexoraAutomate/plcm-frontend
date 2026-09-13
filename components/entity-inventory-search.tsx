@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { P } from '@/lib/permission-codes';
-import { useDataStore } from '@/lib/data-store';
+import { useDataStoreDomain } from '@/lib/data-store';
 import { inventoryPartNumber } from '@/lib/inventory-entity-fields';
 import {
   isInventoryInStock,
@@ -55,7 +55,7 @@ export function EntityInventorySearch({
   allowedInventoryNames,
   onUseInventory,
 }: EntityInventorySearchProps) {
-  const { users } = useDataStore();
+  const { users } = useDataStoreDomain();
   const { can } = useAuth();
   const canViewInventory = can(P.view_inventory);
   const [inventoryItems, setInventoryItems] = useState<Inventory[]>([]);

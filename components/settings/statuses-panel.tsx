@@ -26,7 +26,7 @@ import {
   suggestColorForStatusName,
 } from "@/lib/status-colors";
 import { cn } from "@/lib/utils";
-import { useDataStore } from "@/lib/data-store";
+import { useDataStoreDomain } from "@/lib/data-store";
 import { useAppDefinitions } from "@/lib/app-definitions-context";
 import { validateStatusForm } from "@/lib/form-validation";
 import { usePageDataRefresh } from "@/components/page-data-refresh";
@@ -169,7 +169,7 @@ export function StatusesPanel({ embedded = false }: StatusesPanelProps) {
   const { entityLabel } = useAppDefinitions();
   const STATUS_TYPES = getStatusTypes(entityLabel);
   const { statuses: storeStatuses, createStatus, updateStatus, deleteStatus, refreshStatuses } =
-    useDataStore();
+    useDataStoreDomain();
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

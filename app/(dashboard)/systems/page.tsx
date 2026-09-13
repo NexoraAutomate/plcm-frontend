@@ -66,7 +66,7 @@ export default function SystemsPage() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { pageLoading } = useEntityHierarchyGate();
+  const { pageLoading } = useEntityHierarchyGate({ types: ['subsystems'] });
   const { user, isInventoryManager } = useAuth();
   const inventoryManager = isInventoryManager();
   const { projects, subsystems, createSystem, updateSystem, deleteSystem, statuses: storeStatuses, users } = useDataStore();

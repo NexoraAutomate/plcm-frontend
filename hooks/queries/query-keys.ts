@@ -21,6 +21,7 @@ export const queryKeys = {
   faultyEntities: (skip: number, limit: number) =>
     ['faultyEntities', { skip, limit }] as const,
   hierarchyEntities: () => ['hierarchy', 'entities'] as const,
+  hierarchyType: (type: string) => ['hierarchy', 'type', type] as const,
   executiveDashboard: (filters: ExecutiveDashboardFilters & { kpi_filter?: string }) =>
     ['dashboard', 'executive', filters] as const,
   hierarchies: (hierarchyType?: string) =>

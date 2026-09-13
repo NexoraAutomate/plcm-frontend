@@ -23,7 +23,7 @@ import {
   type EntityStatusHistory,
   type Status,
 } from '@/lib/models';
-import { useDataStore } from '@/lib/data-store';
+import { useDataStoreDomain } from '@/lib/data-store';
 import { workflowStatusLabel } from '@/lib/workflow-status';
 
 interface EntityStatusHistorySheetProps {
@@ -128,7 +128,7 @@ export function EntityStatusHistorySheet({
   triggerVariant = 'button',
   className,
 }: EntityStatusHistorySheetProps) {
-  const { statuses: storeStatuses } = useDataStore();
+  const { statuses: storeStatuses } = useDataStoreDomain();
   const statuses = statusesProp?.length ? statusesProp : storeStatuses;
 
   const [open, setOpen] = useState(false);

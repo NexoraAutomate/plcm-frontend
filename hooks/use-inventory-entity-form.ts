@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useAppDefinitions } from '@/lib/app-definitions-context';
 import { useDataStore } from '@/lib/data-store';
 import { useHierarchiesQuery } from '@/hooks/queries';
+import { HIERARCHY_ENTITY_TYPE_KEYS } from '@/hooks/queries/fetchers';
 import {
   buildInventoryCreatePayload,
   emptyInventoryEntityForm,
@@ -52,7 +53,8 @@ export function useInventoryEntityForm(options: {
   } = options;
   const { user } = useAuth();
   const { definitions, entityLabel } = useAppDefinitions();
-  const { systems, subsystems, modules, units, components } = useDataStore();
+  const { systems, subsystems, modules, units, components, ensureHierarchyTypesLoaded } =
+    useDataStore();
 
   const [selectedEntityType, setSelectedEntityType] =
     useState<InventoryEntityFormType>(entityType);
@@ -72,6 +74,12 @@ export function useInventoryEntityForm(options: {
     () => ({ systems, subsystems, modules, units, components }),
     [systems, subsystems, modules, units, components]
   );
+
+  useEffect(() => {
+    if (!open) return;
+    // Load hierarchy only while the form is open (serial suggestions / PN checks).
+    void ensureHierarchyTypesLoaded([...HIERARCHY_ENTITY_TYPE_KEYS]);
+  }, [open, ensureHierarchyTypesLoaded]);
 
   useEffect(() => {
     if (!open) return;

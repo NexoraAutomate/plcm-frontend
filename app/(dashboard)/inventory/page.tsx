@@ -302,7 +302,7 @@ export default function InventoryPage() {
       })),
     [entityLabel]
   );
-  const { users, statuses, systems, subsystems, modules, units, components, ensureHierarchyLoaded } =
+  const { users, statuses, systems, subsystems, modules, units, components } =
     useDataStore();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
@@ -356,10 +356,6 @@ export default function InventoryPage() {
     [pagination.items, users, entityPools, stockFilter]
   );
   const loading = pagination.loading;
-
-  useEffect(() => {
-    void ensureHierarchyLoaded();
-  }, [ensureHierarchyLoaded]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
