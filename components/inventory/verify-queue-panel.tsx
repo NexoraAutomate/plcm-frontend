@@ -1,5 +1,7 @@
 'use client';
 
+import { WORKFLOW_POLL_MS } from '@/lib/data-loading';
+
 import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -63,7 +65,7 @@ export function VerifyQueuePanel() {
 
   useEffect(() => {
     void refresh();
-    const timer = window.setInterval(() => void refresh(), 12_000);
+    const timer = window.setInterval(() => void refresh(), WORKFLOW_POLL_MS);
     return () => window.clearInterval(timer);
   }, [refresh]);
 

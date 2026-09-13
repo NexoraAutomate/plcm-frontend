@@ -24,7 +24,7 @@ import {
 import * as Models from './models';
 import * as MaintenanceTypes from '@/lib/models';
 import { enrichEntitiesWithStatus, enrichEntityWithStatus } from './entity-status';
-import { LIST_BOOTSTRAP_SIZE, LIST_PAGE_SIZE } from './data-loading';
+import { LIST_BOOTSTRAP_SIZE, HIERARCHY_TYPE_CAP, STATUS_LIST_CAP, appendCapped } from './data-loading';
 import { toast } from 'sonner';
 import { StatusColorProvider } from '@/lib/status-color-context';
 
@@ -329,19 +329,19 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     };
 
     if (snapshot.systems.length) {
-      setSystems((prev) => [...prev, ...snapshot.systems]);
+      setSystems((prev) => appendCapped(prev, snapshot.systems, HIERARCHY_TYPE_CAP));
     }
     if (snapshot.subsystems.length) {
-      setSubsystems((prev) => [...prev, ...snapshot.subsystems]);
+      setSubsystems((prev) => appendCapped(prev, snapshot.subsystems, HIERARCHY_TYPE_CAP));
     }
     if (snapshot.modules.length) {
-      setModules((prev) => [...prev, ...snapshot.modules]);
+      setModules((prev) => appendCapped(prev, snapshot.modules, HIERARCHY_TYPE_CAP));
     }
     if (snapshot.units.length) {
-      setUnits((prev) => [...prev, ...snapshot.units]);
+      setUnits((prev) => appendCapped(prev, snapshot.units, HIERARCHY_TYPE_CAP));
     }
     if (snapshot.components.length) {
-      setComponents((prev) => [...prev, ...snapshot.components]);
+      setComponents((prev) => appendCapped(prev, snapshot.components, HIERARCHY_TYPE_CAP));
     }
   }, []);
 
@@ -958,11 +958,11 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
         if (silentBatchDepthRef.current > 0) {
           silentEntityBufferRef.current.systems.push(enriched);
         } else {
-          setSystems((prev) => [...prev, enriched]);
+          setSystems((prev) => appendCapped(prev, [enriched]));
         }
       } else {
         flushSilentEntityBuffer();
-        setSystems((prev) => [...prev, enriched]);
+        setSystems((prev) => appendCapped(prev, [enriched]));
         toast.success('System created successfully');
       }
       return res.data;
@@ -1029,11 +1029,11 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
         if (silentBatchDepthRef.current > 0) {
           silentEntityBufferRef.current.subsystems.push(enriched);
         } else {
-          setSubsystems((prev) => [...prev, enriched]);
+          setSubsystems((prev) => appendCapped(prev, [enriched]));
         }
       } else {
         flushSilentEntityBuffer();
-        setSubsystems((prev) => [...prev, enriched]);
+        setSubsystems((prev) => appendCapped(prev, [enriched]));
         toast.success('Subsystem created successfully');
       }
       return res.data;
@@ -1100,11 +1100,11 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
         if (silentBatchDepthRef.current > 0) {
           silentEntityBufferRef.current.modules.push(enriched);
         } else {
-          setModules((prev) => [...prev, enriched]);
+          setModules((prev) => appendCapped(prev, [enriched]));
         }
       } else {
         flushSilentEntityBuffer();
-        setModules((prev) => [...prev, enriched]);
+        setModules((prev) => appendCapped(prev, [enriched]));
         toast.success('Module created successfully');
       }
       return res.data;
@@ -1171,11 +1171,11 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
         if (silentBatchDepthRef.current > 0) {
           silentEntityBufferRef.current.units.push(enriched);
         } else {
-          setUnits((prev) => [...prev, enriched]);
+          setUnits((prev) => appendCapped(prev, [enriched]));
         }
       } else {
         flushSilentEntityBuffer();
-        setUnits((prev) => [...prev, enriched]);
+        setUnits((prev) => appendCapped(prev, [enriched]));
         toast.success('Unit created successfully');
       }
       return res.data;
@@ -1242,11 +1242,11 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
         if (silentBatchDepthRef.current > 0) {
           silentEntityBufferRef.current.components.push(enriched);
         } else {
-          setComponents((prev) => [...prev, enriched]);
+          setComponents((prev) => appendCapped(prev, [enriched]));
         }
       } else {
         flushSilentEntityBuffer();
-        setComponents((prev) => [...prev, enriched]);
+        setComponents((prev) => appendCapped(prev, [enriched]));
         toast.success('Component created successfully');
       }
       return res.data;
@@ -1329,7 +1329,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
 
   // Statuses
   const refreshStatuses = useCallback(async () => {
-    const res = await api.statuses.list(0, 5000);
+    const res = await api.statuses.list(0, STATUS_LIST_CAP);
     const next = res.data ?? [];
     setStatuses(next);
     queryClient.setQueryData(queryKeys.statuses(), next);

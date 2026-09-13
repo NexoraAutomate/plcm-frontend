@@ -3,7 +3,7 @@ import * as api from '@/lib/api';
 import { listEntityListNames } from '@/lib/hierarchy-template-names';
 import { fetchExecutiveDashboard } from '@/lib/api/dashboard';
 import { fetchPaginatedList, unwrapListItems } from '@/lib/paginated-api';
-import { fetchCappedPages, ABSOLUTE_FETCH_CAP, HIERARCHY_TYPE_CAP, LIST_BOOTSTRAP_SIZE, LIST_PAGE_SIZE } from '@/lib/data-loading';
+import { fetchCappedPages, ABSOLUTE_FETCH_CAP, HIERARCHY_TYPE_CAP, LIST_BOOTSTRAP_SIZE, LIST_PAGE_SIZE, STATUS_LIST_CAP } from '@/lib/data-loading';
 import type { ListFilterParams } from '@/lib/list-filters';
 import type { ExecutiveDashboardFilters } from '@/lib/types/dashboard';
 import type {
@@ -25,7 +25,7 @@ import type {
 } from '@/lib/models';
 
 export async function fetchStatuses(): Promise<Status[]> {
-  const res = await api.statuses.list(0, 5000);
+  const res = await api.statuses.list(0, STATUS_LIST_CAP);
   return res.data ?? [];
 }
 

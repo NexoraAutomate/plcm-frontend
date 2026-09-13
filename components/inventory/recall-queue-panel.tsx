@@ -1,5 +1,7 @@
 'use client';
 
+import { WORKFLOW_POLL_MS } from '@/lib/data-loading';
+
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
@@ -77,7 +79,7 @@ export function RecallQueuePanel({ mine = false }: Props) {
 
   useEffect(() => {
     void refresh();
-    const timer = window.setInterval(() => void refresh(), 12_000);
+    const timer = window.setInterval(() => void refresh(), WORKFLOW_POLL_MS);
     return () => window.clearInterval(timer);
   }, [refresh]);
 

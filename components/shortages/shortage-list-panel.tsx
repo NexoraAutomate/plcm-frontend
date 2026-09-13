@@ -1,5 +1,7 @@
 'use client';
 
+import { WORKFLOW_POLL_MS } from '@/lib/data-loading';
+
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -51,7 +53,7 @@ function statusVariant(status: string) {
 export function ShortageListPanel({
   projectId,
   inventoryScope = false,
-  pollMs = 12_000,
+  pollMs = WORKFLOW_POLL_MS,
   highlightId,
   onRowsChange,
 }: Props) {

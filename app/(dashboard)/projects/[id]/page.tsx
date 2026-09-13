@@ -1,5 +1,7 @@
 'use client';
 
+import { WORKFLOW_POLL_MS } from '@/lib/data-loading';
+
 import { useAppDefinitions } from '@/lib/app-definitions-context';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -562,7 +564,7 @@ export default function ProjectDetailPage() {
                   </div>
                   <ShortageListPanel
                     projectId={project.id}
-                    pollMs={12_000}
+                    pollMs={WORKFLOW_POLL_MS}
                     highlightId={highlightShortageId}
                     onRowsChange={handleProjectShortagesChange}
                   />

@@ -1,5 +1,7 @@
 'use client';
 
+import { WORKFLOW_POLL_MS } from '@/lib/data-loading';
+
 import { useCallback, useEffect, useState } from 'react';
 import { Clock, Unlock } from 'lucide-react';
 import { toast } from 'sonner';
@@ -96,7 +98,7 @@ export function ProjectReservationsPanel({ project }: Props) {
     if (!isReady) return;
     const id = window.setInterval(() => {
       void refresh().catch(() => undefined);
-    }, 12_000);
+    }, WORKFLOW_POLL_MS);
     const onFocus = () => {
       void refresh().catch(() => undefined);
     };

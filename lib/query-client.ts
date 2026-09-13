@@ -5,7 +5,8 @@ export function createQueryClient() {
     defaultOptions: {
       queries: {
         staleTime: 30_000,
-        gcTime: 5 * 60_000,
+        // Evict unused query results sooner to limit retained heap in long sessions.
+        gcTime: 3 * 60_000,
         retry: 1,
         refetchOnWindowFocus: false,
       },
@@ -15,6 +16,7 @@ export function createQueryClient() {
 
 let browserQueryClient: QueryClient | undefined;
 
+/** Shared browser QueryClient — used by QueryProvider and any non-React callers. */
 export function getQueryClient() {
   if (typeof window === 'undefined') {
     return createQueryClient();

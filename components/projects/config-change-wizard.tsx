@@ -1,5 +1,7 @@
 'use client';
 
+import { WORKFLOW_POLL_MS } from '@/lib/data-loading';
+
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, GitBranch, Loader2, RefreshCw } from 'lucide-react';
@@ -130,7 +132,7 @@ export function ConfigChangeWizard({
     if (!waitingOnInspect) return;
     const id = window.setInterval(() => {
       void load({ silent: true });
-    }, 12_000);
+    }, WORKFLOW_POLL_MS);
     return () => window.clearInterval(id);
   }, [change?.status, change?.inventory_cleared, load]);
 

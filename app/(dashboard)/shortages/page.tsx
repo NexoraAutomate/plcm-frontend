@@ -1,5 +1,7 @@
 'use client';
 
+import { WORKFLOW_POLL_MS } from '@/lib/data-loading';
+
 import { useCallback, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AlertTriangle } from 'lucide-react';
@@ -44,7 +46,7 @@ export default function ShortagesPage() {
           <CardContent>
             <ShortageListPanel
               inventoryScope
-              pollMs={12_000}
+              pollMs={WORKFLOW_POLL_MS}
               highlightId={highlightId}
               onRowsChange={handleShortagesChange}
             />

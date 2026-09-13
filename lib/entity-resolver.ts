@@ -21,7 +21,7 @@ export function toDbEntityType(entityType: string): string {
 }
 
 /** Bound lookup cache — avoids unbounded growth when resolving large subtrees. */
-const LOOKUP_CACHE_MAX = 1_000;
+const LOOKUP_CACHE_MAX = 500;
 const lookupCache = new LruMap<string, Promise<Entity | null>>(LOOKUP_CACHE_MAX);
 
 function cacheKey(entityType: string, entityPk: number): string {
