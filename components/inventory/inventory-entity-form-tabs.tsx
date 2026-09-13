@@ -11,7 +11,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EntityAttachmentsSection, type PendingAttachmentUpload } from '@/components/entity-attachments-section';
 import { EntityPicture } from '@/components/entity-picture';
 import {
-  inventorySupportsQuantity,
   inventoryUsesInstances,
 } from '@/lib/entity-hierarchy';
 import type { InventoryEntityFormType } from '@/hooks/use-inventory-entity-form';
@@ -189,52 +188,49 @@ export function InventoryEntityFormTabs({
               {getEntityDisplayName(selectedEntityType)} Category
               {mode === 'create' ? ' (Entity List)' : ''} {mode === 'create' ? '*' : ''}
             </Label>
-          <Select
-            value={formData.name}
-            disabled={lockEntityName}
-            onValueChange={(value) => {
-                if (mode === 'create' && onApplyDefinitionIdentifiers) {
-                  onFormDataChange(
-                    onApplyDefinitionIdentifiers(
-                      selectedEntityType,
-                      value,
-                      formData.oem_name,
-                      formData
-                    )
-                  );
-                } else {
-                  onFormDataChange({ ...formData, name: value });
-                }
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue
-                  placeholder={
-                    mode === 'create'
-                      ? `Select from Entity List (${entityLabel(selectedEntityType)})`
-                      : `Select ${selectedEntityType} name`
+            {mode === 'create' && !lockEntityName ? (
+              <Select
+                value={formData.name}
+                onValueChange={(value) => {
+                  if (onApplyDefinitionIdentifiers) {
+                    onFormDataChange(
+                      onApplyDefinitionIdentifiers(
+                        selectedEntityType,
+                        value,
+                        formData.oem_name,
+                        formData
+                      )
+                    );
+                  } else {
+                    onFormDataChange({ ...formData, name: value });
                   }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {entityListNames.length === 0 ? (
-                  <SelectItem value="__none__" disabled>
-                    {mode === 'create'
-                      ? `No ${entityLabel(selectedEntityType, true).toLowerCase()} in Entity List — add in Settings → Definitions`
-                      : 'No matching names in Entity List'}
-                  </SelectItem>
-                ) : (
-                  entityListNames.map((entry) => (
-                    <SelectItem key={entry.id} value={entry.name}>
-                      {entry.name}
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={`Select from Entity List (${entityLabel(selectedEntityType)})`}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {entityListNames.length === 0 ? (
+                    <SelectItem value="__none__" disabled>
+                      {`No ${entityLabel(selectedEntityType, true).toLowerCase()} in Entity List — add in Settings → Definitions`}
                     </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
+                  ) : (
+                    entityListNames.map((entry) => (
+                      <SelectItem key={entry.id} value={entry.name}>
+                        {entry.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input value={formData.name || ''} disabled />
+            )}
           </div>
 
-          {inventorySupportsQuantity(selectedEntityType) && !isHierarchy && mode === 'create' ? (
+          {!isHierarchy && mode === 'create' ? (
             <div>
               <Label>Quantity *</Label>
               <Input
@@ -248,20 +244,15 @@ export function InventoryEntityFormTabs({
                 placeholder="Enter quantity"
               />
               <p className="text-xs text-muted-foreground">
-                Component inventory can be stocked in bulk.
+                Enter how many units to add to this inventory group.
               </p>
             </div>
           ) : !isHierarchy ? (
             <div>
               <Label>Quantity</Label>
-              <Input
-                value={mode === 'edit' ? String(formData.quantity || 0) : 'Calculated automatically'}
-                disabled
-              />
+              <Input value={String(formData.quantity || 0)} disabled />
               <p className="text-xs text-muted-foreground">
-                {inventorySupportsQuantity(selectedEntityType)
-                  ? 'Quantity cannot be changed here. Use Add Stock to increase it.'
-                  : 'Quantity is the total number of serialized units sharing this part number.'}
+                Quantity cannot be changed here. Use Add Stock to increase it.
               </p>
             </div>
           ) : null}
@@ -284,19 +275,6 @@ export function InventoryEntityFormTabs({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-          ) : null}
-
-          {mode === 'edit' ? (
-            <div>
-              <Label>Configuration Item</Label>
-              <Input
-                value={formData.configuration_item}
-                onChange={(e) =>
-                  onFormDataChange({ ...formData, configuration_item: e.target.value })
-                }
-                placeholder="Defaults to part number or name"
-              />
             </div>
           ) : null}
 
@@ -433,7 +411,9 @@ export function InventoryEntityFormTabs({
                 />
                 {inventoryUsesInstances(selectedEntityType) ? (
                   <p className="text-xs text-muted-foreground">
-                    Each unit gets its own identity. Leave blank to generate one automatically.
+                    {mode === 'create'
+                      ? 'Identity of the unit. For more than one quantity, only enter the serial number of the first item.'
+                      : 'Identity of the unit.'}
                   </p>
                 ) : null}
               </div>
@@ -461,35 +441,6 @@ export function InventoryEntityFormTabs({
                     placeholder="Component SKU"
                   />
                 </div>
-              ) : null}
-
-              {mode === 'edit' ? (
-                <>
-                  <div>
-                    <Label>Original Part Number</Label>
-                    <Input
-                      value={formData.original_part_number}
-                      onChange={(e) =>
-                        onFormDataChange({ ...formData, original_part_number: e.target.value })
-                      }
-                      placeholder="Original part number from manufacturer"
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Original Serial Number</Label>
-                    <Input
-                      value={formData.original_serial_number}
-                      onChange={(e) =>
-                        onFormDataChange({
-                          ...formData,
-                          original_serial_number: e.target.value,
-                        })
-                      }
-                      placeholder="Original serial number"
-                    />
-                  </div>
-                </>
               ) : null}
 
               <div className={mode === 'edit' ? undefined : 'sm:col-span-2'}>

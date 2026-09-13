@@ -29,11 +29,6 @@ type Props = {
   levelLabel: (level: string) => string;
   /** When set, only this level’s leaves are interactive. */
   selectableLevel?: TemplateNodeLevel | null;
-  /**
-   * Names (lowercase) already used under the current parent for the selectable level.
-   * Shown dimmed/disabled instead of hidden.
-   */
-  usedNames?: Set<string>;
   /** Hide these levels entirely (e.g. system when one already exists). */
   hiddenLevels?: TemplateNodeLevel[];
   selectedName?: string;
@@ -49,7 +44,6 @@ export function ConfigEntityTypeTree({
   entities,
   levelLabel,
   selectableLevel,
-  usedNames,
   hiddenLevels,
   selectedName,
   onSelect,
@@ -176,9 +170,7 @@ export function ConfigEntityTypeTree({
                             abbreviation: (item.abbreviation || '').toUpperCase(),
                             entityId: item.id,
                           };
-                          const taken = usedNames?.has(item.name.trim().toLowerCase()) ?? false;
-                          const levelAllowed = levelInteractive;
-                          const canUse = levelAllowed && !taken;
+                          const canUse = levelInteractive;
                           const canClick = canUse && !!onSelect;
                           const canDrag = !!draggable && canUse;
                           const selected =
@@ -190,11 +182,9 @@ export function ConfigEntityTypeTree({
                                 role={canClick ? 'button' : undefined}
                                 tabIndex={canClick || canDrag ? 0 : -1}
                                 title={
-                                  taken
-                                    ? 'Already used under this parent'
-                                    : !levelAllowed
-                                      ? 'Select a matching parent on the canvas'
-                                      : undefined
+                                  !canUse
+                                    ? 'Select a matching parent on the canvas'
+                                    : undefined
                                 }
                                 draggable={canDrag}
                                 onDragStart={(event) => {
@@ -237,9 +227,6 @@ export function ConfigEntityTypeTree({
                                 />
                                 <span className="min-w-0 flex-1 truncate font-medium pointer-events-none">
                                   {item.name}
-                                  {taken ? (
-                                    <span className="ml-1 font-normal opacity-80">(used)</span>
-                                  ) : null}
                                 </span>
                                 {item.abbreviation ? (
                                   <span

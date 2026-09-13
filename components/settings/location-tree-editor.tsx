@@ -212,6 +212,21 @@ function LocationTreeEditorInner({ value, onChange, readOnly = false }: Props) {
     return `Add child ${childLabel}`;
   }, [nameDialog]);
 
+  const namePlaceholder = useMemo(() => {
+    if (!nameDialog) return '';
+    const entity =
+      nameDialog.mode === 'root-room'
+        ? 'room'
+        : nameDialog.mode === 'child'
+          ? nameDialog.level === 'room'
+            ? 'cabinet'
+            : 'rack'
+          : nameDialog.level;
+    if (entity === 'room') return 'e.g. Room-1';
+    if (entity === 'cabinet') return 'e.g. Cabinet 1';
+    return 'e.g. Rack-3';
+  }, [nameDialog]);
+
   return (
     <LocationActionsContext.Provider value={actions}>
       <div className="h-105 w-full overflow-hidden rounded-md border bg-background">
@@ -316,13 +331,7 @@ function LocationTreeEditorInner({ value, onChange, readOnly = false }: Props) {
                 id="location-node-name"
                 value={nameValue}
                 onChange={(event) => setNameValue(event.target.value)}
-                placeholder={
-                  nameDialog?.mode === 'root-room' || nameDialog?.level === 'room'
-                    ? 'e.g. Room-1'
-                    : nameDialog?.level === 'cabinet'
-                      ? 'e.g. Cabinet-2'
-                      : 'e.g. Rack-3'
-                }
+                placeholder={namePlaceholder}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {
                     event.preventDefault();

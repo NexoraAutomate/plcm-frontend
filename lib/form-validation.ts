@@ -220,7 +220,7 @@ export function validateInventoryForm(input: {
     return `${locationLabel} is required for each serialized unit`;
   }
   if (!isHierarchy && input.supportsQuantity && Number(input.quantity) <= 0) {
-    return 'Please enter a quantity greater than 0 for component inventory';
+    return 'Please enter a quantity greater than 0';
   }
   return null;
 }

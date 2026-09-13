@@ -129,22 +129,31 @@ export function HierarchyTemplateEditor({
     return grouped[parentLevel];
   }, [grouped, selectedLevel]);
 
+  const parentOptionLabels = useMemo(() => {
+    const counts = new Map<string, number>();
+    const indexes = new Map<string, number>();
+    for (const item of parentOptions) {
+      const key = item.name.trim().toLowerCase() || item.client_key;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    const labels = new Map<string, string>();
+    for (const item of parentOptions) {
+      const key = item.name.trim().toLowerCase() || item.client_key;
+      const total = counts.get(key) ?? 1;
+      const next = (indexes.get(key) ?? 0) + 1;
+      indexes.set(key, next);
+      const base = item.name || item.client_key;
+      labels.set(item.client_key, total > 1 ? `${base} (${next})` : base);
+    }
+    return labels;
+  }, [parentOptions]);
+
   const entityNameOptions = useMemo(() => {
     // Entity List is a flat catalog by level — parent/child is chosen in this
-    // configuration tree, not pre-bound in the catalog.
-    const alreadyUsed = new Set(
-      nodes
-        .filter(
-          (n) =>
-            n.level === selectedLevel &&
-            (n.parent_client_key ?? null) === (currentParentKey ?? null)
-        )
-        .map((n) => n.name.trim().toLowerCase())
-    );
-    return filterTemplateNames(entityListItems, selectedLevel).filter(
-      (item) => !alreadyUsed.has(item.name.trim().toLowerCase())
-    );
-  }, [currentParentKey, entityListItems, nodes, selectedLevel]);
+    // configuration tree, not pre-bound in the catalog. The same catalog name
+    // may be added more than once under a parent (e.g. multiple FPGA Cards).
+    return filterTemplateNames(entityListItems, selectedLevel);
+  }, [entityListItems, selectedLevel]);
 
   const editEntityOptions = useMemo(() => {
     if (!editTarget) return [];
@@ -460,7 +469,7 @@ export function HierarchyTemplateEditor({
                         <SelectItem value="0">None</SelectItem>
                         {parentOptions.map((item) => (
                           <SelectItem key={item.client_key} value={item.client_key}>
-                            {item.name || item.client_key}
+                            {parentOptionLabels.get(item.client_key) || item.name || item.client_key}
                           </SelectItem>
                         ))}
                       </SelectContent>

@@ -1,6 +1,5 @@
 import type { Inventory, InventoryInstance } from '@/lib/models';
 import {
-  inventorySupportsQuantity,
   inventoryUsesInstances,
   type HierarchyEntityType,
 } from '@/lib/entity-hierarchy';
@@ -201,11 +200,7 @@ export function buildInventoryCreatePayload(
   const instance = inventoryUsesInstances(entityType)
     ? inventoryInstanceFieldsFromForm(withDefaultLocation, removePicture)
     : {};
-  const quantity = inventorySupportsQuantity(entityType)
-    ? formData.quantity > 0
-      ? formData.quantity
-      : 1
-    : 1;
+  const quantity = formData.quantity > 0 ? formData.quantity : 1;
   return { ...group, ...instance, quantity };
 }
 

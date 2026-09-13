@@ -66,33 +66,6 @@ export function hasSystemNode(nodes: TemplateDraftNode[]): boolean {
   return nodes.some((n) => n.level === 'system');
 }
 
-/** Assigned entity names already used as children of the same parent. */
-export function usedAssignedNamesUnderParent(
-  nodes: TemplateDraftNode[],
-  parentKey: string | null,
-  excludeClientKey?: string
-): Set<string> {
-  const used = new Set<string>();
-  for (const n of nodes) {
-    if ((n.parent_client_key ?? null) !== parentKey) continue;
-    if (excludeClientKey && n.client_key === excludeClientKey) continue;
-    if (!isEntityAssigned(n)) continue;
-    used.add(n.name.trim().toLowerCase());
-  }
-  return used;
-}
-
-export function isNameTakenUnderParent(
-  nodes: TemplateDraftNode[],
-  parentKey: string | null,
-  name: string,
-  excludeClientKey?: string
-): boolean {
-  const needle = name.trim().toLowerCase();
-  if (!needle) return false;
-  return usedAssignedNamesUnderParent(nodes, parentKey, excludeClientKey).has(needle);
-}
-
 export function descendantsOf(
   nodes: TemplateDraftNode[],
   clientKey: string

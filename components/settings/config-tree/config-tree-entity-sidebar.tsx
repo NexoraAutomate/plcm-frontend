@@ -20,8 +20,6 @@ type Props = {
   disabled?: boolean;
   /** Child level to enable when a canvas parent is selected. */
   focusChildLevel?: TemplateNodeLevel | null;
-  /** Assigned names already used under the selected parent. */
-  usedChildNames?: Set<string>;
   /** Hide system folder when a system already exists. */
   hideSystemLevel?: boolean;
   contextLabel?: string;
@@ -32,7 +30,6 @@ export function ConfigTreeEntitySidebar({
   levelLabel,
   disabled,
   focusChildLevel = null,
-  usedChildNames,
   hideSystemLevel,
   contextLabel,
 }: Props) {
@@ -49,7 +46,7 @@ export function ConfigTreeEntitySidebar({
         <p className="text-sm font-medium">Entity list</p>
         <p className="text-[11px] text-muted-foreground">
           {contextLabel ||
-            'Select a node on the canvas to list remaining children, then drag one in.'}
+            'Select a node on the canvas, then drag entities onto it. The same entity can be added more than once.'}
         </p>
       </div>
       <div className="min-h-0 flex-1 p-2">
@@ -57,7 +54,7 @@ export function ConfigTreeEntitySidebar({
           <div className="rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
             {contextLabel ||
               (hideSystemLevel
-                ? 'Select a System, Subsystem, Module, or Unit on the canvas to see remaining children you can add.'
+                ? 'Select a System, Subsystem, Module, or Unit on the canvas to add children.'
                 : 'Drag a System onto the canvas to start.')}
           </div>
         ) : (
@@ -66,14 +63,13 @@ export function ConfigTreeEntitySidebar({
             entities={entities}
             levelLabel={levelLabel}
             selectableLevel={focusChildLevel}
-            usedNames={usedChildNames}
             hiddenLevels={hiddenLevels}
             draggable
             defaultExpandedLevels={[focusChildLevel]}
             emptyHint={
               focusChildLevel === 'system'
                 ? 'Add a System first.'
-                : 'No remaining entities for this parent.'
+                : 'No entities in Entity List for this level.'
             }
             onDragStart={(event, item) => {
               const payload: EntityDragPayload = {

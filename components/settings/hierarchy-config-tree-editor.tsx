@@ -89,10 +89,8 @@ import {
   hasSystemNode,
   isDraftNode,
   isEntityAssigned,
-  isNameTakenUnderParent,
   layoutHandleIds,
   siblingsOf,
-  usedAssignedNamesUnderParent,
   type ConfigTreeEdgeData,
   type ConfigTreeNodeData,
   type LayoutDirection,
@@ -258,20 +256,12 @@ function ConfigTreeCanvasInner({
       ? null
       : ('system' as TemplateNodeLevel | null);
 
-  const usedChildNames = useMemo(() => {
-    if (!selectedParentKey && focusChildLevel === 'system') {
-      return usedAssignedNamesUnderParent(draftNodes, null);
-    }
-    if (!selectedParentKey) return new Set<string>();
-    return usedAssignedNamesUnderParent(draftNodes, selectedParentKey);
-  }, [draftNodes, focusChildLevel, selectedParentKey]);
-
   const sidebarContextLabel = selectedParent
     ? focusChildLevel
-      ? `Adding under “${selectedParent.name || levelLabel(selectedParent.level)}” — remaining ${levelLabel(focusChildLevel)}s`
+      ? `Adding under “${selectedParent.name || levelLabel(selectedParent.level)}” — drag ${levelLabel(focusChildLevel)}s (duplicates allowed)`
       : `“${selectedParent.name || levelLabel(selectedParent.level)}” has no child level`
     : systemExists
-      ? 'Select a parent node to list remaining children'
+      ? 'Select a parent node to add children'
       : 'Drag a System onto the canvas to start';
 
   // Rebuild graph when draft structure / lock / layout direction changes
@@ -424,15 +414,6 @@ function ConfigTreeCanvasInner({
       const desc = descendantsOf(draftNodes, targetId);
       if (desc.has(sourceId)) {
         toast.error('That connection would create a cycle');
-        return false;
-      }
-      if (
-        isEntityAssigned(target) &&
-        isNameTakenUnderParent(draftNodes, sourceId, target.name, targetId)
-      ) {
-        toast.error(
-          `“${target.name}” is already used under this ${levelLabel(source.level)}`
-        );
         return false;
       }
       // Let structure sync re-run Dagre so the linked nodes sit on the active layout
@@ -684,15 +665,6 @@ function ConfigTreeCanvasInner({
         parentKey = best.id;
       }
 
-      if (isNameTakenUnderParent(draftNodes, parentKey, payload.name)) {
-        toast.error(
-          `“${payload.name}” is already used under this ${levelLabel(
-            nodesByKey.get(parentKey!)?.level || 'parent'
-          )}`
-        );
-        return;
-      }
-
       placeNode({
         level: payload.level,
         parentKey,
@@ -774,7 +746,6 @@ function ConfigTreeCanvasInner({
               ? null
               : 'system'
         }
-        usedChildNames={usedChildNames}
         hideSystemLevel={systemExists}
         contextLabel={sidebarContextLabel}
       />
@@ -1107,13 +1078,6 @@ export function HierarchyConfigTreeEditor({
         toast.error('Only one System is allowed in a configuration');
         return '';
       }
-      if (
-        input.name?.trim() &&
-        isNameTakenUnderParent(nodes, input.parentKey, input.name)
-      ) {
-        toast.error(`“${input.name}” is already used under this parent`);
-        return '';
-      }
 
       const key = newClientKey(input.level.slice(0, 3));
       const siblings = siblingsOf(nodes, input.parentKey);
@@ -1234,31 +1198,16 @@ export function HierarchyConfigTreeEditor({
     toast.success('Node and children removed');
   }, [deleteKey, nodes, onChange]);
 
-  const usedNamesForForm = useMemo(() => {
-    if (!form) return new Set<string>();
-    const current = nodes.find((n) => n.client_key === form.clientKey);
-    const parentKey = current?.parent_client_key ?? null;
-    return usedAssignedNamesUnderParent(nodes, parentKey, form.clientKey);
-  }, [form, nodes]);
-
   const entityOptions = useMemo(() => {
     if (!form) return [];
-    return filterTemplateNames(entityListItems, form.level).filter(
-      (item) => !usedNamesForForm.has(item.name.trim().toLowerCase())
-    );
-  }, [entityListItems, form, usedNamesForForm]);
+    return filterTemplateNames(entityListItems, form.level);
+  }, [entityListItems, form]);
 
   const saveForm = useCallback(() => {
     if (!form) return;
     const name = form.name.trim();
     if (!name) {
       toast.error('Select or enter an entity name');
-      return;
-    }
-    const current = nodesByKey.get(form.clientKey);
-    const parentKey = current?.parent_client_key ?? null;
-    if (isNameTakenUnderParent(nodes, parentKey, name, form.clientKey)) {
-      toast.error(`“${name}” is already used under this parent`);
       return;
     }
     const selected = entityOptions.find((item) => item.name === name);
@@ -1283,7 +1232,7 @@ export function HierarchyConfigTreeEditor({
     );
     setForm(null);
     toast.success(form.mode === 'create' ? 'Node details saved' : 'Node updated');
-  }, [entityOptions, form, nodes, nodesByKey, onChange]);
+  }, [entityOptions, form, nodes, onChange]);
 
   const formCanBuild = Boolean(
     form &&
@@ -1463,8 +1412,9 @@ export function HierarchyConfigTreeEditor({
             <div className="flex items-start justify-between gap-3 border-b px-3 py-2">
               <div className="max-w-2xl space-y-1">
                 <div className="text-xs text-muted-foreground">
-                  Click a node to list remaining children · Double-click (or pencil) to
-                  edit · Turnkey/Build toggle on the node · Lock freezes edits · Esc exits
+                  Click a node to add children (same entity can be added more than once) ·
+                  Double-click (or pencil) to edit · Turnkey/Build toggle on the node · Lock
+                  freezes edits · Esc exits
                 </div>
                 {unassignedCount > 0 ? (
                   <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
@@ -1686,7 +1636,6 @@ export function HierarchyConfigTreeEditor({
                     entities={entityListItems}
                     levelLabel={levelLabel}
                     selectableLevel={form.level}
-                    usedNames={usedNamesForForm}
                     selectedName={form.name || undefined}
                     defaultExpandedLevels={[form.level]}
                     onSelect={(item) => {

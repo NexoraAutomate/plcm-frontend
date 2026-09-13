@@ -12,7 +12,6 @@ import {
 } from '@/lib/inventory-entity-fields';
 import { toDateInputValue } from '@/lib/hierarchy-install-fields';
 import {
-  inventorySupportsQuantity,
   inventoryUsesInstances,
 } from '@/lib/entity-hierarchy';
 import {
@@ -202,7 +201,7 @@ export function useInventoryEntityForm(options: {
       location: formData.location,
       quantity: formData.quantity,
       usesInstances: inventoryUsesInstances(selectedEntityType),
-      supportsQuantity: inventorySupportsQuantity(selectedEntityType),
+      supportsQuantity: true,
       isHierarchy: context === 'hierarchy',
       isComponent: selectedEntityType === 'component',
       entityCategoryLabel: entityLabel(selectedEntityType),

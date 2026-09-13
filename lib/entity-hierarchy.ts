@@ -24,13 +24,13 @@ export function getInventoryTypeLabel(type: HierarchyEntityType | undefined): st
   return type.charAt(0).toUpperCase() + type.slice(1);
 }
 
-/** Components accept a bulk quantity when receiving stock. */
-export function inventorySupportsQuantity(type: HierarchyEntityType): boolean {
-  return type === 'component';
+/** Inventory create accepts a bulk quantity for any entity type; edit does not. */
+export function inventorySupportsQuantity(_type: HierarchyEntityType): boolean {
+  return true;
 }
 
-export function resolveInventoryQuantity(type: HierarchyEntityType, quantity: number): number {
-  return inventorySupportsQuantity(type) ? quantity : quantity;
+export function resolveInventoryQuantity(_type: HierarchyEntityType, quantity: number): number {
+  return quantity;
 }
 
 export function inventoryUsesInstances(type: HierarchyEntityType): boolean {
