@@ -20,7 +20,7 @@ import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import * as Models from '@/lib/models';
 import { Badge } from '@/components/ui/badge';
-import { CustomerMiniDashboard } from '@/components/customers/customer-mini-dashboard';
+import { CustomerMiniDashboard } from '@/components/lazy/list-dashboards';
 import { ProjectManagerSelect } from '@/components/orders/project-manager-select';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Can } from '@/components/auth/can';

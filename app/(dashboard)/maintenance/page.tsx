@@ -21,7 +21,7 @@ import * as maintenanceApi from '@/lib/api';
 import * as MaintenanceTypes from '@/lib/models';
 import { maintenanceService } from '@/services/maintenance';
 import { MaintenanceMiniDashboard } from '@/components/maintenance/MaintenanceMiniDashboard';
-import { MaintenanceLookupDialog } from '@/components/maintenance/MaintenanceLookupDialog';
+import { MaintenanceLookupDialog } from '@/components/lazy/heavy-editors';
 import { MaintenanceCaseDialog } from '@/components/maintenance/MaintenanceCaseDialog';
 import { MaintenanceTable } from '@/components/maintenance/MaintenanceTable';
 import { fetchMaintenanceCasesPage } from '@/hooks/queries/fetchers';

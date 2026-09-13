@@ -1,4 +1,4 @@
-# Current Feature: Frontend OOM — DataStore (Phase 2)
+# Current Feature: Frontend OOM — Compile Graph (Phase 3)
 
 ## Status
 
@@ -6,23 +6,25 @@ Complete
 
 ## Goals
 
-- Stop dual-writing React Query cache and DataStore state on bootstrap refresh
-- Split DataStore into domain vs hierarchy contexts so hierarchy loads do not re-render domain-only consumers
-- Replace full 5-type eager hierarchy loads on list pages with adjacent-type slice loads
-- Remove inventory page eager `ensureHierarchyLoaded` (use API `total_used` / page data)
-- Preserve detail/dashboard/search full hierarchy behavior and list child-count UX
+- `next/dynamic` Settings panels so Users/Roles do not compile XYFlow Definitions editors
+- Dynamic Ant Charts on executive grid; avoid fat executive barrel on the page
+- Dynamic Recharts mini-dashboards on list pages
+- Dynamic XYFlow islands (hierarchy dashboard, system hierarchy, inventory dialog, maintenance lookup, location tree)
+- Split location/config tree libs so normalize/helpers do not pull dagre/xyflow
+- Delete dead duplicate modules (dashboard hierarchy-dashboard fork, dead toast, unused editors)
 
 ## Notes
 
-- Frontend-only; builds on Phase 1 (`aabc935`)
-- `useDataStore()` remains for full access; prefer `useDataStoreDomain()` / `useDataStoreHierarchy()` when possible
+- Frontend-only; builds on Phase 1–2 on `main`
+- Do not remove npm packages without approval
+- Preserve settings tab/`?section=` behavior and flow dialog UX
 
 ## History
 
 <!-- Completed features (append only) -->
 
-### Frontend OOM — Resolution History (Phase 1)
-Scoped resolution-history loads to project cases + entity IDs; LRU caches; concurrency caps; merged to main as `aabc935`.
+### Frontend OOM — DataStore (Phase 2)
+Split domain/hierarchy contexts; stop Query dual-write; list-page hierarchy slices; merged as `c0252ad`.
 
-### HM Installation Accept / Reject
-Rename Verify → Accept; add Reject with reason; status `INSTALLATION_REJECTED`; rejection history for Dev/HM/Admin; merged to main.
+### Frontend OOM — Resolution History (Phase 1)
+Scoped resolution-history loads; LRU caches; concurrency caps; merged as `aabc935`.

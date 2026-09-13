@@ -35,7 +35,7 @@ import { PageLoader } from '@/components/page-loader';
 import { ListContentSuspense } from '@/components/list-content-suspense';
 import { ListPageError } from '@/components/list-page-error';
 import { useListPageLoader } from '@/hooks/use-list-page-loader';
-import { ProjectsMiniDashboard } from '@/components/projects/projects-mini-dashboard';
+import { ProjectsMiniDashboard } from '@/components/lazy/list-dashboards';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { toDateInputValue } from '@/lib/hierarchy-install-fields';

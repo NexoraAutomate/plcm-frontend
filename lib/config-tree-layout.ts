@@ -1,10 +1,16 @@
 import dagre from '@dagrejs/dagre';
 import { Position, type Edge, type Node } from '@xyflow/react';
-import {
-  CHILD_TEMPLATE_LEVEL,
-  type TemplateDraftNode,
-  type TemplateNodeLevel,
-} from '@/lib/hierarchy-config';
+import { CHILD_TEMPLATE_LEVEL, type TemplateDraftNode } from '@/lib/hierarchy-config';
+import { isDraftNode } from '@/lib/config-tree-draft';
+
+export {
+  canLinkLevels,
+  descendantsOf,
+  hasSystemNode,
+  isDraftNode,
+  isEntityAssigned,
+  siblingsOf,
+} from '@/lib/config-tree-draft';
 
 export const DEFAULT_NODE_WIDTH = 176;
 export const DEFAULT_NODE_HEIGHT = 74;
@@ -52,58 +58,6 @@ export type ConfigTreeNodeData = {
 export type ConfigTreeEdgeData = {
   toBeDeleted?: boolean;
 };
-
-export function isDraftNode(node: TemplateDraftNode): boolean {
-  return !node.name.trim() || node.name.trim().toLowerCase().startsWith('new ');
-}
-
-/** True when the node has a real Entity List assignment (not a placeholder). */
-export function isEntityAssigned(node: TemplateDraftNode): boolean {
-  return !isDraftNode(node);
-}
-
-export function hasSystemNode(nodes: TemplateDraftNode[]): boolean {
-  return nodes.some((n) => n.level === 'system');
-}
-
-export function descendantsOf(
-  nodes: TemplateDraftNode[],
-  clientKey: string
-): Set<string> {
-  const removeKeys = new Set<string>([clientKey]);
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const node of nodes) {
-      if (
-        node.parent_client_key &&
-        removeKeys.has(node.parent_client_key) &&
-        !removeKeys.has(node.client_key)
-      ) {
-        removeKeys.add(node.client_key);
-        changed = true;
-      }
-    }
-  }
-  return removeKeys;
-}
-
-export function siblingsOf(
-  nodes: TemplateDraftNode[],
-  parentKey: string | null
-): TemplateDraftNode[] {
-  return nodes
-    .filter((n) => (n.parent_client_key ?? null) === parentKey)
-    .slice()
-    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-}
-
-export function canLinkLevels(
-  parentLevel: TemplateNodeLevel,
-  childLevel: TemplateNodeLevel
-): boolean {
-  return CHILD_TEMPLATE_LEVEL[parentLevel] === childLevel;
-}
 
 /** Dagre layout positions for draft hierarchy (https://reactflow.dev/examples/layout/dagre). */
 export function layoutWithDagre(

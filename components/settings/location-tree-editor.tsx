@@ -38,7 +38,6 @@ import {
   addChildLocation,
   addRootRoom,
   addSiblingLocation,
-  buildLocationFlowGraph,
   deleteLocationNode,
   findSiblingNameConflict,
   normalizeLocationTree,
@@ -47,6 +46,7 @@ import {
   type LocationLevel,
   type LocationTreeNodeData,
 } from '@/lib/inventory-location-tree';
+import { buildLocationFlowGraph } from '@/lib/inventory-location-flow';
 
 type Props = {
   value: InventoryLocationTree;

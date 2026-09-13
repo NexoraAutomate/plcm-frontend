@@ -1,23 +1,41 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { ProgramHealthCard } from './ProgramHealthCard';
 import { LogoCard } from './LogoCard';
 import { KPICard } from './KPICard';
-import { AreaChartCard } from './AreaChartCard';
 import { GaugeCard } from './GaugeCard';
 import { StatusMetricCard } from './StatusMetricCard';
 import { FiltersPanel } from './FiltersPanel';
-import { DonutChartCard } from './DonutChartCard';
 import { ScatterChartCard } from './ScatterChartCard';
-import { HorizontalBarCard } from './HorizontalBarCard';
 import { RadarChartCard } from './RadarChartCard';
 import { TreemapCard } from './TreemapCard';
 import { ConfigSplitCard } from './ConfigSplitCard';
 import { AlertPanel } from './AlertPanel';
-import { LineChartCard, DualLineChartCard } from './LineChartCard';
 import { TopDelayedProjectsCard } from './TopDelayedProjectsCard';
 import type { CommandCenterViewModel, ExecFilterOption, ExecFiltersState } from './types';
 import { EXEC_MAINT_COLORS, EXEC_FAULT_COLORS, EXEC } from './theme';
+
+const AreaChartCard = dynamic(
+  () => import('./AreaChartCard').then((m) => ({ default: m.AreaChartCard })),
+  { ssr: false }
+);
+const DonutChartCard = dynamic(
+  () => import('./DonutChartCard').then((m) => ({ default: m.DonutChartCard })),
+  { ssr: false }
+);
+const HorizontalBarCard = dynamic(
+  () => import('./HorizontalBarCard').then((m) => ({ default: m.HorizontalBarCard })),
+  { ssr: false }
+);
+const LineChartCard = dynamic(
+  () => import('./LineChartCard').then((m) => ({ default: m.LineChartCard })),
+  { ssr: false }
+);
+const DualLineChartCard = dynamic(
+  () => import('./LineChartCard').then((m) => ({ default: m.DualLineChartCard })),
+  { ssr: false }
+);
 
 interface ExecutiveCommandGridProps {
   model: CommandCenterViewModel;

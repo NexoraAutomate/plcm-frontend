@@ -12,8 +12,8 @@ import {
 import { LIST_BOOTSTRAP_SIZE } from '@/lib/data-loading';
 import { useExecutiveDashboard } from '@/hooks/use-executive-dashboard';
 import { buildCommandCenterViewModel } from '@/lib/executive-command-center';
-import { ExecutiveCommandGrid } from '@/components/dashboard/executive';
-import type { ExecFiltersState } from '@/components/dashboard/executive';
+import { ExecutiveCommandGrid } from '@/components/dashboard/executive/ExecutiveCommandGrid';
+import type { ExecFiltersState } from '@/components/dashboard/executive/types';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 

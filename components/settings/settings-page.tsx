@@ -6,14 +6,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AccessRestricted } from '@/components/auth/access-restricted';
 import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/utils';
-import { UsersPanel } from '@/components/settings/users-panel';
-import { RolesPanel } from '@/components/settings/roles-panel';
-import { RoleAccessPanel } from '@/components/settings/role-access-panel';
-import { StatusesPanel } from '@/components/settings/statuses-panel';
-import { AlertsPanel } from '@/components/settings/alerts-panel';
-import { SecurityPanel } from '@/components/settings/security-panel';
-import { DefinitionsPanel } from '@/components/settings/definitions-panel';
-import { BackupPanel } from '@/components/settings/backup-panel';
+import {
+  UsersPanel,
+  RolesPanel,
+  RoleAccessPanel,
+  StatusesPanel,
+  AlertsPanel,
+  SecurityPanel,
+  DefinitionsPanel,
+  BackupPanel,
+} from '@/components/lazy/settings-panels';
 import {
   SETTINGS_ACCESS_PERMISSIONS,
   SETTINGS_TABS,

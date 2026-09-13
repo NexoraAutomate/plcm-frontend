@@ -68,7 +68,7 @@ import { duplicateInventoryEntity } from '@/lib/inventory-duplicate';
 import { InventorySerialSelectDialog } from '@/components/inventory-serial-select-dialog';
 import { InventoryAddMoreDialog } from '@/components/inventory-add-more-dialog';
 import { InventoryDeleteDialog } from '@/components/inventory-delete-dialog';
-import { InventoryHierarchyDialog } from '@/components/inventory-hierarchy-dialog';
+import { InventoryHierarchyDialog } from '@/components/lazy/heavy-editors';
 import { InventoryIssueDialog } from '@/components/inventory-issue-dialog';
 import { InventoryReservationHoldDialog } from '@/components/inventory-reservation-hold-dialog';
 import { IssuanceRemarksDialog } from '@/components/inventory/issuance-remarks-dialog';

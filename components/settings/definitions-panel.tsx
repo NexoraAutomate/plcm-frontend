@@ -23,8 +23,7 @@ import { useAuth } from '@/lib/auth-context';
 import { TEMPLATE_PLACEHOLDER_HELP } from '@/lib/app-definitions';
 import type { HierarchyEntityLevel } from '@/lib/app-definitions';
 import { useDefinitionsSettings } from '@/components/settings/hooks/use-definitions-settings';
-import { HierarchyConfigPanel } from '@/components/settings/hierarchy-config-panel';
-import { HierarchyPanel } from '@/components/settings/hierarchy-panel';
+import { HierarchyConfigPanel, HierarchyPanel } from '@/components/lazy/heavy-editors';
 import {
   isDefinitionsSectionId,
   type DefinitionsSectionId,

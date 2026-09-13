@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { PageLoader } from '@/components/page-loader';
 import { AccessRestricted } from '@/components/auth/access-restricted';
-import { LocationTreeEditor } from '@/components/settings/location-tree-editor';
+import { LocationTreeEditor } from '@/components/lazy/heavy-editors';
 import { usePageDataRefresh } from '@/components/page-data-refresh';
 import { useAuth } from '@/lib/auth-context';
 import { useAppDefinitions } from '@/lib/app-definitions-context';

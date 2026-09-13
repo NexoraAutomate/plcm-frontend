@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PageLoader } from '@/components/page-loader';
 import { HierarchyDashboardControls } from '@/components/hierarchy-dashboard/hierarchy-dashboard-controls';
-import { ProjectHierarchyFlow } from '@/components/hierarchy-dashboard/project-hierarchy-flow';
+import { ProjectHierarchyFlow } from '@/components/lazy/heavy-editors';
 import { fetchAllProjects } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
 import { LIST_BOOTSTRAP_SIZE } from '@/lib/data-loading';

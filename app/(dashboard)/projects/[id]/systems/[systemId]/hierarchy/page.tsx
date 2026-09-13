@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useDataStore } from '@/lib/data-store';
 import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
 import { PageLoader } from '@/components/page-loader';
-import { SystemHierarchyFlow } from '@/components/system-hierarchy-flow';
+import { SystemHierarchyFlow } from '@/components/lazy/heavy-editors';
 import {
   isHierarchyEntityType,
   type HierarchyEntityType,

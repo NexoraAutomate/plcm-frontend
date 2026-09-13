@@ -30,7 +30,7 @@ import { PageLoader } from '@/components/page-loader';
 import { ListContentSuspense } from '@/components/list-content-suspense';
 import { ListPageError } from '@/components/list-page-error';
 import { useListPageLoader } from '@/hooks/use-list-page-loader';
-import { OrdersMiniDashboard } from '@/components/orders/orders-mini-dashboard';
+import { OrdersMiniDashboard } from '@/components/lazy/list-dashboards';
 import { ProjectManagerSelect } from '@/components/orders/project-manager-select';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';

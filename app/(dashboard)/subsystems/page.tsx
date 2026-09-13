@@ -35,7 +35,7 @@ import { PageLoader } from '@/components/page-loader';
 import { ListContentSuspense } from '@/components/list-content-suspense';
 import { ListPageError } from '@/components/list-page-error';
 import { useListPageLoader } from '@/hooks/use-list-page-loader';
-import { HierarchyListDashboard } from '@/components/hierarchy/hierarchy-list-dashboard';
+import { HierarchyListDashboard } from '@/components/lazy/list-dashboards';
 import { ParentEntityLink } from '@/components/entity-link';
 import { buildHierarchyPageUrl } from '@/lib/hierarchy-page-filters';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';

@@ -39,10 +39,25 @@ import {
 } from '@/components/ui/dialog';
 import { SettingsSection } from '@/components/settings/settings-section';
 import { SettingsCard } from '@/components/settings/settings-card';
+import dynamic from 'next/dynamic';
 import { HierarchyTemplateEditor } from '@/components/settings/hierarchy-template-editor';
-import { HierarchyConfigTreeEditor } from '@/components/settings/hierarchy-config-tree-editor';
 import { EntityListPagination } from '@/components/entity-list-pagination';
-import { Can } from '@/components/auth';
+import { PageLoader } from '@/components/page-loader';
+
+const HierarchyConfigTreeEditor = dynamic(
+  () =>
+    import('@/components/settings/hierarchy-config-tree-editor').then((m) => ({
+      default: m.HierarchyConfigTreeEditor,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex min-h-[20rem] items-center justify-center">
+        <PageLoader />
+      </div>
+    ),
+  }
+);import { Can } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
 import { useAuth } from '@/lib/auth-context';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
@@ -62,7 +77,7 @@ import {
   type TemplateDraftNode,
   type TemplateNodeLevel,
 } from '@/lib/hierarchy-config';
-import { isEntityAssigned } from '@/lib/config-tree-layout';
+import { isEntityAssigned } from '@/lib/config-tree-draft';
 import { validateHierarchyConfigForm } from '@/lib/form-validation';
 
 export type HierarchyConfigPanelProps = {

@@ -30,7 +30,7 @@ import { Customer } from '@/lib/models';
 import * as Models from '@/lib/models';
 import { getOrderCountByCustomerId, getProjectCountByCustomerId, getCount } from '@/lib/entity-counts';
 import { EntityCountCell } from '@/components/entity-count-cell';
-import { CustomersListDashboard } from '@/components/customers/customers-list-dashboard';
+import { CustomersListDashboard } from '@/components/lazy/list-dashboards';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { ConfirmDialog } from '@/components/confirm-dialog';

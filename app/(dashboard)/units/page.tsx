@@ -25,7 +25,7 @@ import { EntityNameWithFault } from '@/components/entity-fault-ping';
 import { useEntityFaultMap } from '@/hooks/use-entity-fault-map';
 import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
 import { useStatusesByTypeQuery } from '@/hooks/queries';
-import { HierarchyListDashboard } from '@/components/hierarchy/hierarchy-list-dashboard';
+import { HierarchyListDashboard } from '@/components/lazy/list-dashboards';
 import { fetchUnitsPage } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
 import { usePaginatedList } from '@/hooks/use-paginated-list';
