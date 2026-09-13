@@ -1,4 +1,4 @@
-# Current Feature
+# Current Feature: HM Installation Accept / Reject
 
 ## Status
 
@@ -6,17 +6,17 @@ In Progress
 
 ## Goals
 
-- Add **Mark Project as Completed** under Workflow → Administrative Actions for non-existing projects
-- Restrict button visibility to Administrator and Project Director only
-- Flag project status as `COMPLETED` via dedicated API
-- Show **Replace** on hierarchy entities only after completion (existing projects keep Replace as in-service)
+- Rename HM **Verify** action to **Accept** on Verify Installations and related UI
+- Add HM **Reject** beside Accept; open **Reject Installation** dialog with required reason
+- On reject: set item status to **Installation Rejected**, clear complete/test so developer can Pass/Fail again
+- Developer sees **Rejection Reasons** (history of reasons) and can Pass → Report complete again
+- Persist rejection history via issuance events + workflow audit
 
 ## Notes
 
-- Endpoint: `POST /projects/{id}/complete/` with `project.complete` (Admin + PD)
-- Enabled when status is `READY_FOR_INVENTORY`
-- Hidden entirely for `is_existing_project`
-- Replace gate: `projectAllowsReplace` → existing OR `COMPLETED`
+- Endpoint: `POST /item-verifications/{issuance_id}/reject/` with required `notes`
+- New status: `INSTALLATION_REJECTED`
+- Accept keeps existing verify endpoint (label-only rename in UI)
 
 ## History
 

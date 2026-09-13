@@ -259,8 +259,9 @@ export default function CustomerDetailPage(){
                     onShowStatsChange={setShowStats}
                   />
                   <Link href="/customers" className='flex'>
-                      <Button variant="ghost" size="icon" className="w-auto px-3 bg-mist-100">
-                         <CircleArrowLeft className="flex " />Back
+                      <Button variant="ghost" className="gap-2 bg-muted/40">
+                         <CircleArrowLeft className="h-4 w-4" />
+                         Back
                       </Button>
                   </Link>
                 </div>

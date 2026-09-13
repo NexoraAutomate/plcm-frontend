@@ -118,6 +118,42 @@ function defaultSerial(row: ReservationPlanItem): string {
   return serials[0] ?? '';
 }
 
+/** Assign unique default serials across available rows that share the same stock. */
+function assignDistinctDefaultSerials(
+  items: ReservationPlanItem[]
+): Record<string, string> {
+  const next: Record<string, string> = {};
+  const usedByPool = new Map<string, Set<string>>();
+
+  for (const row of items) {
+    if (row.status !== 'available') continue;
+    const key = rowKey(row);
+    const serials = row.serial_numbers?.filter(Boolean) ?? [];
+    const poolKey =
+      row.inventory_id != null
+        ? `id:${row.inventory_id}`
+        : `name:${row.inventory_name ?? ''}:${row.part_number ?? ''}`;
+    let used = usedByPool.get(poolKey);
+    if (!used) {
+      used = new Set();
+      usedByPool.set(poolKey, used);
+    }
+    let pick = '';
+    if (
+      row.suggested_serial &&
+      serials.includes(row.suggested_serial) &&
+      !used.has(row.suggested_serial)
+    ) {
+      pick = row.suggested_serial;
+    } else {
+      pick = serials.find((sn) => !used.has(sn)) ?? '';
+    }
+    if (pick) used.add(pick);
+    next[key] = pick;
+  }
+  return next;
+}
+
 export default function ReserveInventoryPage() {
   const params = useParams();
   const router = useRouter();
@@ -155,15 +191,11 @@ export default function ReserveInventoryPage() {
       setPlan(planRes.data);
       setExtraUsers(usersRes.data ?? []);
 
-      const nextSerials: Record<string, string> = {};
+      const nextSerials = assignDistinctDefaultSerials(planRes.data.items ?? []);
       const nextDevelopers: Record<string, string> = {};
       for (const row of planRes.data.items ?? []) {
-        const key = rowKey(row);
-        if (row.status === 'available') {
-          nextSerials[key] = defaultSerial(row);
-        }
         if (row.can_assign_developer && row.assigned_developer_id) {
-          nextDevelopers[key] = String(row.assigned_developer_id);
+          nextDevelopers[rowKey(row)] = String(row.assigned_developer_id);
         }
       }
       setSerialByKey(nextSerials);
@@ -187,8 +219,9 @@ export default function ReserveInventoryPage() {
 
   function selectedSerial(row: ReservationPlanItem): string | undefined {
     const key = rowKey(row);
-    const chosen = serialByKey[key];
-    if (chosen) return chosen;
+    if (Object.prototype.hasOwnProperty.call(serialByKey, key)) {
+      return serialByKey[key] || undefined;
+    }
     return defaultSerial(row) || undefined;
   }
 
@@ -445,7 +478,10 @@ export default function ReserveInventoryPage() {
               const isBusy = busyKey === key || reservingAll;
               const serials = (row.serial_numbers ?? []).filter(Boolean);
               const showSerialSelect = row.status === 'available' && serials.length > 1;
-              const currentSerial = serialByKey[key] || defaultSerial(row);
+              const currentSerial =
+                serialByKey[key] !== undefined
+                  ? serialByKey[key]
+                  : defaultSerial(row);
               const currentDeveloper = developerByKey[key] || NONE_DEVELOPER;
 
               return (
@@ -528,7 +564,7 @@ export default function ReserveInventoryPage() {
                         <>
                           {showSerialSelect ? (
                             <Select
-                              value={currentSerial || serials[0]}
+                              value={currentSerial || undefined}
                               onValueChange={(value) =>
                                 setSerialByKey((prev) => ({ ...prev, [key]: value }))
                               }

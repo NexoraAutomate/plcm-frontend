@@ -22,6 +22,8 @@ import { WorkflowCan } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
 import { AssignDeveloperDialog } from '@/components/hierarchy/assign-developer-dialog';
 import { ReworkWizardDialog, type ReworkWizardTarget } from '@/components/inventory/rework-wizard-dialog';
+import { RejectInstallationDialog } from '@/components/inventory/reject-installation-dialog';
+import { RejectionReasonsDialog } from '@/components/inventory/rejection-reasons-dialog';
 import { WorkflowAuditHistorySheet } from '@/components/workflow-audit-history-sheet';
 import { isProjectReadOnly } from '@/lib/workflow-status';
 import { useProjectInventoryFlags } from '@/hooks/use-project-inventory-flags';
@@ -36,6 +38,7 @@ import type {
   Component,
   HierarchyAssignmentStatus,
   Inventory,
+  ItemInstallRejection,
   Module,
   Project,
   Status,
@@ -150,6 +153,11 @@ export function HierarchyEntityDetailPanel({
     null
   );
   const [reworkTarget, setReworkTarget] = useState<ReworkWizardTarget | null>(null);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectionView, setRejectionView] = useState<{
+    label: string;
+    history: ItemInstallRejection[];
+  } | null>(null);
   const inventoryFlags = useProjectInventoryFlags(project?.id);
 
   const entity = selection
@@ -301,15 +309,47 @@ export function HierarchyEntityDetailPanel({
     }
   }
 
-  async function handleVerifyInstallation() {
+  async function handleAcceptInstallation() {
     const issuanceId = assignmentProgress?.issuance_id;
     if (!issuanceId) return;
 
     await runInstallAction(
       () => api.inventory.verifyItemInstallation(issuanceId),
-      'Installation verified',
-      'Could not verify installation'
+      'Installation accepted',
+      'Could not accept installation'
     );
+  }
+
+  async function handleRejectInstallation(reason: string) {
+    const issuanceId = assignmentProgress?.issuance_id;
+    if (!issuanceId) return;
+    setInstallBusy(true);
+    try {
+      await api.inventory.rejectItemInstallation(issuanceId, reason);
+      toast.success('Installation rejected — returned to developer');
+      setRejectOpen(false);
+      if (project?.id) {
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.projectProgress(project.id),
+        });
+      }
+      await queryClient.invalidateQueries({ queryKey: ['projects'] });
+      if (selection) {
+        const res = await api.hierarchyWorkflow.assignmentStatus(selection.type, [
+          selection.entityId,
+        ]);
+        const row = res.data?.[0] ?? null;
+        setAssignmentProgress(row);
+        setAssignmentIssued(Boolean(row?.issued));
+      }
+    } catch (error: unknown) {
+      const detail =
+        (error as { response?: { data?: { detail?: string } } })?.response?.data
+          ?.detail || 'Could not reject installation';
+      toast.error(typeof detail === 'string' ? detail : 'Could not reject installation');
+    } finally {
+      setInstallBusy(false);
+    }
   }
 
   const typeLabel = selection ? entityLabel(selection.type) : '';
@@ -577,6 +617,22 @@ export function HierarchyEntityDetailPanel({
                       Report complete
                     </Button>
                   ) : null}
+                  {(assignmentProgress?.rejection_count ?? 0) > 0 ||
+                  (assignmentProgress?.rejection_history?.length ?? 0) > 0 ? (
+                    <Button
+                      className="w-full"
+                      variant="outline"
+                      disabled={installBusy}
+                      onClick={() =>
+                        setRejectionView({
+                          label: 'name' in entity ? String(entity.name) : selection.type,
+                          history: assignmentProgress?.rejection_history ?? [],
+                        })
+                      }
+                    >
+                      Rejection Reasons
+                    </Button>
+                  ) : null}
                   {assignmentProgress?.can_remove || assignmentProgress?.can_return ? (
                     <Button
                       className="w-full"
@@ -611,15 +667,48 @@ export function HierarchyEntityDetailPanel({
               ) : null}
             </WorkflowCan>
             <WorkflowCan role={['HM', 'ADMIN']} permission={P.item_verify}>
-              {canVerifyItem ? (
-                <Button
-                  className="w-full"
-                  disabled={installBusy}
-                  onClick={() => void handleVerifyInstallation()}
-                >
-                  {installBusy ? 'Verifying…' : 'Verify Item Installation'}
-                </Button>
-              ) : null}
+              <div className="space-y-2">
+                {canVerifyItem ? (
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1"
+                      disabled={installBusy}
+                      onClick={() => void handleAcceptInstallation()}
+                    >
+                      {installBusy ? 'Accepting…' : 'Accept'}
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      variant="destructive"
+                      disabled={installBusy}
+                      onClick={() => setRejectOpen(true)}
+                    >
+                      Reject
+                    </Button>
+                  </div>
+                ) : null}
+                {(assignmentProgress?.rejection_count ?? 0) > 0 ||
+                (assignmentProgress?.rejection_history?.length ?? 0) > 0 ? (
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    disabled={installBusy}
+                    onClick={() =>
+                      setRejectionView({
+                        label:
+                          entity && 'name' in entity
+                            ? String(entity.name)
+                            : selection
+                              ? selection.type
+                              : 'Item',
+                        history: assignmentProgress?.rejection_history ?? [],
+                      })
+                    }
+                  >
+                    Rejection Reasons
+                  </Button>
+                ) : null}
+              </div>
             </WorkflowCan>
               </>
             )}
@@ -667,6 +756,27 @@ export function HierarchyEntityDetailPanel({
             setAssignmentIssued(Boolean(row?.issued));
           });
       }}
+    />
+    <RejectInstallationDialog
+      open={rejectOpen}
+      onOpenChange={setRejectOpen}
+      itemLabel={
+        entity && 'name' in entity
+          ? String(entity.name)
+          : selection
+            ? `${selection.type} #${selection.entityId}`
+            : undefined
+      }
+      busy={installBusy}
+      onConfirm={handleRejectInstallation}
+    />
+    <RejectionReasonsDialog
+      open={rejectionView != null}
+      onOpenChange={(open) => {
+        if (!open) setRejectionView(null);
+      }}
+      itemLabel={rejectionView?.label}
+      history={rejectionView?.history}
     />
     </>
   );

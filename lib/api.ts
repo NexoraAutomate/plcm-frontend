@@ -691,6 +691,10 @@ export const inventory = {
     api.post<Models.ItemInstallState>(`/item-verifications/${issuanceId}/verify/`, {
       notes: notes ?? null,
     }),
+  rejectItemInstallation: (issuanceId: number, notes: string) =>
+    api.post<Models.ItemInstallState>(`/item-verifications/${issuanceId}/reject/`, {
+      notes,
+    }),
   listReworkCases: (params?: { stage?: string; status?: string }) =>
     api.get<Models.ItemReworkCase[]>('/item-rework/', { params }),
   getReworkCase: (reworkId: number) =>

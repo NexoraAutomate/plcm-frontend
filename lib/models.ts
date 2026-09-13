@@ -1257,6 +1257,13 @@ export interface HierarchyAssignDeveloperResult {
   issued?: boolean | null
 }
 
+export interface ItemInstallRejection {
+  id: number
+  reason?: string | null
+  rejected_at?: string | null
+  rejected_by_name?: string | null
+}
+
 export interface HierarchyAssignmentStatus {
   entity_type: string
   id: number
@@ -1273,6 +1280,11 @@ export interface HierarchyAssignmentStatus {
   can_install?: boolean
   can_test?: boolean
   can_report_complete?: boolean
+  installation_rejected?: boolean
+  rejection_count?: number
+  latest_rejection_reason?: string | null
+  latest_rejection_at?: string | null
+  rejection_history?: ItemInstallRejection[]
   rework_id?: number | null
   rework_status?: string | null
   rework_stage?: string | null
@@ -1310,6 +1322,11 @@ export interface DeveloperAssignedWork {
   can_install?: boolean
   can_test?: boolean
   can_report_complete?: boolean
+  installation_rejected?: boolean
+  rejection_count?: number
+  latest_rejection_reason?: string | null
+  latest_rejection_at?: string | null
+  rejection_history?: ItemInstallRejection[]
   rework_id?: number | null
   rework_status?: string | null
   rework_stage?: string | null
@@ -1342,6 +1359,11 @@ export interface ItemInstallState {
   can_install: boolean
   can_test: boolean
   can_report_complete: boolean
+  installation_rejected?: boolean
+  rejection_count?: number
+  latest_rejection_reason?: string | null
+  latest_rejection_at?: string | null
+  rejection_history?: ItemInstallRejection[]
   rework_id?: number | null
   rework_status?: string | null
   rework_stage?: string | null

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
-import type { DeveloperAssignedWork } from '@/lib/models';
+import type { DeveloperAssignedWork, ItemInstallRejection } from '@/lib/models';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -20,6 +20,7 @@ import { StatusBadge } from '@/components/status-badge';
 import { WorkflowCan } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
 import { ReworkWizardDialog, type ReworkWizardTarget } from '@/components/inventory/rework-wizard-dialog';
+import { RejectionReasonsDialog } from '@/components/inventory/rejection-reasons-dialog';
 import { usePageDataRefresh } from '@/components/page-data-refresh';
 
 function rowKey(row: DeveloperAssignedWork) {
@@ -30,7 +31,10 @@ function requestLabel(row: DeveloperAssignedWork) {
   if (row.verified) return 'Verified';
   if (row.rework_stage) return `Rework — ${row.rework_stage}`;
   if (row.defect_pending) return 'Fail — rework';
-  if (row.complete_reported) return 'Waiting for HM verify';
+  if (row.installation_rejected || row.item_status === 'INSTALLATION_REJECTED') {
+    return 'Installation rejected';
+  }
+  if (row.complete_reported) return 'Waiting for HM accept';
   if (row.issued) return 'Issued';
   if (row.request_status === 'pending') return 'Requested';
   if (row.reserved) return 'Reserved';
@@ -49,6 +53,10 @@ export function MyAssignmentsPanel() {
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [submitting, setSubmitting] = useState(false);
   const [reworkTarget, setReworkTarget] = useState<ReworkWizardTarget | null>(null);
+  const [rejectionView, setRejectionView] = useState<{
+    label: string;
+    history: ItemInstallRejection[];
+  } | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -164,7 +172,7 @@ export function MyAssignmentsPanel() {
     setSubmitting(true);
     try {
       await api.inventory.reportItemComplete(row.entity_type, row.entity_id);
-      toast.success('Installation complete reported — waiting for HM verify');
+      toast.success('Installation complete reported — waiting for HM accept');
       await refresh();
     } catch (error: unknown) {
       toast.error(apiError(error, 'Could not report complete'));
@@ -358,6 +366,22 @@ export function MyAssignmentsPanel() {
                                 Report complete
                               </Button>
                             ) : null}
+                            {(row.rejection_count ?? 0) > 0 ||
+                            (row.rejection_history?.length ?? 0) > 0 ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={submitting}
+                                onClick={() =>
+                                  setRejectionView({
+                                    label: row.name || `${row.entity_type} #${row.entity_id}`,
+                                    history: row.rejection_history ?? [],
+                                  })
+                                }
+                              >
+                                Rejection Reasons
+                              </Button>
+                            ) : null}
                             {row.can_remove || row.can_return ? (
                               <Button
                                 size="sm"
@@ -391,7 +415,8 @@ export function MyAssignmentsPanel() {
                             !row.can_report_complete &&
                             !row.can_remove &&
                             !row.can_return &&
-                            !row.defect_pending ? (
+                            !row.defect_pending &&
+                            !(row.rejection_count ?? 0) ? (
                               <span className="text-xs text-muted-foreground">
                                 {requestLabel(row)}
                               </span>
@@ -418,6 +443,14 @@ export function MyAssignmentsPanel() {
         setReworkTarget(null);
         void refresh();
       }}
+    />
+    <RejectionReasonsDialog
+      open={rejectionView != null}
+      onOpenChange={(open) => {
+        if (!open) setRejectionView(null);
+      }}
+      itemLabel={rejectionView?.label}
+      history={rejectionView?.history}
     />
     </>
   );

@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AttachmentUploadDialog } from '@/components/attachment-upload-dialog';
 import { useDataStore } from '@/lib/data-store';
 import { attachmentDisplayTitle, attachmentTypeLabel } from '@/lib/attachment-types';
-import type { EntityAttachment, EntityReplacementChainItem, HierarchyInstallFields } from '@/lib/models';
+import type { EntityAttachment, EntityReplacementChainItem, HierarchyInstallFields, ItemInstallRejection } from '@/lib/models';
 import * as api from '@/lib/api';
 import { formatUserRef } from '@/lib/user-display';
 import { toast } from 'sonner';
@@ -37,6 +37,8 @@ import { cn } from '@/lib/utils';
 import { isProjectReadOnly } from '@/lib/workflow-status';
 import { useProjectInventoryFlags } from '@/hooks/use-project-inventory-flags';
 import { inventoryFlagKey } from '@/lib/system-hierarchy-graph';
+import { RejectInstallationDialog } from '@/components/inventory/reject-installation-dialog';
+import { RejectionReasonsDialog } from '@/components/inventory/rejection-reasons-dialog';
 import {
   entityLifecycleCardClass,
   resolveEntityLifecycleTone,
@@ -144,6 +146,11 @@ export function EntityInstallMetadataCard({
   const [uploadOpen, setUploadOpen] = useState(false);
   const [editingAttachment, setEditingAttachment] = useState<EntityAttachment | null>(null);
   const [verifying, setVerifying] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectionView, setRejectionView] = useState<{
+    label: string;
+    history: ItemInstallRejection[];
+  } | null>(null);
   const [pictureUploading, setPictureUploading] = useState(false);
   const pictureInputRef = useRef<HTMLInputElement>(null);
   const [replacementChain, setReplacementChain] = useState<EntityReplacementChainItem[]>([]);
@@ -273,6 +280,9 @@ export function EntityInstallMetadataCard({
       assignment.test_result?.toLowerCase() === 'pass' &&
       !assignment.verified
   );
+  const hasRejectionHistory =
+    (assignment?.rejection_count ?? 0) > 0 ||
+    (assignment?.rejection_history?.length ?? 0) > 0;
   const showOwnInstallChrome =
     tone === 'neutral' &&
     !inventoryManager &&
@@ -465,14 +475,14 @@ export function EntityInstallMetadataCard({
     }
   };
 
-  const handleVerifyInstallation = async () => {
+  const handleAcceptInstallation = async () => {
     const issuanceId = assignment?.issuance_id;
     if (!issuanceId) return;
 
     setVerifying(true);
     try {
       await api.inventory.verifyItemInstallation(issuanceId);
-      toast.success('Installation verified');
+      toast.success('Installation accepted');
       if (projectId) {
         await queryClient.invalidateQueries({
           queryKey: queryKeys.projectProgress(projectId),
@@ -483,8 +493,34 @@ export function EntityInstallMetadataCard({
     } catch (error: unknown) {
       const detail =
         (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-        'Could not verify installation';
-      toast.error(typeof detail === 'string' ? detail : 'Could not verify installation');
+        'Could not accept installation';
+      toast.error(typeof detail === 'string' ? detail : 'Could not accept installation');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleRejectInstallation = async (reason: string) => {
+    const issuanceId = assignment?.issuance_id;
+    if (!issuanceId) return;
+
+    setVerifying(true);
+    try {
+      await api.inventory.rejectItemInstallation(issuanceId, reason);
+      toast.success('Installation rejected — returned to developer');
+      setRejectOpen(false);
+      if (projectId) {
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.projectProgress(projectId),
+        });
+      }
+      const res = await api.hierarchyWorkflow.assignmentStatus(ownerType, [entity.id]);
+      setAssignment(res.data?.[0] ?? null);
+    } catch (error: unknown) {
+      const detail =
+        (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        'Could not reject installation';
+      toast.error(typeof detail === 'string' ? detail : 'Could not reject installation');
     } finally {
       setVerifying(false);
     }
@@ -592,17 +628,48 @@ export function EntityInstallMetadataCard({
                   </Link>
                 </Button>
               ) : null}
-              {canVerifyItem ? (
+              {canVerifyItem || hasRejectionHistory ? (
                 <WorkflowCan role={['HM', 'ADMIN']} permission={P.item_verify}>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={cancelled || verifying}
-                    onClick={() => void handleVerifyInstallation()}
-                  >
-                    {verifying ? 'Verifying…' : 'Verify Item Installation'}
-                  </Button>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {canVerifyItem ? (
+                      <>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={cancelled || verifying}
+                          onClick={() => void handleAcceptInstallation()}
+                        >
+                          {verifying ? 'Accepting…' : 'Accept'}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          disabled={cancelled || verifying}
+                          onClick={() => setRejectOpen(true)}
+                        >
+                          Reject
+                        </Button>
+                      </>
+                    ) : null}
+                    {hasRejectionHistory ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={cancelled || verifying}
+                        onClick={() =>
+                          setRejectionView({
+                            label: entity.name,
+                            history: assignment?.rejection_history ?? [],
+                          })
+                        }
+                      >
+                        Rejection Reasons
+                      </Button>
+                    ) : null}
+                  </div>
                 </WorkflowCan>
               ) : null}
               {allowReplace && projectId && canMutateInstall ? (
@@ -1019,6 +1086,21 @@ export function EntityInstallMetadataCard({
           }}
         />
       ) : null}
+      <RejectInstallationDialog
+        open={rejectOpen}
+        onOpenChange={setRejectOpen}
+        itemLabel={entity.name}
+        busy={verifying}
+        onConfirm={handleRejectInstallation}
+      />
+      <RejectionReasonsDialog
+        open={rejectionView != null}
+        onOpenChange={(open) => {
+          if (!open) setRejectionView(null);
+        }}
+        itemLabel={rejectionView?.label}
+        history={rejectionView?.history}
+      />
     </>
   );
 }

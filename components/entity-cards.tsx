@@ -25,8 +25,10 @@ import { cn } from '@/lib/utils';
 import { WorkflowCan } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
 import { AssignDeveloperDialog } from '@/components/hierarchy/assign-developer-dialog';
+import { RejectInstallationDialog } from '@/components/inventory/reject-installation-dialog';
+import { RejectionReasonsDialog } from '@/components/inventory/rejection-reasons-dialog';
 import * as api from '@/lib/api';
-import type { HierarchyAssignmentStatus } from '@/lib/models';
+import type { HierarchyAssignmentStatus, ItemInstallRejection } from '@/lib/models';
 import { useProjectInventoryFlags } from '@/hooks/use-project-inventory-flags';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/hooks/queries/query-keys';
@@ -132,6 +134,15 @@ export function EntityCards({
     {}
   );
   const [verifyingId, setVerifyingId] = useState<number | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<{
+    entityId: number;
+    issuanceId: number;
+    name: string;
+  } | null>(null);
+  const [rejectionView, setRejectionView] = useState<{
+    label: string;
+    history: ItemInstallRejection[];
+  } | null>(null);
 
   const entityStatusKey = entities
     .map((entity) => `${entity.id}:${entity.assigned_developer_id ?? ''}`)
@@ -165,13 +176,13 @@ export function EntityCards({
     };
   }, [childEntityType, entityStatusKey]);
 
-  async function handleVerifyInstallation(entityId: number, issuanceId: number) {
+  async function handleAcceptInstallation(entityId: number, issuanceId: number) {
     if (!childEntityType) return;
 
     setVerifyingId(entityId);
     try {
       await api.inventory.verifyItemInstallation(issuanceId);
-      toast.success('Installation verified');
+      toast.success('Installation accepted');
       if (projectId) {
         await queryClient.invalidateQueries({
           queryKey: queryKeys.projectProgress(projectId),
@@ -185,8 +196,36 @@ export function EntityCards({
     } catch (error: unknown) {
       const detail =
         (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-        'Could not verify installation';
-      toast.error(typeof detail === 'string' ? detail : 'Could not verify installation');
+        'Could not accept installation';
+      toast.error(typeof detail === 'string' ? detail : 'Could not accept installation');
+    } finally {
+      setVerifyingId(null);
+    }
+  }
+
+  async function handleRejectInstallation(reason: string) {
+    if (!childEntityType || !rejectTarget) return;
+    const { entityId, issuanceId } = rejectTarget;
+    setVerifyingId(entityId);
+    try {
+      await api.inventory.rejectItemInstallation(issuanceId, reason);
+      toast.success('Installation rejected — returned to developer');
+      setRejectTarget(null);
+      if (projectId) {
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.projectProgress(projectId),
+        });
+      }
+      const res = await api.hierarchyWorkflow.assignmentStatus(childEntityType, [entityId]);
+      const row = res.data?.[0];
+      if (row) {
+        setAssignmentById((prev) => ({ ...prev, [entityId]: row }));
+      }
+    } catch (error: unknown) {
+      const detail =
+        (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        'Could not reject installation';
+      toast.error(typeof detail === 'string' ? detail : 'Could not reject installation');
     } finally {
       setVerifyingId(null);
     }
@@ -259,6 +298,9 @@ export function EntityCards({
                   assignment.test_result?.toLowerCase() === 'pass' &&
                   !assignment.verified
               );
+              const hasRejectionHistory =
+                (assignment?.rejection_count ?? 0) > 0 ||
+                (assignment?.rejection_history?.length ?? 0) > 0;
               const showOwnInstallChrome =
                 tone === 'neutral' &&
                 !inventoryManager &&
@@ -396,20 +438,74 @@ export function EntityCards({
                       ) : null}
                       {!readOnly && childEntityType && canVerifyItem && !isExistingProject ? (
                         <WorkflowCan role={['HM', 'ADMIN']} permission={P.item_verify}>
+                          <div className="space-y-1.5">
+                            <div className="flex gap-1.5">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1 gap-1.5"
+                                disabled={verifyingId === entity.id}
+                                onClick={() =>
+                                  void handleAcceptInstallation(
+                                    entity.id,
+                                    assignment.issuance_id as number
+                                  )
+                                }
+                              >
+                                <CheckCircle2 className="h-3 w-3" />
+                                {verifyingId === entity.id ? 'Accepting…' : 'Accept'}
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                className="flex-1"
+                                disabled={verifyingId === entity.id}
+                                onClick={() =>
+                                  setRejectTarget({
+                                    entityId: entity.id,
+                                    issuanceId: assignment.issuance_id as number,
+                                    name: entity.name,
+                                  })
+                                }
+                              >
+                                Reject
+                              </Button>
+                            </div>
+                            {hasRejectionHistory ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full"
+                                disabled={verifyingId === entity.id}
+                                onClick={() =>
+                                  setRejectionView({
+                                    label: entity.name,
+                                    history: assignment?.rejection_history ?? [],
+                                  })
+                                }
+                              >
+                                Rejection Reasons
+                              </Button>
+                            ) : null}
+                          </div>
+                        </WorkflowCan>
+                      ) : !readOnly &&
+                        childEntityType &&
+                        !isExistingProject &&
+                        hasRejectionHistory ? (
+                        <WorkflowCan role={['HM', 'ADMIN']} permission={P.item_verify}>
                           <Button
                             variant="outline"
                             size="sm"
-                            className="w-full gap-1.5"
-                            disabled={verifyingId === entity.id}
+                            className="w-full"
                             onClick={() =>
-                              void handleVerifyInstallation(
-                                entity.id,
-                                assignment.issuance_id as number
-                              )
+                              setRejectionView({
+                                label: entity.name,
+                                history: assignment?.rejection_history ?? [],
+                              })
                             }
                           >
-                            <CheckCircle2 className="h-3 w-3" />
-                            {verifyingId === entity.id ? 'Verifying…' : 'Verify Installation'}
+                            Rejection Reasons
                           </Button>
                         </WorkflowCan>
                       ) : null}
@@ -489,6 +585,23 @@ export function EntityCards({
         }}
       />
     ) : null}
+    <RejectInstallationDialog
+      open={rejectTarget != null}
+      onOpenChange={(open) => {
+        if (!open) setRejectTarget(null);
+      }}
+      itemLabel={rejectTarget?.name}
+      busy={rejectTarget != null && verifyingId === rejectTarget.entityId}
+      onConfirm={handleRejectInstallation}
+    />
+    <RejectionReasonsDialog
+      open={rejectionView != null}
+      onOpenChange={(open) => {
+        if (!open) setRejectionView(null);
+      }}
+      itemLabel={rejectionView?.label}
+      history={rejectionView?.history}
+    />
     </>
   );
 }

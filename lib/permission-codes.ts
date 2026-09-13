@@ -222,7 +222,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [P.hierarchy_assign_developer]: 'Assign Developer',
   [P.item_request]: 'Request Item',
   [P.item_install_test]: 'Install / Test Item',
-  [P.item_verify]: 'Verify Installation',
+  [P.item_verify]: 'Accept / Reject Installation',
   [P.item_inspect]: 'Inspect Returned Item',
   [P.project_cancel]: 'Cancel Project',
   [P.config_change_request]: 'Request Config Change',
