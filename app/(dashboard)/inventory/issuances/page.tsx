@@ -38,6 +38,7 @@ import {
 } from '@/components/inventory/issuance-remarks-dialog';
 import { IssuanceHistorySheet } from '@/components/inventory/issuance-history-sheet';
 import { IssuanceSignatureDialog } from '@/components/inventory/issuance-signature-dialog';
+import { IssuanceDetailsDialog } from '@/components/inventory/issuance-details-dialog';
 import { issuanceCanReturn, issuanceInstallStateLabel } from '@/lib/inventory-issuance';
 import {
   displayStatusBadgeVariant,
@@ -83,6 +84,8 @@ export default function InventoryIssuancesPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [signatureRow, setSignatureRow] = useState<InventoryIssuance | null>(null);
   const [signatureOpen, setSignatureOpen] = useState(false);
+  const [detailsRow, setDetailsRow] = useState<InventoryIssuance | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -169,8 +172,8 @@ export default function InventoryIssuancesPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Inventory issuances</h1>
           <p className="text-sm text-muted-foreground">
             {inventoryManager
-              ? 'Full issuance and return history. Click a row for unit ping-pong timeline. Accept or reject pending returns with remarks.'
-              : 'Your issuance history — click a row for timeline. Return unused items with a reason.'}
+              ? 'Full issuance and return history. Click a row for issuance details. Accept or reject pending returns with remarks.'
+              : 'Your issuance history — click a row for details. Return unused items with a reason.'}
           </p>
         </div>
         <Button
@@ -263,7 +266,14 @@ export default function InventoryIssuancesPage() {
                     const hasSignatureArtifacts = issuanceHasSignatureArtifacts(row);
 
                     return (
-                    <TableRow key={row.id}>
+                    <TableRow
+                      key={row.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => {
+                        setDetailsRow(row);
+                        setDetailsOpen(true);
+                      }}
+                    >
                       <TableCell>
                         <div className="font-medium">
                           {row.inventory_name || `Inventory #${row.inventory_id}`}
@@ -409,6 +419,24 @@ export default function InventoryIssuancesPage() {
         issuance={signatureRow}
         open={signatureOpen}
         onOpenChange={setSignatureOpen}
+      />
+
+      <IssuanceDetailsDialog
+        issuance={detailsRow}
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+        onViewHistory={() => {
+          if (!detailsRow) return;
+          setDetailsOpen(false);
+          setHistoryRow(detailsRow);
+          setHistoryOpen(true);
+        }}
+        onViewSignature={() => {
+          if (!detailsRow) return;
+          setDetailsOpen(false);
+          setSignatureRow(detailsRow);
+          setSignatureOpen(true);
+        }}
       />
     </div>
   );

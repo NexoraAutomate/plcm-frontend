@@ -2,7 +2,7 @@
 
 import { ShieldCheck } from 'lucide-react';
 import { VerifyQueuePanel } from '@/components/inventory/verify-queue-panel';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageDataRefreshProvider, PageRefreshButton } from '@/components/page-data-refresh';
 
 export default function VerifyQueuePage() {
@@ -25,9 +25,6 @@ export default function VerifyQueuePage() {
               <ShieldCheck className="h-4 w-4" />
               Waiting for HM verification
             </CardTitle>
-            <CardDescription>
-              INSTALLED_VERIFIED is set only after testing and your verification.
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <VerifyQueuePanel />

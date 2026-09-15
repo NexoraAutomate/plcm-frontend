@@ -1,12 +1,25 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import type { DeveloperAssignedWork, ItemInstallRejection } from '@/lib/models';
+import { ENTITY_TYPE_DB_LABELS } from '@/lib/entity-resolver';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { HierarchySearchCombobox } from '@/components/hierarchy-dashboard/hierarchy-search-combobox';
 import {
   Table,
   TableBody,
@@ -47,9 +60,118 @@ function apiError(error: unknown, fallback: string) {
   return typeof detail === 'string' ? detail : fallback;
 }
 
+const FILTER_ALL = 'all';
+
+type AssignmentStatusFilter =
+  | typeof FILTER_ALL
+  | 'needs_action'
+  | 'ready_to_request'
+  | 'reserved'
+  | 'requested'
+  | 'issued'
+  | 'installing'
+  | 'testing'
+  | 'rework'
+  | 'complete_reported'
+  | 'rejected'
+  | 'verified';
+
+const STATUS_FILTER_DEFS: {
+  key: AssignmentStatusFilter;
+  label: string;
+  badgeStatus?: string;
+}[] = [
+  { key: FILTER_ALL, label: 'All' },
+  { key: 'needs_action', label: 'Needs action' },
+  { key: 'ready_to_request', label: 'Ready to request' },
+  { key: 'reserved', label: 'Reserved', badgeStatus: 'RESERVED' },
+  { key: 'requested', label: 'Requested' },
+  { key: 'issued', label: 'Issued', badgeStatus: 'ISSUED' },
+  { key: 'installing', label: 'Installing', badgeStatus: 'INSTALLATION_IN_PROGRESS' },
+  { key: 'testing', label: 'Testing', badgeStatus: 'UNDER_TESTING_REVIEW' },
+  { key: 'rework', label: 'Rework / fail' },
+  { key: 'complete_reported', label: 'Awaiting HM accept' },
+  { key: 'rejected', label: 'Installation rejected', badgeStatus: 'INSTALLATION_REJECTED' },
+  { key: 'verified', label: 'Verified', badgeStatus: 'INSTALLED_VERIFIED' },
+];
+
+function rowNeedsAction(row: DeveloperAssignedWork) {
+  return Boolean(
+    row.can_request ||
+      row.can_install ||
+      row.can_test ||
+      row.can_report_complete ||
+      row.can_remove ||
+      row.can_return
+  );
+}
+
+function rowMatchesStatusFilter(row: DeveloperAssignedWork, filter: AssignmentStatusFilter) {
+  if (filter === FILTER_ALL) return true;
+  switch (filter) {
+    case 'needs_action':
+      return rowNeedsAction(row);
+    case 'ready_to_request':
+      return row.can_request;
+    case 'reserved':
+      return row.reserved && !row.issued;
+    case 'requested':
+      return row.request_status === 'pending';
+    case 'issued':
+      return (
+        row.issued &&
+        !row.verified &&
+        !row.complete_reported &&
+        !row.defect_pending &&
+        !row.rework_stage &&
+        !row.can_install &&
+        !row.can_test
+      );
+    case 'installing':
+      return Boolean(row.can_install || row.item_status === 'INSTALLATION_IN_PROGRESS');
+    case 'testing':
+      return Boolean(
+        row.can_test ||
+          row.item_status === 'UNDER_TESTING_REVIEW' ||
+          (row.test_result === 'pass' && !row.verified)
+      );
+    case 'rework':
+      return Boolean(row.defect_pending || row.rework_stage || row.can_remove || row.can_return);
+    case 'complete_reported':
+      return Boolean(row.complete_reported && !row.verified);
+    case 'rejected':
+      return Boolean(row.installation_rejected || row.item_status === 'INSTALLATION_REJECTED');
+    case 'verified':
+      return Boolean(row.verified);
+    default:
+      return true;
+  }
+}
+
+function rowMatchesSearch(row: DeveloperAssignedWork, query: string) {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const haystack = [
+    row.name,
+    row.part_number,
+    row.serial_number,
+    row.project_name,
+    row.entity_type,
+    row.entity_id != null ? String(row.entity_id) : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return haystack.includes(q);
+}
+
 export function MyAssignmentsPanel() {
   const [rows, setRows] = useState<DeveloperAssignedWork[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [projectFilter, setProjectFilter] = useState<string | undefined>();
+  const [entityTypeFilter, setEntityTypeFilter] = useState(FILTER_ALL);
+  const [statusFilter, setStatusFilter] = useState<AssignmentStatusFilter>(FILTER_ALL);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [submitting, setSubmitting] = useState(false);
   const [reworkTarget, setReworkTarget] = useState<ReworkWizardTarget | null>(null);
@@ -77,12 +199,73 @@ export function MyAssignmentsPanel() {
     void refresh();
   }, [refresh]);
 
+  const projectOptions = useMemo(() => {
+    const byId = new Map<number, string>();
+    for (const row of rows) {
+      if (row.project_id == null) continue;
+      byId.set(row.project_id, row.project_name?.trim() || `Project #${row.project_id}`);
+    }
+    return [...byId.entries()]
+      .sort(([, a], [, b]) => a.localeCompare(b))
+      .map(([id, label]) => ({ value: String(id), label }));
+  }, [rows]);
+
+  const entityTypeOptions = useMemo(() => {
+    const types = new Set<string>();
+    for (const row of rows) {
+      if (row.entity_type) types.add(row.entity_type.toLowerCase());
+    }
+    return [...types].sort((a, b) => {
+      const la = ENTITY_TYPE_DB_LABELS[a] ?? a;
+      const lb = ENTITY_TYPE_DB_LABELS[b] ?? b;
+      return la.localeCompare(lb);
+    });
+  }, [rows]);
+
+  const statusFilterCounts = useMemo(() => {
+    const counts = new Map<AssignmentStatusFilter, number>();
+    for (const def of STATUS_FILTER_DEFS) {
+      counts.set(def.key, 0);
+    }
+    for (const row of rows) {
+      counts.set(FILTER_ALL, (counts.get(FILTER_ALL) ?? 0) + 1);
+      for (const def of STATUS_FILTER_DEFS) {
+        if (def.key === FILTER_ALL) continue;
+        if (rowMatchesStatusFilter(row, def.key)) {
+          counts.set(def.key, (counts.get(def.key) ?? 0) + 1);
+        }
+      }
+    }
+    return counts;
+  }, [rows]);
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => {
+      if (!rowMatchesSearch(row, searchQuery)) return false;
+      if (projectFilter && String(row.project_id ?? '') !== projectFilter) return false;
+      if (
+        entityTypeFilter !== FILTER_ALL &&
+        row.entity_type.toLowerCase() !== entityTypeFilter
+      ) {
+        return false;
+      }
+      if (!rowMatchesStatusFilter(row, statusFilter)) return false;
+      return true;
+    });
+  }, [rows, searchQuery, projectFilter, entityTypeFilter, statusFilter]);
+
+  const filtersActive =
+    searchQuery.trim().length > 0 ||
+    projectFilter != null ||
+    entityTypeFilter !== FILTER_ALL ||
+    statusFilter !== FILTER_ALL;
+
   const selectedRows = useMemo(
-    () => rows.filter((row) => selected[rowKey(row)]),
-    [rows, selected]
+    () => filteredRows.filter((row) => selected[rowKey(row)]),
+    [filteredRows, selected]
   );
-  const requestable = rows.filter((row) => row.can_request);
-  const reservedCount = rows.filter((row) => row.reserved && !row.issued).length;
+  const requestable = filteredRows.filter((row) => row.can_request);
+  const reservedCount = filteredRows.filter((row) => row.reserved && !row.issued).length;
 
   async function requestBulk(
     mode: 'all' | 'reserved' | 'selected',
@@ -187,6 +370,111 @@ export function MyAssignmentsPanel() {
   return (
     <>
     <div className="space-y-3">
+      <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-[200px] flex-1 space-y-2 sm:max-w-md">
+            <Label htmlFor="my-assignments-search" className="text-xs">
+              Search items
+            </Label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="my-assignments-search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Name, serial, part number, project…"
+                className="pl-9"
+              />
+            </div>
+          </div>
+          <HierarchySearchCombobox
+            label="Project"
+            labelClassName="text-xs"
+            placeholder="All projects"
+            value={projectFilter}
+            options={projectOptions}
+            onChange={setProjectFilter}
+            onClear={() => setProjectFilter(undefined)}
+            className="w-full sm:w-[240px]"
+            triggerClassName="h-9"
+          />
+          <div className="w-full space-y-2 sm:w-[200px]">
+            <Label className="text-xs">Item category</Label>
+            <Select value={entityTypeFilter} onValueChange={setEntityTypeFilter}>
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="All categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={FILTER_ALL}>All categories</SelectItem>
+                {entityTypeOptions.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {ENTITY_TYPE_DB_LABELS[type] ?? type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {filtersActive ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-9 shrink-0"
+              onClick={() => {
+                setSearchQuery('');
+                setProjectFilter(undefined);
+                setEntityTypeFilter(FILTER_ALL);
+                setStatusFilter(FILTER_ALL);
+              }}
+            >
+              <X className="mr-1 h-4 w-4" />
+              Clear filters
+            </Button>
+          ) : null}
+        </div>
+        <div className="space-y-2">
+          <Label className="text-xs">Workflow status</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {STATUS_FILTER_DEFS.map((def) => {
+              const count = statusFilterCounts.get(def.key) ?? 0;
+              const active = statusFilter === def.key;
+              const disabled = def.key !== FILTER_ALL && count === 0;
+              return (
+                <button
+                  key={def.key}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => setStatusFilter(def.key)}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-left transition-colors',
+                    active && 'border-primary bg-primary/5 ring-1 ring-primary/30',
+                    disabled && 'cursor-not-allowed opacity-40',
+                    !disabled && !active && 'hover:bg-muted/60'
+                  )}
+                >
+                  {def.badgeStatus ? (
+                    <StatusBadge status={def.badgeStatus} className="pointer-events-none text-[10px]" />
+                  ) : (
+                    <Badge variant={active ? 'default' : 'outline'} className="pointer-events-none text-[10px]">
+                      {def.label}
+                    </Badge>
+                  )}
+                  <span className="text-xs tabular-nums text-muted-foreground">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        {rows.length > 0 ? (
+          <p className="text-xs text-muted-foreground">
+            Showing {filteredRows.length} of {rows.length} assignment
+            {rows.length === 1 ? '' : 's'}
+            {statusFilter !== FILTER_ALL
+              ? ` · ${STATUS_FILTER_DEFS.find((d) => d.key === statusFilter)?.label ?? statusFilter}`
+              : ''}
+          </p>
+        ) : null}
+      </div>
       <div className="flex flex-wrap gap-2">
         <Button
           size="sm"
@@ -225,6 +513,22 @@ export function MyAssignmentsPanel() {
           <p className="py-8 text-center text-sm text-muted-foreground">
             No hierarchy items have been assigned to you yet.
           </p>
+        ) : filteredRows.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            No assignments match the current filters.{' '}
+            <button
+              type="button"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+              onClick={() => {
+                setSearchQuery('');
+                setProjectFilter(undefined);
+                setEntityTypeFilter(FILTER_ALL);
+                setStatusFilter(FILTER_ALL);
+              }}
+            >
+              Clear filters
+            </button>
+          </p>
         ) : (
           <Table>
             <TableHeader>
@@ -252,7 +556,7 @@ export function MyAssignmentsPanel() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row) => {
+              {filteredRows.map((row) => {
                 const key = rowKey(row);
                 return (
                   <TableRow key={key}>

@@ -14,13 +14,39 @@ import {
   type WorkflowRoleCode,
 } from './workflow-roles';
 
+export type ExistingActiveSession = {
+  ip_address?: string | null;
+  device_name?: string | null;
+  browser?: string | null;
+  operating_system?: string | null;
+  login_time?: string | null;
+};
+
+export class ActiveSessionConflictError extends Error {
+  readonly code = 'ACTIVE_SESSION_EXISTS';
+  readonly conflictMessage: string;
+  readonly existingSession: ExistingActiveSession;
+
+  constructor(message: string, existingSession: ExistingActiveSession) {
+    super(message);
+    this.name = 'ActiveSessionConflictError';
+    this.conflictMessage = message;
+    this.existingSession = existingSession;
+  }
+}
+
+export type LoginOptions = {
+  /** End other devices' sessions and complete sign-in on this device. */
+  forceSessionTakeover?: boolean;
+};
+
 interface AuthContextType {
   user: Models.User | null;
   permissions: string[];
   isAuthenticated: boolean;
   /** True after localStorage session hydration completes (avoids redirect churn). */
   authReady: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string, options?: LoginOptions) => Promise<void>;
   logout: () => void;
   /**
    * Access check. Admin role always passes.
@@ -209,12 +235,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const login = useCallback(
-    async (username: string, password: string) => {
+    async (username: string, password: string, options?: LoginOptions) => {
       const formData = new URLSearchParams();
       formData.append('username', username);
       formData.append('password', password);
 
-      const response = await fetch(`${apiBase()}/auth/login`, {
+      const loginUrl = new URL(`${apiBase()}/auth/login`);
+      if (options?.forceSessionTakeover) {
+        loginUrl.searchParams.set('force_session_takeover', 'true');
+      }
+
+      const response = await fetch(loginUrl.toString(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: formData,
@@ -224,10 +255,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         let detail = 'Authentication failed';
         try {
           const errorBody = await response.json();
-          if (typeof errorBody?.detail === 'string' && errorBody.detail.trim()) {
-            detail = errorBody.detail;
+          const rawDetail = errorBody?.detail;
+          if (
+            response.status === 409 &&
+            rawDetail &&
+            typeof rawDetail === 'object' &&
+            rawDetail.code === 'ACTIVE_SESSION_EXISTS'
+          ) {
+            throw new ActiveSessionConflictError(
+              typeof rawDetail.message === 'string'
+                ? rawDetail.message
+                : 'This account is already signed in on another device.',
+              (rawDetail.existing_session as ExistingActiveSession) ?? {}
+            );
           }
-        } catch {
+          if (typeof rawDetail === 'string' && rawDetail.trim()) {
+            detail = rawDetail;
+          }
+        } catch (err) {
+          if (err instanceof ActiveSessionConflictError) {
+            throw err;
+          }
           // ignore non-JSON error bodies
         }
         throw new Error(detail);

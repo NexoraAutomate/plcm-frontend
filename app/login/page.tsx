@@ -4,7 +4,21 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Satellite, Loader2 } from 'lucide-react';
-import { useAuth } from '@/lib/auth-context';
+import {
+  ActiveSessionConflictError,
+  type ExistingActiveSession,
+  useAuth,
+} from '@/lib/auth-context';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { firstAccessiblePath } from '@/lib/permission-codes';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,8 +31,41 @@ export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [sessionConflictOpen, setSessionConflictOpen] = useState(false);
+  const [sessionConflictMessage, setSessionConflictMessage] = useState('');
+  const [existingSession, setExistingSession] = useState<ExistingActiveSession | null>(null);
+  const [pendingCredentials, setPendingCredentials] = useState<{
+    username: string;
+    password: string;
+  } | null>(null);
   const { login, isAuthenticated, authReady, can, user } = useAuth();
   const router = useRouter();
+
+  async function completeLogin(username: string, password: string, forceSessionTakeover = false) {
+    await login(username, password, forceSessionTakeover ? { forceSessionTakeover: true } : undefined);
+    toast.success('Logged in successfully');
+    const stored = localStorage.getItem('sat-user');
+    let destination = '/executive-dashboard';
+    if (stored) {
+      try {
+        const storedUser = JSON.parse(stored) as {
+          permissions?: string[];
+          roles?: string[];
+        };
+        const perms = storedUser.permissions ?? [];
+        destination = firstAccessiblePath(
+          (p) => {
+            const list = Array.isArray(p) ? p : [p];
+            return list.some((code) => perms.includes(code));
+          },
+          storedUser.roles
+        );
+      } catch {
+        /* keep default */
+      }
+    }
+    router.push(destination);
+  }
 
   useEffect(() => {
     if (!authReady) return;
@@ -36,35 +83,50 @@ export default function LoginPage() {
 
     setIsLoading(true);
     try {
-      await login(username.trim(), password);
-      toast.success('Logged in successfully');
-      const stored = localStorage.getItem('sat-user');
-      let destination = '/executive-dashboard';
-      if (stored) {
-        try {
-          const storedUser = JSON.parse(stored) as {
-            permissions?: string[];
-            roles?: string[];
-          };
-          const perms = storedUser.permissions ?? [];
-          destination = firstAccessiblePath(
-            (p) => {
-              const list = Array.isArray(p) ? p : [p];
-              return list.some((code) => perms.includes(code));
-            },
-            storedUser.roles
-          );
-        } catch {
-          /* keep default */
-        }
+      await completeLogin(username.trim(), password);
+    } catch (err) {
+      if (err instanceof ActiveSessionConflictError) {
+        setPendingCredentials({ username: username.trim(), password });
+        setSessionConflictMessage(err.conflictMessage);
+        setExistingSession(err.existingSession);
+        setSessionConflictOpen(true);
+      } else {
+        const message = err instanceof Error ? err.message : 'Authentication failed';
+        toast.error(message);
       }
-      router.push(destination);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleConfirmSessionTakeover() {
+    if (!pendingCredentials) return;
+    setSessionConflictOpen(false);
+    setIsLoading(true);
+    try {
+      await completeLogin(
+        pendingCredentials.username,
+        pendingCredentials.password,
+        true
+      );
+      setPendingCredentials(null);
+      setExistingSession(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Authentication failed';
       toast.error(message);
     } finally {
       setIsLoading(false);
     }
+  }
+
+  function formatExistingSessionHint(sessionInfo: ExistingActiveSession | null): string {
+    if (!sessionInfo) return '';
+    const parts: string[] = [];
+    if (sessionInfo.operating_system) parts.push(sessionInfo.operating_system);
+    if (sessionInfo.browser) parts.push(sessionInfo.browser);
+    if (sessionInfo.ip_address) parts.push(`IP ${sessionInfo.ip_address}`);
+    if (parts.length === 0) return '';
+    return ` Active session: ${parts.join(' · ')}.`;
   }
 
   return (
@@ -132,6 +194,32 @@ export default function LoginPage() {
           </form>
         </CardContent>
       </Card>
+
+      <AlertDialog open={sessionConflictOpen} onOpenChange={setSessionConflictOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Already signed in elsewhere</AlertDialogTitle>
+            <AlertDialogDescription>
+              {sessionConflictMessage ||
+                'This user is already logged in on another PC. Signing in here will log them out from that session.'}
+              {formatExistingSessionHint(existingSession)}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setPendingCredentials(null);
+                setExistingSession(null);
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => void handleConfirmSessionTakeover()}>
+              Sign in and sign out other device
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

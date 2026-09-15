@@ -13,7 +13,6 @@ import {
   Wrench,
   LogOut,
   Gauge,
-  Pin,
   PinOff,
   Server,
   Network,
@@ -540,12 +539,14 @@ export function AppSidebar() {
     visibleAdministration,
   ]);
 
-  const togglePin = () => {
-    setPinned((current) => {
-      const next = !current;
-      localStorage.setItem(SIDEBAR_PIN_KEY, String(next));
-      return next;
-    });
+  const pinSidebar = () => {
+    setPinned(true);
+    localStorage.setItem(SIDEBAR_PIN_KEY, "true");
+  };
+
+  const unpinSidebar = () => {
+    setPinned(false);
+    localStorage.setItem(SIDEBAR_PIN_KEY, "false");
   };
 
   const toggleGroup = (id: CollapsibleGroupId) => {
@@ -703,21 +704,19 @@ export function AppSidebar() {
           collapsed ? "w-16" : "w-64"
         )}
       >
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={togglePin}
-          className="absolute right-1 top-3 z-10 h-7 w-7 text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-          aria-label={pinned ? "Unpin sidebar" : "Pin sidebar open"}
-          title={pinned ? "Unpin sidebar" : "Pin sidebar open"}
-        >
-          {mounted && pinned ? (
+        {mounted && pinned && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={unpinSidebar}
+            className="absolute right-1 top-3 z-10 h-7 w-7 text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+            aria-label="Unpin sidebar"
+            title="Unpin sidebar"
+          >
             <PinOff className="h-3.5 w-3.5" />
-          ) : (
-            <Pin className="h-3.5 w-3.5" />
-          )}
-        </Button>
+          </Button>
+        )}
 
         <div
           className={cn(
@@ -725,15 +724,33 @@ export function AppSidebar() {
             collapsed ? "justify-center px-2" : "gap-3 px-4 pt-5"
           )}
         >
-          <div className="flex h-9 w-9 shrink-0 text-blue-500 items-center justify-center">
-            <Image
-              src="/SSDLS.svg"
-              width={30}
-              height={30}
-              alt="Backend"
-              className="h-auto w-auto dark:invert"
-            />
-          </div>
+          {collapsed ? (
+            <button
+              type="button"
+              onClick={pinSidebar}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-blue-500 transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+              aria-label="Pin sidebar open"
+              title="Pin sidebar open"
+            >
+              <Image
+                src="/SSDLS.svg"
+                width={30}
+                height={30}
+                alt="SSDLS"
+                className="h-auto w-auto dark:invert"
+              />
+            </button>
+          ) : (
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center text-blue-500">
+              <Image
+                src="/SSDLS.svg"
+                width={30}
+                height={30}
+                alt="SSDLS"
+                className="h-auto w-auto dark:invert"
+              />
+            </div>
+          )}
           {!collapsed && (
             <div className="min-w-0 flex-1 pr-6">
               <h1 className="truncate text-base font-semibold tracking-tight text-sidebar-foreground">

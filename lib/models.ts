@@ -1184,6 +1184,16 @@ export interface InventoryIssuance {
   issued_by_name?: string | null
   installed_by_name?: string | null
   closed_by_name?: string | null
+  project_id?: number | null
+  project_name?: string | null
+  flight_id?: number | null
+  flight_name?: string | null
+  flight_code?: string | null
+  sdls_id?: number | null
+  sdls_name?: string | null
+  sdls_code?: string | null
+  target_entity_name?: string | null
+  installed_entity_name?: string | null
   item_lifecycle_status?: string | null
   verified_at?: string | null
   signature_type?: string | null

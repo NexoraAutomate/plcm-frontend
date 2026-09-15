@@ -40,6 +40,7 @@ import { ProjectWorkflowStatus, isProjectReadOnly } from '@/lib/workflow-status'
 import { isExistingProject } from '@/lib/project-existing';
 import { isOpenConfigChange } from '@/lib/config-change';
 import { useDataStore } from '@/lib/data-store';
+import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 
 type Props = {
@@ -54,7 +55,17 @@ export function ProjectWorkflowActions({
   onUpdated,
 }: Props) {
   const router = useRouter();
+  const { user, can } = useAuth();
   const { ensureHierarchyLoaded } = useDataStore();
+  const canMarkProjectComplete = useMemo(() => {
+    if (!user) return false;
+    const roles = (user.roles ?? []).map((role) => role.trim().toLowerCase());
+    if (roles.includes('admin')) return can(P.project_complete);
+    return (
+      (roles.includes('projectdirector') || roles.includes('pd')) &&
+      can(P.project_complete)
+    );
+  }, [user, can]);
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [completeOpen, setCompleteOpen] = useState(false);
@@ -354,27 +365,25 @@ export function ProjectWorkflowActions({
               </TooltipProvider>
             </Can>
 
-            {!isExisting ? (
-              <WorkflowCan role={['ADMIN', 'PD']}>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="block w-full">
-                        <Button
-                          variant="outline"
-                          className="w-full"
-                          disabled={busy || !canMarkComplete}
-                          onClick={() => setCompleteOpen(true)}
-                        >
-                          <Flag className="mr-1.5 h-4 w-4" />
-                          Mark Project as Completed
-                        </Button>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>{markCompleteTooltip}</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </WorkflowCan>
+            {!isExisting && canMarkProjectComplete ? (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="block w-full">
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        disabled={busy || !canMarkComplete}
+                        onClick={() => setCompleteOpen(true)}
+                      >
+                        <Flag className="mr-1.5 h-4 w-4" />
+                        Mark Project as Completed
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>{markCompleteTooltip}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             ) : null}
 
             <Can permission={P.project_cancel}>
@@ -494,29 +503,31 @@ export function ProjectWorkflowActions({
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={completeOpen} onOpenChange={setCompleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Mark project as completed?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This flags the project as Completed and unlocks Replace on hierarchy entities.
-              This cannot be undone from Workflow actions.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={busy}
-              onClick={(e) => {
-                e.preventDefault();
-                void handleComplete();
-              }}
-            >
-              {busy ? 'Marking…' : 'Mark as Completed'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {canMarkProjectComplete ? (
+        <AlertDialog open={completeOpen} onOpenChange={setCompleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Mark project as completed?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This flags the project as Completed and unlocks Replace on hierarchy entities.
+                This cannot be undone from Workflow actions.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={busy}
+                onClick={(e) => {
+                  e.preventDefault();
+                  void handleComplete();
+                }}
+              >
+                {busy ? 'Marking…' : 'Mark as Completed'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      ) : null}
 
       <AlertDialog
         open={cancelOpen}
