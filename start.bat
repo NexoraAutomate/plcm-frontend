@@ -11,7 +11,7 @@ echo ===========================================
 echo.
 
 echo [1/2] Backend: activate .venv and run uvicorn...
-start "PLCM Backend" cmd /k "cd /d "%BACKEND_DIR%" && call .venv\Scripts\activate.bat && uvicorn app.main:app --reload"
+start "PLCM Backend" cmd /k "cd /d "%BACKEND_DIR%" && call .venv\Scripts\activate.bat && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 echo       Window opened.
 echo.
 

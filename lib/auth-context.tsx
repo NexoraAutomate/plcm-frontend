@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import * as Models from './models';
+import { getApiBaseUrl } from './api-base';
 import {
   hasWorkflowRole as matchWorkflowRole,
   type WorkflowRoleCode,
@@ -99,7 +100,7 @@ function toStoredUser(userData: Record<string, unknown>): Models.User {
 }
 
 function apiBase(): string {
-  return process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
+  return getApiBaseUrl()
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

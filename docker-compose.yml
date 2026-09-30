@@ -1,6 +1,7 @@
 # Production-style frontend stack.
 # Builds the Next.js standalone image from Dockerfile.
-# Expects the backend API at NEXT_PUBLIC_API_URL (baked in at build time).
+# NEXT_PUBLIC_API_URL is baked at build time. Prefer localhost here: the app
+# rewrites that hostname to the page origin at runtime so LAN Docker access works.
 
 services:
   frontend:

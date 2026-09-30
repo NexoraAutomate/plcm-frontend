@@ -2,8 +2,7 @@ import axios from "axios";
 import type * as Models from "./models";
 import type { ListFilterParams } from "./list-filters";
 import { normalizeListFilters } from "./list-filters";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api' ||'http://193.193.193.80:8000/api';
+import { getApiBaseUrl } from "./api-base";
 
 export type ListRequestOptions = { includeTotal?: boolean };
 
@@ -35,7 +34,7 @@ function listParams(
 }
 
 const api = axios.create({
-  baseURL: API_BASE,
+  baseURL: getApiBaseUrl(),
   timeout: 45_000,
 });
 
@@ -44,6 +43,9 @@ export function isForbiddenError(error: unknown): boolean {
 }
 
 api.interceptors.request.use((config) => {
+  // Re-resolve on each request so LAN hosts (e.g. 192.168.x.x) work when the
+  // baked NEXT_PUBLIC_API_URL still points at localhost.
+  config.baseURL = getApiBaseUrl();
   if (typeof window !== "undefined") {
     const token = localStorage.getItem("token");
     if (token) {

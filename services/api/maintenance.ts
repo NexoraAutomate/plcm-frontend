@@ -1,11 +1,13 @@
 import axios from 'axios';
 import * as Types from '@/types/maintenance';
+import { getApiBaseUrl } from '@/lib/api-base';
 
 const api = axios.create({
-  baseURL: 'http://127.0.0.1:8000/api',
+  baseURL: getApiBaseUrl(),
 });
 
 api.interceptors.request.use((config) => {
+  config.baseURL = getApiBaseUrl();
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('token');
     if (token) {

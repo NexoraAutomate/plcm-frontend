@@ -99,6 +99,8 @@ export function InventoryDeleteDialog({
         await onDeleteOne(selectedInstance.id);
       }
       onOpenChange(false);
+    } catch {
+      // Parent handlers already toast; keep dialog open for retry.
     } finally {
       setSubmitting(false);
     }
