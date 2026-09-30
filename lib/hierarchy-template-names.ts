@@ -137,7 +137,7 @@ export async function loadAvailableConfigurations(): Promise<HierarchyConfigurat
   }
 }
 
-/** Load names from the Entity List master catalog (Settings → Definitions → Entity List). */
+/** Load names from the Entity List master catalog (Definitions → Entity List). */
 export async function listEntityListNames(options?: {
   level?: string;
   parentName?: string | null;

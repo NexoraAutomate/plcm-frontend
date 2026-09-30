@@ -13,18 +13,19 @@ import {
   StatusesPanel,
   AlertsPanel,
   SecurityPanel,
-  DefinitionsPanel,
   BackupPanel,
 } from '@/components/lazy/settings-panels';
 import {
   SETTINGS_ACCESS_PERMISSIONS,
   SETTINGS_TABS,
-  LEGACY_SETTINGS_TAB_ALIASES,
+  LEGACY_DEFINITIONS_TAB_ALIASES,
+  isDefinitionsSectionId,
   isSettingsTabId,
   type SettingsTabConfig,
   type SettingsTabId,
 } from '@/components/settings/settings-tabs-config';
 import { PageDataRefreshProvider, PageRefreshButton } from '@/components/page-data-refresh';
+import { PageLoader } from '@/components/page-loader';
 
 function SettingsTabContent({ tab }: { tab: SettingsTabId }) {
   switch (tab) {
@@ -40,8 +41,6 @@ function SettingsTabContent({ tab }: { tab: SettingsTabId }) {
       return <AlertsPanel embedded />;
     case 'security':
       return <SecurityPanel embedded />;
-    case 'definitions':
-      return <DefinitionsPanel embedded />;
     case 'backup':
       return <BackupPanel embedded />;
     default:
@@ -79,6 +78,21 @@ export function SettingsPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  const requestedTabRaw = searchParams.get('tab');
+  const definitionsRedirectSection =
+    requestedTabRaw && requestedTabRaw in LEGACY_DEFINITIONS_TAB_ALIASES
+      ? LEGACY_DEFINITIONS_TAB_ALIASES[requestedTabRaw]
+      : null;
+
+  useEffect(() => {
+    if (!definitionsRedirectSection) return;
+    const requestedSection = searchParams.get('section');
+    const section = isDefinitionsSectionId(requestedSection)
+      ? requestedSection
+      : definitionsRedirectSection;
+    router.replace(`/definitions/${section}`);
+  }, [definitionsRedirectSection, router, searchParams]);
+
   const visibleTabs = useMemo(
     () => SETTINGS_TABS.filter((tab) => tabIsVisible(tab, can, hasAccess)),
     [can, hasAccess]
@@ -86,9 +100,7 @@ export function SettingsPage() {
 
   const canAccessSettings = can(SETTINGS_ACCESS_PERMISSIONS);
 
-  const requestedTabRaw = searchParams.get('tab');
-  const tabAlias = requestedTabRaw ? LEGACY_SETTINGS_TAB_ALIASES[requestedTabRaw] : undefined;
-  const requestedTab = tabAlias ? tabAlias.tab : requestedTabRaw;
+  const requestedTab = definitionsRedirectSection ? null : requestedTabRaw;
   const requestedTabDenied =
     isSettingsTabId(requestedTab) &&
     !visibleTabs.some((t) => t.id === requestedTab);
@@ -103,15 +115,7 @@ export function SettingsPage() {
   }, [requestedTab, requestedTabDenied, visibleTabs]);
 
   useEffect(() => {
-    if (!tabAlias) return;
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('tab', tabAlias.tab);
-    params.set('section', tabAlias.section);
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-  }, [pathname, router, searchParams, tabAlias]);
-
-  useEffect(() => {
-    if (tabAlias) return;
+    if (definitionsRedirectSection) return;
     if (!canAccessSettings || !activeTab) return;
     if (requestedTab === activeTab) return;
     if (requestedTabDenied) return;
@@ -121,13 +125,17 @@ export function SettingsPage() {
   }, [
     activeTab,
     canAccessSettings,
+    definitionsRedirectSection,
     pathname,
     requestedTab,
     requestedTabDenied,
     router,
     searchParams,
-    tabAlias,
   ]);
+
+  if (definitionsRedirectSection) {
+    return <PageLoader />;
+  }
 
   if (!canAccessSettings) {
     return (

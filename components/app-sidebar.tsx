@@ -32,6 +32,9 @@ import {
   ChevronDown,
   ChevronRight,
   Settings,
+  Tags,
+  ListTree,
+  LayoutTemplate,
   PackageCheck,
   MapPinned,
   type LucideIcon,
@@ -43,6 +46,9 @@ import {
   SETTINGS_ACCESS_PERMISSIONS,
   type PermissionCode,
 } from "@/lib/permission-codes";
+import {
+  DEFINITIONS_SECTION_META,
+} from "@/components/settings/settings-tabs-config";
 import {
   sidebarOrderForRoles,
   type SidebarEntryKey,
@@ -201,8 +207,29 @@ const administrationItems: NavItem[] = [
     icon: Settings,
     permission: SETTINGS_ACCESS_PERMISSIONS,
   },
-  NAV_BY_HREF["/config-changes"],
   NAV_BY_HREF["/audit"],
+];
+
+const definitionsItems: NavItem[] = [
+  {
+    label: DEFINITIONS_SECTION_META.labels.label,
+    href: DEFINITIONS_SECTION_META.labels.href,
+    icon: Tags,
+    permission: NAV_PERMISSIONS["/definitions/labels"] as PermissionCode[],
+  },
+  {
+    label: DEFINITIONS_SECTION_META["entity-list"].label,
+    href: DEFINITIONS_SECTION_META["entity-list"].href,
+    icon: ListTree,
+    permission: NAV_PERMISSIONS["/definitions/entity-list"] as PermissionCode[],
+  },
+  {
+    label: DEFINITIONS_SECTION_META.configurations.label,
+    href: DEFINITIONS_SECTION_META.configurations.href,
+    icon: LayoutTemplate,
+    permission: NAV_PERMISSIONS["/definitions/configurations"] as PermissionCode[],
+  },
+  NAV_BY_HREF["/config-changes"],
 ];
 
 const reportingGroup: NavGroup = {
@@ -316,6 +343,7 @@ function canSeeItem(
 type CollapsibleGroupId =
   | "inventory-system"
   | "project-hierarchy"
+  | "definitions"
   | "administration"
   | "reporting";
 
@@ -333,6 +361,7 @@ const ALL_NAV_HREFS: string[] = Array.from(
     ...Object.values(NAV_BY_HREF).map((item) => item.href),
     ...inventorySystemItems.map((item) => item.href),
     ...administrationItems.map((item) => item.href),
+    ...definitionsItems.map((item) => item.href),
     ...hierarchyItems.map((item) => item.href),
     reportingGroup.href,
     ...reportingGroup.children.map((item) => item.href),
@@ -459,6 +488,7 @@ export function AppSidebar() {
   >({
     "inventory-system": false,
     "project-hierarchy": false,
+    definitions: false,
     administration: false,
     reporting: false,
   });
@@ -516,6 +546,11 @@ export function AppSidebar() {
     [can]
   );
 
+  const visibleDefinitions = useMemo(
+    () => definitionsItems.filter((item) => canSeeItem(item, can)),
+    [can]
+  );
+
   useEffect(() => {
     setOpenGroups((prev) => {
       const next = { ...prev };
@@ -529,6 +564,7 @@ export function AppSidebar() {
       openIf("reporting", pathname.startsWith("/reporting"));
       openIf("inventory-system", pathMatchesAny(pathname, visibleInventorySystem));
       openIf("project-hierarchy", pathMatchesAny(pathname, visibleHierarchy));
+      openIf("definitions", pathMatchesAny(pathname, visibleDefinitions));
       openIf("administration", pathMatchesAny(pathname, visibleAdministration));
       return changed ? next : prev;
     });
@@ -536,6 +572,7 @@ export function AppSidebar() {
     pathname,
     visibleInventorySystem,
     visibleHierarchy,
+    visibleDefinitions,
     visibleAdministration,
   ]);
 
@@ -672,6 +709,13 @@ export function AppSidebar() {
           label: `${entityLabel("project")} Hierarchy`,
           icon: GitBranch,
           items: visibleHierarchy,
+        });
+      case "definitions":
+        return renderCollapsibleGroup({
+          id: "definitions",
+          label: "Definitions",
+          icon: Tags,
+          items: visibleDefinitions,
         });
       case "administration":
         return renderCollapsibleGroup({

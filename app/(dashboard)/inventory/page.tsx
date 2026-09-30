@@ -1224,7 +1224,7 @@ export default function InventoryPage() {
               <SelectContent>
                 {entityListNames.length === 0 ? (
                   <SelectItem value="__none__" disabled>
-                    {`No ${entityLabel(selectedEntityType, true).toLowerCase()} in Entity List — add in Settings → Definitions`}
+                    {`No ${entityLabel(selectedEntityType, true).toLowerCase()} in Entity List — add in Definitions`}
                   </SelectItem>
                 ) : (
                   entityListNames.map((entry) => (

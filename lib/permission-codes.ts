@@ -270,11 +270,26 @@ export const NAV_PERMISSIONS: Record<string, PermissionCode | PermissionCode[]> 
     P.view_users,
     P.view_roles,
     P.view_statuses,
-    P.view_hierarchy,
     P.manage_settings,
     P.manage_notifications,
-    P.hierarchy_config_manage,
+    P.backup_database,
+    P.restore_database,
   ],
+  '/definitions': [
+    P.manage_settings,
+    P.edit_inventory,
+    P.hierarchy_config_manage,
+    P.view_hierarchy,
+    P.create_hierarchy,
+  ],
+  '/definitions/labels': [
+    P.manage_settings,
+    P.edit_inventory,
+    P.hierarchy_config_manage,
+    P.create_hierarchy,
+  ],
+  '/definitions/entity-list': [P.view_hierarchy, P.create_hierarchy, P.manage_settings],
+  '/definitions/configurations': [P.hierarchy_config_manage, P.view_hierarchy, P.manage_settings],
   '/dashboard': P.view_executive_dashboard,
   '/maintenanceLogs': P.view_maintenance,
   '/reporting': P.view_reports,
@@ -291,12 +306,18 @@ export const SETTINGS_ACCESS_PERMISSIONS: PermissionCode[] = [
   P.view_users,
   P.view_roles,
   P.view_statuses,
-  P.view_hierarchy,
   P.manage_settings,
   P.manage_notifications,
   P.backup_database,
   P.restore_database,
+];
+
+/** OR of permissions that grant access to Definitions */
+export const DEFINITIONS_ACCESS_PERMISSIONS: PermissionCode[] = [
+  P.manage_settings,
+  P.edit_inventory,
   P.hierarchy_config_manage,
+  P.view_hierarchy,
 ];
 
 /**

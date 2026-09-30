@@ -73,7 +73,7 @@ export function CascadingLocationSelects({
         <Label>Location {required ? '*' : ''}</Label>
         <p className="mt-1 text-xs text-muted-foreground">
           Admin has not defined a Room → Cabinet → Rack tree yet. Ask Admin to set locations under
-          Settings → Definitions.
+          Definitions.
         </p>
       </div>
     );

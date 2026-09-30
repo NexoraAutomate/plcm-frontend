@@ -21,6 +21,7 @@ export type SidebarEntryKey =
   | 'notifications'
   | 'reporting'
   | 'project-hierarchy'
+  | 'definitions'
   | 'administration';
 
 /** Default / Admin: full nav with new groupings */
@@ -37,6 +38,7 @@ export const FALLBACK_SIDEBAR_ORDER: SidebarEntryKey[] = [
   'notifications',
   'reporting',
   'project-hierarchy',
+  'definitions',
   'administration',
 ];
 
@@ -65,6 +67,7 @@ export const ROLE_SIDEBAR_ORDER: Record<WorkflowRoleCode, SidebarEntryKey[]> = {
     'notifications',
     'reporting',
     'project-hierarchy',
+    'definitions',
   ],
   IM: [
     'inventory-system',

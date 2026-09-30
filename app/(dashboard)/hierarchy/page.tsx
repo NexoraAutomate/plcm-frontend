@@ -7,7 +7,7 @@ import { PageLoader } from '@/components/page-loader';
 export default function HierarchyRedirectPage() {
   const router = useRouter();
   useEffect(() => {
-    router.replace('/settings?tab=definitions&section=configurations');
+    router.replace('/definitions/configurations');
   }, [router]);
   return <PageLoader />;
 }

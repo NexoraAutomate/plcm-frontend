@@ -18,8 +18,12 @@ export { UserDetailsDialog } from './user-details-dialog';
 export {
   SETTINGS_TABS,
   SETTINGS_ACCESS_PERMISSIONS,
+  DEFINITIONS_ACCESS_PERMISSIONS,
+  DEFINITIONS_SECTION_META,
+  definitionsSectionPath,
   LEGACY_ADMIN_REDIRECTS,
   LEGACY_SETTINGS_TAB_ALIASES,
+  LEGACY_DEFINITIONS_TAB_ALIASES,
   isSettingsTabId,
   isDefinitionsSectionId,
 } from './settings-tabs-config';
