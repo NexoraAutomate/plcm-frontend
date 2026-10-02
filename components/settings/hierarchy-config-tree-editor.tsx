@@ -71,8 +71,8 @@ import { filterTemplateNames, hierarchiesToNameItems } from '@/lib/hierarchy-tem
 import {
   CHILD_TEMPLATE_LEVEL,
   INVENTORY_SOURCE,
-  PARENT_TEMPLATE_LEVEL,
   TEMPLATE_NODE_LEVELS,
+  allowedChildLevels,
   syncInventorySources,
   newClientKey,
   normalizeInventorySource,
@@ -250,15 +250,15 @@ function ConfigTreeCanvasInner({
     ? nodesByKey.get(selectedParentKey) ?? null
     : null;
 
-  const focusChildLevel = selectedParent
-    ? CHILD_TEMPLATE_LEVEL[selectedParent.level]
+  const focusChildLevels = selectedParent
+    ? allowedChildLevels(selectedParent.level)
     : systemExists
-      ? null
-      : ('system' as TemplateNodeLevel | null);
+      ? []
+      : (['system'] as TemplateNodeLevel[]);
 
   const sidebarContextLabel = selectedParent
-    ? focusChildLevel
-      ? `Adding under “${selectedParent.name || levelLabel(selectedParent.level)}” — drag ${levelLabel(focusChildLevel)}s (duplicates allowed)`
+    ? focusChildLevels.length
+      ? `Adding under “${selectedParent.name || levelLabel(selectedParent.level)}” — drag any lower-level entity (duplicates allowed)`
       : `“${selectedParent.name || levelLabel(selectedParent.level)}” has no child level`
     : systemExists
       ? 'Select a parent node to add children'
@@ -634,9 +634,11 @@ function ConfigTreeCanvasInner({
       let parentKey: string | null = selectedParentKey;
       if (parentKey) {
         const parent = nodesByKey.get(parentKey);
-        if (!parent || CHILD_TEMPLATE_LEVEL[parent.level] !== payload.level) {
+        if (!parent || !canLinkLevels(parent.level, payload.level)) {
           toast.error(
-            `Select a ${levelLabel(PARENT_TEMPLATE_LEVEL[payload.level] || 'parent')} first, then drop this ${levelLabel(payload.level)}`
+            `Cannot place ${levelLabel(payload.level)} under ${
+              parent ? levelLabel(parent.level) : 'this parent'
+            }. Select a higher-level parent first.`
           );
           return;
         }
@@ -739,12 +741,12 @@ function ConfigTreeCanvasInner({
         entities={entityListItems}
         levelLabel={levelLabel}
         disabled={!interactive}
-        focusChildLevel={
+        focusChildLevels={
           selectedParent
-            ? focusChildLevel
+            ? focusChildLevels
             : systemExists
               ? null
-              : 'system'
+              : (['system'] as TemplateNodeLevel[])
         }
         hideSystemLevel={systemExists}
         contextLabel={sidebarContextLabel}

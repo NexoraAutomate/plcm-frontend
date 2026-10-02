@@ -11,6 +11,12 @@ type HierarchyTree = Awaited<
 >['data'];
 
 type HierarchySystemNode = HierarchyTree['flights'][number]['sdls'][number]['systems'][number];
+type HierarchySubsystemNode = NonNullable<HierarchySystemNode['subsystems']>[number];
+type HierarchyModuleNode = NonNullable<
+  HierarchySystemNode['modules']
+>[number];
+type HierarchyUnitNode = NonNullable<HierarchySystemNode['units']>[number];
+type HierarchyComponentNode = NonNullable<HierarchySystemNode['components']>[number];
 
 function TreeNode({
   kind,
@@ -47,7 +53,70 @@ function TreeNode({
   );
 }
 
+function renderComponent(component: HierarchyComponentNode) {
+  return (
+    <TreeNode
+      key={`component-${component.id}`}
+      kind="Component"
+      name={component.name}
+      href={`/components/${component.id}`}
+    />
+  );
+}
+
+function renderUnit(unit: HierarchyUnitNode) {
+  const components = unit.components ?? [];
+  return (
+    <TreeNode
+      key={`unit-${unit.id}`}
+      kind="Unit"
+      name={unit.name}
+      href={`/units/${unit.id}`}
+    >
+      {components.map(renderComponent)}
+    </TreeNode>
+  );
+}
+
+function renderModule(module: HierarchyModuleNode) {
+  const units = module.units ?? [];
+  const components = module.components ?? [];
+  return (
+    <TreeNode
+      key={`module-${module.id}`}
+      kind="Module"
+      name={module.name}
+      href={`/modules/${module.id}`}
+    >
+      {units.map(renderUnit)}
+      {components.map(renderComponent)}
+    </TreeNode>
+  );
+}
+
+function renderSubsystem(subsystem: HierarchySubsystemNode) {
+  const modules = subsystem.modules ?? [];
+  const units = subsystem.units ?? [];
+  const components = subsystem.components ?? [];
+  return (
+    <TreeNode
+      key={`subsystem-${subsystem.id}`}
+      kind="Subsystem"
+      name={subsystem.name}
+      href={`/subsystems/${subsystem.id}`}
+    >
+      {modules.map(renderModule)}
+      {units.map(renderUnit)}
+      {components.map(renderComponent)}
+    </TreeNode>
+  );
+}
+
 function renderSystemBranch(system: HierarchySystemNode) {
+  const subsystems = system.subsystems ?? [];
+  const modules = system.modules ?? [];
+  const units = system.units ?? [];
+  const components = system.components ?? [];
   return (
     <TreeNode
       key={`system-${system.id}`}
@@ -55,41 +124,10 @@ function renderSystemBranch(system: HierarchySystemNode) {
       name={system.name}
       href={`/systems/${system.id}`}
     >
-      {(system.subsystems ?? []).map((subsystem) => (
-        <TreeNode
-          key={`subsystem-${subsystem.id}`}
-          kind="Subsystem"
-          name={subsystem.name}
-          href={`/subsystems/${subsystem.id}`}
-        >
-          {(subsystem.modules ?? []).map((module) => (
-            <TreeNode
-              key={`module-${module.id}`}
-              kind="Module"
-              name={module.name}
-              href={`/modules/${module.id}`}
-            >
-              {(module.units ?? []).map((unit) => (
-                <TreeNode
-                  key={`unit-${unit.id}`}
-                  kind="Unit"
-                  name={unit.name}
-                  href={`/units/${unit.id}`}
-                >
-                  {(unit.components ?? []).map((component) => (
-                    <TreeNode
-                      key={`component-${component.id}`}
-                      kind="Component"
-                      name={component.name}
-                      href={`/components/${component.id}`}
-                    />
-                  ))}
-                </TreeNode>
-              ))}
-            </TreeNode>
-          ))}
-        </TreeNode>
-      ))}
+      {subsystems.map(renderSubsystem)}
+      {modules.map(renderModule)}
+      {units.map(renderUnit)}
+      {components.map(renderComponent)}
     </TreeNode>
   );
 }

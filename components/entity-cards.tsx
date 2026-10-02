@@ -231,6 +231,10 @@ export function EntityCards({
     }
   }
 
+  if (entities.length === 0) {
+    return null;
+  }
+
   return (
     <>
     <Card>
@@ -247,26 +251,21 @@ export function EntityCards({
         ) : null}
       </CardHeader>
       <CardContent>
-        {entities.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12">
-            <p className="text-muted-foreground text-sm">{emptyMessage}</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {entities.map((entity) => {
-              const statusLabel = resolveStatusName(entity, statuses);
-              const assignment = assignmentById[entity.id];
-              const assignedId =
-                assignment?.assigned_developer_id ?? entity.assigned_developer_id ?? null;
-              const issued = Boolean(assignment?.issued);
-              const flagKey = childEntityType
-                ? inventoryFlagKey(childEntityType, entity.id)
-                : '';
-              const reservation = flagKey
-                ? inventoryFlags.reservationsByKey[flagKey]
-                : undefined;
-              const shortage = flagKey ? inventoryFlags.shortagesByKey[flagKey] : undefined;
-              const hasActiveReservation = Boolean(reservation);
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {entities.map((entity) => {
+            const statusLabel = resolveStatusName(entity, statuses);
+            const assignment = assignmentById[entity.id];
+            const assignedId =
+              assignment?.assigned_developer_id ?? entity.assigned_developer_id ?? null;
+            const issued = Boolean(assignment?.issued);
+            const flagKey = childEntityType
+              ? inventoryFlagKey(childEntityType, entity.id)
+              : '';
+            const reservation = flagKey
+              ? inventoryFlags.reservationsByKey[flagKey]
+              : undefined;
+            const shortage = flagKey ? inventoryFlags.shortagesByKey[flagKey] : undefined;
+            const hasActiveReservation = Boolean(reservation);
               const hasShortage = Boolean(shortage);
               const tone = resolveEntityLifecycleTone({
                 hasShortage,
@@ -552,7 +551,6 @@ export function EntityCards({
             );
             })}
           </div>
-        )}
       </CardContent>
     </Card>
 

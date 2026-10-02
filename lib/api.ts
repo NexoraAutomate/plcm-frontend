@@ -317,8 +317,31 @@ export const projects = {
                   name: string;
                   components: Array<{ id: number; name: string }>;
                 }>;
+                components?: Array<{ id: number; name: string }>;
               }>;
+              units?: Array<{
+                id: number;
+                name: string;
+                components: Array<{ id: number; name: string }>;
+              }>;
+              components?: Array<{ id: number; name: string }>;
             }>;
+            modules?: Array<{
+              id: number;
+              name: string;
+              units: Array<{
+                id: number;
+                name: string;
+                components: Array<{ id: number; name: string }>;
+              }>;
+              components?: Array<{ id: number; name: string }>;
+            }>;
+            units?: Array<{
+              id: number;
+              name: string;
+              components: Array<{ id: number; name: string }>;
+            }>;
+            components?: Array<{ id: number; name: string }>;
           }>;
         }>;
       }>;

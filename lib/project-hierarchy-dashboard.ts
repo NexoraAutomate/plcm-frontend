@@ -66,13 +66,50 @@ export function getModulesForSubsystem(modules: Module[], subsystemId: number): 
   );
 }
 
+export function getModulesForSystem(modules: Module[], systemId: number): Module[] {
+  return filterCurrentInstallEntities(
+    modules.filter((module) => module.system_id === systemId)
+  );
+}
+
 export function getUnitsForModule(units: Unit[], moduleId: number): Unit[] {
   return filterCurrentInstallEntities(units.filter((unit) => unit.module_id === moduleId));
+}
+
+export function getUnitsForSubsystem(units: Unit[], subsystemId: number): Unit[] {
+  return filterCurrentInstallEntities(
+    units.filter((unit) => unit.subsystem_id === subsystemId)
+  );
+}
+
+export function getUnitsForSystem(units: Unit[], systemId: number): Unit[] {
+  return filterCurrentInstallEntities(units.filter((unit) => unit.system_id === systemId));
 }
 
 export function getComponentsForUnit(components: Component[], unitId: number): Component[] {
   return filterCurrentInstallEntities(
     components.filter((component) => component.unit_id === unitId)
+  );
+}
+
+export function getComponentsForModule(components: Component[], moduleId: number): Component[] {
+  return filterCurrentInstallEntities(
+    components.filter((component) => component.module_id === moduleId)
+  );
+}
+
+export function getComponentsForSubsystem(
+  components: Component[],
+  subsystemId: number
+): Component[] {
+  return filterCurrentInstallEntities(
+    components.filter((component) => component.subsystem_id === subsystemId)
+  );
+}
+
+export function getComponentsForSystem(components: Component[], systemId: number): Component[] {
+  return filterCurrentInstallEntities(
+    components.filter((component) => component.system_id === systemId)
   );
 }
 
@@ -184,16 +221,42 @@ export function buildProjectHierarchyTree(
       : selection;
     const systemChildren =
       isOnPath && (options?.expandAll || selection.systemId)
-        ? buildSubsystemLevel(
-            effectiveSelection,
-            system.id,
-            subsystems,
-            modules,
-            units,
-            components,
-            statuses,
-            options
-          )
+        ? [
+            ...buildSubsystemLevel(
+              effectiveSelection,
+              system.id,
+              subsystems,
+              modules,
+              units,
+              components,
+              statuses,
+              options
+            ),
+            ...buildModuleLevelForParent(
+              effectiveSelection,
+              { systemId: system.id },
+              modules,
+              units,
+              components,
+              statuses,
+              options
+            ),
+            ...buildUnitLevelForParent(
+              effectiveSelection,
+              { systemId: system.id },
+              units,
+              components,
+              statuses,
+              options
+            ),
+            ...buildComponentLevelForParent(
+              effectiveSelection,
+              { systemId: system.id },
+              components,
+              statuses,
+              options
+            ),
+          ]
         : [];
 
     return toTreeNode(system, 'system', statuses, selection, systemChildren, options);
@@ -220,76 +283,135 @@ function buildSubsystemLevel(
       : selection;
     const subsystemChildren =
       isOnPath && (options?.expandAll || selection.subsystemId)
-        ? buildModuleLevel(
-            effectiveSelection,
-            subsystem.id,
-            modules,
-            units,
-            components,
-            statuses,
-            options
-          )
+        ? [
+            ...buildModuleLevelForParent(
+              effectiveSelection,
+              { subsystemId: subsystem.id },
+              modules,
+              units,
+              components,
+              statuses,
+              options
+            ),
+            ...buildUnitLevelForParent(
+              effectiveSelection,
+              { subsystemId: subsystem.id },
+              units,
+              components,
+              statuses,
+              options
+            ),
+            ...buildComponentLevelForParent(
+              effectiveSelection,
+              { subsystemId: subsystem.id },
+              components,
+              statuses,
+              options
+            ),
+          ]
         : [];
 
     return toTreeNode(subsystem, 'subsystem', statuses, selection, subsystemChildren, options);
   });
 }
 
-function buildModuleLevel(
+function buildModuleLevelForParent(
   selection: HierarchyDashboardSelection,
-  subsystemId: number,
+  parent: { subsystemId?: number; systemId?: number },
   modules: Module[],
   units: Unit[],
   components: Component[],
   statuses: Status[],
   options?: { expandAll?: boolean; preferOriginalBuild?: boolean }
 ): HierarchyTreeNode[] {
-  const subsystemModules = getModulesForSubsystem(modules, subsystemId);
+  const parentModules = parent.subsystemId
+    ? getModulesForSubsystem(modules, parent.subsystemId)
+    : parent.systemId
+      ? getModulesForSystem(modules, parent.systemId)
+      : [];
 
-  return subsystemModules.map((module) => {
+  return parentModules.map((module) => {
     const isOnPath = options?.expandAll || !selection.moduleId || module.id === selection.moduleId;
     const effectiveSelection = options?.expandAll
       ? { ...selection, moduleId: module.id }
       : selection;
     const moduleChildren =
       isOnPath && (options?.expandAll || selection.moduleId)
-        ? buildUnitLevel(effectiveSelection, module.id, units, components, statuses, options)
+        ? [
+            ...buildUnitLevelForParent(
+              effectiveSelection,
+              { moduleId: module.id },
+              units,
+              components,
+              statuses,
+              options
+            ),
+            ...buildComponentLevelForParent(
+              effectiveSelection,
+              { moduleId: module.id },
+              components,
+              statuses,
+              options
+            ),
+          ]
         : [];
 
     return toTreeNode(module, 'module', statuses, selection, moduleChildren, options);
   });
 }
 
-function buildUnitLevel(
+function buildUnitLevelForParent(
   selection: HierarchyDashboardSelection,
-  moduleId: number,
+  parent: { moduleId?: number; subsystemId?: number; systemId?: number },
   units: Unit[],
   components: Component[],
   statuses: Status[],
   options?: { expandAll?: boolean; preferOriginalBuild?: boolean }
 ): HierarchyTreeNode[] {
-  const moduleUnits = getUnitsForModule(units, moduleId);
+  const parentUnits = parent.moduleId
+    ? getUnitsForModule(units, parent.moduleId)
+    : parent.subsystemId
+      ? getUnitsForSubsystem(units, parent.subsystemId)
+      : parent.systemId
+        ? getUnitsForSystem(units, parent.systemId)
+        : [];
 
-  return moduleUnits.map((unit) => {
+  return parentUnits.map((unit) => {
     const isOnPath = options?.expandAll || !selection.unitId || unit.id === selection.unitId;
     const effectiveSelection = options?.expandAll ? { ...selection, unitId: unit.id } : selection;
     const unitChildren =
       isOnPath && (options?.expandAll || selection.unitId)
-        ? buildComponentLevel(effectiveSelection, unit.id, components, statuses, options)
+        ? buildComponentLevelForParent(
+            effectiveSelection,
+            { unitId: unit.id },
+            components,
+            statuses,
+            options
+          )
         : [];
 
     return toTreeNode(unit, 'unit', statuses, selection, unitChildren, options);
   });
 }
 
-function buildComponentLevel(
+function buildComponentLevelForParent(
   selection: HierarchyDashboardSelection,
-  unitId: number,
+  parent: { unitId?: number; moduleId?: number; subsystemId?: number; systemId?: number },
   components: Component[],
   statuses: Status[],
   options?: { expandAll?: boolean; preferOriginalBuild?: boolean }
 ): HierarchyTreeNode[] {
-  return getComponentsForUnit(components, unitId).map((component) =>
+  const parentComponents = parent.unitId
+    ? getComponentsForUnit(components, parent.unitId)
+    : parent.moduleId
+      ? getComponentsForModule(components, parent.moduleId)
+      : parent.subsystemId
+        ? getComponentsForSubsystem(components, parent.subsystemId)
+        : parent.systemId
+          ? getComponentsForSystem(components, parent.systemId)
+          : [];
+
+  return parentComponents.map((component) =>
     toTreeNode(component, 'component', statuses, selection, [], options)
   );
 }
@@ -375,40 +497,125 @@ export function resolveSelectionFromEntity(
     case 'component': {
       const component = components.find((item) => item.id === entityId);
       if (!component) return null;
-      const unit = units.find((item) => item.id === component.unit_id);
-      if (!unit) return null;
-      return {
-        ...resolveSelectionFromEntity('unit', unit.id, systems, subsystems, modules, units, components),
-        componentId: component.id,
-      };
-    }
-    case 'unit': {
-      const unit = units.find((item) => item.id === entityId);
-      if (!unit) return null;
-      const module = modules.find((item) => item.id === unit.module_id);
-      if (!module) return null;
-      return {
-        ...resolveSelectionFromEntity('module', module.id, systems, subsystems, modules, units, components),
-        unitId: unit.id,
-      };
-    }
-    case 'module': {
-      const module = modules.find((item) => item.id === entityId);
-      if (!module) return null;
-      const subsystem = subsystems.find((item) => item.id === module.subsystem_id);
-      if (!subsystem) return null;
-      return {
-        ...resolveSelectionFromEntity(
-          'subsystem',
-          subsystem.id,
+      if (component.unit_id) {
+        const parent = resolveSelectionFromEntity(
+          'unit',
+          component.unit_id,
           systems,
           subsystems,
           modules,
           units,
           components
-        ),
-        moduleId: module.id,
-      };
+        );
+        return parent ? { ...parent, componentId: component.id } : null;
+      }
+      if (component.module_id) {
+        const parent = resolveSelectionFromEntity(
+          'module',
+          component.module_id,
+          systems,
+          subsystems,
+          modules,
+          units,
+          components
+        );
+        return parent ? { ...parent, componentId: component.id } : null;
+      }
+      if (component.subsystem_id) {
+        const parent = resolveSelectionFromEntity(
+          'subsystem',
+          component.subsystem_id,
+          systems,
+          subsystems,
+          modules,
+          units,
+          components
+        );
+        return parent ? { ...parent, componentId: component.id } : null;
+      }
+      if (component.system_id) {
+        const parent = resolveSelectionFromEntity(
+          'system',
+          component.system_id,
+          systems,
+          subsystems,
+          modules,
+          units,
+          components
+        );
+        return parent ? { ...parent, componentId: component.id } : null;
+      }
+      return null;
+    }
+    case 'unit': {
+      const unit = units.find((item) => item.id === entityId);
+      if (!unit) return null;
+      if (unit.module_id) {
+        const parent = resolveSelectionFromEntity(
+          'module',
+          unit.module_id,
+          systems,
+          subsystems,
+          modules,
+          units,
+          components
+        );
+        return parent ? { ...parent, unitId: unit.id } : null;
+      }
+      if (unit.subsystem_id) {
+        const parent = resolveSelectionFromEntity(
+          'subsystem',
+          unit.subsystem_id,
+          systems,
+          subsystems,
+          modules,
+          units,
+          components
+        );
+        return parent ? { ...parent, unitId: unit.id } : null;
+      }
+      if (unit.system_id) {
+        const parent = resolveSelectionFromEntity(
+          'system',
+          unit.system_id,
+          systems,
+          subsystems,
+          modules,
+          units,
+          components
+        );
+        return parent ? { ...parent, unitId: unit.id } : null;
+      }
+      return null;
+    }
+    case 'module': {
+      const module = modules.find((item) => item.id === entityId);
+      if (!module) return null;
+      if (module.subsystem_id) {
+        const parent = resolveSelectionFromEntity(
+          'subsystem',
+          module.subsystem_id,
+          systems,
+          subsystems,
+          modules,
+          units,
+          components
+        );
+        return parent ? { ...parent, moduleId: module.id } : null;
+      }
+      if (module.system_id) {
+        const parent = resolveSelectionFromEntity(
+          'system',
+          module.system_id,
+          systems,
+          subsystems,
+          modules,
+          units,
+          components
+        );
+        return parent ? { ...parent, moduleId: module.id } : null;
+      }
+      return null;
     }
     case 'subsystem': {
       const subsystem = subsystems.find((item) => item.id === entityId);
@@ -535,91 +742,15 @@ export function collectSubtreeEntities(
   units: Unit[],
   components: Component[]
 ): SubtreeEntityRef[] {
-  const result: SubtreeEntityRef[] = [];
-  const system = systems.find((item) => item.id === systemId);
-  if (!system) return result;
-
-  result.push({
-    type: 'system',
-    pk: system.id,
-    name: system.name,
-    part_number: system.part_number,
-    serial_number: system.serial_number,
-    created_at: system.created_at,
-    installation_date: system.installation_date,
-    installed_by_id: system.installed_by_id,
-    ...installRefFields(system),
-  });
-
-  const systemSubsystems = getSubsystemsForSystem(subsystems, systemId);
-  for (const subsystem of systemSubsystems) {
-    result.push({
-      type: 'subsystem',
-      pk: subsystem.id,
-      name: subsystem.name,
-      part_number: subsystem.part_number,
-      serial_number: subsystem.serial_number,
-      created_at: subsystem.created_at,
-      installation_date: subsystem.installation_date,
-      installed_by_id: subsystem.installed_by_id,
-      original_part_number: subsystem.original_part_number,
-      original_serial_number: subsystem.original_serial_number,
-      ...installRefFields(subsystem),
-    });
-
-    const subsystemModules = getModulesForSubsystem(modules, subsystem.id);
-    for (const module of subsystemModules) {
-      result.push({
-        type: 'module',
-        pk: module.id,
-        name: module.name,
-        part_number: module.part_number,
-        serial_number: module.serial_number,
-        created_at: module.created_at,
-        installation_date: module.installation_date,
-        installed_by_id: module.installed_by_id,
-        original_part_number: module.original_part_number,
-        original_serial_number: module.original_serial_number,
-        ...installRefFields(module),
-      });
-
-      const moduleUnits = getUnitsForModule(units, module.id);
-      for (const unit of moduleUnits) {
-        result.push({
-          type: 'unit',
-          pk: unit.id,
-          name: unit.name,
-          part_number: unit.part_number,
-          serial_number: unit.serial_number,
-          created_at: unit.created_at,
-          installation_date: unit.installation_date,
-          installed_by_id: unit.installed_by_id,
-          original_part_number: unit.original_part_number,
-          original_serial_number: unit.original_serial_number,
-          ...installRefFields(unit),
-        });
-
-        const unitComponents = getComponentsForUnit(components, unit.id);
-        for (const component of unitComponents) {
-          result.push({
-            type: 'component',
-            pk: component.id,
-            name: component.name,
-            part_number: component.part_number,
-            serial_number: component.serial_number,
-            created_at: component.created_at,
-            installation_date: component.installation_date,
-            installed_by_id: component.installed_by_id,
-            original_part_number: component.original_part_number,
-            original_serial_number: component.original_serial_number,
-            ...installRefFields(component),
-          });
-        }
-      }
-    }
-  }
-
-  return result;
+  return collectSubtreeFromNode(
+    'system',
+    systemId,
+    systems,
+    subsystems,
+    modules,
+    units,
+    components
+  );
 }
 
 function toSubtreeRef(
@@ -662,7 +793,62 @@ export function collectSubtreeFromNode(
   components: Component[]
 ): SubtreeEntityRef[] {
   if (type === 'system') {
-    return collectSubtreeEntities(pk, systems, subsystems, modules, units, components);
+    const system = systems.find((item) => item.id === pk);
+    if (!system) return [];
+    const result = [toSubtreeRef('system', system)];
+    for (const subsystem of getSubsystemsForSystem(subsystems, pk)) {
+      result.push(
+        ...collectSubtreeFromNode(
+          'subsystem',
+          subsystem.id,
+          systems,
+          subsystems,
+          modules,
+          units,
+          components
+        )
+      );
+    }
+    for (const module of getModulesForSystem(modules, pk)) {
+      result.push(
+        ...collectSubtreeFromNode(
+          'module',
+          module.id,
+          systems,
+          subsystems,
+          modules,
+          units,
+          components
+        )
+      );
+    }
+    for (const unit of getUnitsForSystem(units, pk)) {
+      result.push(
+        ...collectSubtreeFromNode(
+          'unit',
+          unit.id,
+          systems,
+          subsystems,
+          modules,
+          units,
+          components
+        )
+      );
+    }
+    for (const component of getComponentsForSystem(components, pk)) {
+      result.push(
+        ...collectSubtreeFromNode(
+          'component',
+          component.id,
+          systems,
+          subsystems,
+          modules,
+          units,
+          components
+        )
+      );
+    }
+    return result;
   }
 
   if (type === 'subsystem') {
@@ -672,6 +858,12 @@ export function collectSubtreeFromNode(
     const result = [toSubtreeRef('subsystem', subsystem)];
     for (const module of getModulesForSubsystem(modules, pk)) {
       result.push(...collectSubtreeFromNode('module', module.id, systems, subsystems, modules, units, components));
+    }
+    for (const unit of getUnitsForSubsystem(units, pk)) {
+      result.push(...collectSubtreeFromNode('unit', unit.id, systems, subsystems, modules, units, components));
+    }
+    for (const component of getComponentsForSubsystem(components, pk)) {
+      result.push(...collectSubtreeFromNode('component', component.id, systems, subsystems, modules, units, components));
     }
     return result;
   }
@@ -683,6 +875,9 @@ export function collectSubtreeFromNode(
     const result = [toSubtreeRef('module', module)];
     for (const unit of getUnitsForModule(units, pk)) {
       result.push(...collectSubtreeFromNode('unit', unit.id, systems, subsystems, modules, units, components));
+    }
+    for (const component of getComponentsForModule(components, pk)) {
+      result.push(...collectSubtreeFromNode('component', component.id, systems, subsystems, modules, units, components));
     }
     return result;
   }
@@ -712,18 +907,16 @@ export function collectProjectEntityRefs(
 ): Array<{ type: HierarchyEntityType; id: number }> {
   const refs: Array<{ type: HierarchyEntityType; id: number }> = [];
   for (const system of getSystemsForProject(systems, projectId)) {
-    refs.push({ type: 'system', id: system.id });
-    for (const subsystem of getSubsystemsForSystem(subsystems, system.id)) {
-      refs.push({ type: 'subsystem', id: subsystem.id });
-      for (const module of getModulesForSubsystem(modules, subsystem.id)) {
-        refs.push({ type: 'module', id: module.id });
-        for (const unit of getUnitsForModule(units, module.id)) {
-          refs.push({ type: 'unit', id: unit.id });
-          for (const component of getComponentsForUnit(components, unit.id)) {
-            refs.push({ type: 'component', id: component.id });
-          }
-        }
-      }
+    for (const entity of collectSubtreeFromNode(
+      'system',
+      system.id,
+      systems,
+      subsystems,
+      modules,
+      units,
+      components
+    )) {
+      refs.push({ type: entity.type, id: entity.pk });
     }
   }
   return refs;

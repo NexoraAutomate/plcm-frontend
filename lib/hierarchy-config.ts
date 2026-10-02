@@ -23,6 +23,15 @@ export const TEMPLATE_NODE_LEVELS: TemplateNodeLevel[] = [
   'component',
 ];
 
+export const TEMPLATE_LEVEL_RANK: Record<TemplateNodeLevel, number> = {
+  system: 0,
+  subsystem: 1,
+  module: 2,
+  unit: 3,
+  component: 4,
+};
+
+/** Preferred (adjacent) parent — UX default, not a hard restriction. */
 export const PARENT_TEMPLATE_LEVEL: Record<TemplateNodeLevel, TemplateNodeLevel | null> = {
   system: null,
   subsystem: 'system',
@@ -31,6 +40,7 @@ export const PARENT_TEMPLATE_LEVEL: Record<TemplateNodeLevel, TemplateNodeLevel 
   component: 'unit',
 };
 
+/** Preferred (adjacent) child — UX default for quick-add. */
 export const CHILD_TEMPLATE_LEVEL: Record<TemplateNodeLevel, TemplateNodeLevel | null> = {
   system: 'subsystem',
   subsystem: 'module',
@@ -38,6 +48,27 @@ export const CHILD_TEMPLATE_LEVEL: Record<TemplateNodeLevel, TemplateNodeLevel |
   unit: 'component',
   component: null,
 };
+
+/** Any higher template level may parent any lower level; System is root. */
+export function isValidTemplateParent(
+  parentLevel: TemplateNodeLevel | null | undefined,
+  childLevel: TemplateNodeLevel
+): boolean {
+  if (childLevel === 'system') return parentLevel == null;
+  if (parentLevel == null) return false;
+  return TEMPLATE_LEVEL_RANK[parentLevel] < TEMPLATE_LEVEL_RANK[childLevel];
+}
+
+export function allowedParentLevels(childLevel: TemplateNodeLevel): TemplateNodeLevel[] {
+  if (childLevel === 'system') return [];
+  const childRank = TEMPLATE_LEVEL_RANK[childLevel];
+  return TEMPLATE_NODE_LEVELS.filter((level) => TEMPLATE_LEVEL_RANK[level] < childRank);
+}
+
+export function allowedChildLevels(parentLevel: TemplateNodeLevel): TemplateNodeLevel[] {
+  const parentRank = TEMPLATE_LEVEL_RANK[parentLevel];
+  return TEMPLATE_NODE_LEVELS.filter((level) => TEMPLATE_LEVEL_RANK[level] > parentRank);
+}
 
 export const INVENTORY_SOURCE = {
   TURNKEY: 'turnkey',

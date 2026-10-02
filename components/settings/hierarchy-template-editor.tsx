@@ -31,8 +31,9 @@ import {
   CHILD_TEMPLATE_LEVEL,
   INVENTORY_SOURCE,
   INVENTORY_SOURCE_OPTIONS,
-  PARENT_TEMPLATE_LEVEL,
   TEMPLATE_NODE_LEVELS,
+  allowedChildLevels,
+  allowedParentLevels,
   newClientKey,
   normalizeInventorySource,
   type InventorySource,
@@ -124,9 +125,9 @@ export function HierarchyTemplateEditor({
     selectedLevel === 'system' ? null : parentByLevel[selectedLevel] ?? null;
 
   const parentOptions = useMemo(() => {
-    const parentLevel = PARENT_TEMPLATE_LEVEL[selectedLevel];
-    if (!parentLevel) return [];
-    return grouped[parentLevel];
+    const parentLevels = allowedParentLevels(selectedLevel);
+    if (parentLevels.length === 0) return [];
+    return parentLevels.flatMap((level) => grouped[level]);
   }, [grouped, selectedLevel]);
 
   const parentOptionLabels = useMemo(() => {
@@ -186,10 +187,14 @@ export function HierarchyTemplateEditor({
       return;
     }
     if (selectedLevel !== 'system' && !currentParentKey) {
-      const parentLevel = PARENT_TEMPLATE_LEVEL[selectedLevel];
+      const parentLevels = allowedParentLevels(selectedLevel);
+      const parentLabel =
+        parentLevels.length === 1
+          ? levelLabel(parentLevels[0])
+          : parentLevels.map(levelLabel).join(' / ');
       setValidationResult({
         valid: false,
-        message: `Select a parent ${levelLabel(parentLevel as TemplateNodeLevel)} before adding a ${levelLabel(selectedLevel)}.`,
+        message: `Select a parent (${parentLabel}) before adding a ${levelLabel(selectedLevel)}.`,
       });
       return;
     }
@@ -270,7 +275,8 @@ export function HierarchyTemplateEditor({
   }
 
   function renderActions(node: TemplateDraftNode) {
-    const childLevel = CHILD_TEMPLATE_LEVEL[node.level];
+    const childLevels = allowedChildLevels(node.level);
+    const defaultChild = CHILD_TEMPLATE_LEVEL[node.level];
     if (readOnly) return null;
     return (
       <div className="flex items-center gap-1">
@@ -288,13 +294,13 @@ export function HierarchyTemplateEditor({
         >
           <Edit className="h-4 w-4" />
         </Button>
-        {childLevel ? (
+        {defaultChild && childLevels.includes(defaultChild) ? (
           <Button
             variant="ghost"
             size="icon"
             className="h-8 w-8 text-muted-foreground hover:text-foreground"
-            onClick={() => prepareAddChild(childLevel, node)}
-            aria-label={`Add ${childLevel}`}
+            onClick={() => prepareAddChild(defaultChild, node)}
+            aria-label={`Add ${defaultChild}`}
           >
             <Plus className="h-4 w-4" />
           </Button>
@@ -313,10 +319,11 @@ export function HierarchyTemplateEditor({
   }
 
   function renderNode(node: TemplateDraftNode) {
-    const childLevel = CHILD_TEMPLATE_LEVEL[node.level];
-    const children = childLevel
-      ? grouped[childLevel].filter((c) => c.parent_client_key === node.client_key)
-      : [];
+    const children = nodes
+      .filter((c) => c.parent_client_key === node.client_key)
+      .slice()
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    const canHaveChildren = allowedChildLevels(node.level).length > 0;
     const abbr = node.abbreviation ? ` [${node.abbreviation}]` : '';
     const sourceLabel =
       normalizeInventorySource(node.inventory_source) ===
@@ -349,12 +356,10 @@ export function HierarchyTemplateEditor({
           </div>
           {renderActions(node)}
         </div>
-        {childLevel ? (
+        {canHaveChildren ? (
           <div className={node.level === 'component' ? '' : 'space-y-2 pt-3'}>
             {children.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                No {entityLabel(childLevel, true).toLowerCase()} defined.
-              </p>
+              <p className="text-xs text-muted-foreground">No children defined.</p>
             ) : node.level === 'unit' ? (
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                 {children.map(renderNode)}
@@ -451,9 +456,7 @@ export function HierarchyTemplateEditor({
 
                 {selectedLevel !== 'system' ? (
                   <div className="space-y-2">
-                    <Label>
-                      {levelLabel(PARENT_TEMPLATE_LEVEL[selectedLevel] as TemplateNodeLevel)}
-                    </Label>
+                    <Label>Parent</Label>
                     <Select
                       value={currentParentKey ?? '0'}
                       onValueChange={(value) =>
@@ -461,14 +464,13 @@ export function HierarchyTemplateEditor({
                       }
                     >
                       <SelectTrigger>
-                        <SelectValue
-                          placeholder={`Select ${levelLabel(PARENT_TEMPLATE_LEVEL[selectedLevel] as TemplateNodeLevel)}`}
-                        />
+                        <SelectValue placeholder="Select any higher-level parent" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="0">None</SelectItem>
                         {parentOptions.map((item) => (
                           <SelectItem key={item.client_key} value={item.client_key}>
+                            {levelLabel(item.level)} —{' '}
                             {parentOptionLabels.get(item.client_key) || item.name || item.client_key}
                           </SelectItem>
                         ))}

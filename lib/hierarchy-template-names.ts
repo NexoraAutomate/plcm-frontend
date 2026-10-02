@@ -1,7 +1,10 @@
 import * as api from '@/lib/api';
 import type { Hierarchy, HierarchyConfigNode, HierarchyConfiguration } from '@/lib/models';
-import type { TemplateNodeLevel } from '@/lib/hierarchy-config';
-import { PARENT_TEMPLATE_LEVEL } from '@/lib/hierarchy-config';
+import {
+  allowedChildLevels,
+  PARENT_TEMPLATE_LEVEL,
+  type TemplateNodeLevel,
+} from '@/lib/hierarchy-config';
 
 export type TemplateNameItem = Pick<
   Hierarchy,
@@ -175,4 +178,9 @@ export async function listTemplateNames(options?: {
 export function childLevelOf(level: TemplateNodeLevel): TemplateNodeLevel | null {
   const entry = Object.entries(PARENT_TEMPLATE_LEVEL).find(([, parent]) => parent === level);
   return (entry?.[0] as TemplateNodeLevel | undefined) ?? null;
+}
+
+/** All levels that may be placed directly under this parent. */
+export function childLevelsOf(level: TemplateNodeLevel): TemplateNodeLevel[] {
+  return allowedChildLevels(level);
 }

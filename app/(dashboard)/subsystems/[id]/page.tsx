@@ -27,6 +27,7 @@ import {
 } from '@/components/replace-from-inventory-dialog';
 import {
   filterChildrenForParentSlot,
+  filterCurrentInstallEntities,
   resolveCurrentInstallEntity,
   resolveProjectIdForHardwareEntity,
   systemHierarchyPath,
@@ -45,6 +46,8 @@ export default function SubsystemDetailPage() {
     subsystems,
     systems,
     modules,
+    units,
+    components,
     projects,
     deleteModule,
     updateModule,
@@ -76,7 +79,15 @@ export default function SubsystemDetailPage() {
   const isExisting = isExistingProject(project);
   const allowReplace = projectAllowsReplace(project);
   const subsystemModules = subsystem
-    ? filterChildrenForParentSlot(modules, subsystem, subsystems, (mod) => mod.subsystem_id)
+    ? filterChildrenForParentSlot(modules, subsystem, subsystems, (mod) => mod.subsystem_id ?? -1)
+    : [];
+  const subsystemUnits = subsystem
+    ? filterCurrentInstallEntities(units.filter((item) => item.subsystem_id === subsystem.id))
+    : [];
+  const subsystemComponents = subsystem
+    ? filterCurrentInstallEntities(
+        components.filter((item) => item.subsystem_id === subsystem.id)
+      )
     : [];
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
@@ -303,6 +314,84 @@ export default function SubsystemDetailPage() {
         isExistingProject={isExisting}
         allowReplace={allowReplace}
         projectId={projectId}
+      />
+
+      <EntityCards
+        title={entityLabel('unit', true)}
+        description={`Direct ${entityLabel('unit', true).toLowerCase()} under ${subsystem.name}`}
+        entities={subsystemUnits}
+        detailPath={(id) => `/units/${id}`}
+        secondaryPath={
+          projectId && system
+            ? (id) =>
+                systemHierarchyPath(projectId, system.id, {
+                  rootType: 'unit',
+                  rootId: id,
+                }) ?? '#'
+            : undefined
+        }
+        emptyMessage={`No direct ${entityLabel('unit', true).toLowerCase()}.`}
+        childEntityType="unit"
+        editPermission={P.edit_units}
+        deletePermission={P.delete_units}
+        readOnly
+        isExistingProject={isExisting}
+        allowReplace={allowReplace}
+        projectId={projectId}
+        onReplace={
+          allowReplace
+            ? (entity) => {
+                setReplaceTarget({
+                  entityType: 'unit',
+                  entityId: entity.id,
+                  entityName: entity.name,
+                  partNumber: entity.part_number,
+                  serialNumber: entity.serial_number,
+                  replacementSequence: entity.replacement_sequence,
+                });
+                setReplaceOpen(true);
+              }
+            : undefined
+        }
+      />
+
+      <EntityCards
+        title={entityLabel('component', true)}
+        description={`Direct ${entityLabel('component', true).toLowerCase()} under ${subsystem.name}`}
+        entities={subsystemComponents}
+        detailPath={(id) => `/components/${id}`}
+        secondaryPath={
+          projectId && system
+            ? (id) =>
+                systemHierarchyPath(projectId, system.id, {
+                  rootType: 'component',
+                  rootId: id,
+                }) ?? '#'
+            : undefined
+        }
+        emptyMessage={`No direct ${entityLabel('component', true).toLowerCase()}.`}
+        childEntityType="component"
+        editPermission={P.edit_components}
+        deletePermission={P.delete_components}
+        readOnly
+        isExistingProject={isExisting}
+        allowReplace={allowReplace}
+        projectId={projectId}
+        onReplace={
+          allowReplace
+            ? (entity) => {
+                setReplaceTarget({
+                  entityType: 'component',
+                  entityId: entity.id,
+                  entityName: entity.name,
+                  partNumber: entity.part_number,
+                  serialNumber: entity.serial_number,
+                  replacementSequence: entity.replacement_sequence,
+                });
+                setReplaceOpen(true);
+              }
+            : undefined
+        }
       />
 
       {isExisting ? (

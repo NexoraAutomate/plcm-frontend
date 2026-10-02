@@ -18,7 +18,9 @@ type Props = {
   entities: TemplateNameItem[];
   levelLabel: (level: string) => string;
   disabled?: boolean;
-  /** Child level to enable when a canvas parent is selected. */
+  /** Child levels enabled when a canvas parent is selected. */
+  focusChildLevels?: TemplateNodeLevel[] | null;
+  /** @deprecated Prefer focusChildLevels. */
   focusChildLevel?: TemplateNodeLevel | null;
   /** Hide system folder when a system already exists. */
   hideSystemLevel?: boolean;
@@ -29,11 +31,15 @@ export function ConfigTreeEntitySidebar({
   entities,
   levelLabel,
   disabled,
+  focusChildLevels = null,
   focusChildLevel = null,
   hideSystemLevel,
   contextLabel,
 }: Props) {
   const hiddenLevels = hideSystemLevel ? (['system'] as TemplateNodeLevel[]) : undefined;
+  const activeLevels =
+    focusChildLevels ?? (focusChildLevel != null ? [focusChildLevel] : null);
+  const hasFocus = !!activeLevels?.length;
 
   return (
     <aside
@@ -50,7 +56,7 @@ export function ConfigTreeEntitySidebar({
         </p>
       </div>
       <div className="min-h-0 flex-1 p-2">
-        {!focusChildLevel ? (
+        {!hasFocus ? (
           <div className="rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
             {contextLabel ||
               (hideSystemLevel
@@ -62,14 +68,14 @@ export function ConfigTreeEntitySidebar({
             className="h-full"
             entities={entities}
             levelLabel={levelLabel}
-            selectableLevel={focusChildLevel}
+            selectableLevels={activeLevels}
             hiddenLevels={hiddenLevels}
             draggable
-            defaultExpandedLevels={[focusChildLevel]}
+            defaultExpandedLevels={activeLevels ?? undefined}
             emptyHint={
-              focusChildLevel === 'system'
+              activeLevels?.length === 1 && activeLevels[0] === 'system'
                 ? 'Add a System first.'
-                : 'No entities in Entity List for this level.'
+                : 'No entities in Entity List for these levels.'
             }
             onDragStart={(event, item) => {
               const payload: EntityDragPayload = {

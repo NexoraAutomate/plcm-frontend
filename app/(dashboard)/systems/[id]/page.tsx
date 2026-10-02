@@ -29,6 +29,7 @@ import {
 } from '@/components/replace-from-inventory-dialog';
 import {
   filterChildrenForParentSlot,
+  filterCurrentInstallEntities,
   systemHierarchyPath,
 } from '@/lib/entity-replacement';
 import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
@@ -44,6 +45,9 @@ export default function SystemDetailPage() {
     systems,
     projects,
     subsystems,
+    modules,
+    units,
+    components,
     deleteSubsystem,
     updateSubsystem,
     updateSystem,
@@ -62,6 +66,15 @@ export default function SystemDetailPage() {
   const allowReplace = projectAllowsReplace(project);
   const systemSubsystems = system
     ? filterChildrenForParentSlot(subsystems, system, systems, (sub) => sub.system_id)
+    : [];
+  const systemModules = system
+    ? filterCurrentInstallEntities(modules.filter((item) => item.system_id === system.id))
+    : [];
+  const systemUnits = system
+    ? filterCurrentInstallEntities(units.filter((item) => item.system_id === system.id))
+    : [];
+  const systemComponents = system
+    ? filterCurrentInstallEntities(components.filter((item) => item.system_id === system.id))
     : [];
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
@@ -278,6 +291,126 @@ export default function SystemDetailPage() {
         isExistingProject={isExisting}
         allowReplace={allowReplace}
         projectId={project?.id}
+      />
+
+      <EntityCards
+        title={entityLabel('module', true)}
+        description={`Direct ${entityLabel('module', true).toLowerCase()} under ${system.name}`}
+        entities={systemModules}
+        statuses={storeStatuses.length ? storeStatuses : statuses}
+        detailPath={(id) => `/modules/${id}`}
+        secondaryPath={
+          project
+            ? (id) =>
+                systemHierarchyPath(project.id, system.id, {
+                  rootType: 'module',
+                  rootId: id,
+                }) ?? '#'
+            : undefined
+        }
+        emptyMessage={`No direct ${entityLabel('module', true).toLowerCase()}.`}
+        childEntityType="module"
+        editPermission={P.edit_modules}
+        deletePermission={P.delete_modules}
+        readOnly
+        isExistingProject={isExisting}
+        allowReplace={allowReplace}
+        projectId={project?.id}
+        onReplace={
+          allowReplace
+            ? (entity) => {
+                setReplaceTarget({
+                  entityType: 'module',
+                  entityId: entity.id,
+                  entityName: entity.name,
+                  partNumber: entity.part_number,
+                  serialNumber: entity.serial_number,
+                  replacementSequence: entity.replacement_sequence,
+                });
+                setReplaceOpen(true);
+              }
+            : undefined
+        }
+      />
+
+      <EntityCards
+        title={entityLabel('unit', true)}
+        description={`Direct ${entityLabel('unit', true).toLowerCase()} under ${system.name}`}
+        entities={systemUnits}
+        statuses={storeStatuses.length ? storeStatuses : statuses}
+        detailPath={(id) => `/units/${id}`}
+        secondaryPath={
+          project
+            ? (id) =>
+                systemHierarchyPath(project.id, system.id, {
+                  rootType: 'unit',
+                  rootId: id,
+                }) ?? '#'
+            : undefined
+        }
+        emptyMessage={`No direct ${entityLabel('unit', true).toLowerCase()}.`}
+        childEntityType="unit"
+        editPermission={P.edit_units}
+        deletePermission={P.delete_units}
+        readOnly
+        isExistingProject={isExisting}
+        allowReplace={allowReplace}
+        projectId={project?.id}
+        onReplace={
+          allowReplace
+            ? (entity) => {
+                setReplaceTarget({
+                  entityType: 'unit',
+                  entityId: entity.id,
+                  entityName: entity.name,
+                  partNumber: entity.part_number,
+                  serialNumber: entity.serial_number,
+                  replacementSequence: entity.replacement_sequence,
+                });
+                setReplaceOpen(true);
+              }
+            : undefined
+        }
+      />
+
+      <EntityCards
+        title={entityLabel('component', true)}
+        description={`Direct ${entityLabel('component', true).toLowerCase()} under ${system.name}`}
+        entities={systemComponents}
+        statuses={storeStatuses.length ? storeStatuses : statuses}
+        detailPath={(id) => `/components/${id}`}
+        secondaryPath={
+          project
+            ? (id) =>
+                systemHierarchyPath(project.id, system.id, {
+                  rootType: 'component',
+                  rootId: id,
+                }) ?? '#'
+            : undefined
+        }
+        emptyMessage={`No direct ${entityLabel('component', true).toLowerCase()}.`}
+        childEntityType="component"
+        editPermission={P.edit_components}
+        deletePermission={P.delete_components}
+        readOnly
+        isExistingProject={isExisting}
+        allowReplace={allowReplace}
+        projectId={project?.id}
+        onReplace={
+          allowReplace
+            ? (entity) => {
+                setReplaceTarget({
+                  entityType: 'component',
+                  entityId: entity.id,
+                  entityName: entity.name,
+                  partNumber: entity.part_number,
+                  serialNumber: entity.serial_number,
+                  replacementSequence: entity.replacement_sequence,
+                });
+                setReplaceOpen(true);
+              }
+            : undefined
+        }
       />
 
       {isExisting ? (

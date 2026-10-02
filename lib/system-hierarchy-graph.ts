@@ -151,6 +151,95 @@ export function mapEntityFields(
   };
 }
 
+function toComponentNode(
+  component: Component,
+  statuses: Status[]
+): HierarchyTreeNode {
+  return {
+    id: makeNodeId('component', component.id),
+    entityId: component.id,
+    type: 'component',
+    ...mapEntityFields(component, statuses),
+    detailPath: DETAIL_PATH.component(component.id),
+    children: [],
+  };
+}
+
+function toUnitNode(
+  unit: Unit,
+  components: Component[],
+  statuses: Status[]
+): HierarchyTreeNode {
+  const unitComponents = filterCurrentInstallEntities(
+    components.filter((comp) => comp.unit_id === unit.id)
+  );
+  return {
+    id: makeNodeId('unit', unit.id),
+    entityId: unit.id,
+    type: 'unit',
+    ...mapEntityFields(unit, statuses),
+    detailPath: DETAIL_PATH.unit(unit.id),
+    children: unitComponents.map((component) => toComponentNode(component, statuses)),
+  };
+}
+
+function toModuleNode(
+  module: Module,
+  units: Unit[],
+  components: Component[],
+  statuses: Status[]
+): HierarchyTreeNode {
+  const moduleUnits = filterCurrentInstallEntities(
+    units.filter((unit) => unit.module_id === module.id)
+  );
+  const moduleComponents = filterCurrentInstallEntities(
+    components.filter((comp) => comp.module_id === module.id)
+  );
+  return {
+    id: makeNodeId('module', module.id),
+    entityId: module.id,
+    type: 'module',
+    ...mapEntityFields(module, statuses),
+    detailPath: DETAIL_PATH.module(module.id),
+    children: [
+      ...moduleUnits.map((unit) => toUnitNode(unit, components, statuses)),
+      ...moduleComponents.map((component) => toComponentNode(component, statuses)),
+    ],
+  };
+}
+
+function toSubsystemNode(
+  subsystem: Subsystem,
+  modules: Module[],
+  units: Unit[],
+  components: Component[],
+  statuses: Status[]
+): HierarchyTreeNode {
+  const subsystemModules = filterCurrentInstallEntities(
+    modules.filter((mod) => mod.subsystem_id === subsystem.id)
+  );
+  const subsystemUnits = filterCurrentInstallEntities(
+    units.filter((unit) => unit.subsystem_id === subsystem.id)
+  );
+  const subsystemComponents = filterCurrentInstallEntities(
+    components.filter((comp) => comp.subsystem_id === subsystem.id)
+  );
+  return {
+    id: makeNodeId('subsystem', subsystem.id),
+    entityId: subsystem.id,
+    type: 'subsystem',
+    ...mapEntityFields(subsystem, statuses),
+    detailPath: DETAIL_PATH.subsystem(subsystem.id),
+    children: [
+      ...subsystemModules.map((module) =>
+        toModuleNode(module, units, components, statuses)
+      ),
+      ...subsystemUnits.map((unit) => toUnitNode(unit, components, statuses)),
+      ...subsystemComponents.map((component) => toComponentNode(component, statuses)),
+    ],
+  };
+}
+
 export function buildSystemHierarchyTree(
   system: System,
   subsystems: Subsystem[],
@@ -162,6 +251,15 @@ export function buildSystemHierarchyTree(
   const systemSubsystems = filterCurrentInstallEntities(
     subsystems.filter((sub) => sub.system_id === system.id)
   );
+  const systemModules = filterCurrentInstallEntities(
+    modules.filter((mod) => mod.system_id === system.id)
+  );
+  const systemUnits = filterCurrentInstallEntities(
+    units.filter((unit) => unit.system_id === system.id)
+  );
+  const systemComponents = filterCurrentInstallEntities(
+    components.filter((comp) => comp.system_id === system.id)
+  );
 
   return {
     id: makeNodeId('system', system.id),
@@ -169,53 +267,16 @@ export function buildSystemHierarchyTree(
     type: 'system',
     ...mapEntityFields(system, statuses),
     detailPath: DETAIL_PATH.system(system.id),
-    children: systemSubsystems.map((subsystem) => {
-      const subsystemModules = filterCurrentInstallEntities(
-        modules.filter((mod) => mod.subsystem_id === subsystem.id)
-      );
-
-      return {
-        id: makeNodeId('subsystem', subsystem.id),
-        entityId: subsystem.id,
-        type: 'subsystem',
-        ...mapEntityFields(subsystem, statuses),
-        detailPath: DETAIL_PATH.subsystem(subsystem.id),
-        children: subsystemModules.map((module) => {
-            const moduleUnits = filterCurrentInstallEntities(
-              units.filter((unit) => unit.module_id === module.id)
-            );
-
-          return {
-            id: makeNodeId('module', module.id),
-            entityId: module.id,
-            type: 'module',
-            ...mapEntityFields(module, statuses),
-            detailPath: DETAIL_PATH.module(module.id),
-            children: moduleUnits.map((unit) => {
-              const unitComponents = filterCurrentInstallEntities(
-                components.filter((comp) => comp.unit_id === unit.id)
-              );
-
-              return {
-                id: makeNodeId('unit', unit.id),
-                entityId: unit.id,
-                type: 'unit',
-                ...mapEntityFields(unit, statuses),
-                detailPath: DETAIL_PATH.unit(unit.id),
-                children: unitComponents.map((component) => ({
-                  id: makeNodeId('component', component.id),
-                  entityId: component.id,
-                  type: 'component',
-                  ...mapEntityFields(component, statuses),
-                  detailPath: DETAIL_PATH.component(component.id),
-                  children: [],
-                })),
-              };
-            }),
-          };
-        }),
-      };
-    }),
+    children: [
+      ...systemSubsystems.map((subsystem) =>
+        toSubsystemNode(subsystem, modules, units, components, statuses)
+      ),
+      ...systemModules.map((module) =>
+        toModuleNode(module, units, components, statuses)
+      ),
+      ...systemUnits.map((unit) => toUnitNode(unit, components, statuses)),
+      ...systemComponents.map((component) => toComponentNode(component, statuses)),
+    ],
   };
 }
 

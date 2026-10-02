@@ -191,9 +191,30 @@ export function resolveProjectIdForHardwareEntity(
   context: {
     systems: Array<{ id: number; project_id: number } & HardwareEntityWithSlot>;
     subsystems: Array<{ id: number; system_id: number } & HardwareEntityWithSlot>;
-    modules: Array<{ id: number; subsystem_id: number } & HardwareEntityWithSlot>;
-    units: Array<{ id: number; module_id: number } & HardwareEntityWithSlot>;
-    components: Array<{ id: number; unit_id: number } & HardwareEntityWithSlot>;
+    modules: Array<
+      {
+        id: number;
+        subsystem_id?: number | null;
+        system_id?: number | null;
+      } & HardwareEntityWithSlot
+    >;
+    units: Array<
+      {
+        id: number;
+        module_id?: number | null;
+        subsystem_id?: number | null;
+        system_id?: number | null;
+      } & HardwareEntityWithSlot
+    >;
+    components: Array<
+      {
+        id: number;
+        unit_id?: number | null;
+        module_id?: number | null;
+        subsystem_id?: number | null;
+        system_id?: number | null;
+      } & HardwareEntityWithSlot
+    >;
   }
 ): number | null {
   if (entityType === 'system') {
@@ -209,18 +230,45 @@ export function resolveProjectIdForHardwareEntity(
   if (entityType === 'module') {
     const module = resolveCurrentInstallEntity(entityId, context.modules);
     if (!module) return null;
-    return resolveProjectIdForHardwareEntity('subsystem', module.subsystem_id, context);
+    if (module.subsystem_id) {
+      return resolveProjectIdForHardwareEntity('subsystem', module.subsystem_id, context);
+    }
+    if (module.system_id) {
+      return resolveProjectIdForHardwareEntity('system', module.system_id, context);
+    }
+    return null;
   }
 
   if (entityType === 'unit') {
     const unit = resolveCurrentInstallEntity(entityId, context.units);
     if (!unit) return null;
-    return resolveProjectIdForHardwareEntity('module', unit.module_id, context);
+    if (unit.module_id) {
+      return resolveProjectIdForHardwareEntity('module', unit.module_id, context);
+    }
+    if (unit.subsystem_id) {
+      return resolveProjectIdForHardwareEntity('subsystem', unit.subsystem_id, context);
+    }
+    if (unit.system_id) {
+      return resolveProjectIdForHardwareEntity('system', unit.system_id, context);
+    }
+    return null;
   }
 
   const component = resolveCurrentInstallEntity(entityId, context.components);
   if (!component) return null;
-  return resolveProjectIdForHardwareEntity('unit', component.unit_id, context);
+  if (component.unit_id) {
+    return resolveProjectIdForHardwareEntity('unit', component.unit_id, context);
+  }
+  if (component.module_id) {
+    return resolveProjectIdForHardwareEntity('module', component.module_id, context);
+  }
+  if (component.subsystem_id) {
+    return resolveProjectIdForHardwareEntity('subsystem', component.subsystem_id, context);
+  }
+  if (component.system_id) {
+    return resolveProjectIdForHardwareEntity('system', component.system_id, context);
+  }
+  return null;
 }
 
 export function resolveSystemIdForHardwareEntity(
@@ -228,9 +276,24 @@ export function resolveSystemIdForHardwareEntity(
   entityId: number,
   context: {
     subsystems: Array<{ id: number; system_id: number }>;
-    modules: Array<{ id: number; subsystem_id: number }>;
-    units: Array<{ id: number; module_id: number }>;
-    components: Array<{ id: number; unit_id: number }>;
+    modules: Array<{
+      id: number;
+      subsystem_id?: number | null;
+      system_id?: number | null;
+    }>;
+    units: Array<{
+      id: number;
+      module_id?: number | null;
+      subsystem_id?: number | null;
+      system_id?: number | null;
+    }>;
+    components: Array<{
+      id: number;
+      unit_id?: number | null;
+      module_id?: number | null;
+      subsystem_id?: number | null;
+      system_id?: number | null;
+    }>;
   }
 ): number | null {
   if (entityType === 'system') return entityId;
@@ -242,18 +305,39 @@ export function resolveSystemIdForHardwareEntity(
   if (entityType === 'module') {
     const module = context.modules.find((item) => item.id === entityId);
     if (!module) return null;
-    return resolveSystemIdForHardwareEntity('subsystem', module.subsystem_id, context);
+    if (module.system_id) return module.system_id;
+    if (module.subsystem_id) {
+      return resolveSystemIdForHardwareEntity('subsystem', module.subsystem_id, context);
+    }
+    return null;
   }
 
   if (entityType === 'unit') {
     const unit = context.units.find((item) => item.id === entityId);
     if (!unit) return null;
-    return resolveSystemIdForHardwareEntity('module', unit.module_id, context);
+    if (unit.system_id) return unit.system_id;
+    if (unit.subsystem_id) {
+      return resolveSystemIdForHardwareEntity('subsystem', unit.subsystem_id, context);
+    }
+    if (unit.module_id) {
+      return resolveSystemIdForHardwareEntity('module', unit.module_id, context);
+    }
+    return null;
   }
 
   const component = context.components.find((item) => item.id === entityId);
   if (!component) return null;
-  return resolveSystemIdForHardwareEntity('unit', component.unit_id, context);
+  if (component.system_id) return component.system_id;
+  if (component.subsystem_id) {
+    return resolveSystemIdForHardwareEntity('subsystem', component.subsystem_id, context);
+  }
+  if (component.module_id) {
+    return resolveSystemIdForHardwareEntity('module', component.module_id, context);
+  }
+  if (component.unit_id) {
+    return resolveSystemIdForHardwareEntity('unit', component.unit_id, context);
+  }
+  return null;
 }
 
 export function systemHierarchyPath(

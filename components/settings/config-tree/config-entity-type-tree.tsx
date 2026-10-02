@@ -27,7 +27,9 @@ export type EntityTreeSelection = {
 type Props = {
   entities: TemplateNameItem[];
   levelLabel: (level: string) => string;
-  /** When set, only this level’s leaves are interactive. */
+  /** When set, only these levels’ leaves are interactive. */
+  selectableLevels?: TemplateNodeLevel[] | null;
+  /** @deprecated Prefer selectableLevels — single-level convenience. */
   selectableLevel?: TemplateNodeLevel | null;
   /** Hide these levels entirely (e.g. system when one already exists). */
   hiddenLevels?: TemplateNodeLevel[];
@@ -43,6 +45,7 @@ type Props = {
 export function ConfigEntityTypeTree({
   entities,
   levelLabel,
+  selectableLevels,
   selectableLevel,
   hiddenLevels,
   selectedName,
@@ -53,6 +56,12 @@ export function ConfigEntityTypeTree({
   defaultExpandedLevels,
   emptyHint,
 }: Props) {
+  const activeSelectableLevels = useMemo(() => {
+    if (selectableLevels != null) return selectableLevels;
+    if (selectableLevel != null) return [selectableLevel];
+    return null;
+  }, [selectableLevel, selectableLevels]);
+
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Set<TemplateNodeLevel>>(() => {
     if (defaultExpandedLevels?.length) return new Set(defaultExpandedLevels);
@@ -60,10 +69,10 @@ export function ConfigEntityTypeTree({
   });
 
   useEffect(() => {
-    if (selectableLevel) {
-      setExpanded(new Set([selectableLevel]));
+    if (activeSelectableLevels?.length) {
+      setExpanded(new Set(activeSelectableLevels));
     }
-  }, [selectableLevel]);
+  }, [activeSelectableLevels]);
 
   const visibleLevels = useMemo(
     () => TEMPLATE_NODE_LEVELS.filter((l) => !hiddenLevels?.includes(l)),
@@ -109,7 +118,7 @@ export function ConfigEntityTypeTree({
         <ul className="space-y-1" role="tree" aria-label="Entity list by type">
           {groups.map(({ level, items }) => {
             const levelInteractive =
-              selectableLevel == null || selectableLevel === level;
+              activeSelectableLevels == null || activeSelectableLevels.includes(level);
             const isOpen =
               (expanded.has(level) || (query.trim().length > 0 && items.length > 0)) &&
               (levelInteractive || query.trim().length > 0);
@@ -131,7 +140,9 @@ export function ConfigEntityTypeTree({
                         levelInteractive
                           ? 'hover:bg-muted/80'
                           : 'cursor-not-allowed opacity-40',
-                        selectableLevel === level && 'bg-muted/60'
+                        levelInteractive &&
+                          activeSelectableLevels?.includes(level) &&
+                          'bg-muted/60'
                       )}
                     >
                       {isOpen ? (
@@ -174,8 +185,7 @@ export function ConfigEntityTypeTree({
                           const canClick = canUse && !!onSelect;
                           const canDrag = !!draggable && canUse;
                           const selected =
-                            selectedName === item.name &&
-                            (selectableLevel == null || selectableLevel === level);
+                            selectedName === item.name && levelInteractive;
                           return (
                             <li key={`${level}-${item.id}-${item.name}`} role="treeitem">
                               <div

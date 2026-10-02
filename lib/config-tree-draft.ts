@@ -1,5 +1,6 @@
 import {
-  CHILD_TEMPLATE_LEVEL,
+  allowedChildLevels,
+  isValidTemplateParent,
   type TemplateDraftNode,
   type TemplateNodeLevel,
 } from '@/lib/hierarchy-config';
@@ -51,9 +52,14 @@ export function siblingsOf(
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 }
 
+/** True when parentLevel may directly contain childLevel (any higher → any lower). */
 export function canLinkLevels(
   parentLevel: TemplateNodeLevel,
   childLevel: TemplateNodeLevel
 ): boolean {
-  return CHILD_TEMPLATE_LEVEL[parentLevel] === childLevel;
+  return isValidTemplateParent(parentLevel, childLevel);
+}
+
+export function childLevelsOf(parentLevel: TemplateNodeLevel): TemplateNodeLevel[] {
+  return allowedChildLevels(parentLevel);
 }

@@ -268,7 +268,9 @@ export function HierarchyPanel({
       setValidationResult({ valid: false, message: nameError });
       return;
     }
-    if (selectedLevel !== "system" && !currentParentId) {
+    // Entity List is a flat catalog — parent is optional and not collected in the Add dialog.
+    // Legacy hierarchy mode still requires a parent for non-System levels.
+    if (!isEntityList && selectedLevel !== "system" && !currentParentId) {
       setValidationResult({ valid: false, message: `Select a parent ${entityLabel(PARENT_LEVEL[selectedLevel] as HierarchyLevel)}.` });
       return;
     }
@@ -278,7 +280,7 @@ export function HierarchyPanel({
         name: newName.trim(),
         hierarchy_type: selectedLevel,
         abbreviation: newAbbr.trim() || undefined,
-        parent_id: currentParentId ?? undefined,
+        parent_id: isEntityList ? null : (currentParentId ?? undefined),
       });
       await loadData();
       invalidateEntityList();

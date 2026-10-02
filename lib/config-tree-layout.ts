@@ -1,6 +1,6 @@
 import dagre from '@dagrejs/dagre';
 import { Position, type Edge, type Node } from '@xyflow/react';
-import { CHILD_TEMPLATE_LEVEL, type TemplateDraftNode } from '@/lib/hierarchy-config';
+import { type TemplateDraftNode, allowedChildLevels } from '@/lib/hierarchy-config';
 import { isDraftNode } from '@/lib/config-tree-draft';
 
 export {
@@ -174,7 +174,7 @@ export function buildGraphFromDraft(input: {
         isDraft: isDraftNode(node),
         locked,
         readOnly,
-        canAddChild: !!CHILD_TEMPLATE_LEVEL[node.level],
+        canAddChild: allowedChildLevels(node.level).length > 0,
         canBuildFromChildren:
           node.level !== 'component' && parentKeysWithChildren.has(node.client_key),
         layoutDirection: direction,

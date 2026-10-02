@@ -60,7 +60,10 @@ export default function UnitDetailPage() {
   const [replaceTarget, setReplaceTarget] = useState<ReplaceFromInventoryTarget | null>(null);
 
   const unit = useResolvedHardwareEntity(unitId, 'unit', units);
-  const module = unit ? resolveCurrentInstallEntity(unit.module_id, modules) : null;
+  const module =
+    unit?.module_id != null
+      ? resolveCurrentInstallEntity(unit.module_id, modules)
+      : null;
   const projectId = unit
     ? resolveProjectIdForHardwareEntity('unit', unit.id, {
         systems,
@@ -91,7 +94,7 @@ export default function UnitDetailPage() {
       })
     : undefined;
   const unitComponents = unit
-    ? filterChildrenForParentSlot(components, unit, units, (component) => component.unit_id)
+    ? filterChildrenForParentSlot(components, unit, units, (component) => component.unit_id ?? -1)
     : [];
 
   const [statuses, setStatuses] = useState<Models.Status[]>([]);

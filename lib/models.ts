@@ -849,7 +849,8 @@ export interface Module extends HierarchyInstallFields {
   id: number
   name: string
   description: string
-  subsystem_id: number
+  subsystem_id?: number | null
+  system_id?: number | null
   status_id: number
   created_at: string
   part_number: string
@@ -864,7 +865,9 @@ export interface Unit extends HierarchyInstallFields {
   id: number
   name: string
   description: string
-  module_id: number
+  module_id?: number | null
+  subsystem_id?: number | null
+  system_id?: number | null
   status_id: number
   created_at: string
   part_number: string
@@ -880,7 +883,10 @@ export interface Component extends HierarchyInstallFields {
   name: string
   description: string
   sku: string
-  unit_id: number
+  unit_id?: number | null
+  module_id?: number | null
+  subsystem_id?: number | null
+  system_id?: number | null
   status_id: number
   created_at: string
   part_number: string

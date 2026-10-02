@@ -27,6 +27,7 @@ import {
 } from '@/components/replace-from-inventory-dialog';
 import {
   filterChildrenForParentSlot,
+  filterCurrentInstallEntities,
   resolveCurrentInstallEntity,
   resolveProjectIdForHardwareEntity,
   resolveSystemIdForHardwareEntity,
@@ -47,6 +48,7 @@ export default function ModuleDetailPage() {
     subsystems,
     systems,
     units,
+    components,
     projects,
     deleteUnit,
     updateUnit,
@@ -59,7 +61,16 @@ export default function ModuleDetailPage() {
   const [replaceTarget, setReplaceTarget] = useState<ReplaceFromInventoryTarget | null>(null);
 
   const module = useResolvedHardwareEntity(moduleId, 'module', modules);
-  const subsystem = module ? resolveCurrentInstallEntity(module.subsystem_id, subsystems) : null;
+  const subsystem =
+    module?.subsystem_id != null
+      ? resolveCurrentInstallEntity(module.subsystem_id, subsystems)
+      : null;
+  const parentSystem =
+    module?.system_id != null
+      ? resolveCurrentInstallEntity(module.system_id, systems)
+      : subsystem
+        ? resolveCurrentInstallEntity(subsystem.system_id, systems)
+        : null;
   const projectId = module
     ? resolveProjectIdForHardwareEntity('module', module.id, {
         systems,
@@ -90,7 +101,12 @@ export default function ModuleDetailPage() {
       })
     : undefined;
   const moduleUnits = module
-    ? filterChildrenForParentSlot(units, module, modules, (unit) => unit.module_id)
+    ? filterChildrenForParentSlot(units, module, modules, (unit) => unit.module_id ?? -1)
+    : [];
+  const moduleComponents = module
+    ? filterCurrentInstallEntities(
+        components.filter((item) => item.module_id === module.id)
+      )
     : [];
 
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
@@ -234,17 +250,41 @@ export default function ModuleDetailPage() {
     <div className="space-y-6">
       <Breadcrumb>
         <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href="/subsystems">Subsystems</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href={`/subsystems/${subsystem?.id}`}>{subsystem?.name}</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
+          {subsystem ? (
+            <>
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link href="/subsystems">Subsystems</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link href={`/subsystems/${subsystem.id}`}>{subsystem.name}</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+            </>
+          ) : parentSystem ? (
+            <>
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link href="/systems">Systems</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link href={`/systems/${parentSystem.id}`}>{parentSystem.name}</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+            </>
+          ) : (
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/modules">Modules</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+          )}
           <BreadcrumbSeparator />
           <BreadcrumbItem>
             <BreadcrumbPage>{module.name}</BreadcrumbPage>
@@ -255,7 +295,13 @@ export default function ModuleDetailPage() {
       <HierarchyEntityHeader
         name={module.name}
         description={module.description}
-        backHref={subsystem ? `/subsystems/${subsystem.id}` : '/modules'}
+        backHref={
+          subsystem
+            ? `/subsystems/${subsystem.id}`
+            : parentSystem
+              ? `/systems/${parentSystem.id}`
+              : '/modules'
+        }
         projectId={projectId}
         projectName={project?.name}
         systemName={
@@ -275,7 +321,7 @@ export default function ModuleDetailPage() {
         entity={module}
         onUpdate={(data) => updateModule(module.id, data)}
         projectId={projectId ?? undefined}
-        parentId={subsystem?.id}
+        parentId={subsystem?.id ?? parentSystem?.id}
         isExistingProject={isExisting}
         allowReplace={allowReplace}
         hierarchyHref={hierarchyHref}
@@ -322,6 +368,45 @@ export default function ModuleDetailPage() {
         isExistingProject={isExisting}
         allowReplace={allowReplace}
         projectId={projectId}
+      />
+
+      <EntityCards
+        title={entityLabel('component', true)}
+        description={`Direct ${entityLabel('component', true).toLowerCase()} under ${module.name}`}
+        entities={moduleComponents}
+        detailPath={(id) => `/components/${id}`}
+        secondaryPath={
+          projectId && systemId
+            ? (id) =>
+                systemHierarchyPath(projectId, systemId, {
+                  rootType: 'component',
+                  rootId: id,
+                }) ?? '#'
+            : undefined
+        }
+        emptyMessage={`No direct ${entityLabel('component', true).toLowerCase()}.`}
+        childEntityType="component"
+        editPermission={P.edit_components}
+        deletePermission={P.delete_components}
+        readOnly
+        isExistingProject={isExisting}
+        allowReplace={allowReplace}
+        projectId={projectId}
+        onReplace={
+          allowReplace
+            ? (entity) => {
+                setReplaceTarget({
+                  entityType: 'component',
+                  entityId: entity.id,
+                  entityName: entity.name,
+                  partNumber: entity.part_number,
+                  serialNumber: entity.serial_number,
+                  replacementSequence: entity.replacement_sequence,
+                });
+                setReplaceOpen(true);
+              }
+            : undefined
+        }
       />
 
       {isExisting ? (
