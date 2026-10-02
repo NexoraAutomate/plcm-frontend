@@ -55,6 +55,7 @@ export const ROLE_SIDEBAR_ORDER: Record<WorkflowRoleCode, SidebarEntryKey[]> = {
     'maintenance',
     'notifications',
     'reporting',
+    'definitions',
   ],
   HM: [
     'hierarchy-dashboard',
@@ -74,6 +75,7 @@ export const ROLE_SIDEBAR_ORDER: Record<WorkflowRoleCode, SidebarEntryKey[]> = {
     'hierarchy-dashboard',
     'notifications',
     'reporting',
+    'definitions',
   ],
   DEV: [
     'my-assignments',
