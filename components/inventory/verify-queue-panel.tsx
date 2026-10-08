@@ -12,6 +12,7 @@ import { ENTITY_TYPE_DB_LABELS } from '@/lib/entity-resolver';
 import { cn } from '@/lib/utils';
 import { parseApiDate } from '@/lib/parse-api-date';
 import { queryKeys } from '@/hooks/queries/query-keys';
+import { invalidatePendingActionCounts } from '@/hooks/use-pending-action-counts';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -127,13 +128,14 @@ export function VerifyQueuePanel() {
     try {
       const res = await api.inventory.listItemVerifications();
       setRows(res.data ?? []);
+      await invalidatePendingActionCounts(queryClient);
     } catch {
       toast.error('Failed to load verification queue');
       setRows([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [queryClient]);
 
   usePageDataRefresh(refresh);
 
@@ -240,6 +242,7 @@ export function VerifyQueuePanel() {
       });
     }
     await queryClient.invalidateQueries({ queryKey: ['projects'] });
+    await invalidatePendingActionCounts(queryClient);
   }
 
   async function handleAccept(row: ItemInstallState) {

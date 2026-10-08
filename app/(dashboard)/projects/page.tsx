@@ -43,9 +43,9 @@ import { workflowStatusLabel } from '@/lib/workflow-status';
 import { getSystemCountByProjectId, getCount } from '@/lib/entity-counts';
 import { EntityCountCell } from '@/components/entity-count-cell';
 import { Progress } from '@/components/ui/progress';
-import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
+import { ProjectDeleteDialog } from '@/components/projects/project-delete-dialog';
 import {
   ListStatsVisibilityControls,
   useListStatsVisibility,
@@ -201,6 +201,16 @@ export default function ProjectsPage(){
     [projects]
   );
 
+  /** 1-based sequence on the current sorted list; renumbers when rows are removed. */
+  const serialByProjectId = useMemo(() => {
+    const map = new Map<number, number>();
+    const base = pagination.page * pagination.pageSize;
+    projects.forEach((project, index) => {
+      map.set(project.id, base + index + 1);
+    });
+    return map;
+  }, [projects, pagination.page, pagination.pageSize]);
+
   function toggleProjectGroup(key: string) {
     setExpandedProjectGroups((prev) => {
       const next = new Set(prev);
@@ -216,12 +226,16 @@ export default function ProjectsPage(){
   ) {
     const owner = users.find((u) => u.id === project.owner_id);
     const status = statuses.find((s) => s.id === project.status_id);
+    const serial = serialByProjectId.get(project.id) ?? '—';
     return (
       <TableRow
         key={project.id}
         className="cursor-pointer"
         onClick={() => router.push(`/projects/${project.id}`)}
       >
+        <TableCell className="w-12 text-center tabular-nums text-muted-foreground">
+          {serial}
+        </TableCell>
         <TableCell className={cn('font-medium', options?.indented && 'pl-10')}>
           <div className="flex items-center gap-2">
             <EntityNameWithFault
@@ -231,6 +245,11 @@ export default function ProjectsPage(){
               faultMap={faultMap}
             />
             {isExistingProject(project) ? <ExistingProjectBadge /> : null}
+            {project.delete_requested_at ? (
+              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+                Pending delete
+              </span>
+            ) : null}
           </div>
         </TableCell>
         <TableCell>{owner?.full_name || 'N/A'}</TableCell>
@@ -372,18 +391,6 @@ export default function ProjectsPage(){
       setIsEditOpen(false);
     } catch {
       // Error handled by DataStore
-    }
-  }
-
-  async function confirmDelete() {
-    if (deleteConfirm.id === null) return;
-    try {
-      await deleteProject(deleteConfirm.id);
-      pagination.invalidate();
-    } catch {
-      // Error handled by DataStore
-    } finally {
-      setDeleteConfirm({ open: false, id: null });
     }
   }
 
@@ -736,6 +743,7 @@ export default function ProjectsPage(){
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12 text-center">#</TableHead>
                   <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Name</SortableTableHead>
                   <SortableTableHead column="owner_id" sort={sort} onSort={cycleSort}>Owner</SortableTableHead>
                   <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
@@ -749,7 +757,7 @@ export default function ProjectsPage(){
               <TableBody>
                 {projects.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                       No projects found
                     </TableCell>
                   </TableRow>
@@ -765,7 +773,7 @@ export default function ProjectsPage(){
                         key={`group-${group.key}`}
                         className="bg-muted/30 hover:bg-muted/50"
                       >
-                        <TableCell colSpan={8} className="p-0">
+                        <TableCell colSpan={9} className="p-0">
                           <button
                             type="button"
                             className="flex w-full items-center gap-2 px-4 py-3 text-left font-medium"
@@ -906,14 +914,14 @@ export default function ProjectsPage(){
         </DialogContent>
       </Dialog>
 
-      <ConfirmDialog
+      <ProjectDeleteDialog
         open={deleteConfirm.open}
+        projectId={deleteConfirm.id}
         onOpenChange={(open) =>
           setDeleteConfirm((prev) => ({ ...prev, open, id: open ? prev.id : null }))
         }
-        title="Delete Project"
-        description="Are you sure? Reserved inventory will be released back to stock. Projects past issue-to-developer cannot be deleted. This action cannot be undone."
-        onConfirm={confirmDelete}
+        onDelete={deleteProject}
+        onCompleted={() => pagination.invalidate()}
       />
     </div>
   );

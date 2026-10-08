@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Search, X } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import type { DeveloperAssignedWork, ItemInstallRejection } from '@/lib/models';
@@ -35,6 +36,7 @@ import { P } from '@/lib/permission-codes';
 import { ReworkWizardDialog, type ReworkWizardTarget } from '@/components/inventory/rework-wizard-dialog';
 import { RejectionReasonsDialog } from '@/components/inventory/rejection-reasons-dialog';
 import { usePageDataRefresh } from '@/components/page-data-refresh';
+import { invalidatePendingActionCounts } from '@/hooks/use-pending-action-counts';
 
 function rowKey(row: DeveloperAssignedWork) {
   return `${row.entity_type}:${row.entity_id}`;
@@ -180,18 +182,20 @@ export function MyAssignmentsPanel() {
     history: ItemInstallRejection[];
   } | null>(null);
 
+  const queryClient = useQueryClient();
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.inventory.listMyAssignments();
       setRows(res.data ?? []);
+      await invalidatePendingActionCounts(queryClient);
     } catch {
       toast.error('Failed to load assigned items');
       setRows([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [queryClient]);
 
   usePageDataRefresh(refresh);
 

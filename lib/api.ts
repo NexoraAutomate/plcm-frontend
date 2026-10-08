@@ -382,7 +382,21 @@ export const projects = {
   requestConfigChange: (id: number, data?: { notes?: string | null }) =>
     api.post<Models.ConfigChangeRequest>(`/projects/${id}/config-change/`, data ?? {}),
   update: (id: number, data: Partial<Models.Project>) => api.put<Models.Project>(`/projects/${id}/`, data),
-  delete: (id: number) => api.delete(`/projects/${id}/`),
+  deletePreview: (id: number) =>
+    api.get<Models.ProjectDeletePreview>(`/projects/${id}/delete-preview/`),
+  delete: (
+    id: number,
+    options?: {
+      inventory_disposition?: Models.ProjectDeleteDisposition;
+      confirm?: boolean;
+    }
+  ) =>
+    api.delete<Models.ProjectDeleteResult>(`/projects/${id}/`, {
+      params: buildQueryParams({
+        inventory_disposition: options?.inventory_disposition ?? 'auto',
+        confirm: options?.confirm ? true : undefined,
+      }),
+    }),
   getSystems: (id: number) => api.get<Models.System[]>(`/projects/${id}/systems/`),
 };
 
@@ -1287,6 +1301,10 @@ export const notifications = {
     api.post<Models.AppNotificationRecord>(`/notifications/${noticeId}/read/`),
   markAllRead: () =>
     api.post<{ ok: boolean; marked: number }>('/notifications/read-all/'),
+};
+
+export const pendingActions = {
+  counts: () => api.get<Models.PendingActionCounts>('/pending-actions/counts/'),
 };
 
 export default api;

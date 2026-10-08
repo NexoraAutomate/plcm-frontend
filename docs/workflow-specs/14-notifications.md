@@ -124,7 +124,9 @@ Status: **exists** | **partial** | **gap** | **optional**.
 | Project completed / ready to deliver | Completion gate | PD + assigned HM + Admin* | high | gap |
 | Project cancelled | `POST /projects/{id}/cancel/` | Assigned HM, Developers with open issue, IM (recall), PD, Admin* | high | gap |
 | Project edited (non-structural) | `PUT /projects/{id}/` | Assigned HM + PD | low | gap |
-| Project deleted | `DELETE /projects/{id}/` | Assigned HM + PD + Admin* | high | gap |
+| Project delete requested | `DELETE /projects/{id}/?inventory_disposition=revert` | IM + assigned HM + PD + Admin* (+ developers with open recall) | high | exists |
+| Project ready to delete | Last recall disposition when `delete_requested` | Delete requester + IM + Admin* | high | exists |
+| Project deleted | `DELETE /projects/{id}/` | Assigned HM + PD + Admin* + IM | high | exists |
 
 ### 2. Customers and orders
 

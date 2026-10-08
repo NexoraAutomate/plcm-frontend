@@ -53,6 +53,7 @@ import {
   sidebarOrderForRoles,
   type SidebarEntryKey,
 } from "@/lib/sidebar-nav";
+import { usePendingActionCounts } from "@/hooks/use-pending-action-counts";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -379,14 +380,41 @@ function isNavItemActive(pathname: string, href: string) {
   );
 }
 
+function formatPendingCount(count: number) {
+  return count > 99 ? "99+" : String(count);
+}
+
+function PendingBadge({
+  count,
+  className,
+}: {
+  count: number;
+  className?: string;
+}) {
+  if (count <= 0) return null;
+  return (
+    <span
+      className={cn(
+        "absolute -left-1 -top-1 z-10 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-white shadow-sm",
+        className
+      )}
+      aria-label={`${count} pending`}
+    >
+      {formatPendingCount(count)}
+    </span>
+  );
+}
+
 function NavLink({
   item,
   pathname,
   collapsed,
+  badgeCount = 0,
 }: {
   item: NavItem;
   pathname: string;
   collapsed: boolean;
+  badgeCount?: number;
 }) {
   const isActive = isNavItemActive(pathname, item.href);
 
@@ -394,14 +422,17 @@ function NavLink({
     <Link
       href={item.href}
       className={cn(
-        "flex items-center rounded-lg border text-sm font-medium transition-colors",
+        "relative flex items-center rounded-lg border text-sm font-medium transition-colors",
         collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2.5",
         isActive
           ? "border-sidebar-primary bg-sidebar-accent text-sidebar-primary"
           : "border-transparent text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
       )}
     >
-      <item.icon className="h-4.5 w-4.5 shrink-0" />
+      <span className="relative shrink-0">
+        <PendingBadge count={badgeCount} />
+        <item.icon className="h-4.5 w-4.5" />
+      </span>
       {!collapsed && <span className="truncate">{item.label}</span>}
     </Link>
   );
@@ -412,7 +443,9 @@ function NavLink({
     <Tooltip delayDuration={0}>
       <TooltipTrigger asChild>{link}</TooltipTrigger>
       <TooltipContent side="right" sideOffset={8}>
-        {item.label}
+        {badgeCount > 0
+          ? `${item.label} (${formatPendingCount(badgeCount)} pending)`
+          : item.label}
       </TooltipContent>
     </Tooltip>
   );
@@ -425,6 +458,7 @@ function CollapsibleGroupHeader({
   active,
   onToggle,
   href,
+  badgeCount = 0,
 }: {
   label: string;
   icon: LucideIcon;
@@ -432,7 +466,15 @@ function CollapsibleGroupHeader({
   active: boolean;
   onToggle: () => void;
   href?: string;
+  badgeCount?: number;
 }) {
+  const iconWithBadge = (
+    <span className="relative shrink-0">
+      <PendingBadge count={badgeCount} />
+      <Icon className="h-4.5 w-4.5" />
+    </span>
+  );
+
   return (
     <div
       className={cn(
@@ -445,18 +487,18 @@ function CollapsibleGroupHeader({
       {href ? (
         <Link
           href={href}
-          className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5"
+          className="relative flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5"
         >
-          <Icon className="h-4.5 w-4.5 shrink-0" />
+          {iconWithBadge}
           <span className="truncate">{label}</span>
         </Link>
       ) : (
         <button
           type="button"
           onClick={onToggle}
-          className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left"
+          className="relative flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left"
         >
-          <Icon className="h-4.5 w-4.5 shrink-0" />
+          {iconWithBadge}
           <span className="truncate">{label}</span>
         </button>
       )}
@@ -481,6 +523,7 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { logout, can, user } = useAuth();
   const { entityLabel } = useAppDefinitions();
+  const { countForHref, sumForHrefs } = usePendingActionCounts(Boolean(user));
   const [pinned, setPinned] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [openGroups, setOpenGroups] = useState<
@@ -612,27 +655,34 @@ export function AppSidebar() {
         item={withEntityLabel(item)}
         pathname={pathname}
         collapsed={collapsed}
+        badgeCount={countForHref(item.href)}
       />
     );
   };
 
   const renderChildLinks = (items: NavItem[]) => (
     <div className="ml-3 mr-1 mt-0.5 space-y-0.5 rounded-md bg-sidebar-submenu p-1">
-      {items.map((item) => (
-        <Link
-          key={item.href}
-          href={item.href}
-          className={cn(
-            "flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
-            isNavItemActive(pathname, item.href)
-              ? "border-sidebar-primary bg-sidebar-primary/20 text-sidebar-primary"
-              : "border-transparent text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-          )}
-        >
-          <item.icon className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate">{item.label}</span>
-        </Link>
-      ))}
+      {items.map((item) => {
+        const badgeCount = countForHref(item.href);
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              "relative flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
+              isNavItemActive(pathname, item.href)
+                ? "border-sidebar-primary bg-sidebar-primary/20 text-sidebar-primary"
+                : "border-transparent text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+            )}
+          >
+            <span className="relative shrink-0">
+              <PendingBadge count={badgeCount} className="-left-1.5 -top-1.5 h-3.5 min-w-3.5 text-[9px]" />
+              <item.icon className="h-3.5 w-3.5" />
+            </span>
+            <span className="truncate">{item.label}</span>
+          </Link>
+        );
+      })}
     </div>
   );
 
@@ -652,6 +702,10 @@ export function AppSidebar() {
     if (items.length === 0) return null;
     const active = Boolean(href && pathname === href);
     const open = openGroups[id];
+    const groupBadgeCount = sumForHrefs([
+      ...items.map((item) => item.href),
+      ...(href ? [href] : []),
+    ]);
 
     if (collapsed) {
       if (href) {
@@ -661,6 +715,7 @@ export function AppSidebar() {
             item={{ label, href, icon }}
             pathname={pathname}
             collapsed={collapsed}
+            badgeCount={groupBadgeCount}
           />
         );
       }
@@ -673,6 +728,7 @@ export function AppSidebar() {
               item={item}
               pathname={pathname}
               collapsed={collapsed}
+              badgeCount={countForHref(item.href)}
             />
           ))}
         </div>
@@ -688,6 +744,7 @@ export function AppSidebar() {
           active={active}
           onToggle={() => toggleGroup(id)}
           href={href}
+          badgeCount={open ? 0 : groupBadgeCount}
         />
         {open && renderChildLinks(items)}
       </div>

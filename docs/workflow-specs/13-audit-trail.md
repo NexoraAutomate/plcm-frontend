@@ -34,7 +34,8 @@ Record **immutable** audit logs for every meaningful action across hierarchy and
    - Remarks  
 3. Action types at minimum:
    - Reserved · Released · Issued · Installation in Progress · Under Testing · Installed Verified · Returned · Re-Issued · Modified · Deleted  
-   - Plus project: created, approved, hierarchy generated, cancelled, config change request/approve  
+   - Plus project: created, approved, hierarchy generated, cancelled, delete requested, config change request/approve  
+
 4. Query filters: entity, user, role, action, date range, project.
 5. No update/delete of audit rows via application APIs.
 

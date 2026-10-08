@@ -38,6 +38,7 @@ export const queryKeys = {
   inventoryPage: (type?: string, filters?: ListFilterParams) =>
     ['inventory', 'page', { type: type ?? null, filters: stableFiltersKey(filters) }] as const,
   inventoryStatsSummary: () => ['inventory', 'statsSummary'] as const,
+  pendingActionCounts: () => ['pendingActions', 'counts'] as const,
   systemsPage: (filters?: ListFilterParams) =>
     ['systems', 'page', stableFiltersKey(filters)] as const,
   subsystemsPage: (filters?: ListFilterParams) =>

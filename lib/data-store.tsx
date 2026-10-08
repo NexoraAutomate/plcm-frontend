@@ -79,7 +79,13 @@ interface DataStoreContextType {
   updateProject: (id: number, data: Partial<Models.Project>) => Promise<Models.Project>;
   /** Merge a project payload into local store state (no API call). */
   mergeProjectLocal: (project: Models.Project) => void;
-  deleteProject: (id: number) => Promise<void>;
+  deleteProject: (
+    id: number,
+    options?: {
+      inventory_disposition?: Models.ProjectDeleteDisposition;
+      confirm?: boolean;
+    }
+  ) => Promise<Models.ProjectDeleteResult | void>;
   getProjectSystems: (projectId: number) => Promise<Models.System[]>;
 
   // Systems
@@ -906,11 +912,41 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const deleteProject = async (id: number) => {
+  const deleteProject = async (
+    id: number,
+    options?: {
+      inventory_disposition?: Models.ProjectDeleteDisposition;
+      confirm?: boolean;
+    }
+  ) => {
     try {
-      await api.projects.delete(id);
+      const res = await api.projects.delete(id, options);
+      const result = res.data;
+      if (result?.status === 'delete_requested') {
+        setProjects((prev) =>
+          prev.map((p) =>
+            p.id === id
+              ? {
+                  ...p,
+                  delete_requested_at:
+                    (result as { delete_requested_at?: string }).delete_requested_at ??
+                    new Date().toISOString(),
+                  delete_requested_by_id:
+                    (result as { delete_requested_by_id?: number })
+                      .delete_requested_by_id ?? p.delete_requested_by_id,
+                  status_name: 'CANCELLED',
+                }
+              : p
+          )
+        );
+        toast.success(
+          'Delete requested. Inventory Manager has been notified to recall stock. Delete again once inventory is cleared.'
+        );
+        return result;
+      }
       setProjects(projects.filter((p) => p.id !== id));
       toast.success('Project deleted successfully');
+      return result;
     } catch (err) {
       const detail =
         err && typeof err === 'object' && 'response' in err

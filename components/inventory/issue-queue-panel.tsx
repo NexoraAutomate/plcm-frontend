@@ -47,7 +47,9 @@ import { ListContentSuspense } from '@/components/list-content-suspense';
 import { Can } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
 import { usePageDataRefresh } from '@/components/page-data-refresh';
+import { invalidatePendingActionCounts } from '@/hooks/use-pending-action-counts';
 import { uploadIssuanceProformaIfNeeded } from '@/lib/issuance-signature';
+import { useQueryClient } from '@tanstack/react-query';
 
 function formatWhen(value?: string | null) {
   if (!value) return '—';
@@ -119,18 +121,20 @@ export function IssueQueuePanel() {
   const [submitting, setSubmitting] = useState(false);
   const signature = useIssueSignature();
 
+  const queryClient = useQueryClient();
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.inventory.listItemRequests({ status: 'pending' });
       setRows(res.data ?? []);
+      await invalidatePendingActionCounts(queryClient);
     } catch {
       toast.error('Failed to load issue queue');
       setRows([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [queryClient]);
 
   usePageDataRefresh(refresh);
 

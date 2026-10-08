@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, GitBranch, UserCog, Ban, Package, FileCog, Flag } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { invalidatePendingActionCounts } from '@/hooks/use-pending-action-counts';
 import {
   Select,
   SelectContent,
@@ -55,6 +57,7 @@ export function ProjectWorkflowActions({
   onUpdated,
 }: Props) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { user, can } = useAuth();
   const { ensureHierarchyLoaded } = useDataStore();
   const canMarkProjectComplete = useMemo(() => {
@@ -107,6 +110,13 @@ export function ProjectWorkflowActions({
     status === ProjectWorkflowStatus.HIERARCHY_GENERATED;
   const isCompleted = status === ProjectWorkflowStatus.COMPLETED;
   const isCancelled = isProjectReadOnly(status);
+  const hmReassignable = project.hm_reassignable !== false;
+  const hmAssignDisabled = busy || isCancelled || !hmReassignable;
+  const hmAssignTooltip = isCancelled
+    ? 'Cancelled or superseded projects cannot change Hierarchy Manager'
+    : !hmReassignable
+      ? 'Hierarchy Manager is locked after installation verification Accept/Reject'
+      : undefined;
   const isExisting = isExistingProject(project);
   const configChangeDisabled = !isApproved || isReady || isCancelled;
   const configChangeTooltip = isReady
@@ -160,6 +170,7 @@ export function ProjectWorkflowActions({
     try {
       const res = await api.projects.approve(project.id);
       onUpdated(res.data);
+      await invalidatePendingActionCounts(queryClient);
       toast.success('Project approved');
     } catch (error: unknown) {
       const detail =
@@ -301,31 +312,49 @@ export function ProjectWorkflowActions({
           <Can permission={P.project_assign_hm}>
             <div className="space-y-3">
               <h3 className="text-sm font-medium">Assign Hierarchy Manager</h3>
-              <Select
-                value={hmId}
-                onValueChange={setHmId}
-                disabled={busy || isCancelled || isApproved}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select HM" />
-                </SelectTrigger>
-                <SelectContent>
-                  {hmCandidates.map((u) => (
-                    <SelectItem key={u.id} value={String(u.id)}>
-                      {u.full_name || u.username}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => void handleAssignHm()}
-                disabled={busy || isCancelled || isApproved}
-              >
-                <UserCog className="mr-1.5 h-4 w-4" />
-                Assign HM
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="space-y-3">
+                      <Select
+                        value={hmId}
+                        onValueChange={setHmId}
+                        disabled={hmAssignDisabled}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select HM" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {hmCandidates.map((u) => (
+                            <SelectItem key={u.id} value={String(u.id)}>
+                              {u.full_name || u.username}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => void handleAssignHm()}
+                        disabled={hmAssignDisabled}
+                      >
+                        <UserCog className="mr-1.5 h-4 w-4" />
+                        {project.assigned_hm_id ? 'Update HM' : 'Assign HM'}
+                      </Button>
+                    </div>
+                  </TooltipTrigger>
+                  {hmAssignTooltip ? (
+                    <TooltipContent>
+                      <p>{hmAssignTooltip}</p>
+                    </TooltipContent>
+                  ) : null}
+                </Tooltip>
+              </TooltipProvider>
+              {!hmReassignable ? (
+                <p className="text-xs text-muted-foreground">
+                  Locked after verification Accept/Reject on this project.
+                </p>
+              ) : null}
             </div>
           </Can>
 

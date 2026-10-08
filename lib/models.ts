@@ -284,6 +284,38 @@ export interface Project {
   successor_project_id?: number | null
   predecessor_project_id?: number | null
   is_existing_project?: boolean
+  /** False after any HM Accept/Reject on installation verification for this project */
+  hm_reassignable?: boolean
+  delete_requested_at?: string | null
+  delete_requested_by_id?: number | null
+}
+
+export type ProjectDeleteDisposition = 'auto' | 'revert' | 'discard'
+
+export interface ProjectDeletePreview {
+  project_id: number
+  project_name?: string | null
+  project_status?: string | null
+  progressed_past_reserve_or_assign: boolean
+  inventory_is_cleared: boolean
+  delete_requested_at?: string | null
+  delete_requested_by_id?: number | null
+  open_recall_count: number
+  reserved_count: number
+  can_hard_delete: boolean
+  preview?: ProjectCancelPreview | null
+}
+
+export interface ProjectDeleteResult {
+  ok: boolean
+  status: 'deleted' | 'delete_requested'
+  project_id: number
+  inventory_disposition?: string
+  reserved_released?: number
+  recall_tasks_created?: number
+  shortages_cancelled?: number
+  pending_requests_cancelled?: number
+  rework_closed?: number
 }
 
 export interface ProjectCancelPreview {
@@ -1148,6 +1180,19 @@ export interface InventoryStatsSummary {
   open_shortage_top_names: string[]
   pending_issue_requests: number
   return_pending_inspect: number
+}
+
+/** Sidebar badge counts for actions awaiting the current user. */
+export interface PendingActionCounts {
+  verify_queue: number
+  my_assignments: number
+  issue_queue: number
+  inspect_queue: number
+  issuances: number
+  projects: number
+  config_changes: number
+  shortages: number
+  notifications: number
 }
 
 export type InventoryIssuanceStatus =

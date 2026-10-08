@@ -1,4 +1,4 @@
-# Current Feature: Frontend OOM — Safety Caps (Phase 4)
+# Current Feature: Project Delete — Revert vs Discard
 
 ## Status
 
@@ -6,22 +6,24 @@ Complete
 
 ## Goals
 
-- Lower absolute paginated-fetch safety valve (still above normal workloads)
-- Cap status list fetch (replace hard-coded 5000)
-- Align workflow poll intervals with React Query `staleTime` (stop 12s vs 30s fights)
-- Shorten unused shadcn toast remove delay; unify QueryClient singleton + slightly tighter `gcTime`
-- Cap silent hierarchy merges so store arrays cannot grow past `HIERARCHY_TYPE_CAP`
-- Do not use Node heap increases as the fix
+- Anyone with `delete_projects` can delete past reserve/assign via revert or discard
+- Revert: release reserved stock, open recall tasks, mark delete requested; hard-delete only after inventory cleared
+- Discard: immediate hard-delete of project + purge ledger; leave InventoryItem rows untouched
+- Audit who/when and inventory disposition (reverted vs discarded vs released)
+- Notify Inventory Manager on delete request and on final delete; notify requester when ready to finalize
 
 ## Notes
 
-- Frontend-only; builds on Phases 1–3 on `main`
-- Keep `HIERARCHY_TYPE_CAP` at 500 (tree correctness)
-- Auth session poll stays at 15s (security)
+- Reuses Spec 11 `clear_project_inventory` cascade for revert path
+- Permission: `delete_projects` (not Admin-only)
+- No auto hard-delete when recalls finish — user clicks Delete again once cleared
 
 ## History
 
 <!-- Completed features (append only) -->
+
+### Frontend OOM — Safety Caps (Phase 4)
+Lower absolute paginated-fetch safety valve; status list cap; poll intervals; toast/gcTime; hierarchy merge cap.
 
 ### Frontend OOM — Compile Graph (Phase 3)
 `next/dynamic` for Settings, Recharts, XYFlow, Ant Charts; dead module cleanup; merged as `179fd52`.

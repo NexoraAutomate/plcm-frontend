@@ -51,6 +51,7 @@ const INSPECT_TYPES = new Set([
   'recall_inspected',
   'install_reverted',
   'project_cancelled',
+  'project_delete_requested',
 ]);
 
 const SETTINGS_TYPES = new Set([

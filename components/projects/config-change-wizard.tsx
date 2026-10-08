@@ -5,8 +5,10 @@ import { WORKFLOW_POLL_MS } from '@/lib/data-loading';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, GitBranch, Loader2, RefreshCw } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { invalidatePendingActionCounts } from '@/hooks/use-pending-action-counts';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -56,6 +58,7 @@ export function ConfigChangeWizard({
   asPage = false,
 }: Props) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [change, setChange] = useState<ConfigChangeRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -207,6 +210,7 @@ export function ConfigChangeWizard({
       });
       setChange(res.data);
       onConfigChange?.(res.data);
+      await invalidatePendingActionCounts(queryClient);
       toast.success('Change request submitted for Admin approval');
     } catch (error: unknown) {
       toast.error(apiError(error, 'Submit failed'));
@@ -222,6 +226,7 @@ export function ConfigChangeWizard({
       const res = await api.configChanges.approve(change.id);
       setChange(res.data);
       onConfigChange?.(res.data);
+      await invalidatePendingActionCounts(queryClient);
       toast.success('Configuration change approved');
     } catch (error: unknown) {
       toast.error(apiError(error, 'Approve failed'));
