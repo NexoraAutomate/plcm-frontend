@@ -35,6 +35,8 @@ import {
 import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
 import { isProjectReadOnly } from '@/lib/workflow-status';
 import { HierarchyEntityHeader } from '@/components/hierarchy-entity-header';
+import { useProjectProgressQuery } from '@/hooks/queries';
+import { unitProgressById } from '@/lib/project-progress';
 
 export default function ModuleDetailPage() {
   const { entityLabel } = useAppDefinitions();
@@ -92,6 +94,11 @@ export default function ModuleDetailPage() {
   const moduleUnits = module
     ? filterChildrenForParentSlot(units, module, modules, (unit) => unit.module_id)
     : [];
+  const progressQuery = useProjectProgressQuery(projectId ?? null);
+  const unitCardProgress = useMemo(
+    () => (module ? unitProgressById(progressQuery.data, module.id) : {}),
+    [progressQuery.data, module]
+  );
 
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
@@ -322,6 +329,7 @@ export default function ModuleDetailPage() {
         isExistingProject={isExisting}
         allowReplace={allowReplace}
         projectId={projectId}
+        progressById={unitCardProgress}
       />
 
       {isExisting ? (

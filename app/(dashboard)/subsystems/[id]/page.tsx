@@ -34,6 +34,8 @@ import {
 import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
 import { isProjectReadOnly } from '@/lib/workflow-status';
 import { HierarchyEntityHeader } from '@/components/hierarchy-entity-header';
+import { useProjectProgressQuery } from '@/hooks/queries';
+import { moduleProgressById } from '@/lib/project-progress';
 
 export default function SubsystemDetailPage() {
   const { entityLabel } = useAppDefinitions();
@@ -78,6 +80,12 @@ export default function SubsystemDetailPage() {
   const subsystemModules = subsystem
     ? filterChildrenForParentSlot(modules, subsystem, subsystems, (mod) => mod.subsystem_id)
     : [];
+  const progressQuery = useProjectProgressQuery(projectId ?? null);
+  const moduleCardProgress = useMemo(
+    () =>
+      subsystem ? moduleProgressById(progressQuery.data, subsystem.id) : {},
+    [progressQuery.data, subsystem]
+  );
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
   const [moduleHierarchyNames, setModuleHierarchyNames] = useState<Models.Hierarchy[]>([]);
@@ -303,6 +311,7 @@ export default function SubsystemDetailPage() {
         isExistingProject={isExisting}
         allowReplace={allowReplace}
         projectId={projectId}
+        progressById={moduleCardProgress}
       />
 
       {isExisting ? (

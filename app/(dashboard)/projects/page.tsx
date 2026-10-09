@@ -341,13 +341,11 @@ export default function ProjectsPage(){
             {new Date(project.end_date).toLocaleDateString()}
           </TableCell>
           <TableCell>
-            <EntityCountCell
-              count={systemCount}
-              label="Total systems"
-            />
-          </TableCell>
-          <TableCell className="min-w-35">
-            <div className="flex items-center gap-1.5 rounded-md p-1">
+            <div className="flex items-center justify-between gap-1.5">
+              <EntityCountCell
+                count={systemCount}
+                label="Total systems"
+              />
               {canExpandSystems ? (
                 <button
                   type="button"
@@ -376,8 +374,12 @@ export default function ProjectsPage(){
                   />
                 </button>
               ) : null}
-              <Progress value={project.progress ?? 0} className="h-2 flex-1" />
-              <span className="w-10 text-right text-xs font-medium tabular-nums">
+            </div>
+          </TableCell>
+          <TableCell className="min-w-40">
+            <div className="flex items-center gap-2 rounded-md p-1">
+              <Progress value={project.progress ?? 0} className="h-2 min-w-16 flex-1" />
+              <span className="w-10 shrink-0 text-right text-xs font-medium tabular-nums">
                 {project.progress ?? 0}%
               </span>
             </div>

@@ -40,6 +40,8 @@ import {
 } from '@/lib/entity-lifecycle-style';
 import { EntityInventoryHoldDetails } from '@/components/entity-inventory-hold-details';
 import { toast } from 'sonner';
+import { Progress } from '@/components/ui/progress';
+import type { EntityProgressSnapshot } from '@/lib/project-progress';
 
 interface EntityCardsProps {
   title: string;
@@ -79,6 +81,8 @@ interface EntityCardsProps {
   childEntityType?: HardwareEntityType;
   /** Loads reserved/shortage inventory details for card PN/SN and lifecycle colors. */
   projectId?: number | null;
+  /** Spec 09 weighted progress keyed by entity id — shown as a bar on each card. */
+  progressById?: Record<number, EntityProgressSnapshot>;
   /** Permission code(s) required to add entities. Omit to always allow (backward compat). */
   createPermission?: string | string[];
   /** Permission code(s) required to edit entities. Omit to always allow (backward compat). */
@@ -111,6 +115,7 @@ export function EntityCards({
   statuses = [],
   childEntityType,
   projectId,
+  progressById,
   createPermission,
   editPermission,
   readOnly = false,
@@ -306,6 +311,7 @@ export function EntityCards({
                 !inventoryManager &&
                 mine &&
                 entity.is_current_install !== false;
+              const progress = progressById?.[entity.id];
               return (
               <Card
                 key={entity.id}
@@ -392,6 +398,23 @@ export function EntityCards({
                         </div>
                       </div>
                     </Link>
+
+                    {progress ? (
+                      <div className="space-y-1.5 px-1">
+                        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                          <span>Progress</span>
+                          <span className="tabular-nums font-medium text-foreground">
+                            {progress.progress_pct}%
+                            {typeof progress.verified_leaves === 'number' &&
+                            typeof progress.weight === 'number' &&
+                            progress.weight > 0
+                              ? ` · ${progress.verified_leaves}/${progress.weight}`
+                              : ''}
+                          </span>
+                        </div>
+                        <Progress value={progress.progress_pct} className="h-2" />
+                      </div>
+                    ) : null}
 
                     <div className="space-y-2 pt-2">
                       {isExistingProject ? (

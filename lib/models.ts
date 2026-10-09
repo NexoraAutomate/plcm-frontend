@@ -534,6 +534,49 @@ export const WORKFLOW_AUDIT_ENTITY_TYPES = [
 ] as const
 
 /** Spec 09 — automatic weighted project progress */
+export interface ProjectProgressComponentNode {
+  entity_type: string
+  entity_id: number
+  name: string
+  weight: number
+  progress_pct: number
+  verified_leaves: number
+  status?: string | null
+}
+
+export interface ProjectProgressUnitNode {
+  entity_type: string
+  entity_id: number
+  name: string
+  weight: number
+  progress_pct: number
+  verified_leaves: number
+  status?: string | null
+  components?: ProjectProgressComponentNode[]
+}
+
+export interface ProjectProgressModuleNode {
+  entity_type: string
+  entity_id: number
+  name: string
+  weight: number
+  progress_pct: number
+  verified_leaves: number
+  status?: string | null
+  units?: ProjectProgressUnitNode[]
+}
+
+export interface ProjectProgressSubsystemNode {
+  entity_type: string
+  entity_id: number
+  name: string
+  weight: number
+  progress_pct: number
+  verified_leaves: number
+  status?: string | null
+  modules?: ProjectProgressModuleNode[]
+}
+
 export interface ProjectProgressSystemNode {
   entity_type: string
   entity_id: number
@@ -542,6 +585,7 @@ export interface ProjectProgressSystemNode {
   progress_pct: number
   verified_leaves: number
   status?: string | null
+  subsystems?: ProjectProgressSubsystemNode[]
 }
 
 export interface ProjectProgressSdlsNode {
@@ -660,6 +704,8 @@ export interface ReservationPlanItem {
   target_entity_type: string
   target_entity_id: number
   entity_name: string
+  /** Hierarchy shell serial assigned at generation (e.g. SDLS-1). */
+  entity_serial_number?: string | null
   path: string
   depth: number
   status: 'available' | 'short' | 'reserved' | 'assemble' | 'issued' | 'installing' | 'testing' | 'verified' | string

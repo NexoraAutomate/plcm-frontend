@@ -33,6 +33,8 @@ import {
 } from '@/lib/entity-replacement';
 import { useResolvedHardwareEntity } from '@/hooks/use-resolved-hardware-entity';
 import { HierarchyEntityHeader } from '@/components/hierarchy-entity-header';
+import { useProjectProgressQuery } from '@/hooks/queries';
+import { subsystemProgressById } from '@/lib/project-progress';
 
 export default function SystemDetailPage() {
   const { entityLabel } = useAppDefinitions();
@@ -63,6 +65,12 @@ export default function SystemDetailPage() {
   const systemSubsystems = system
     ? filterChildrenForParentSlot(subsystems, system, systems, (sub) => sub.system_id)
     : [];
+  const progressQuery = useProjectProgressQuery(project?.id ?? null);
+  const subsystemCardProgress = useMemo(
+    () =>
+      system ? subsystemProgressById(progressQuery.data, system.id) : {},
+    [progressQuery.data, system]
+  );
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
   const [subsystemHierarchyNames, setSubsystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
@@ -278,6 +286,7 @@ export default function SystemDetailPage() {
         isExistingProject={isExisting}
         allowReplace={allowReplace}
         projectId={project?.id}
+        progressById={subsystemCardProgress}
       />
 
       {isExisting ? (

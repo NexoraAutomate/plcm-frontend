@@ -56,6 +56,7 @@ import {
   useListStatsVisibility,
 } from '@/components/list-stats-visibility';
 import { cn } from '@/lib/utils';
+import { systemProgressById } from '@/lib/project-progress';
 export default function ProjectDetailPage() {
   const { entityLabel } = useAppDefinitions();
 
@@ -212,6 +213,10 @@ export default function ProjectDetailPage() {
     if (!project) return [];
     return systems.filter((s) => s.project_id === project.id && isCurrentInstallEntity(s));
   }, [scopedSystems, systems, project]);
+  const systemCardProgress = useMemo(
+    () => systemProgressById(progressQuery.data),
+    [progressQuery.data]
+  );
   const order = project ? orders.find((o) => o.id === project.order_id) : null;
 
 
@@ -620,6 +625,7 @@ export default function ProjectDetailPage() {
         readOnly={hierarchyReadOnly}
         isExistingProject={isExisting}
         projectId={Number.isFinite(Number(projectId)) ? Number(projectId) : null}
+        progressById={systemCardProgress}
       />
 
       {isExisting ? (

@@ -7,14 +7,17 @@ import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
-  ChevronDown,
+  FoldVertical,
+  Info,
   Lock,
   Package,
   RefreshCw,
+  UnfoldVertical,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -24,9 +27,17 @@ import {
 } from '@/components/ui/select';
 import { Can } from '@/components/auth';
 import { PageLoader } from '@/components/page-loader';
+import { StatusBadge } from '@/components/status-badge';
 import { P } from '@/lib/permission-codes';
 import * as api from '@/lib/api';
-import type { Project, ReservationPlan, ReservationPlanItem, User } from '@/lib/models';
+import type {
+  Project,
+  ProjectProgress,
+  ProjectProgressSystemNode,
+  ReservationPlan,
+  ReservationPlanItem,
+  User,
+} from '@/lib/models';
 import { ITEM_STATUS_LABELS, ProjectWorkflowStatus, workflowStatusLabel } from '@/lib/workflow-status';
 import { cn } from '@/lib/utils';
 import { useDataStore } from '@/lib/data-store';
@@ -65,6 +76,81 @@ function isRowVisible(
 ): boolean {
   if (collapsedKeys.size === 0) return true;
   return !ancestorKeys(items, index).some((key) => collapsedKeys.has(key));
+}
+
+/** System id owning a depth-ordered plan row (self, payload, or nearest ancestor). */
+function resolveSystemId(
+  items: ReservationPlanItem[],
+  index: number
+): number | null {
+  const row = items[index];
+  if (row.target_entity_type === 'system') return row.target_entity_id;
+  if (row.system_id != null) return row.system_id;
+  for (const key of ancestorKeys(items, index)) {
+    const colon = key.indexOf(':');
+    if (colon < 0) continue;
+    if (key.slice(0, colon) === 'system') {
+      const id = Number(key.slice(colon + 1));
+      return Number.isFinite(id) ? id : null;
+    }
+  }
+  return null;
+}
+
+function flattenProgressSystems(
+  progress: ProjectProgress | null
+): Map<number, ProjectProgressSystemNode> {
+  const map = new Map<number, ProjectProgressSystemNode>();
+  if (!progress) return map;
+  for (const flight of progress.flights) {
+    for (const sdls of flight.sdls) {
+      for (const system of sdls.systems) {
+        map.set(system.entity_id, system);
+      }
+    }
+  }
+  return map;
+}
+
+function planFallbackProgress(
+  items: ReservationPlanItem[],
+  systemId: number
+): { progress_pct: number; verified: number; weight: number } {
+  let weight = 0;
+  let verified = 0;
+  for (let i = 0; i < items.length; i += 1) {
+    if (resolveSystemId(items, i) !== systemId) continue;
+    weight += 1;
+    const row = items[i];
+    if (row.status === 'verified' || row.item_status === 'VERIFIED') {
+      verified += 1;
+    }
+  }
+  return {
+    weight,
+    verified,
+    progress_pct: weight > 0 ? Math.round((verified / weight) * 100) : 0,
+  };
+}
+
+type SystemFilterOption = {
+  id: number;
+  name: string;
+  /** Display label — prefers shell serial (SDLS-1) over template name. */
+  label: string;
+  status?: string | null;
+  progress_pct: number;
+  verified_leaves: number;
+  weight: number;
+};
+
+function systemFilterLabel(row: ReservationPlanItem): string {
+  const serial = row.entity_serial_number?.trim();
+  if (serial) return serial;
+  const parts = row.path.split(' / ').map((p) => p.trim()).filter(Boolean);
+  // path: Flight / SDLS / System — use SDLS segment when present
+  if (parts.length >= 2 && /^SDLS-/i.test(parts[1])) return parts[1];
+  return row.entity_name;
 }
 
 function apiError(error: unknown, fallback: string): string {
@@ -190,6 +276,7 @@ export default function ReserveInventoryPage() {
   const { users: storeUsers } = useDataStore();
   const [project, setProject] = useState<Project | null>(null);
   const [plan, setPlan] = useState<ReservationPlan | null>(null);
+  const [progress, setProgress] = useState<ProjectProgress | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [reservingAll, setReservingAll] = useState(false);
@@ -197,6 +284,10 @@ export default function ReserveInventoryPage() {
   const [serialByKey, setSerialByKey] = useState<Record<string, string>>({});
   const [developerByKey, setDeveloperByKey] = useState<Record<string, string>>({});
   const [collapsedKeys, setCollapsedKeys] = useState<Set<string>>(() => new Set());
+  const [selectedSystemId, setSelectedSystemId] = useState<number | null>(null);
+  const [expandedDetailKeys, setExpandedDetailKeys] = useState<Set<string>>(
+    () => new Set()
+  );
 
   const developers = useMemo(() => {
     const merged = new Map<number, User>();
@@ -212,13 +303,15 @@ export default function ReserveInventoryPage() {
     if (!Number.isFinite(projectId)) return;
     setLoading(true);
     try {
-      const [projectRes, planRes, usersRes] = await Promise.all([
+      const [projectRes, planRes, usersRes, progressRes] = await Promise.all([
         api.projects.get(projectId),
         api.projects.reservationPlan(projectId),
         api.users.list(0, 500).catch(() => ({ data: [] as User[] })),
+        api.projects.progress(projectId).catch(() => ({ data: null })),
       ]);
       setProject(projectRes.data);
       setPlan(planRes.data);
+      setProgress(progressRes.data);
       setExtraUsers(usersRes.data ?? []);
 
       const nextSerials = assignDistinctDefaultSerials(planRes.data.items ?? []);
@@ -233,6 +326,7 @@ export default function ReserveInventoryPage() {
     } catch (error: unknown) {
       toast.error(apiError(error, 'Failed to load reservation plan'));
       setPlan(null);
+      setProgress(null);
     } finally {
       setLoading(false);
     }
@@ -249,17 +343,96 @@ export default function ReserveInventoryPage() {
 
   const planItems = plan?.items;
 
+  const systemFilters = useMemo((): SystemFilterOption[] => {
+    if (!planItems?.length) return [];
+    const progressById = flattenProgressSystems(progress);
+    const options: SystemFilterOption[] = [];
+    for (const row of planItems) {
+      if (row.target_entity_type !== 'system') continue;
+      const prog = progressById.get(row.target_entity_id);
+      const fallback = prog
+        ? null
+        : planFallbackProgress(planItems, row.target_entity_id);
+      options.push({
+        id: row.target_entity_id,
+        name: row.entity_name,
+        label: systemFilterLabel(row),
+        status: prog?.status ?? row.status,
+        progress_pct: prog?.progress_pct ?? fallback?.progress_pct ?? 0,
+        verified_leaves: prog?.verified_leaves ?? fallback?.verified ?? 0,
+        weight: prog?.weight ?? fallback?.weight ?? 0,
+      });
+    }
+    return options;
+  }, [planItems, progress]);
+
+  useEffect(() => {
+    if (
+      selectedSystemId != null &&
+      !systemFilters.some((s) => s.id === selectedSystemId)
+    ) {
+      setSelectedSystemId(null);
+    }
+  }, [selectedSystemId, systemFilters]);
+
+  /** Parent rows in the current filter scope (selected system, or all). */
+  const scopedParentKeys = useMemo(() => {
+    if (!planItems?.length) return [] as string[];
+    const keys: string[] = [];
+    for (let i = 0; i < planItems.length; i += 1) {
+      if (
+        selectedSystemId != null &&
+        resolveSystemId(planItems, i) !== selectedSystemId
+      ) {
+        continue;
+      }
+      if (hasChildRows(planItems, i)) keys.push(rowKey(planItems[i]));
+    }
+    return keys;
+  }, [planItems, selectedSystemId]);
+
+  const scopedAllCollapsed =
+    scopedParentKeys.length > 0 &&
+    scopedParentKeys.every((key) => collapsedKeys.has(key));
+
   const visibleItemIndexes = useMemo(() => {
     if (!planItems?.length) return [] as number[];
     const indexes: number[] = [];
     for (let i = 0; i < planItems.length; i += 1) {
+      if (
+        selectedSystemId != null &&
+        resolveSystemId(planItems, i) !== selectedSystemId
+      ) {
+        continue;
+      }
       if (isRowVisible(planItems, i, collapsedKeys)) indexes.push(i);
     }
     return indexes;
-  }, [planItems, collapsedKeys]);
+  }, [planItems, collapsedKeys, selectedSystemId]);
 
   function toggleCollapsed(key: string) {
     setCollapsedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function toggleExpandCollapseAll() {
+    setCollapsedKeys((prev) => {
+      const next = new Set(prev);
+      if (scopedAllCollapsed) {
+        for (const key of scopedParentKeys) next.delete(key);
+      } else {
+        for (const key of scopedParentKeys) next.add(key);
+      }
+      return next;
+    });
+  }
+
+  function toggleDetailExpanded(key: string) {
+    setExpandedDetailKeys((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
@@ -513,12 +686,87 @@ export default function ReserveInventoryPage() {
       ) : null}
 
       <div className="overflow-hidden rounded-lg border">
-        <div className="border-b bg-muted/40 px-4 py-2 text-sm font-medium">
-          Hierarchy → matched inventory
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/40 px-4 py-2">
+          <span className="text-sm font-medium">Hierarchy → matched inventory</span>
+          {scopedParentKeys.length > 0 ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5"
+              onClick={toggleExpandCollapseAll}
+            >
+              {scopedAllCollapsed ? (
+                <>
+                  <UnfoldVertical className="h-3.5 w-3.5" />
+                  Expand all
+                </>
+              ) : (
+                <>
+                  <FoldVertical className="h-3.5 w-3.5" />
+                  Collapse all
+                </>
+              )}
+            </Button>
+          ) : null}
         </div>
+        {systemFilters.length > 0 ? (
+          <div className="flex flex-wrap gap-2 border-b px-4 py-3">
+            {systemFilters.map((system) => {
+              const selected = selectedSystemId === system.id;
+              return (
+                <button
+                  key={system.id}
+                  type="button"
+                  onClick={() =>
+                    setSelectedSystemId((prev) =>
+                      prev === system.id ? null : system.id
+                    )
+                  }
+                  className={cn(
+                    'inline-flex min-w-[9.5rem] max-w-full flex-col gap-1.5 rounded-md border px-3 py-2 text-left transition-colors',
+                    selected
+                      ? 'border-primary bg-primary/10'
+                      : 'hover:bg-muted'
+                  )}
+                  aria-pressed={selected}
+                  title={
+                    system.label !== system.name
+                      ? `${system.label} · ${system.name}`
+                      : system.name
+                  }
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="truncate text-sm font-medium">
+                      {system.label}
+                    </span>
+                    <span className="shrink-0 tabular-nums text-xs text-muted-foreground">
+                      {system.progress_pct}%
+                    </span>
+                  </span>
+                  <Progress value={system.progress_pct} className="h-1.5" />
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    {system.status ? (
+                      <StatusBadge status={system.status} className="text-[10px]" />
+                    ) : null}
+                    {system.weight > 0 ? (
+                      <span className="text-[10px] tabular-nums text-muted-foreground">
+                        {system.verified_leaves}/{system.weight} verified
+                      </span>
+                    ) : null}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
         {!plan || !planItems || planItems.length === 0 ? (
           <p className="p-6 text-sm text-muted-foreground">
             No hierarchy shells found. Generate hierarchy on the project first.
+          </p>
+        ) : visibleItemIndexes.length === 0 ? (
+          <p className="p-6 text-sm text-muted-foreground">
+            No hierarchy items for the selected system.
           </p>
         ) : (
           <ul className="divide-y">
@@ -536,6 +784,7 @@ export default function ReserveInventoryPage() {
               const currentDeveloper = developerByKey[key] || NONE_DEVELOPER;
               const isParent = hasChildRows(planItems, index);
               const isCollapsed = collapsedKeys.has(key);
+              const detailsOpen = expandedDetailKeys.has(key);
 
               return (
                 <li
@@ -551,87 +800,112 @@ export default function ReserveInventoryPage() {
                       {isParent ? (
                         <button
                           type="button"
-                          className="rounded p-0.5 hover:bg-muted"
+                          className={cn(
+                            'rounded px-0.5 text-left font-medium hover:underline',
+                            isCollapsed && 'text-muted-foreground'
+                          )}
                           onClick={() => toggleCollapsed(key)}
                           aria-expanded={!isCollapsed}
-                          aria-label={
+                          title={
                             isCollapsed
                               ? `Expand ${row.entity_name} children`
                               : `Collapse ${row.entity_name} children`
                           }
-                          title={isCollapsed ? 'Expand children' : 'Collapse children'}
                         >
-                          <ChevronDown
-                            className={cn(
-                              'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
-                              isCollapsed && '-rotate-90'
-                            )}
-                          />
+                          {row.entity_name}
                         </button>
                       ) : (
-                        <span className="inline-block w-5 shrink-0" aria-hidden />
+                        <span className="font-medium">{row.entity_name}</span>
                       )}
-                      <span className="font-medium">{row.entity_name}</span>
                       <span className="text-xs uppercase text-muted-foreground">
                         {row.target_entity_type}
                       </span>
                       {statusBadge(row)}
+                      <button
+                        type="button"
+                        className={cn(
+                          'rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground',
+                          detailsOpen && 'text-primary'
+                        )}
+                        onClick={() => toggleDetailExpanded(key)}
+                        aria-expanded={detailsOpen}
+                        aria-label={
+                          detailsOpen
+                            ? `Hide details for ${row.entity_name}`
+                            : `Show details for ${row.entity_name}`
+                        }
+                        title={detailsOpen ? 'Hide details' : 'Show details'}
+                      >
+                        <Info className="h-4 w-4 shrink-0" />
+                      </button>
                     </div>
-                    <p className="truncate text-xs text-muted-foreground">{row.path}</p>
-                    {row.status === 'available' ? (
-                      <p className="flex flex-wrap items-center gap-x-2 text-xs text-emerald-800">
-                        <Package className="inline h-3.5 w-3.5" />
-                        <span>
-                          {row.inventory_name || 'Stock'}
-                          {row.part_number ? ` · PN ${row.part_number}` : ''}
-                          {!showSerialSelect && currentSerial
-                            ? ` · SN ${currentSerial}`
-                            : !showSerialSelect && row.free_quantity != null
-                              ? ` · qty ${row.free_quantity}`
-                              : showSerialSelect
-                                ? ` · ${serials.length} serials available`
+                    {detailsOpen ? (
+                      <div className="space-y-1">
+                        <p className="truncate text-xs text-muted-foreground">
+                          {row.path}
+                        </p>
+                        {row.status === 'available' ? (
+                          <p className="flex flex-wrap items-center gap-x-2 text-xs text-emerald-800">
+                            <Package className="inline h-3.5 w-3.5" />
+                            <span>
+                              {row.inventory_name || 'Stock'}
+                              {row.part_number ? ` · PN ${row.part_number}` : ''}
+                              {!showSerialSelect && currentSerial
+                                ? ` · SN ${currentSerial}`
+                                : !showSerialSelect && row.free_quantity != null
+                                  ? ` · qty ${row.free_quantity}`
+                                  : showSerialSelect
+                                    ? ` · ${serials.length} serials available`
+                                    : ''}
+                            </span>
+                          </p>
+                        ) : null}
+                        {isShort ? (
+                          <p className="text-xs text-destructive">
+                            {row.reason ||
+                              'No matching available inventory for this entity'}
+                          </p>
+                        ) : null}
+                        {row.status === 'assemble' ? (
+                          <p className="text-xs text-muted-foreground">
+                            {typeof row.children_complete === 'number' &&
+                            typeof row.children_total === 'number' &&
+                            row.children_total > 0
+                              ? `${row.children_complete}/${row.children_total} children installed and verified. `
+                              : ''}
+                            {row.reason ||
+                              'Automatically created when required child items are installed and verified'}
+                          </p>
+                        ) : null}
+                        {row.can_assign_developer ? (
+                          <p className="text-xs text-muted-foreground">
+                            {row.reason ||
+                              (row.assembled
+                                ? 'Automatically assembled from verified children'
+                                : 'Reserved — assign a developer for IM to issue')}
+                            {row.suggested_serial
+                              ? ` · SN ${row.suggested_serial}`
+                              : ''}
+                            {row.part_number ? ` · PN ${row.part_number}` : ''}
+                            {row.assigned_developer_name
+                              ? ` · Developer: ${row.assigned_developer_name}`
+                              : ''}
+                          </p>
+                        ) : null}
+                        {isCommittedRow(row) && !row.can_assign_developer ? (
+                          <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                            <CheckCircle2 className="inline h-3.5 w-3.5 shrink-0" />
+                            <span>
+                              {row.reason ||
+                                `${lifecycleLabel(row)} for this hierarchy node`}
+                              {row.suggested_serial
+                                ? ` · SN ${row.suggested_serial}`
                                 : ''}
-                        </span>
-                      </p>
-                    ) : null}
-                    {isShort ? (
-                      <p className="text-xs text-destructive">
-                        {row.reason || 'No matching available inventory for this entity'}
-                      </p>
-                    ) : null}
-                    {row.status === 'assemble' ? (
-                      <p className="text-xs text-muted-foreground">
-                        {typeof row.children_complete === 'number' &&
-                        typeof row.children_total === 'number' &&
-                        row.children_total > 0
-                          ? `${row.children_complete}/${row.children_total} children installed and verified. `
-                          : ''}
-                        {row.reason ||
-                          'Automatically created when required child items are installed and verified'}
-                      </p>
-                    ) : null}
-                    {row.can_assign_developer ? (
-                      <p className="text-xs text-muted-foreground">
-                        {row.reason ||
-                          (row.assembled
-                            ? 'Automatically assembled from verified children'
-                            : 'Reserved — assign a developer for IM to issue')}
-                        {row.suggested_serial ? ` · SN ${row.suggested_serial}` : ''}
-                        {row.part_number ? ` · PN ${row.part_number}` : ''}
-                        {row.assigned_developer_name
-                          ? ` · Developer: ${row.assigned_developer_name}`
-                          : ''}
-                      </p>
-                    ) : null}
-                    {isCommittedRow(row) && !row.can_assign_developer ? (
-                      <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                        <CheckCircle2 className="inline h-3.5 w-3.5 shrink-0" />
-                        <span>
-                          {row.reason || `${lifecycleLabel(row)} for this hierarchy node`}
-                          {row.suggested_serial ? ` · SN ${row.suggested_serial}` : ''}
-                          {row.part_number ? ` · PN ${row.part_number}` : ''}
-                        </span>
-                      </p>
+                              {row.part_number ? ` · PN ${row.part_number}` : ''}
+                            </span>
+                          </p>
+                        ) : null}
+                      </div>
                     ) : null}
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
