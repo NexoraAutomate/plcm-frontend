@@ -31,6 +31,8 @@ import {
   ListStatsVisibilityControls,
   useListStatsVisibility,
 } from '@/components/list-stats-visibility';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 type OrderForm = {
   order_number?: string
@@ -110,6 +112,8 @@ export default function CustomerDetailPage(){
     const matchesStatus = statusFilter === 'all' || o.status_id?.toString() === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const { sort, cycleSort, sortedRows } = useClientTableSort(filtered);
 
   async function handleCreate() {
     const validationError = validateOrderForm({
@@ -538,18 +542,34 @@ export default function CustomerDetailPage(){
                 <CardDescription>Total: {filtered.length}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-visible">
                     <Table>
                     <TableHeader>
                         <TableRow>
-                        <TableHead>Order No.</TableHead>
-                        <TableHead>Title</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Contract / PO</TableHead>
-                        <TableHead>Value</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Delivery</TableHead>
-                        <TableHead>PM</TableHead>
+                        <SortableTableHead column="order_number" sort={sort} onSort={cycleSort}>
+                          Order No.
+                        </SortableTableHead>
+                        <SortableTableHead column="title" sort={sort} onSort={cycleSort}>
+                          Title
+                        </SortableTableHead>
+                        <SortableTableHead column="customer_id" sort={sort} onSort={cycleSort}>
+                          Customer
+                        </SortableTableHead>
+                        <SortableTableHead column="contract_number" sort={sort} onSort={cycleSort}>
+                          Contract / PO
+                        </SortableTableHead>
+                        <SortableTableHead column="total_value" sort={sort} onSort={cycleSort}>
+                          Value
+                        </SortableTableHead>
+                        <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>
+                          Status
+                        </SortableTableHead>
+                        <SortableTableHead column="delivery_date" sort={sort} onSort={cycleSort}>
+                          Delivery
+                        </SortableTableHead>
+                        <SortableTableHead column="project_manager" sort={sort} onSort={cycleSort}>
+                          PM
+                        </SortableTableHead>
                         <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -561,7 +581,7 @@ export default function CustomerDetailPage(){
                             </TableCell>
                         </TableRow>
                         ) : (
-                        filtered.map((order) => {
+                        sortedRows.map((order) => {
                             const customer = customers.find((c) => c.id === order.customer_id);
                             const status = statuses.find((s) => s.id === order.status_id);
                             return (

@@ -439,7 +439,7 @@ export default function SubsystemsPage() {
         </CardHeader>
         <CardContent>
           <ListContentSuspense loading={pagination.fetching}>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-visible">
             <Table>
               <TableHeader>
                 <TableRow>

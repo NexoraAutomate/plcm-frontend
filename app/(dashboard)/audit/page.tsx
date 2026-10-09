@@ -40,6 +40,8 @@ import {
 import { Can } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
 import { PageRefreshButton } from '@/components/page-data-refresh';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 const PAGE_SIZE = 20;
 const ALL = 'all';
@@ -144,6 +146,7 @@ export default function AuditTrailPage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const rangeStart = total === 0 ? 0 : page * PAGE_SIZE + 1;
   const rangeEnd = Math.min(total, (page + 1) * PAGE_SIZE);
+  const { sort, cycleSort, sortedRows } = useClientTableSort(rows);
 
   async function handleExport() {
     try {
@@ -328,20 +331,30 @@ export default function AuditTrailPage() {
             {rows.length === 0 ? (
               <p className="text-sm text-muted-foreground">No audit events match these filters.</p>
             ) : (
-              <div className="overflow-x-auto rounded-md border">
-                <Table>
+              <div className="overflow-x-visible">
+                <Table containerClassName="rounded-md border">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>When</TableHead>
-                      <TableHead>Actor</TableHead>
-                      <TableHead>Action</TableHead>
-                      <TableHead>Entity</TableHead>
+                      <SortableTableHead column="occurred_at" sort={sort} onSort={cycleSort}>
+                        When
+                      </SortableTableHead>
+                      <SortableTableHead column="actor_username" sort={sort} onSort={cycleSort}>
+                        Actor
+                      </SortableTableHead>
+                      <SortableTableHead column="action" sort={sort} onSort={cycleSort}>
+                        Action
+                      </SortableTableHead>
+                      <SortableTableHead column="entity_type" sort={sort} onSort={cycleSort}>
+                        Entity
+                      </SortableTableHead>
                       <TableHead>Old → New</TableHead>
-                      <TableHead>Remarks</TableHead>
+                      <SortableTableHead column="remarks" sort={sort} onSort={cycleSort}>
+                        Remarks
+                      </SortableTableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {rows.map((row) => (
+                    {sortedRows.map((row) => (
                       <TableRow key={row.id}>
                         <TableCell className="whitespace-nowrap text-xs">
                           {formatDateTime(row.occurred_at)}

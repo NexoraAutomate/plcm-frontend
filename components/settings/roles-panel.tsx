@@ -305,7 +305,7 @@ export function RolesPanel({ embedded = false }: RolesPanelProps) {
         title="All Roles"
         description={`Showing ${pageItems.length} on this page · ${filtered.length} total`}
       >
-        <div className="overflow-x-auto">
+        <div className="overflow-x-visible">
           <Table>
             <TableHeader>
               <TableRow>

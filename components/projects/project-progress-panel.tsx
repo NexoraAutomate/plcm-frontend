@@ -22,11 +22,12 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 function statusLabel(code?: string | null) {
   if (!code) return 'Not started';
@@ -217,6 +218,8 @@ export function ProjectBottlenecksPanel({
   data?: ProjectProgress;
   loading?: boolean;
 }) {
+  const { sort, cycleSort, sortedRows } = useClientTableSort(data?.bottlenecks ?? []);
+
   if (loading && !data) {
     return (
       <div className="rounded-lg border p-4 text-sm text-muted-foreground">
@@ -244,14 +247,22 @@ export function ProjectBottlenecksPanel({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Item</TableHead>
-              <TableHead>Path</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Leaves</TableHead>
+              <SortableTableHead column="name" sort={sort} onSort={cycleSort}>
+                Item
+              </SortableTableHead>
+              <SortableTableHead column="path" sort={sort} onSort={cycleSort}>
+                Path
+              </SortableTableHead>
+              <SortableTableHead column="status" sort={sort} onSort={cycleSort}>
+                Status
+              </SortableTableHead>
+              <SortableTableHead column="weight" sort={sort} onSort={cycleSort} className="text-right">
+                Leaves
+              </SortableTableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.bottlenecks.map((row) => (
+            {sortedRows.map((row) => (
               <TableRow key={`${row.entity_type}-${row.entity_id}-${row.reason}`}>
                 <TableCell className="font-medium">{row.name}</TableCell>
                 <TableCell className="text-muted-foreground text-xs">{row.path}</TableCell>

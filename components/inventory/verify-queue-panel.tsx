@@ -40,6 +40,8 @@ import { P } from '@/lib/permission-codes';
 import { usePageDataRefresh } from '@/components/page-data-refresh';
 import { RejectInstallationDialog } from '@/components/inventory/reject-installation-dialog';
 import { RejectionReasonsDialog } from '@/components/inventory/rejection-reasons-dialog';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 function formatWhen(value?: string | null) {
   if (!value) return '—';
@@ -219,6 +221,8 @@ export function VerifyQueuePanel() {
       return true;
     });
   }, [rows, searchQuery, projectFilter, entityTypeFilter, developerFilter, statusFilter]);
+
+  const { sort, cycleSort, sortedRows } = useClientTableSort(filteredRows);
 
   const filtersActive =
     searchQuery.trim().length > 0 ||
@@ -419,17 +423,29 @@ export function VerifyQueuePanel() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Item</TableHead>
-                <TableHead>Project</TableHead>
-                <TableHead>Developer</TableHead>
-                <TableHead>Serial</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Complete reported</TableHead>
+                <SortableTableHead column="entity_name" sort={sort} onSort={cycleSort}>
+                  Item
+                </SortableTableHead>
+                <SortableTableHead column="project_name" sort={sort} onSort={cycleSort}>
+                  Project
+                </SortableTableHead>
+                <SortableTableHead column="assigned_developer_name" sort={sort} onSort={cycleSort}>
+                  Developer
+                </SortableTableHead>
+                <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>
+                  Serial
+                </SortableTableHead>
+                <SortableTableHead column="item_status" sort={sort} onSort={cycleSort}>
+                  Status
+                </SortableTableHead>
+                <SortableTableHead column="complete_reported_at" sort={sort} onSort={cycleSort}>
+                  Complete reported
+                </SortableTableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredRows.map((row) => (
+              {sortedRows.map((row) => (
                 <TableRow key={row.issuance_id}>
                   <TableCell>
                     <div className="font-medium">

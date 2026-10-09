@@ -50,6 +50,8 @@ import { usePageDataRefresh } from '@/components/page-data-refresh';
 import { invalidatePendingActionCounts } from '@/hooks/use-pending-action-counts';
 import { uploadIssuanceProformaIfNeeded } from '@/lib/issuance-signature';
 import { useQueryClient } from '@tanstack/react-query';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 function formatWhen(value?: string | null) {
   if (!value) return '—';
@@ -248,6 +250,8 @@ export function IssueQueuePanel() {
     flightFilter,
     statusFilter,
   ]);
+
+  const { sort, cycleSort, sortedRows } = useClientTableSort(filteredRows);
 
   const filtersActive =
     searchQuery.trim().length > 0 ||
@@ -457,17 +461,29 @@ export function IssueQueuePanel() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Item</TableHead>
-                <TableHead>Project</TableHead>
-                <TableHead>Serial</TableHead>
-                <TableHead>Hierarchy</TableHead>
-                <TableHead>Developer</TableHead>
-                <TableHead>Requested</TableHead>
+                <SortableTableHead column="inventory_name" sort={sort} onSort={cycleSort}>
+                  Item
+                </SortableTableHead>
+                <SortableTableHead column="project_name" sort={sort} onSort={cycleSort}>
+                  Project
+                </SortableTableHead>
+                <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>
+                  Serial
+                </SortableTableHead>
+                <SortableTableHead column="target_entity_name" sort={sort} onSort={cycleSort}>
+                  Hierarchy
+                </SortableTableHead>
+                <SortableTableHead column="assigned_developer_name" sort={sort} onSort={cycleSort}>
+                  Developer
+                </SortableTableHead>
+                <SortableTableHead column="requested_at" sort={sort} onSort={cycleSort}>
+                  Requested
+                </SortableTableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredRows.map((row) => (
+              {sortedRows.map((row) => (
                 <TableRow key={row.id}>
                   <TableCell>
                     <div className="font-medium">{row.inventory_name || '—'}</div>

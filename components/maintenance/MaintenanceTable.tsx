@@ -162,10 +162,10 @@ export function MaintenanceTable({
 
   return (
     <>
-      <div className="border rounded-lg overflow-hidden">
+      <div className="overflow-x-visible rounded-lg border">
         <Table>
           <TableHeader>
-            <TableRow className="bg-muted/50">
+            <TableRow>
               <TableHead className="w-12"></TableHead>
               {onSort ? (
                 <>

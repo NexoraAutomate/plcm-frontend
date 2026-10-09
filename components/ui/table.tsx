@@ -3,7 +3,13 @@
 import * as React from 'react'
 
 import { cn } from '@/lib/utils'
-import Link from 'next/link';
+
+/** Sticky under the main navbar with a blurred translucent background. */
+const TABLE_HEADER_STICKY =
+  '[&_th]:sticky [&_th]:top-0 [&_th]:z-20 ' +
+  '[&_th]:bg-background/80 [&_th]:backdrop-blur-md [&_th]:supports-backdrop-filter:bg-background/70 ' +
+  '[&_tr]:border-b [&_tr]:bg-transparent [&_tr]:hover:bg-transparent ' +
+  'dark:[&_th]:bg-background/80 dark:[&_th]:supports-backdrop-filter:bg-background/70'
 
 function Table({
   className,
@@ -13,7 +19,11 @@ function Table({
   return (
     <div
       data-slot="table-container"
-      className={cn('relative w-full overflow-x-auto', containerClassName)}
+      className={cn(
+        // overflow-x-auto creates a scrollport that blocks page-level sticky headers.
+        'relative w-full overflow-x-visible overflow-y-visible',
+        containerClassName
+      )}
     >
       <table
         data-slot="table"
@@ -32,10 +42,7 @@ const TableHeader = React.forwardRef<
     <thead
       ref={ref}
       data-slot="table-header"
-      className={cn(
-        '[&_tr]:border-b [&_tr]:bg-slate-200 [&_tr]:hover:bg-slate-200 dark:[&_tr]:bg-black dark:[&_tr]:hover:bg-black',
-        className
-      )}
+      className={cn(TABLE_HEADER_STICKY, className)}
       {...props}
     />
   )
@@ -126,4 +133,5 @@ export {
   TableRow,
   TableCell,
   TableCaption,
+  TABLE_HEADER_STICKY,
 }

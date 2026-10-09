@@ -424,7 +424,7 @@ export default function InventoryAddChildrenPage() {
                 No child categories are defined in the hierarchy for this item.
               </p>
             ) : (
-              <div className="overflow-x-auto rounded-md border">
+              <div className="overflow-x-visible rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>

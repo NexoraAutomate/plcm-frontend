@@ -35,6 +35,8 @@ import { ResolutionType } from '@/lib/models';
 import { ResolutionHistoryTimelineDialog } from '@/components/hierarchy-dashboard/resolution-history-timeline-dialog';
 import { useDataStoreDomain } from '@/lib/data-store';
 import { formatUserRef } from '@/lib/user-display';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 interface ResolutionHistoryPanelProps {
   systemId: number;
@@ -90,6 +92,8 @@ export function ResolutionHistoryPanel({
       entityLabelForHistory(record, matchContext, subtreeByEntityId),
     [matchContext, subtreeByEntityId]
   );
+
+  const { sort, cycleSort, sortedRows } = useClientTableSort(records);
 
   const resolvedProjectId =
     projectId ?? systems.find((system) => system.id === systemId)?.project_id;
@@ -240,21 +244,33 @@ export function ResolutionHistoryPanel({
                   : ' Resolved maintenance cases for this project will appear here after parts are repaired or replaced.'}
               </p>
             ) : (
-              <div className="overflow-x-auto rounded-lg border">
+              <div className="overflow-x-visible rounded-lg border">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead>Date</TableHead>
-                      <TableHead>Entity</TableHead>
-                      <TableHead>Resolution</TableHead>
-                      <TableHead>Old Part #</TableHead>
-                      <TableHead>New Part #</TableHead>
-                      <TableHead>Case</TableHead>
+                    <TableRow>
+                      <SortableTableHead column="change_date" sort={sort} onSort={cycleSort}>
+                        Date
+                      </SortableTableHead>
+                      <SortableTableHead column="entity_id" sort={sort} onSort={cycleSort}>
+                        Entity
+                      </SortableTableHead>
+                      <SortableTableHead column="resolution_type" sort={sort} onSort={cycleSort}>
+                        Resolution
+                      </SortableTableHead>
+                      <SortableTableHead column="old_part_number" sort={sort} onSort={cycleSort}>
+                        Old Part #
+                      </SortableTableHead>
+                      <SortableTableHead column="new_part_number" sort={sort} onSort={cycleSort}>
+                        New Part #
+                      </SortableTableHead>
+                      <SortableTableHead column="maintenance_case_id" sort={sort} onSort={cycleSort}>
+                        Case
+                      </SortableTableHead>
                       <TableHead className="w-[100px]">Timeline</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {records.map((record) => {
+                    {sortedRows.map((record) => {
                       const entityLabel = labelForRecord(record);
 
                       return (

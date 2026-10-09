@@ -37,6 +37,8 @@ import { P } from '@/lib/permission-codes';
 import { usePageDataRefresh } from '@/components/page-data-refresh';
 import { invalidatePendingActionCounts } from '@/hooks/use-pending-action-counts';
 import { useQueryClient } from '@tanstack/react-query';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 function formatWhen(value?: string | null) {
   if (!value) return '—';
@@ -101,6 +103,8 @@ export function InspectQueuePanel() {
       .then((res) => setInstances(res.data ?? []))
       .catch(() => setInstances([]));
   }, [action, selected]);
+
+  const { sort, cycleSort, sortedRows } = useClientTableSort(rows);
 
   function openAction(row: ItemReworkCase, next: InspectAction) {
     signature.reset();
@@ -172,17 +176,29 @@ export function InspectQueuePanel() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Item</TableHead>
-                <TableHead>Serial</TableHead>
-                <TableHead>Stage</TableHead>
-                <TableHead>Attempt</TableHead>
-                <TableHead>Developer</TableHead>
-                <TableHead>Updated</TableHead>
+                <SortableTableHead column="target_entity_name" sort={sort} onSort={cycleSort}>
+                  Item
+                </SortableTableHead>
+                <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>
+                  Serial
+                </SortableTableHead>
+                <SortableTableHead column="stage" sort={sort} onSort={cycleSort}>
+                  Stage
+                </SortableTableHead>
+                <SortableTableHead column="attempt_count" sort={sort} onSort={cycleSort}>
+                  Attempt
+                </SortableTableHead>
+                <SortableTableHead column="assigned_developer_name" sort={sort} onSort={cycleSort}>
+                  Developer
+                </SortableTableHead>
+                <SortableTableHead column="updated_at" sort={sort} onSort={cycleSort}>
+                  Updated
+                </SortableTableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row) => (
+              {sortedRows.map((row) => (
                 <TableRow key={row.id}>
                   <TableCell>
                     <div className="font-medium">

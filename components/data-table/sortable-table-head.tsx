@@ -35,7 +35,7 @@ export function SortableTableHead({
   return (
     <TableHead
       className={cn(
-        'cursor-pointer select-none hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'cursor-pointer select-none hover:bg-background/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         isActive && 'text-foreground font-semibold',
         className
       )}
@@ -46,8 +46,8 @@ export function SortableTableHead({
       onClick={() => onSort(column)}
       onKeyDown={handleKeyDown}
     >
-      <span className="inline-flex items-center gap-0.5">
-        {children}
+      <span className="inline-flex items-center gap-1">
+        <span>{children}</span>
         <TableSortIcon column={column} sort={sort} />
       </span>
     </TableHead>

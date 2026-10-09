@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { Fragment, useState, useMemo, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Search, GitBranch, ChevronDown } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, GitBranch, ChevronDown, Eye } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import {
@@ -24,7 +24,7 @@ import * as Models from '@/lib/models';
 import { EntityNameWithFault } from '@/components/entity-fault-ping';
 import { useEntityFaultMap } from '@/hooks/use-entity-fault-map';
 import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
-import { useStatusesByTypeQuery } from '@/hooks/queries';
+import { useProjectProgressQuery, useStatusesByTypeQuery } from '@/hooks/queries';
 import { fetchProjectsPage } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
 import { usePaginatedList } from '@/hooks/use-paginated-list';
@@ -58,6 +58,69 @@ import { ExistingProjectBadge } from '@/components/projects/existing-project-bad
 import { isExistingProject } from '@/lib/project-existing';
 import { validateProjectCreateForm, validateProjectEditForm } from '@/lib/form-validation';
 
+const PROJECT_TABLE_COL_SPAN = 9;
+
+function ProjectSystemProgressRows({ projectId }: { projectId: number }) {
+  const { data, isLoading, isError } = useProjectProgressQuery(projectId);
+  const systems = useMemo(() => {
+    if (!data) return [];
+    return data.flights.flatMap((flight) =>
+      flight.sdls.flatMap((sdls) =>
+        sdls.systems.map((system) => ({
+          ...system,
+          flightName: flight.name,
+          sdlsName: sdls.name,
+        }))
+      )
+    );
+  }, [data]);
+
+  return (
+    <TableRow className="bg-muted/20 hover:bg-muted/20">
+      <TableCell colSpan={PROJECT_TABLE_COL_SPAN} className="px-4 py-3">
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading system progress…</p>
+        ) : isError ? (
+          <p className="text-sm text-destructive">Could not load system progress.</p>
+        ) : systems.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No system progress available yet. Generate hierarchy to see per-system progress.
+          </p>
+        ) : (
+          <div className="space-y-2.5 pl-6">
+            <p className="text-xs font-medium text-muted-foreground">System progress</p>
+            {systems.map((system) => (
+              <div
+                key={`system-${system.entity_id}`}
+                className="flex items-center gap-3 rounded-md border bg-background/80 px-3 py-2"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{system.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {system.flightName}
+                    {system.sdlsName ? ` · ${system.sdlsName}` : ''}
+                    {typeof system.verified_leaves === 'number' &&
+                    typeof system.weight === 'number'
+                      ? ` · ${system.verified_leaves}/${system.weight} verified`
+                      : ''}
+                  </p>
+                </div>
+                <div className="flex w-48 shrink-0 items-center gap-2">
+                  <Progress value={system.progress_pct ?? 0} className="h-2 flex-1" />
+                  <span className="w-10 text-right text-xs font-medium tabular-nums">
+                    {system.progress_pct ?? 0}%
+                  </span>
+                </div>
+                {system.status ? <StatusBadge status={system.status} /> : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </TableCell>
+    </TableRow>
+  );
+}
+
 export default function ProjectsPage(){
   const router = useRouter();
   const { entityLabel } = useAppDefinitions();
@@ -88,6 +151,9 @@ export default function ProjectsPage(){
   const [statusFilter, setStatusFilter] = useState<string>(statusFilterParam || 'Total');
   const [groupByProjectName, setGroupByProjectName] = useState(false);
   const [expandedProjectGroups, setExpandedProjectGroups] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [expandedSystemProgress, setExpandedSystemProgress] = useState<Set<number>>(
     () => new Set()
   );
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -220,6 +286,15 @@ export default function ProjectsPage(){
     });
   }
 
+  function toggleSystemProgress(projectId: number) {
+    setExpandedSystemProgress((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+  }
+
   function renderProjectRow(
     project: (typeof projects)[0],
     options?: { indented?: boolean }
@@ -227,89 +302,126 @@ export default function ProjectsPage(){
     const owner = users.find((u) => u.id === project.owner_id);
     const status = statuses.find((s) => s.id === project.status_id);
     const serial = serialByProjectId.get(project.id) ?? '—';
+    const systemCount = getCount(systemCountByProject, project.id);
+    const canExpandSystems = systemCount > 1;
+    const systemsExpanded = expandedSystemProgress.has(project.id);
     return (
-      <TableRow
-        key={project.id}
-        className="cursor-pointer"
-        onClick={() => router.push(`/projects/${project.id}`)}
-      >
-        <TableCell className="w-12 text-center tabular-nums text-muted-foreground">
-          {serial}
-        </TableCell>
-        <TableCell className={cn('font-medium', options?.indented && 'pl-10')}>
-          <div className="flex items-center gap-2">
-            <EntityNameWithFault
-              name={project.name}
-              entityType="project"
-              entityId={project.id}
-              faultMap={faultMap}
+      <Fragment key={project.id}>
+        <TableRow
+          className={cn('cursor-pointer', systemsExpanded && 'bg-muted/30')}
+          onClick={() => router.push(`/projects/${project.id}`)}
+        >
+          <TableCell className="w-12 text-center tabular-nums text-muted-foreground">
+            {serial}
+          </TableCell>
+          <TableCell className={cn('font-medium', options?.indented && 'pl-10')}>
+            <div className="flex items-center gap-2">
+              <EntityNameWithFault
+                name={project.name}
+                entityType="project"
+                entityId={project.id}
+                faultMap={faultMap}
+              />
+              {isExistingProject(project) ? <ExistingProjectBadge /> : null}
+              {project.delete_requested_at ? (
+                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+                  Pending delete
+                </span>
+              ) : null}
+            </div>
+          </TableCell>
+          <TableCell>{owner?.full_name || 'N/A'}</TableCell>
+          <TableCell>
+            <StatusBadge status={status?.status_name || 'Unknown'} />
+          </TableCell>
+          <TableCell className="text-sm text-muted-foreground">
+            {new Date(project.start_date).toLocaleDateString()}
+          </TableCell>
+          <TableCell className="text-sm text-muted-foreground">
+            {new Date(project.end_date).toLocaleDateString()}
+          </TableCell>
+          <TableCell>
+            <EntityCountCell
+              count={systemCount}
+              label="Total systems"
             />
-            {isExistingProject(project) ? <ExistingProjectBadge /> : null}
-            {project.delete_requested_at ? (
-              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-900 dark:bg-amber-950 dark:text-amber-100">
-                Pending delete
+          </TableCell>
+          <TableCell className="min-w-35">
+            <div className="flex items-center gap-1.5 rounded-md p-1">
+              {canExpandSystems ? (
+                <button
+                  type="button"
+                  className="rounded p-0.5 hover:bg-muted"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleSystemProgress(project.id);
+                  }}
+                  aria-expanded={systemsExpanded}
+                  aria-label={
+                    systemsExpanded
+                      ? 'Collapse system progress'
+                      : `Show progress for ${systemCount} systems`
+                  }
+                  title={
+                    systemsExpanded
+                      ? 'Collapse system progress'
+                      : 'View each system progress'
+                  }
+                >
+                  <ChevronDown
+                    className={cn(
+                      'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
+                      systemsExpanded && 'rotate-180'
+                    )}
+                  />
+                </button>
+              ) : null}
+              <Progress value={project.progress ?? 0} className="h-2 flex-1" />
+              <span className="w-10 text-right text-xs font-medium tabular-nums">
+                {project.progress ?? 0}%
               </span>
-            ) : null}
-          </div>
-        </TableCell>
-        <TableCell>{owner?.full_name || 'N/A'}</TableCell>
-        <TableCell>
-          <StatusBadge status={status?.status_name || 'Unknown'} />
-        </TableCell>
-        <TableCell className="text-sm text-muted-foreground">
-          {new Date(project.start_date).toLocaleDateString()}
-        </TableCell>
-        <TableCell className="text-sm text-muted-foreground">
-          {new Date(project.end_date).toLocaleDateString()}
-        </TableCell>
-        <TableCell>
-          <EntityCountCell
-            count={getCount(systemCountByProject, project.id)}
-            label="Total systems"
-          />
-        </TableCell>
-        <TableCell className="min-w-35">
-          <div className="flex items-center gap-2 rounded-md p-1">
-            <Progress value={project.progress ?? 0} className="h-2 flex-1" />
-            <span className="w-10 text-right text-xs font-medium tabular-nums">
-              {project.progress ?? 0}%
-            </span>
-          </div>
-        </TableCell>
-        <TableCell className="text-right">
-          <div className="flex gap-2 justify-end">
-            <Link href={`/projects/${project.id}`} onClick={(e) => e.stopPropagation()}>
-              <Button variant="outline" size="sm">
-                View
-              </Button>
-            </Link>
-            <Can permission={P.edit_projects}>
-              <button
-                type="button"
+            </div>
+          </TableCell>
+          <TableCell className="text-right">
+            <div className="flex gap-2 justify-end">
+              <Link
+                href={`/projects/${project.id}`}
+                onClick={(e) => e.stopPropagation()}
                 className="rounded p-1 hover:bg-muted"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openEdit(project);
-                }}
+                aria-label={`View ${project.name}`}
+                title="View"
               >
-                <Edit className="h-4 w-4 text-accent-foreground hover:text-blue-600" />
-              </button>
-            </Can>
-            <Can permission={P.delete_projects}>
-              <button
-                type="button"
-                className="rounded p-1 hover:bg-muted"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDeleteConfirm({ open: true, id: project.id });
-                }}
-              >
-                <Trash2 className="h-4 w-4 text-accent-foreground hover:text-red-600" />
-              </button>
-            </Can>
-          </div>
-        </TableCell>
-      </TableRow>
+                <Eye className="h-4 w-4 text-accent-foreground hover:text-blue-600" />
+              </Link>
+              <Can permission={P.edit_projects}>
+                <button
+                  type="button"
+                  className="rounded p-1 hover:bg-muted"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openEdit(project);
+                  }}
+                >
+                  <Edit className="h-4 w-4 text-accent-foreground hover:text-blue-600" />
+                </button>
+              </Can>
+              <Can permission={P.delete_projects}>
+                <button
+                  type="button"
+                  className="rounded p-1 hover:bg-muted"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteConfirm({ open: true, id: project.id });
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 text-accent-foreground hover:text-red-600" />
+                </button>
+              </Can>
+            </div>
+          </TableCell>
+        </TableRow>
+        {systemsExpanded ? <ProjectSystemProgressRows projectId={project.id} /> : null}
+      </Fragment>
     );
   }
 
@@ -739,8 +851,7 @@ export default function ProjectsPage(){
         </CardHeader>
         <CardContent>
           <ListContentSuspense loading={pagination.fetching}>
-          <div className="overflow-x-auto">
-            <Table>
+          <Table containerClassName="rounded-md border">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12 text-center">#</TableHead>
@@ -757,7 +868,10 @@ export default function ProjectsPage(){
               <TableBody>
                 {projects.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                    <TableCell
+                      colSpan={PROJECT_TABLE_COL_SPAN}
+                      className="text-center text-muted-foreground py-8"
+                    >
                       No projects found
                     </TableCell>
                   </TableRow>
@@ -773,7 +887,7 @@ export default function ProjectsPage(){
                         key={`group-${group.key}`}
                         className="bg-muted/30 hover:bg-muted/50"
                       >
-                        <TableCell colSpan={9} className="p-0">
+                        <TableCell colSpan={PROJECT_TABLE_COL_SPAN} className="p-0">
                           <button
                             type="button"
                             className="flex w-full items-center gap-2 px-4 py-3 text-left font-medium"
@@ -811,7 +925,6 @@ export default function ProjectsPage(){
                 )}
               </TableBody>
             </Table>
-          </div>
           </ListContentSuspense>
           <EntityListPagination
             page={pagination.page}

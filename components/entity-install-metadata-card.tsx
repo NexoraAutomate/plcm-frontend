@@ -50,13 +50,14 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
 import { StatusBadge } from '@/components/status-badge';
 import { syncReservedInventoryMediaToEntity } from '@/lib/inventory-install';
 import type { HierarchyEntityType } from '@/lib/entity-hierarchy';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 type HardwareOwnerType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
 
@@ -412,6 +413,12 @@ export function EntityInstallMetadataCard({
       replacementChain.some((row) => (row.replacement_sequence ?? 0) > 0 || !row.is_current_install),
     [replacementChain]
   );
+
+  const {
+    sort: replacementSort,
+    cycleSort: cycleReplacementSort,
+    sortedRows: sortedReplacementChain,
+  } = useClientTableSort(replacementChain);
 
   useEffect(() => {
     if (entity.oem_name?.trim()) {
@@ -967,21 +974,66 @@ export function EntityInstallMetadataCard({
                         </p>
                       </div>
                     ) : (
-                      <div className="overflow-x-auto rounded-md border bg-background/60">
+                      <div className="overflow-x-visible rounded-md border bg-background/60">
                         <Table>
                           <TableHeader>
-                            <TableRow className="bg-muted/50">
-                              <TableHead className="whitespace-nowrap">Gen</TableHead>
-                              <TableHead>Part #</TableHead>
-                              <TableHead>Serial #</TableHead>
-                              <TableHead className="whitespace-nowrap">Installed</TableHead>
-                              <TableHead>Installed By</TableHead>
-                              <TableHead className="whitespace-nowrap">Replaced</TableHead>
-                              <TableHead>Status</TableHead>
+                            <TableRow>
+                              <SortableTableHead
+                                column="replacement_sequence"
+                                sort={replacementSort}
+                                onSort={cycleReplacementSort}
+                                className="whitespace-nowrap"
+                              >
+                                Gen
+                              </SortableTableHead>
+                              <SortableTableHead
+                                column="part_number"
+                                sort={replacementSort}
+                                onSort={cycleReplacementSort}
+                              >
+                                Part #
+                              </SortableTableHead>
+                              <SortableTableHead
+                                column="serial_number"
+                                sort={replacementSort}
+                                onSort={cycleReplacementSort}
+                              >
+                                Serial #
+                              </SortableTableHead>
+                              <SortableTableHead
+                                column="installation_date"
+                                sort={replacementSort}
+                                onSort={cycleReplacementSort}
+                                className="whitespace-nowrap"
+                              >
+                                Installed
+                              </SortableTableHead>
+                              <SortableTableHead
+                                column="installed_by_id"
+                                sort={replacementSort}
+                                onSort={cycleReplacementSort}
+                              >
+                                Installed By
+                              </SortableTableHead>
+                              <SortableTableHead
+                                column="replaced_at"
+                                sort={replacementSort}
+                                onSort={cycleReplacementSort}
+                                className="whitespace-nowrap"
+                              >
+                                Replaced
+                              </SortableTableHead>
+                              <SortableTableHead
+                                column="is_current_install"
+                                sort={replacementSort}
+                                onSort={cycleReplacementSort}
+                              >
+                                Status
+                              </SortableTableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {replacementChain.map((row) => {
+                            {sortedReplacementChain.map((row) => {
                               const installer = row.installed_by_id
                                 ? users.find((user) => user.id === row.installed_by_id)
                                 : undefined;

@@ -32,6 +32,8 @@ import {
   useSecuritySettings,
 } from '@/components/settings/hooks/use-security-settings';
 import { usePageDataRefresh } from '@/components/page-data-refresh';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 export type SecurityPanelProps = {
   embedded?: boolean;
@@ -63,6 +65,7 @@ export function SecurityPanel({ embedded = false }: SecurityPanelProps) {
   );
 
   usePageDataRefresh(refresh);
+  const { sort, cycleSort, sortedRows } = useClientTableSort(sessions);
 
   if (loading) return <PageLoader />;
 
@@ -308,18 +311,34 @@ export function SecurityPanel({ embedded = false }: SecurityPanelProps) {
         }
       >
         <SettingsCard>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-visible">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Device</TableHead>
-                  <TableHead>Browser</TableHead>
-                  <TableHead>Operating System</TableHead>
-                  <TableHead>IP Address</TableHead>
-                  <TableHead>Login Time</TableHead>
-                  <TableHead>Last Activity</TableHead>
-                  <TableHead>Status</TableHead>
+                  <SortableTableHead column="user" sort={sort} onSort={cycleSort}>
+                    User
+                  </SortableTableHead>
+                  <SortableTableHead column="device" sort={sort} onSort={cycleSort}>
+                    Device
+                  </SortableTableHead>
+                  <SortableTableHead column="browser" sort={sort} onSort={cycleSort}>
+                    Browser
+                  </SortableTableHead>
+                  <SortableTableHead column="operatingSystem" sort={sort} onSort={cycleSort}>
+                    Operating System
+                  </SortableTableHead>
+                  <SortableTableHead column="ipAddress" sort={sort} onSort={cycleSort}>
+                    IP Address
+                  </SortableTableHead>
+                  <SortableTableHead column="loginTime" sort={sort} onSort={cycleSort}>
+                    Login Time
+                  </SortableTableHead>
+                  <SortableTableHead column="lastActivity" sort={sort} onSort={cycleSort}>
+                    Last Activity
+                  </SortableTableHead>
+                  <SortableTableHead column="status" sort={sort} onSort={cycleSort}>
+                    Status
+                  </SortableTableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -337,7 +356,7 @@ export function SecurityPanel({ embedded = false }: SecurityPanelProps) {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  sessions.map((session) => (
+                  sortedRows.map((session) => (
                     <TableRow key={session.id}>
                       <TableCell className="font-medium">{session.user}</TableCell>
                       <TableCell>{session.device}</TableCell>

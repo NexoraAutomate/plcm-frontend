@@ -307,12 +307,12 @@ export default function MaintenancePage() {
         </CardHeader>
         <CardContent>
           <ListContentSuspense loading={pagination.fetching}>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-visible">
             <Table>
               <TableHeader>
                 <TableRow>
                   <SortableTableHead column="entity_id" sort={sort} onSort={cycleSort}>Entity</SortableTableHead>
-                  <TableHead>Type</TableHead>
+                  <SortableTableHead column="maintenance_type" sort={sort} onSort={cycleSort}>Type</SortableTableHead>
                   <SortableTableHead column="performed_by" sort={sort} onSort={cycleSort}>Technician</SortableTableHead>
                   <SortableTableHead column="performed_at" sort={sort} onSort={cycleSort}>Date</SortableTableHead>
                   <TableHead className="text-right">Actions</TableHead>

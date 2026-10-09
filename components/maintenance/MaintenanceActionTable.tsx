@@ -72,10 +72,10 @@ export function MaintenanceActionTable({
   }
 
   return (
-    <div className="border rounded-lg overflow-hidden">
+    <div className="overflow-x-visible rounded-lg border">
       <Table>
         <TableHeader>
-          <TableRow className="bg-muted/50">
+          <TableRow>
             <SortableTableHead column="action_type" sort={sort} onSort={cycleSort}>
               Action Type
             </SortableTableHead>

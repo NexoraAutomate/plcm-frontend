@@ -5,6 +5,7 @@ import type { ListFilterParams } from '@/lib/list-filters';
 import {
   EMPTY_SORT,
   cycleSortState,
+  sortRowsByState,
   sortStateToParams,
   type TableSortState,
 } from '@/lib/sorting';
@@ -43,4 +44,18 @@ export function useTableSorting(options: UseTableSortingOptions = {}) {
     sortBy: sort.sortBy,
     sortOrder: sort.sortOrder,
   };
+}
+
+/** Client-side sort for already-loaded table rows (dialogs, queues, pages without API sort). */
+export function useClientTableSort<T>(
+  rows: T[],
+  options: UseTableSortingOptions = {}
+) {
+  const sorting = useTableSorting(options);
+  const sortedRows = useMemo(
+    () =>
+      sortRowsByState(rows as unknown as Record<string, unknown>[], sorting.sort) as T[],
+    [rows, sorting.sort]
+  );
+  return { ...sorting, sortedRows };
 }

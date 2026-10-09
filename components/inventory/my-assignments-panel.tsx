@@ -37,6 +37,8 @@ import { ReworkWizardDialog, type ReworkWizardTarget } from '@/components/invent
 import { RejectionReasonsDialog } from '@/components/inventory/rejection-reasons-dialog';
 import { usePageDataRefresh } from '@/components/page-data-refresh';
 import { invalidatePendingActionCounts } from '@/hooks/use-pending-action-counts';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 function rowKey(row: DeveloperAssignedWork) {
   return `${row.entity_type}:${row.entity_id}`;
@@ -257,6 +259,8 @@ export function MyAssignmentsPanel() {
       return true;
     });
   }, [rows, searchQuery, projectFilter, entityTypeFilter, statusFilter]);
+
+  const { sort, cycleSort, sortedRows } = useClientTableSort(filteredRows);
 
   const filtersActive =
     searchQuery.trim().length > 0 ||
@@ -552,15 +556,23 @@ export function MyAssignmentsPanel() {
                     aria-label="Select all requestable items"
                   />
                 </TableHead>
-                <TableHead>Item</TableHead>
-                <TableHead>Project</TableHead>
-                <TableHead>Serial</TableHead>
-                <TableHead>Status</TableHead>
+                <SortableTableHead column="name" sort={sort} onSort={cycleSort}>
+                  Item
+                </SortableTableHead>
+                <SortableTableHead column="project_name" sort={sort} onSort={cycleSort}>
+                  Project
+                </SortableTableHead>
+                <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>
+                  Serial
+                </SortableTableHead>
+                <SortableTableHead column="item_status" sort={sort} onSort={cycleSort}>
+                  Status
+                </SortableTableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredRows.map((row) => {
+              {sortedRows.map((row) => {
                 const key = rowKey(row);
                 return (
                   <TableRow key={key}>

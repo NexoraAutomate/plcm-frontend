@@ -6,13 +6,14 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
 import type { ActivityItem } from '@/lib/types/dashboard';
 import { parseApiDate } from '@/lib/parse-api-date';
 import { DashboardEmptyState } from './DashboardEmptyState';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 interface RecentActivityTableProps {
   title: string;
@@ -21,6 +22,8 @@ interface RecentActivityTableProps {
 }
 
 export function RecentActivityTable({ title, items, onRowClick }: RecentActivityTableProps) {
+  const { sort, cycleSort, sortedRows } = useClientTableSort(items);
+
   return (
     <Card className="h-full">
       <CardHeader className="pb-2">
@@ -33,13 +36,24 @@ export function RecentActivityTable({ title, items, onRowClick }: RecentActivity
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead className="hidden sm:table-cell">Status</TableHead>
-                <TableHead className="text-right">When</TableHead>
+                <SortableTableHead column="title" sort={sort} onSort={cycleSort}>
+                  Title
+                </SortableTableHead>
+                <SortableTableHead
+                  column="status"
+                  sort={sort}
+                  onSort={cycleSort}
+                  className="hidden sm:table-cell"
+                >
+                  Status
+                </SortableTableHead>
+                <SortableTableHead column="timestamp" sort={sort} onSort={cycleSort} className="text-right">
+                  When
+                </SortableTableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((item) => (
+              {sortedRows.map((item) => (
                 <TableRow
                   key={`${item.link_type}-${item.id}`}
                   className={onRowClick ? 'cursor-pointer hover:bg-muted/50' : undefined}

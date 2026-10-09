@@ -21,6 +21,8 @@ import { EntityNameWithFault } from '@/components/entity-fault-ping';
 import { useEntityFaultMap } from '@/hooks/use-entity-fault-map';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 function formatDate(value?: string | null) {
   if (!value) return '—';
@@ -47,6 +49,7 @@ export default function OrderDetailPage() {
     () => (order ? projects.filter((project) => project.order_id === order.id) : []),
     [order, projects]
   );
+  const { sort, cycleSort, sortedRows: sortedOrderProjects } = useClientTableSort(orderProjects);
 
   if (loading) {
     return <div className="p-8 text-center">Loading...</div>;
@@ -199,18 +202,26 @@ export default function OrderDetailPage() {
               </Can>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-visible">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Start</TableHead>
-                    <TableHead>End</TableHead>
+                    <SortableTableHead column="name" sort={sort} onSort={cycleSort}>
+                      Name
+                    </SortableTableHead>
+                    <SortableTableHead column="status_name" sort={sort} onSort={cycleSort}>
+                      Status
+                    </SortableTableHead>
+                    <SortableTableHead column="start_date" sort={sort} onSort={cycleSort}>
+                      Start
+                    </SortableTableHead>
+                    <SortableTableHead column="end_date" sort={sort} onSort={cycleSort}>
+                      End
+                    </SortableTableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {orderProjects.map((project) => (
+                  {sortedOrderProjects.map((project) => (
                     <TableRow
                       key={project.id}
                       className="cursor-pointer hover:bg-muted/50"

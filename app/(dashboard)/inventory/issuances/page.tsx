@@ -45,6 +45,8 @@ import {
   issuanceDisplayStatus,
   issuanceHasSignatureArtifacts,
 } from '@/lib/issuance-signature';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All (history)' },
@@ -108,6 +110,8 @@ export default function InventoryIssuancesPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const { sort, cycleSort, sortedRows } = useClientTableSort(rows);
 
   const openRemarks = (row: InventoryIssuance, action: IssuanceRemarksAction) => {
     setRemarksRow(row);
@@ -245,23 +249,39 @@ export default function InventoryIssuancesPage() {
           {rows.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">No issuances found.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
+            <div className="overflow-x-visible">
+              <Table containerClassName="rounded-md border">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Item</TableHead>
-                    <TableHead>Part / Serial</TableHead>
-                    <TableHead>Qty</TableHead>
-                    <TableHead>Whom</TableHead>
-                    <TableHead>Issued by</TableHead>
-                    <TableHead>Issued</TableHead>
-                    <TableHead>Return / Closed</TableHead>
-                    <TableHead>Status</TableHead>
+                    <SortableTableHead column="inventory_name" sort={sort} onSort={cycleSort}>
+                      Item
+                    </SortableTableHead>
+                    <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>
+                      Part / Serial
+                    </SortableTableHead>
+                    <SortableTableHead column="quantity" sort={sort} onSort={cycleSort}>
+                      Qty
+                    </SortableTableHead>
+                    <SortableTableHead column="issued_to_name" sort={sort} onSort={cycleSort}>
+                      Whom
+                    </SortableTableHead>
+                    <SortableTableHead column="issued_by_name" sort={sort} onSort={cycleSort}>
+                      Issued by
+                    </SortableTableHead>
+                    <SortableTableHead column="issued_at" sort={sort} onSort={cycleSort}>
+                      Issued
+                    </SortableTableHead>
+                    <SortableTableHead column="closed_at" sort={sort} onSort={cycleSort}>
+                      Return / Closed
+                    </SortableTableHead>
+                    <SortableTableHead column="status" sort={sort} onSort={cycleSort}>
+                      Status
+                    </SortableTableHead>
                     <TableHead className="w-[1%] whitespace-nowrap text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((row) => {
+                  {sortedRows.map((row) => {
                     const displayStatus = issuanceDisplayStatus(row);
                     const hasSignatureArtifacts = issuanceHasSignatureArtifacts(row);
 

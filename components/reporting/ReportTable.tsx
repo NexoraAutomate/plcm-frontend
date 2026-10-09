@@ -26,15 +26,15 @@ export function ReportTable<T extends Record<string, unknown>>({
   dense = true,
 }: ReportTableProps<T>) {
   return (
-    <div className={cn('overflow-x-auto rounded-md border border-border', className)}>
+    <div className={cn('overflow-x-visible rounded-md border border-border', className)}>
       <table className="w-full border-collapse text-left text-sm">
         <thead>
-          <tr className="border-b border-border bg-muted/40">
+          <tr className="border-b border-border bg-transparent">
             {columns.map((col) => (
               <th
                 key={col.key}
                 className={cn(
-                  'font-medium text-muted-foreground',
+                  'sticky top-0 z-20 bg-background/80 font-medium text-muted-foreground backdrop-blur-md supports-backdrop-filter:bg-background/70',
                   dense ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-sm',
                   col.className
                 )}

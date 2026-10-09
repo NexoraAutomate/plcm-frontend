@@ -569,14 +569,14 @@ export default function ComponentsPage() {
         </CardHeader>
         <CardContent>
           <ListContentSuspense loading={pagination.fetching || allComponentsQuery.isFetching}>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-visible">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10" />
                   <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Name</SortableTableHead>
                   <SortableTableHead column="part_number" sort={sort} onSort={cycleSort}>Part Number</SortableTableHead>
-                  <TableHead>Serial Number</TableHead>
+                  <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>Serial Number</SortableTableHead>
                   <SortableTableHead column="unit_id" sort={sort} onSort={cycleSort}>{entityLabel('unit')}</SortableTableHead>
                   <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
                   <TableHead>Inventory Qty</TableHead>
@@ -675,7 +675,7 @@ export default function ComponentsPage() {
                                   <p className="mb-2 text-xs font-medium text-muted-foreground">
                                     Components with part number {firstComponent.part_number?.trim() || '—'}
                                   </p>
-                                  <div className="overflow-x-auto rounded-md border bg-background">
+                                  <div className="overflow-x-visible rounded-md border bg-background">
                                     <Table>
                                       <TableHeader>
                                         <TableRow>

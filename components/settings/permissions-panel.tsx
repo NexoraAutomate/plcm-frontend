@@ -267,7 +267,7 @@ export function PermissionsPanel({ embedded = false }: PermissionsPanelProps) {
         title="All Permissions"
         description={`Showing ${pageItems.length} on this page · ${filtered.length} total · grouped by module when searching`}
       >
-        <div className="overflow-x-auto">
+        <div className="overflow-x-visible">
           <Table>
             <TableHeader>
               <TableRow>

@@ -105,7 +105,7 @@ export function DefinitionsLabelsSection() {
         description="Display names for hierarchy levels and short codes used as {levelAbbr} in templates (e.g. SYS, SUB)."
       >
         <SettingsCard className="max-w-5xl py-3" contentClassName="px-3 pt-0 sm:px-4">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-visible">
             <table className="w-full min-w-160 table-fixed text-sm">
               <colgroup>
                 <col className="w-28" />
@@ -114,11 +114,19 @@ export function DefinitionsLabelsSection() {
                 <col className="w-32" />
               </colgroup>
               <thead>
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="pb-1.5 pr-3 text-xs font-medium">Key</th>
-                  <th className="pb-1.5 pr-3 text-xs font-medium">Singular</th>
-                  <th className="pb-1.5 pr-3 text-xs font-medium">Plural</th>
-                  <th className="pb-1.5 text-xs font-medium">Level abbrev</th>
+                <tr className="border-b bg-transparent text-left text-muted-foreground">
+                  <th className="sticky top-0 z-20 bg-background/80 pb-1.5 pr-3 text-xs font-medium backdrop-blur-md supports-backdrop-filter:bg-background/70">
+                    Key
+                  </th>
+                  <th className="sticky top-0 z-20 bg-background/80 pb-1.5 pr-3 text-xs font-medium backdrop-blur-md supports-backdrop-filter:bg-background/70">
+                    Singular
+                  </th>
+                  <th className="sticky top-0 z-20 bg-background/80 pb-1.5 pr-3 text-xs font-medium backdrop-blur-md supports-backdrop-filter:bg-background/70">
+                    Plural
+                  </th>
+                  <th className="sticky top-0 z-20 bg-background/80 pb-1.5 text-xs font-medium backdrop-blur-md supports-backdrop-filter:bg-background/70">
+                    Level abbrev
+                  </th>
                 </tr>
               </thead>
               <tbody>

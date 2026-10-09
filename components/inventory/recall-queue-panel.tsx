@@ -30,6 +30,8 @@ import { StatusBadge } from '@/components/status-badge';
 import { Can } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
 import { usePageDataRefresh } from '@/components/page-data-refresh';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 function formatWhen(value?: string | null) {
   if (!value) return '—';
@@ -82,6 +84,8 @@ export function RecallQueuePanel({ mine = false }: Props) {
     const timer = window.setInterval(() => void refresh(), WORKFLOW_POLL_MS);
     return () => window.clearInterval(timer);
   }, [refresh]);
+
+  const { sort, cycleSort, sortedRows } = useClientTableSort(rows);
 
   function openAction(row: InventoryRecallTask, next: RecallAction) {
     setOutcome('reusable');
@@ -137,17 +141,29 @@ export function RecallQueuePanel({ mine = false }: Props) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Item</TableHead>
-                <TableHead>Serial</TableHead>
-                <TableHead>Project</TableHead>
-                <TableHead>Stage</TableHead>
-                <TableHead>Developer</TableHead>
-                <TableHead>Updated</TableHead>
+                <SortableTableHead column="target_entity_name" sort={sort} onSort={cycleSort}>
+                  Item
+                </SortableTableHead>
+                <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>
+                  Serial
+                </SortableTableHead>
+                <SortableTableHead column="project_name" sort={sort} onSort={cycleSort}>
+                  Project
+                </SortableTableHead>
+                <SortableTableHead column="stage" sort={sort} onSort={cycleSort}>
+                  Stage
+                </SortableTableHead>
+                <SortableTableHead column="assigned_developer_name" sort={sort} onSort={cycleSort}>
+                  Developer
+                </SortableTableHead>
+                <SortableTableHead column="updated_at" sort={sort} onSort={cycleSort}>
+                  Updated
+                </SortableTableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row) => (
+              {sortedRows.map((row) => (
                 <TableRow key={row.id}>
                   <TableCell>
                     <div className="font-medium">

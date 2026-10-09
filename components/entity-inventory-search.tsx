@@ -26,6 +26,8 @@ import { InventorySerialSelectDialog } from '@/components/inventory-serial-selec
 import { InventoryHierarchyDialog } from '@/components/inventory-hierarchy-dialog';
 import type { Inventory } from '@/lib/models';
 import { getInventoryTypeLabel, type HierarchyEntityType } from '@/lib/entity-hierarchy';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 interface EntityInventorySearchProps {
   parentEntityName: string;
@@ -75,6 +77,7 @@ export function EntityInventorySearch({
   } | null>(null);
 
   const inventoryTypeLabel = getInventoryTypeLabel(inventoryType);
+  const { sort, cycleSort, sortedRows: sortedFilteredItems } = useClientTableSort(filteredItems);
 
   function getHolderName(item: Inventory): string {
     const fromInstances = [
@@ -300,22 +303,36 @@ export function EntityInventorySearch({
             {filteredItems.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">{emptyMessage}</div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-visible">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Serial Number</TableHead>
-                      <TableHead>Part Number</TableHead>
-                      <TableHead>OEM</TableHead>
-                      <TableHead>Inventory Holder</TableHead>
-                      <TableHead>Location</TableHead>
-                      <TableHead className="text-right">Qty</TableHead>
+                      <SortableTableHead column="name" sort={sort} onSort={cycleSort}>
+                        Name
+                      </SortableTableHead>
+                      <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>
+                        Serial Number
+                      </SortableTableHead>
+                      <SortableTableHead column="part_number" sort={sort} onSort={cycleSort}>
+                        Part Number
+                      </SortableTableHead>
+                      <SortableTableHead column="oem_name" sort={sort} onSort={cycleSort}>
+                        OEM
+                      </SortableTableHead>
+                      <SortableTableHead column="holder_name" sort={sort} onSort={cycleSort}>
+                        Inventory Holder
+                      </SortableTableHead>
+                      <SortableTableHead column="location" sort={sort} onSort={cycleSort}>
+                        Location
+                      </SortableTableHead>
+                      <SortableTableHead column="quantity" sort={sort} onSort={cycleSort} className="text-right">
+                        Qty
+                      </SortableTableHead>
                       <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredItems.map((item) => {
+                    {sortedFilteredItems.map((item) => {
                       const qty = displayQty(item);
                       const pendingOnly = isInventoryReturnPendingOnly(item);
 

@@ -22,11 +22,12 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
 import { TimelineEventRow } from '@/components/hierarchy-dashboard/resolution-history-timeline-dialog';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 interface ResolutionHistoryDialogProps {
   open: boolean;
@@ -76,6 +77,9 @@ export function ResolutionHistoryDialog({
     [records, matchContext, subtreeByEntityId, deliveries]
   );
 
+  const { sort, cycleSort, sortedRows: sortedReplacementRows } =
+    useClientTableSort(replacementRows);
+
   const hasContent = installEvents.length > 0 || replacementRows.length > 0;
 
   return (
@@ -121,7 +125,7 @@ export function ResolutionHistoryDialog({
                   Part replacements with fault type and redelivery dates
                 </p>
               </div>
-              <div className="flex-1 overflow-x-auto overflow-y-auto">
+              <div className="flex-1 overflow-x-visible overflow-y-auto">
                 {replacementRows.length === 0 ? (
                   <p className="px-4 py-4 text-sm text-muted-foreground">
                     No replacement records for this subtree.
@@ -129,18 +133,32 @@ export function ResolutionHistoryDialog({
                 ) : (
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-muted/50">
-                        <TableHead>Date</TableHead>
-                        <TableHead>Entity</TableHead>
-                        <TableHead>Fault</TableHead>
-                        <TableHead>Old Part / Serial</TableHead>
-                        <TableHead>New Part / Serial</TableHead>
-                        <TableHead>Redelivery</TableHead>
-                        <TableHead>Case</TableHead>
+                      <TableRow>
+                        <SortableTableHead column="date" sort={sort} onSort={cycleSort}>
+                          Date
+                        </SortableTableHead>
+                        <SortableTableHead column="entityLabel" sort={sort} onSort={cycleSort}>
+                          Entity
+                        </SortableTableHead>
+                        <SortableTableHead column="faultType" sort={sort} onSort={cycleSort}>
+                          Fault
+                        </SortableTableHead>
+                        <SortableTableHead column="oldPartNumber" sort={sort} onSort={cycleSort}>
+                          Old Part / Serial
+                        </SortableTableHead>
+                        <SortableTableHead column="newPartNumber" sort={sort} onSort={cycleSort}>
+                          New Part / Serial
+                        </SortableTableHead>
+                        <SortableTableHead column="redeliveryDate" sort={sort} onSort={cycleSort}>
+                          Redelivery
+                        </SortableTableHead>
+                        <SortableTableHead column="maintenanceCaseId" sort={sort} onSort={cycleSort}>
+                          Case
+                        </SortableTableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {replacementRows.map((row) => (
+                      {sortedReplacementRows.map((row) => (
                         <TableRow key={row.id}>
                           <TableCell className="whitespace-nowrap text-sm">
                             {new Date(row.date).toLocaleString()}

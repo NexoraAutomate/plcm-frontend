@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
+import { Fragment, useState, useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -104,15 +104,6 @@ const MAX_VISIBLE_EXPANDED_UNITS = 10;
 const EXPANDED_UNITS_SCROLL_CLASS =
   'max-h-[calc(2.5rem+10*2.75rem)] overflow-y-auto overflow-x-hidden';
 const EXPANDED_CELL_TRUNCATE = 'max-w-0 truncate';
-/** Sticky offset so a frost band can sit above the stuck header. */
-const STUCK_HEADER_TOP_PX = 12;
-const STUCK_HEADER_FROST =
-  'bg-slate-200/90 backdrop-blur-xl backdrop-saturate-150 dark:bg-zinc-950/90';
-const STUCK_HEADER_BAND =
-  '[&_th]:overflow-visible ' +
-  '[&_th]:before:pointer-events-none [&_th]:before:absolute [&_th]:before:inset-x-0 [&_th]:before:-top-3 [&_th]:before:h-3 [&_th]:before:bg-slate-200/90 [&_th]:before:backdrop-blur-xl [&_th]:before:backdrop-saturate-150 [&_th]:before:content-[\'\'] ' +
-  '[&_th]:after:pointer-events-none [&_th]:after:absolute [&_th]:after:inset-x-0 [&_th]:after:top-full [&_th]:after:h-4 [&_th]:after:bg-slate-200/90 [&_th]:after:backdrop-blur-xl [&_th]:after:backdrop-saturate-150 [&_th]:after:content-[\'\'] ' +
-  'dark:[&_th]:before:bg-zinc-950/90 dark:[&_th]:after:bg-zinc-950/90';
 
 const ACTION_ICON = {
   add: 'size-3.5 text-muted-foreground transition-colors group-hover/add:text-emerald-600',
@@ -387,8 +378,6 @@ export default function InventoryPage() {
     location_rack: '',
   });
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
-  const [headerStuck, setHeaderStuck] = useState(false);
-  const tableHeaderRef = useRef<HTMLTableSectionElement | null>(null);
   const [addMoreItem, setAddMoreItem] = useState<InventoryItem | null>(null);
   const [issueTarget, setIssueTarget] = useState<{
     item: InventoryItem;
@@ -447,27 +436,6 @@ export default function InventoryPage() {
     setSelectingAll(false);
     setSelectedIds(new Set());
   }, [debouncedSearch, entityTypeFilter, stockFilter]);
-
-  useLayoutEffect(() => {
-    const header = tableHeaderRef.current;
-    if (!header) return;
-    const scroller = header.closest('main');
-    if (!(scroller instanceof HTMLElement)) return;
-
-    const updateStuck = () => {
-      const headerTop = header.getBoundingClientRect().top;
-      const scrollerTop = scroller.getBoundingClientRect().top;
-      setHeaderStuck(headerTop <= scrollerTop + STUCK_HEADER_TOP_PX + 1);
-    };
-
-    updateStuck();
-    scroller.addEventListener('scroll', updateStuck, { passive: true });
-    window.addEventListener('resize', updateStuck);
-    return () => {
-      scroller.removeEventListener('scroll', updateStuck);
-      window.removeEventListener('resize', updateStuck);
-    };
-  }, [loading, inventory.length]);
 
   function toggleRowSelected(id: number, checked: boolean) {
     setSelectedIds((prev) => {
@@ -1539,7 +1507,7 @@ export default function InventoryPage() {
               </Button>
             ) : null}
           </div>
-          <div className="overflow-x-auto rounded-md border">
+          <div className="overflow-x-visible rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1888,32 +1856,11 @@ export default function InventoryPage() {
         </CardHeader>
         <CardContent>
           <ListContentSuspense loading={pagination.fetching}>
-          <div
-            aria-hidden
-            className={cn(
-              'pointer-events-none -mb-18 h-18',
-              headerStuck
-                ? cn('sticky top-0 z-10', STUCK_HEADER_FROST)
-                : 'relative z-0 bg-transparent'
-            )}
-          />
           <Table
             className="table-fixed"
-            containerClassName="relative z-20 overflow-x-visible overflow-y-visible rounded-md border"
+            containerClassName="rounded-md border"
           >
-              <TableHeader
-                ref={tableHeaderRef}
-                className={cn(
-                  '[&_th]:sticky [&_th]:top-3 [&_th]:z-40',
-                  headerStuck &&
-                    cn(
-                      STUCK_HEADER_BAND,
-                      '[&_tr]:bg-slate-200/90! [&_tr]:hover:bg-slate-200/90! dark:[&_tr]:bg-zinc-950/90! dark:[&_tr]:hover:bg-zinc-950/90!',
-                      '[&_th]:bg-slate-200/90! [&_th]:backdrop-blur-xl [&_th]:backdrop-saturate-150 [&_th]:hover:bg-slate-200/90!',
-                      'dark:[&_th]:bg-zinc-950/90! dark:[&_th]:hover:bg-zinc-950/90!'
-                    )
-                )}
-              >
+              <TableHeader>
                 <TableRow>
                   {inventoryManager ? (
                     <TableHead className="w-10 pl-2">
@@ -1942,12 +1889,7 @@ export default function InventoryPage() {
                   <SortableTableHead className="w-28" column="quantity" sort={sort} onSort={cycleSort}>Quantity</SortableTableHead>
                   <SortableTableHead column="holder_user_id" sort={sort} onSort={cycleSort}>Inventory Holder</SortableTableHead>
                   <SortableTableHead column="location" sort={sort} onSort={cycleSort}>Location</SortableTableHead>
-                  <TableHead
-                    className={cn(
-                      'sticky right-0 top-3 z-50 w-64 overflow-visible text-right',
-                      headerStuck ? STUCK_HEADER_FROST : 'bg-slate-200 dark:bg-black'
-                    )}
-                  >
+                  <TableHead className="sticky right-0 top-0 z-30 w-64 text-right">
                     Actions
                   </TableHead>
                 </TableRow>
@@ -2269,13 +2211,7 @@ export default function InventoryPage() {
                                     <col style={{ width: '7rem' }} />
                                     <col style={{ width: '11rem' }} />
                                   </colgroup>
-                                  <TableHeader
-                                    className={
-                                      serialInstances.length > MAX_VISIBLE_EXPANDED_UNITS
-                                        ? 'sticky top-0 z-10'
-                                        : undefined
-                                    }
-                                  >
+                                  <TableHeader>
                                     <TableRow>
                                       <TableHead>Unit Identity</TableHead>
                                       <TableHead>Inventory Holder</TableHead>

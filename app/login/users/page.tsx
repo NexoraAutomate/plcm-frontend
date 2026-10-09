@@ -13,6 +13,8 @@ import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { validateUserCreateForm, validateUserEditForm } from '@/lib/form-validation';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
@@ -39,6 +41,7 @@ export default function UsersPage() {
       u.email.toLowerCase().includes(search.toLowerCase()) ||
       u.username.toLowerCase().includes(search.toLowerCase())
   );
+  const { sort, cycleSort, sortedRows } = useClientTableSort(filtered);
 
   // Admin-only access
   if (currentUser?.role !== 'admin') {
@@ -198,14 +201,22 @@ export default function UsersPage() {
           <CardDescription>Total: {filtered.length}</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-visible">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
+                  <SortableTableHead column="full_name" sort={sort} onSort={cycleSort}>
+                    Name
+                  </SortableTableHead>
+                  <SortableTableHead column="username" sort={sort} onSort={cycleSort}>
+                    Username
+                  </SortableTableHead>
+                  <SortableTableHead column="email" sort={sort} onSort={cycleSort}>
+                    Email
+                  </SortableTableHead>
+                  <SortableTableHead column="role" sort={sort} onSort={cycleSort}>
+                    Role
+                  </SortableTableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -217,7 +228,7 @@ export default function UsersPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((user) => (
+                  sortedRows.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell className="font-medium">{user.full_name}</TableCell>
                       <TableCell className="font-mono text-sm">{user.username}</TableCell>

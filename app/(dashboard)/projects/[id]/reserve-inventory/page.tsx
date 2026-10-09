@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
+  ChevronDown,
   Lock,
   Package,
   RefreshCw,
@@ -36,6 +37,34 @@ const NONE_DEVELOPER = '__none__';
 
 function rowKey(row: Pick<ReservationPlanItem, 'target_entity_type' | 'target_entity_id'>) {
   return `${row.target_entity_type}:${row.target_entity_id}`;
+}
+
+/** True when the next flat-list item is a direct/deeper child (depth-ordered plan). */
+function hasChildRows(items: ReservationPlanItem[], index: number): boolean {
+  const depth = items[index]?.depth ?? 0;
+  return index + 1 < items.length && items[index + 1].depth > depth;
+}
+
+/** Ancestor keys for a depth-ordered item (nearest parent first). */
+function ancestorKeys(items: ReservationPlanItem[], index: number): string[] {
+  const keys: string[] = [];
+  let depth = items[index]?.depth ?? 0;
+  for (let i = index - 1; i >= 0 && depth > 0; i -= 1) {
+    if (items[i].depth < depth) {
+      keys.push(rowKey(items[i]));
+      depth = items[i].depth;
+    }
+  }
+  return keys;
+}
+
+function isRowVisible(
+  items: ReservationPlanItem[],
+  index: number,
+  collapsedKeys: ReadonlySet<string>
+): boolean {
+  if (collapsedKeys.size === 0) return true;
+  return !ancestorKeys(items, index).some((key) => collapsedKeys.has(key));
 }
 
 function apiError(error: unknown, fallback: string): string {
@@ -167,6 +196,7 @@ export default function ReserveInventoryPage() {
   const [extraUsers, setExtraUsers] = useState<User[]>([]);
   const [serialByKey, setSerialByKey] = useState<Record<string, string>>({});
   const [developerByKey, setDeveloperByKey] = useState<Record<string, string>>({});
+  const [collapsedKeys, setCollapsedKeys] = useState<Set<string>>(() => new Set());
 
   const developers = useMemo(() => {
     const merged = new Map<number, User>();
@@ -216,6 +246,26 @@ export default function ReserveInventoryPage() {
     () => (plan?.items ?? []).filter((row) => row.status === 'available'),
     [plan]
   );
+
+  const planItems = plan?.items;
+
+  const visibleItemIndexes = useMemo(() => {
+    if (!planItems?.length) return [] as number[];
+    const indexes: number[] = [];
+    for (let i = 0; i < planItems.length; i += 1) {
+      if (isRowVisible(planItems, i, collapsedKeys)) indexes.push(i);
+    }
+    return indexes;
+  }, [planItems, collapsedKeys]);
+
+  function toggleCollapsed(key: string) {
+    setCollapsedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   function selectedSerial(row: ReservationPlanItem): string | undefined {
     const key = rowKey(row);
@@ -466,13 +516,14 @@ export default function ReserveInventoryPage() {
         <div className="border-b bg-muted/40 px-4 py-2 text-sm font-medium">
           Hierarchy → matched inventory
         </div>
-        {!plan || plan.items.length === 0 ? (
+        {!plan || !planItems || planItems.length === 0 ? (
           <p className="p-6 text-sm text-muted-foreground">
             No hierarchy shells found. Generate hierarchy on the project first.
           </p>
         ) : (
           <ul className="divide-y">
-            {plan.items.map((row) => {
+            {visibleItemIndexes.map((index) => {
+              const row = planItems[index];
               const key = rowKey(row);
               const isShort = row.status === 'short';
               const isBusy = busyKey === key || reservingAll;
@@ -483,6 +534,8 @@ export default function ReserveInventoryPage() {
                   ? serialByKey[key]
                   : defaultSerial(row);
               const currentDeveloper = developerByKey[key] || NONE_DEVELOPER;
+              const isParent = hasChildRows(planItems, index);
+              const isCollapsed = collapsedKeys.has(key);
 
               return (
                 <li
@@ -495,6 +548,29 @@ export default function ReserveInventoryPage() {
                 >
                   <div className="min-w-0 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
+                      {isParent ? (
+                        <button
+                          type="button"
+                          className="rounded p-0.5 hover:bg-muted"
+                          onClick={() => toggleCollapsed(key)}
+                          aria-expanded={!isCollapsed}
+                          aria-label={
+                            isCollapsed
+                              ? `Expand ${row.entity_name} children`
+                              : `Collapse ${row.entity_name} children`
+                          }
+                          title={isCollapsed ? 'Expand children' : 'Collapse children'}
+                        >
+                          <ChevronDown
+                            className={cn(
+                              'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
+                              isCollapsed && '-rotate-90'
+                            )}
+                          />
+                        </button>
+                      ) : (
+                        <span className="inline-block w-5 shrink-0" aria-hidden />
+                      )}
                       <span className="font-medium">{row.entity_name}</span>
                       <span className="text-xs uppercase text-muted-foreground">
                         {row.target_entity_type}

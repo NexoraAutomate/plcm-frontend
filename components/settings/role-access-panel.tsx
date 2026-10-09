@@ -460,7 +460,7 @@ export function RoleAccessPanel({ embedded = false }: RoleAccessPanelProps) {
             title="Resource permissions"
             description="Toggle view / create / edit / delete for each area of the application"
           >
-            <div className="overflow-x-auto">
+            <div className="overflow-x-visible">
               <Table>
                 <TableHeader>
                   <TableRow>

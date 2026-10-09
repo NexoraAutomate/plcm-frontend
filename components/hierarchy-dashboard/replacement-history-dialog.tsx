@@ -12,11 +12,12 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
 import type { ReplacementHistoryRow } from '@/lib/resolution-history-matching';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 interface ReplacementHistoryDialogProps {
   open: boolean;
@@ -33,6 +34,8 @@ export function ReplacementHistoryDialog({
   description = 'Part replacements with fault type and redelivery dates.',
   rows,
 }: ReplacementHistoryDialogProps) {
+  const { sort, cycleSort, sortedRows } = useClientTableSort(rows);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] min-w-7xl max-w-[min(96vw,80rem)] overflow-hidden">
@@ -49,18 +52,32 @@ export function ReplacementHistoryDialog({
           ) : (
             <Table>
               <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="whitespace-nowrap">Date</TableHead>
-                  <TableHead>Entity</TableHead>
-                  <TableHead>Fault</TableHead>
-                  <TableHead>Old Part / Serial</TableHead>
-                  <TableHead>New Part / Serial</TableHead>
-                  <TableHead className="whitespace-nowrap">Redelivery</TableHead>
-                  <TableHead>Case</TableHead>
+                <TableRow>
+                  <SortableTableHead column="date" sort={sort} onSort={cycleSort} className="whitespace-nowrap">
+                    Date
+                  </SortableTableHead>
+                  <SortableTableHead column="entityLabel" sort={sort} onSort={cycleSort}>
+                    Entity
+                  </SortableTableHead>
+                  <SortableTableHead column="faultType" sort={sort} onSort={cycleSort}>
+                    Fault
+                  </SortableTableHead>
+                  <SortableTableHead column="oldPartNumber" sort={sort} onSort={cycleSort}>
+                    Old Part / Serial
+                  </SortableTableHead>
+                  <SortableTableHead column="newPartNumber" sort={sort} onSort={cycleSort}>
+                    New Part / Serial
+                  </SortableTableHead>
+                  <SortableTableHead column="redeliveryDate" sort={sort} onSort={cycleSort} className="whitespace-nowrap">
+                    Redelivery
+                  </SortableTableHead>
+                  <SortableTableHead column="maintenanceCaseId" sort={sort} onSort={cycleSort}>
+                    Case
+                  </SortableTableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row) => (
+                {sortedRows.map((row) => (
                   <TableRow key={row.id}>
                     <TableCell className="whitespace-nowrap text-sm">
                       {new Date(row.date).toLocaleString()}
