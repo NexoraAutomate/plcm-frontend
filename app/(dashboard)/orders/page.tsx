@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -34,6 +34,8 @@ import { OrdersMiniDashboard } from '@/components/lazy/list-dashboards';
 import { ProjectManagerSelect } from '@/components/orders/project-manager-select';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-menu';
+import { useColumnVisibility, type ColumnVisibilityDef } from '@/hooks/use-column-visibility';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
@@ -76,8 +78,21 @@ const emptyOrderForm: OrderForm = {
   status_id: undefined
 };
 
+const COLUMN_DEFS: ColumnVisibilityDef[] = [
+  { id: 'order_number', label: 'Order No.', alwaysVisible: true },
+  { id: 'title', label: 'Title' },
+  { id: 'customer_id', label: 'Customer' },
+  { id: 'contract_number', label: 'Contract / PO' },
+  { id: 'total_value', label: 'Value' },
+  { id: 'status_id', label: 'Status' },
+  { id: 'projects', label: 'Projects' },
+  { id: 'delivery_date', label: 'Delivery' },
+  { id: 'project_manager', label: 'PM' },
+];
+
 export default function OrdersPage() {
   const { showStats, setShowStats } = useListStatsVisibility();
+  const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility('orders-list', COLUMN_DEFS);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { customers, projects, createOrder, updateOrder, deleteOrder } = useDataStore();
@@ -544,6 +559,14 @@ export default function OrdersPage() {
           <CardDescription>
             Showing {orders.length} on this page · {pagination.total} matching
           </CardDescription>
+          <CardAction>
+            <ColumnVisibilityMenu
+              columns={COLUMN_DEFS}
+              visibleIds={visibleIds}
+              onToggle={toggleColumn}
+              onReset={resetColumns}
+            />
+          </CardAction>
         </CardHeader>
         <CardContent>
           <ListContentSuspense loading={pagination.fetching}>
@@ -551,22 +574,38 @@ export default function OrdersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <SortableTableHead column="order_number" sort={sort} onSort={cycleSort}>Order No.</SortableTableHead>
-                  <SortableTableHead column="title" sort={sort} onSort={cycleSort}>Title</SortableTableHead>
-                  <SortableTableHead column="customer_id" sort={sort} onSort={cycleSort}>Customer</SortableTableHead>
-                  <SortableTableHead column="contract_number" sort={sort} onSort={cycleSort}>Contract / PO</SortableTableHead>
-                  <SortableTableHead column="total_value" sort={sort} onSort={cycleSort}>Value</SortableTableHead>
-                  <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
-                  <TableHead>Projects</TableHead>
-                  <SortableTableHead column="delivery_date" sort={sort} onSort={cycleSort}>Delivery</SortableTableHead>
-                  <SortableTableHead column="project_manager" sort={sort} onSort={cycleSort}>PM</SortableTableHead>
+                  {isVisible('order_number') && (
+                    <SortableTableHead column="order_number" sort={sort} onSort={cycleSort}>Order No.</SortableTableHead>
+                  )}
+                  {isVisible('title') && (
+                    <SortableTableHead column="title" sort={sort} onSort={cycleSort}>Title</SortableTableHead>
+                  )}
+                  {isVisible('customer_id') && (
+                    <SortableTableHead column="customer_id" sort={sort} onSort={cycleSort}>Customer</SortableTableHead>
+                  )}
+                  {isVisible('contract_number') && (
+                    <SortableTableHead column="contract_number" sort={sort} onSort={cycleSort}>Contract / PO</SortableTableHead>
+                  )}
+                  {isVisible('total_value') && (
+                    <SortableTableHead column="total_value" sort={sort} onSort={cycleSort}>Value</SortableTableHead>
+                  )}
+                  {isVisible('status_id') && (
+                    <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
+                  )}
+                  {isVisible('projects') && <TableHead>Projects</TableHead>}
+                  {isVisible('delivery_date') && (
+                    <SortableTableHead column="delivery_date" sort={sort} onSort={cycleSort}>Delivery</SortableTableHead>
+                  )}
+                  {isVisible('project_manager') && (
+                    <SortableTableHead column="project_manager" sort={sort} onSort={cycleSort}>PM</SortableTableHead>
+                  )}
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {orders.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={visibleIds.length + 1} className="text-center text-muted-foreground py-8">
                       No orders found
                     </TableCell>
                   </TableRow>
@@ -580,45 +619,56 @@ export default function OrdersPage() {
                         className="cursor-pointer hover:bg-muted/50"
                         onClick={() => router.push(`/projects?order_id=${order.id}`)}
                       >
-                        <TableCell className="font-medium">
-                          <EntityNameWithFault
-                            name={order.order_number}
-                            entityType="order"
-                            entityId={order.id}
-                            faultMap={faultMap}
-                          />
+                        {isVisible('order_number') && (
+                          <TableCell className="font-medium">
+                            <EntityNameWithFault
+                              name={order.order_number}
+                              entityType="order"
+                              entityId={order.id}
+                              faultMap={faultMap}
+                            />
+                          </TableCell>
+                        )}
+
+                      {isVisible('title') && (
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{order.title}</p>
+                            {order.description && (
+                              <p className="text-xs text-muted-foreground truncate max-w-62.5">
+                                {order.description}
+                              </p>
+                            )}
+                          </div>
                         </TableCell>
+                      )}
 
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{order.title}</p>
-                          {order.description && (
-                            <p className="text-xs text-muted-foreground truncate max-w-62.5">
-                              {order.description}
+                      {isVisible('customer_id') && (
+                        <TableCell>
+                          {customer?.name || "N/A"}
+                        </TableCell>
+                      )}
+
+                      {isVisible('contract_number') && (
+                        <TableCell>
+                          <div className="text-sm">
+                            <p>{order.contract_number || "-"}</p>
+                            <p className="text-muted-foreground">
+                              {order.po_number || "-"}
                             </p>
-                          )}
-                        </div>
-                      </TableCell>
+                          </div>
+                        </TableCell>
+                      )}
 
-                      <TableCell>
-                        {customer?.name || "N/A"}
-                      </TableCell>
+                      {isVisible('total_value') && (
+                        <TableCell>
+                          {order.total_value
+                            ? `${order.currency} ${order.total_value.toLocaleString()}`
+                            : "-"}
+                        </TableCell>
+                      )}
 
-                      <TableCell>
-                        <div className="text-sm">
-                          <p>{order.contract_number || "-"}</p>
-                          <p className="text-muted-foreground">
-                            {order.po_number || "-"}
-                          </p>
-                        </div>
-                      </TableCell>
-
-                      <TableCell>
-                        {order.total_value
-                          ? `${order.currency} ${order.total_value.toLocaleString()}`
-                          : "-"}
-                      </TableCell>
-
+                      {isVisible('status_id') && (
                       <TableCell>
                         <Badge
                           className={
@@ -640,23 +690,30 @@ export default function OrdersPage() {
                           {order.status_name}
                         </Badge>
                       </TableCell>
+                      )}
 
-                      <TableCell>
-                        <EntityCountCell
-                          count={getCount(projectCountByOrder, order.id)}
-                          label="Total projects"
-                        />
-                      </TableCell>
+                      {isVisible('projects') && (
+                        <TableCell>
+                          <EntityCountCell
+                            count={getCount(projectCountByOrder, order.id)}
+                            label="Total projects"
+                          />
+                        </TableCell>
+                      )}
 
-                      <TableCell>
-                        {order.delivery_date
-                          ? new Date(order.delivery_date).toLocaleDateString()
-                          : "-"}
-                      </TableCell>
+                      {isVisible('delivery_date') && (
+                        <TableCell>
+                          {order.delivery_date
+                            ? new Date(order.delivery_date).toLocaleDateString()
+                            : "-"}
+                        </TableCell>
+                      )}
 
-                      <TableCell>
-                        {order.project_manager || "-"}
-                      </TableCell>
+                      {isVisible('project_manager') && (
+                        <TableCell>
+                          {order.project_manager || "-"}
+                        </TableCell>
+                      )}
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2 text-accent">
                             <Can permission={P.edit_orders}>

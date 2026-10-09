@@ -31,6 +31,8 @@ import { Can } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
 import { usePageDataRefresh } from '@/components/page-data-refresh';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-menu';
+import { useColumnVisibility, type ColumnVisibilityDef } from '@/hooks/use-column-visibility';
 import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 function formatWhen(value?: string | null) {
@@ -56,7 +58,20 @@ type Props = {
   mine?: boolean;
 };
 
+const COLUMN_DEFS: ColumnVisibilityDef[] = [
+  { id: 'target_entity_name', label: 'Item', alwaysVisible: true },
+  { id: 'serial_number', label: 'Serial' },
+  { id: 'project_name', label: 'Project' },
+  { id: 'stage', label: 'Stage' },
+  { id: 'assigned_developer_name', label: 'Developer' },
+  { id: 'updated_at', label: 'Updated' },
+];
+
 export function RecallQueuePanel({ mine = false }: Props) {
+  const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility(
+    mine ? 'recall-queue-mine-list' : 'recall-queue-list',
+    COLUMN_DEFS
+  );
   const [rows, setRows] = useState<InventoryRecallTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<InventoryRecallTask | null>(null);
@@ -132,6 +147,16 @@ export function RecallQueuePanel({ mine = false }: Props) {
 
   return (
     <>
+      {rows.length > 0 ? (
+        <div className="mb-2 flex justify-end">
+          <ColumnVisibilityMenu
+            columns={COLUMN_DEFS}
+            visibleIds={visibleIds}
+            onToggle={toggleColumn}
+            onReset={resetColumns}
+          />
+        </div>
+      ) : null}
       <ListContentSuspense loading={loading}>
         {rows.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
@@ -141,53 +166,73 @@ export function RecallQueuePanel({ mine = false }: Props) {
           <Table>
             <TableHeader>
               <TableRow>
-                <SortableTableHead column="target_entity_name" sort={sort} onSort={cycleSort}>
-                  Item
-                </SortableTableHead>
-                <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>
-                  Serial
-                </SortableTableHead>
-                <SortableTableHead column="project_name" sort={sort} onSort={cycleSort}>
-                  Project
-                </SortableTableHead>
-                <SortableTableHead column="stage" sort={sort} onSort={cycleSort}>
-                  Stage
-                </SortableTableHead>
-                <SortableTableHead column="assigned_developer_name" sort={sort} onSort={cycleSort}>
-                  Developer
-                </SortableTableHead>
-                <SortableTableHead column="updated_at" sort={sort} onSort={cycleSort}>
-                  Updated
-                </SortableTableHead>
+                {isVisible('target_entity_name') && (
+                  <SortableTableHead column="target_entity_name" sort={sort} onSort={cycleSort}>
+                    Item
+                  </SortableTableHead>
+                )}
+                {isVisible('serial_number') && (
+                  <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>
+                    Serial
+                  </SortableTableHead>
+                )}
+                {isVisible('project_name') && (
+                  <SortableTableHead column="project_name" sort={sort} onSort={cycleSort}>
+                    Project
+                  </SortableTableHead>
+                )}
+                {isVisible('stage') && (
+                  <SortableTableHead column="stage" sort={sort} onSort={cycleSort}>
+                    Stage
+                  </SortableTableHead>
+                )}
+                {isVisible('assigned_developer_name') && (
+                  <SortableTableHead column="assigned_developer_name" sort={sort} onSort={cycleSort}>
+                    Developer
+                  </SortableTableHead>
+                )}
+                {isVisible('updated_at') && (
+                  <SortableTableHead column="updated_at" sort={sort} onSort={cycleSort}>
+                    Updated
+                  </SortableTableHead>
+                )}
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedRows.map((row) => (
                 <TableRow key={row.id}>
-                  <TableCell>
-                    <div className="font-medium">
-                      {row.target_entity_name ||
-                        `${row.target_entity_type || 'item'} #${row.target_entity_id ?? row.id}`}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {row.inventory_name || row.part_number || '—'}
-                    </div>
-                  </TableCell>
-                  <TableCell>{row.serial_number || '—'}</TableCell>
-                  <TableCell>{row.project_name || `#${row.project_id}`}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {row.item_status ? <StatusBadge status={row.item_status} /> : null}
-                      <Badge variant="outline">{row.stage}</Badge>
-                      {row.forced_return ? <Badge variant="secondary">Forced</Badge> : null}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {row.assigned_developer_name ||
-                      (row.assigned_developer_id ? `#${row.assigned_developer_id}` : '—')}
-                  </TableCell>
-                  <TableCell>{formatWhen(row.updated_at)}</TableCell>
+                  {isVisible('target_entity_name') && (
+                    <TableCell>
+                      <div className="font-medium">
+                        {row.target_entity_name ||
+                          `${row.target_entity_type || 'item'} #${row.target_entity_id ?? row.id}`}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {row.inventory_name || row.part_number || '—'}
+                      </div>
+                    </TableCell>
+                  )}
+                  {isVisible('serial_number') && <TableCell>{row.serial_number || '—'}</TableCell>}
+                  {isVisible('project_name') && (
+                    <TableCell>{row.project_name || `#${row.project_id}`}</TableCell>
+                  )}
+                  {isVisible('stage') && (
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {row.item_status ? <StatusBadge status={row.item_status} /> : null}
+                        <Badge variant="outline">{row.stage}</Badge>
+                        {row.forced_return ? <Badge variant="secondary">Forced</Badge> : null}
+                      </div>
+                    </TableCell>
+                  )}
+                  {isVisible('assigned_developer_name') && (
+                    <TableCell>
+                      {row.assigned_developer_name ||
+                        (row.assigned_developer_id ? `#${row.assigned_developer_id}` : '—')}
+                    </TableCell>
+                  )}
+                  {isVisible('updated_at') && <TableCell>{formatWhen(row.updated_at)}</TableCell>}
                   <TableCell className="text-right">
                     <div className="flex flex-wrap justify-end gap-1">
                       {mine && row.can_return ? (

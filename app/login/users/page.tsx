@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -14,15 +14,30 @@ import { useAuth } from '@/lib/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { validateUserCreateForm, validateUserEditForm } from '@/lib/form-validation';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-menu';
+import {
+  useColumnVisibility,
+  type ColumnVisibilityDef,
+} from '@/hooks/use-column-visibility';
 import { useClientTableSort } from '@/hooks/use-table-sorting';
-
 function primaryRole(user: { roles?: string[] | null }) {
   return user.roles?.[0] || '—';
 }
 
+const COLUMN_DEFS: ColumnVisibilityDef[] = [
+  { id: 'full_name', label: 'Name', alwaysVisible: true },
+  { id: 'username', label: 'Username' },
+  { id: 'email', label: 'Email' },
+  { id: 'role', label: 'Role' },
+];
+
 export default function UsersPage() {
   const { user: currentUser, hasAccess } = useAuth();
   const { users, loading, createUser, updateUser, deleteUser } = useDataStore();
+  const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility(
+    'users-list',
+    COLUMN_DEFS
+  );
   const [search, setSearch] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -207,41 +222,66 @@ export default function UsersPage() {
         <CardHeader>
           <CardTitle>All Users</CardTitle>
           <CardDescription>Total: {filtered.length}</CardDescription>
+          <CardAction>
+            <ColumnVisibilityMenu
+              columns={COLUMN_DEFS}
+              visibleIds={visibleIds}
+              onToggle={toggleColumn}
+              onReset={resetColumns}
+            />
+          </CardAction>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-visible">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <SortableTableHead column="full_name" sort={sort} onSort={cycleSort}>
-                    Name
-                  </SortableTableHead>
-                  <SortableTableHead column="username" sort={sort} onSort={cycleSort}>
-                    Username
-                  </SortableTableHead>
-                  <SortableTableHead column="email" sort={sort} onSort={cycleSort}>
-                    Email
-                  </SortableTableHead>
-                  <SortableTableHead column="role" sort={sort} onSort={cycleSort}>
-                    Role
-                  </SortableTableHead>
+                  {isVisible('full_name') && (
+                    <SortableTableHead column="full_name" sort={sort} onSort={cycleSort}>
+                      Name
+                    </SortableTableHead>
+                  )}
+                  {isVisible('username') && (
+                    <SortableTableHead column="username" sort={sort} onSort={cycleSort}>
+                      Username
+                    </SortableTableHead>
+                  )}
+                  {isVisible('email') && (
+                    <SortableTableHead column="email" sort={sort} onSort={cycleSort}>
+                      Email
+                    </SortableTableHead>
+                  )}
+                  {isVisible('role') && (
+                    <SortableTableHead column="role" sort={sort} onSort={cycleSort}>
+                      Role
+                    </SortableTableHead>
+                  )}
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableCell
+                      colSpan={visibleIds.length + 1}
+                      className="text-center text-muted-foreground py-8"
+                    >
                       No users found
                     </TableCell>
                   </TableRow>
                 ) : (
                   sortedRows.map((user) => (
                     <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.full_name}</TableCell>
-                      <TableCell className="font-mono text-sm">{user.username}</TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell className="capitalize">{primaryRole(user)}</TableCell>
+                      {isVisible('full_name') && (
+                        <TableCell className="font-medium">{user.full_name}</TableCell>
+                      )}
+                      {isVisible('username') && (
+                        <TableCell className="font-mono text-sm">{user.username}</TableCell>
+                      )}
+                      {isVisible('email') && <TableCell>{user.email}</TableCell>}
+                      {isVisible('role') && (
+                        <TableCell className="capitalize">{primaryRole(user)}</TableCell>
+                      )}
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
                           <Button

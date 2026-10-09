@@ -2,6 +2,11 @@
 
 import React, { useMemo, useState } from 'react';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-menu';
+import {
+  useColumnVisibility,
+  type ColumnVisibilityDef,
+} from '@/hooks/use-column-visibility';
 import { useTableSorting } from '@/hooks/use-table-sorting';
 import { sortRowsByState } from '@/lib/sorting';
 import { Eye, Edit, Trash2, ChevronDown } from 'lucide-react';
@@ -14,7 +19,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { StatusBadge } from '@/components/status-badge';
 import { MaintenanceTable } from '@/components/maintenance-table';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import type { MaintenanceLog } from '@/lib/models';
@@ -24,12 +28,15 @@ interface Column {
   key: string;
   label: string;
   render?: (value: any, row: any) => React.ReactNode;
+  defaultVisible?: boolean;
+  alwaysVisible?: boolean;
 }
 
 interface EntityTableProps {
   columns: Column[];
   data: any[];
   entityName: string;
+  tableId?: string;
   onView?: (item: any) => void;
   onEdit?: (item: any) => void;
   onDelete?: (item: any) => void;
@@ -47,6 +54,7 @@ export function EntityTable({
   columns,
   data,
   entityName,
+  tableId,
   onView,
   onEdit,
   onDelete,
@@ -60,24 +68,49 @@ export function EntityTable({
     [data, sort]
   );
 
+  const columnDefs: ColumnVisibilityDef[] = useMemo(
+    () =>
+      columns.map((c) => ({
+        id: c.key,
+        label: c.label,
+        defaultVisible: c.defaultVisible,
+        alwaysVisible: c.alwaysVisible,
+      })),
+    [columns]
+  );
+
+  const resolvedTableId = tableId || `entity-table:${entityName.toLowerCase()}`;
+  const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility(
+    resolvedTableId,
+    columnDefs
+  );
+
+  const visibleColumnDefs = useMemo(
+    () => columns.filter((c) => isVisible(c.key)),
+    [columns, isVisible]
+  );
+
   const [expandedRows, setExpandedRows] = useState<Map<number, ExpandedRow>>(new Map());
-  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({ open: false, id: null });
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({
+    open: false,
+    id: null,
+  });
 
   const toggleExpand = async (id: number) => {
     const current = expandedRows.get(id);
-    
+
     if (current) {
-      setExpandedRows(prev => {
+      setExpandedRows((prev) => {
         const next = new Map(prev);
         next.delete(id);
         return next;
       });
     } else if (getMaintenanceLogs) {
-      setExpandedRows(prev => new Map(prev).set(id, { id, logs: [], isLoading: true }));
-      
+      setExpandedRows((prev) => new Map(prev).set(id, { id, logs: [], isLoading: true }));
+
       try {
         const logs = await getMaintenanceLogs(id);
-        setExpandedRows(prev => {
+        setExpandedRows((prev) => {
           const next = new Map(prev);
           if (next.has(id)) {
             next.set(id, { id, logs, isLoading: false });
@@ -86,7 +119,7 @@ export function EntityTable({
         });
       } catch (error) {
         console.error('Failed to fetch maintenance logs:', error);
-        setExpandedRows(prev => {
+        setExpandedRows((prev) => {
           const next = new Map(prev);
           if (next.has(id)) {
             next.set(id, { id, logs: [], isLoading: false });
@@ -103,7 +136,7 @@ export function EntityTable({
 
   const confirmDelete = () => {
     if (deleteConfirm.id !== null) {
-      const item = data.find(d => d.id === deleteConfirm.id);
+      const item = data.find((d) => d.id === deleteConfirm.id);
       if (item && onDelete) {
         onDelete(item);
       }
@@ -123,14 +156,25 @@ export function EntityTable({
     );
   }
 
+  const colSpan =
+    visibleColumnDefs.length + 1 + (getMaintenanceLogs ? 1 : 0);
+
   return (
     <>
+      <div className="mb-2 flex justify-end">
+        <ColumnVisibilityMenu
+          columns={columnDefs}
+          visibleIds={visibleIds}
+          onToggle={toggleColumn}
+          onReset={resetColumns}
+        />
+      </div>
       <div className="overflow-x-visible rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
               {getMaintenanceLogs && <TableHead className="w-12"></TableHead>}
-              {columns.map((col) => (
+              {visibleColumnDefs.map((col) => (
                 <SortableTableHead key={col.key} column={col.key} sort={sort} onSort={cycleSort}>
                   {col.label}
                 </SortableTableHead>
@@ -142,13 +186,12 @@ export function EntityTable({
             {sortedData.map((row) => {
               const isExpanded = expandedRows.has(row.id);
               const expanded = expandedRows.get(row.id);
-              
+
               return (
                 <React.Fragment key={row.id}>
-                  <TableRow className={cn(
-                    'hover:bg-muted/50',
-                    isExpanded && 'bg-muted/30'
-                  )}>
+                  <TableRow
+                    className={cn('hover:bg-muted/50', isExpanded && 'bg-muted/30')}
+                  >
                     {getMaintenanceLogs && (
                       <TableCell className="p-2">
                         <Button
@@ -166,7 +209,7 @@ export function EntityTable({
                         </Button>
                       </TableCell>
                     )}
-                    {columns.map(col => (
+                    {visibleColumnDefs.map((col) => (
                       <TableCell key={col.key} className="text-sm">
                         {col.render ? col.render(row[col.key], row) : row[col.key]}
                       </TableCell>
@@ -208,7 +251,7 @@ export function EntityTable({
                   </TableRow>
                   {isExpanded && expanded && getMaintenanceLogs && (
                     <TableRow className="bg-muted/30 border-b">
-                      <TableCell colSpan={100} className="p-4">
+                      <TableCell colSpan={colSpan} className="p-4">
                         <div className="space-y-4">
                           <h4 className="font-medium">Maintenance Logs</h4>
                           <MaintenanceTable

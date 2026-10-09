@@ -16,6 +16,8 @@ import {
 import type { InventoryEntityFormType } from '@/hooks/use-inventory-entity-form';
 import type { emptyInventoryEntityForm } from '@/lib/inventory-entity-fields';
 import { workflowStatusLabel } from '@/lib/workflow-status';
+import { CascadingLocationSelects } from '@/components/inventory/cascading-location-selects';
+import { useAppDefinitions } from '@/lib/app-definitions-context';
 
 export type InventoryEntityFormData = typeof emptyInventoryEntityForm;
 
@@ -88,6 +90,7 @@ export function InventoryEntityFormTabs({
   lockEntityName = false,
   entityId,
 }: InventoryEntityFormTabsProps) {
+  const { definitions } = useAppDefinitions();
   const getEntityDisplayName = (entityType: InventoryEntityFormType) => entityLabel(entityType);
   const isHierarchy = context === 'hierarchy';
   /** Existing-project edit: no General tab; Description lives on Part Number. */
@@ -124,7 +127,7 @@ export function InventoryEntityFormTabs({
             value="part-number"
             className="rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
           >
-            {hideGeneralTab ? 'Item Details' : 'Part Number'}
+            {hideGeneralTab ? 'Item Details' : 'OEM / SKU'}
           </TabsTrigger>
           {!isHierarchy ? (
             <TabsTrigger
@@ -298,33 +301,9 @@ export function InventoryEntityFormTabs({
               <div className="grid gap-3 sm:grid-cols-2">
                 <Card className="gap-3 py-3 shadow-none">
                   <CardHeader className="px-4 pb-0 pt-0">
-                    <CardTitle className="text-sm font-semibold">Part Number Details</CardTitle>
+                    <CardTitle className="text-sm font-semibold">Item Details</CardTitle>
                   </CardHeader>
                   <CardContent className="grid grid-cols-1 gap-3 px-4 [&>div]:space-y-1.5">
-                    <div>
-                      <Label className="text-xs">Part Number</Label>
-                      <Input
-                        className="h-8"
-                        value={formData.part_number}
-                        onChange={(e) =>
-                          onFormDataChange({ ...formData, part_number: e.target.value })
-                        }
-                        placeholder="e.g., MPN-12345"
-                      />
-                    </div>
-
-                    <div>
-                      <Label className="text-xs">Serial Number</Label>
-                      <Input
-                        className="h-8"
-                        value={formData.serial_number}
-                        onChange={(e) =>
-                          onFormDataChange({ ...formData, serial_number: e.target.value })
-                        }
-                        placeholder="e.g., SN-2024-001"
-                      />
-                    </div>
-
                     <div>
                       <Label className="text-xs">OEM Name</Label>
                       <Input
@@ -335,6 +314,9 @@ export function InventoryEntityFormTabs({
                         }}
                         placeholder="e.g. AMP"
                       />
+                      <p className="text-[11px] text-muted-foreground">
+                        Part # / Serial # are generated from the name and OEM (not entered manually).
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
@@ -393,45 +375,6 @@ export function InventoryEntityFormTabs({
             </>
           ) : (
             <>
-              <div>
-                <Label>
-                  Serial Number
-                  {inventoryUsesInstances(selectedEntityType) &&
-                  selectedEntityType !== 'component' &&
-                  mode === 'create'
-                    ? ' *'
-                    : ''}
-                </Label>
-                <Input
-                  value={formData.serial_number}
-                  onChange={(e) =>
-                    onFormDataChange({ ...formData, serial_number: e.target.value })
-                  }
-                  placeholder="e.g., SN-2024-001"
-                />
-                {inventoryUsesInstances(selectedEntityType) ? (
-                  <p className="text-xs text-muted-foreground">
-                    {mode === 'create'
-                      ? 'Identity of the unit. For more than one quantity, only enter the serial number of the first item.'
-                      : 'Identity of the unit.'}
-                  </p>
-                ) : null}
-              </div>
-
-              <div>
-                <Label>
-                  Part Number
-                  {inventoryUsesInstances(selectedEntityType) ? ' *' : ''}
-                </Label>
-                <Input
-                  value={formData.part_number}
-                  onChange={(e) =>
-                    onFormDataChange({ ...formData, part_number: e.target.value })
-                  }
-                  placeholder="e.g., MPN-12345"
-                />
-              </div>
-
               {mode === 'edit' && selectedEntityType === 'component' ? (
                 <div>
                   <Label>SKU</Label>
@@ -453,8 +396,8 @@ export function InventoryEntityFormTabs({
                   placeholder="Short acronym for {vendor} token, e.g. AMP"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Used as the {'{vendor}'} token when Part # / Serial # are generated from the
-                  name. Changing it later does not rewrite existing Part # or Serial #.
+                  Part # / Serial # are generated automatically from the item name and this OEM
+                  acronym. They are not entered manually.
                 </p>
               </div>
             </>
@@ -501,12 +444,24 @@ export function InventoryEntityFormTabs({
             )}
           </div>
 
-          <div>
-            <Label>Location {mode === 'create' ? '*' : ''}</Label>
-            <Input
-              value={formData.location}
-              onChange={(e) => onFormDataChange({ ...formData, location: e.target.value })}
-              placeholder="Warehouse location"
+          <div className="sm:col-span-2">
+            <CascadingLocationSelects
+              tree={definitions.inventory_location_tree}
+              required={mode === 'create'}
+              value={{
+                location_room: formData.location_room,
+                location_cabinet: formData.location_cabinet,
+                location_rack: formData.location_rack,
+              }}
+              onChange={(next) =>
+                onFormDataChange({
+                  ...formData,
+                  location_room: next.location_room,
+                  location_cabinet: next.location_cabinet,
+                  location_rack: next.location_rack,
+                  location: next.location,
+                })
+              }
             />
           </div>
 

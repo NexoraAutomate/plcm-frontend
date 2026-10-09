@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -39,6 +39,8 @@ import { HierarchyListDashboard } from '@/components/lazy/list-dashboards';
 import { ParentEntityLink } from '@/components/entity-link';
 import { buildHierarchyPageUrl } from '@/lib/hierarchy-page-filters';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-menu';
+import { useColumnVisibility, type ColumnVisibilityDef } from '@/hooks/use-column-visibility';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import {
   getSubsystemsDashboardConfig,
@@ -58,8 +60,16 @@ import {
   resolveInstallerFilterId,
 } from '@/components/installer-filter-select';
 
+const COLUMN_DEFS: ColumnVisibilityDef[] = [
+  { id: 'name', label: 'Name', alwaysVisible: true },
+  { id: 'system_id', label: 'System' },
+  { id: 'status_id', label: 'Status' },
+  { id: 'modules', label: 'Modules' },
+];
+
 export default function SubsystemsPage() {
   const { entityLabel } = useAppDefinitions();
+  const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility('subsystems-list', COLUMN_DEFS);
   const { showStats, setShowStats } = useListStatsVisibility();
 
   const router = useRouter();
@@ -436,6 +446,14 @@ export default function SubsystemsPage() {
           <CardDescription>
             Showing {subsystems.length} on this page · {pagination.total} matching
           </CardDescription>
+          <CardAction>
+            <ColumnVisibilityMenu
+              columns={COLUMN_DEFS}
+              visibleIds={visibleIds}
+              onToggle={toggleColumn}
+              onReset={resetColumns}
+            />
+          </CardAction>
         </CardHeader>
         <CardContent>
           <ListContentSuspense loading={pagination.fetching}>
@@ -443,17 +461,23 @@ export default function SubsystemsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Name</SortableTableHead>
-                  <SortableTableHead column="system_id" sort={sort} onSort={cycleSort}>{entityLabel('system')}</SortableTableHead>
-                  <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
-                  <TableHead>{entityLabel('module', true)}</TableHead>
+                  {isVisible('name') && (
+                    <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Name</SortableTableHead>
+                  )}
+                  {isVisible('system_id') && (
+                    <SortableTableHead column="system_id" sort={sort} onSort={cycleSort}>{entityLabel('system')}</SortableTableHead>
+                  )}
+                  {isVisible('status_id') && (
+                    <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
+                  )}
+                  {isVisible('modules') && <TableHead>{entityLabel('module', true)}</TableHead>}
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {subsystems.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={visibleIds.length + 1} className="text-center text-muted-foreground py-8">
                       {`No ${entityLabel('subsystem', true).toLowerCase()} found`}
                     </TableCell>
                   </TableRow>
@@ -479,43 +503,51 @@ export default function SubsystemsPage() {
                         )}
                         onClick={() => router.push(`/subsystems/${subsystem.id}`)}
                       >
-                        <TableCell className="font-medium">
-                          <EntityNameWithFault
-                            name={subsystem.name}
-                            entityType="subsystem"
-                            entityId={subsystem.id}
-                            faultMap={faultMap}
-                          />
-                          {showOwnInstallBadge({
-                            isInventoryManager: inventoryManager,
-                            currentUserId: user?.id,
-                            installedById: subsystem.installed_by_id,
-                            isCurrentInstall: subsystem.is_current_install,
-                          }) ? (
-                            <p className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
-                              Installed by you
-                            </p>
-                          ) : null}
-                        </TableCell>
-                        <TableCell>
-                          {system ? (
-                            <ParentEntityLink
-                              href={`/systems/${system.id}`}
-                              label={system.name}
+                        {isVisible('name') && (
+                          <TableCell className="font-medium">
+                            <EntityNameWithFault
+                              name={subsystem.name}
+                              entityType="subsystem"
+                              entityId={subsystem.id}
+                              faultMap={faultMap}
                             />
-                          ) : (
-                            'N/A'
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge status={getStatusName(subsystem)} />
-                        </TableCell>
-                        <TableCell>
-                          <EntityCountCell
-                            count={getCount(moduleCountBySubsystem, subsystem.id)}
-                            label="Total modules"
-                          />
-                        </TableCell>
+                            {showOwnInstallBadge({
+                              isInventoryManager: inventoryManager,
+                              currentUserId: user?.id,
+                              installedById: subsystem.installed_by_id,
+                              isCurrentInstall: subsystem.is_current_install,
+                            }) ? (
+                              <p className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                                Installed by you
+                              </p>
+                            ) : null}
+                          </TableCell>
+                        )}
+                        {isVisible('system_id') && (
+                          <TableCell>
+                            {system ? (
+                              <ParentEntityLink
+                                href={`/systems/${system.id}`}
+                                label={system.name}
+                              />
+                            ) : (
+                              'N/A'
+                            )}
+                          </TableCell>
+                        )}
+                        {isVisible('status_id') && (
+                          <TableCell>
+                            <StatusBadge status={getStatusName(subsystem)} />
+                          </TableCell>
+                        )}
+                        {isVisible('modules') && (
+                          <TableCell>
+                            <EntityCountCell
+                              count={getCount(moduleCountBySubsystem, subsystem.id)}
+                              label="Total modules"
+                            />
+                          </TableCell>
+                        )}
                         <TableCell className="text-right">
                           <div className="flex gap-2 justify-end">
                             <Link href={`/subsystems/${subsystem.id}`} onClick={(e) => e.stopPropagation()}>

@@ -5,6 +5,7 @@ import { useReactToPrint } from 'react-to-print';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
 import { useDataStore } from '@/lib/data-store';
+import { useAppDefinitions } from '@/lib/app-definitions-context';
 import { APP_VERSION } from '@/lib/app-version';
 import { reportsApi, type InventoryReportResponse } from '@/lib/api/reports';
 import {
@@ -24,8 +25,12 @@ import {
   newReportUuid,
   registerGeneratedReport,
 } from '@/components/reporting/report-utils';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { CascadingLocationSelects } from '@/components/inventory/cascading-location-selects';
+import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-menu';
+import {
+  useColumnVisibility,
+  type ColumnVisibilityDef,
+} from '@/hooks/use-column-visibility';
 import { workflowStatusLabel } from '@/lib/workflow-status';
 
 function displayInventoryStatus(value?: string | null) {
@@ -33,22 +38,47 @@ function displayInventoryStatus(value?: string | null) {
   return workflowStatusLabel(value);
 }
 
+/** Significant modes only — stubs/duplicates removed. */
 const INVENTORY_MODES = [
   { value: 'current', label: 'Current Stock' },
   { value: 'low', label: 'Low Stock' },
   { value: 'out', label: 'Out of Stock' },
-  { value: 'reserved', label: 'Reserved / Issued (open)' },
-  { value: 'issued', label: 'Issued Items (open)' },
   { value: 'available', label: 'Available Items' },
-  { value: 'by_project', label: 'Inventory by Project' },
-  { value: 'by_system', label: 'Inventory by System' },
-  { value: 'by_location', label: 'Inventory by Location' },
+  { value: 'issued', label: 'Open Issuances' },
   { value: 'movements', label: 'Issuance Movements' },
-  { value: 'valuation', label: 'Stock Valuation' },
-  { value: 'lookup', label: 'Part / Serial Lookup' },
 ];
 
-const ISSUANCE_MODES = new Set(['issued', 'reserved', 'movements']);
+const ISSUANCE_MODES = new Set(['issued', 'movements']);
+
+const STOCK_COLUMN_DEFS: ColumnVisibilityDef[] = [
+  { id: 'name', label: 'Name', alwaysVisible: true },
+  { id: 'inventory_type', label: 'Type' },
+  { id: 'quantity', label: 'Qty' },
+  { id: 'available_quantity', label: 'Available' },
+  { id: 'location', label: 'Location' },
+  { id: 'status_name', label: 'Status' },
+  { id: 'sku', label: 'SKU' },
+];
+
+const ISSUANCE_COLUMN_DEFS: ColumnVisibilityDef[] = [
+  { id: 'name', label: 'Name', alwaysVisible: true },
+  { id: 'quantity', label: 'Qty' },
+  { id: 'issued_to_name', label: 'Whom' },
+  { id: 'issued_by_name', label: 'Issued By' },
+  { id: 'issued_at', label: 'When' },
+  { id: 'entity_detail', label: 'Entity' },
+  { id: 'issuance_status', label: 'Status' },
+];
+
+/** Mode-specific default visibility (others still available via Columns). */
+const MODE_DEFAULT_HIDDEN: Record<string, string[]> = {
+  low: ['sku'],
+  out: ['available_quantity', 'sku'],
+  available: ['sku'],
+  issued: [],
+  movements: [],
+  current: [],
+};
 
 function entityDetail(item: {
   configuration_item?: string | null;
@@ -67,21 +97,36 @@ function entityDetail(item: {
   return '—';
 }
 
+function defsForMode(mode: string): ColumnVisibilityDef[] {
+  const base = ISSUANCE_MODES.has(mode) ? ISSUANCE_COLUMN_DEFS : STOCK_COLUMN_DEFS;
+  const hidden = new Set(MODE_DEFAULT_HIDDEN[mode] || []);
+  return base.map((col) =>
+    hidden.has(col.id) ? { ...col, defaultVisible: false } : col
+  );
+}
+
 export default function InventoryReportsPage() {
   const { user } = useAuth();
   const { projects } = useDataStore();
+  const { definitions } = useAppDefinitions();
   const printRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState('current');
   const [search, setSearch] = useState('');
   const [location, setLocation] = useState('');
+  const [locationRoom, setLocationRoom] = useState('');
+  const [locationCabinet, setLocationCabinet] = useState('');
+  const [locationRack, setLocationRack] = useState('');
   const [projectId, setProjectId] = useState('all');
-  const [partNumber, setPartNumber] = useState('');
-  const [serialNumber, setSerialNumber] = useState('');
   const [data, setData] = useState<InventoryReportResponse | null>(null);
   const [reportUuid, setReportUuid] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [exporting, setExporting] = useState(false);
   const generatedAt = useMemo(() => new Date(), [data]);
+
+  const columnDefs = useMemo(() => defsForMode(mode), [mode]);
+  const tableId = `inventory-report:${mode}`;
+  const { visibleIds, isVisible, toggleColumn, resetColumns, visibleColumns } =
+    useColumnVisibility(tableId, columnDefs);
 
   const projectOptions = useMemo(
     () => (projects || []).map((p) => ({ value: String(p.id), label: p.name })),
@@ -98,8 +143,6 @@ export default function InventoryReportsPage() {
     search: search || undefined,
     location: location || undefined,
     project_id: projectId !== 'all' ? Number(projectId) : undefined,
-    part_number: partNumber || undefined,
-    serial_number: serialNumber || undefined,
   };
 
   const generate = async () => {
@@ -116,6 +159,24 @@ export default function InventoryReportsPage() {
       setGenerating(false);
     }
   };
+
+  const isIssuanceMode = ISSUANCE_MODES.has(mode);
+
+  const previewRows = useMemo(() => {
+    if (!data) return [] as Record<string, unknown>[];
+    if (isIssuanceMode) {
+      return (data.items || []).map((i) => ({
+        ...i,
+        entity_detail: entityDetail(i),
+        issued_at: i.issued_at ? formatReportDate(new Date(i.issued_at)) : '—',
+        issuance_status: displayInventoryStatus(i.issuance_status || i.status_name),
+      }));
+    }
+    return (data.items || []).map((i) => ({
+      ...i,
+      status_name: displayInventoryStatus(i.status_name),
+    }));
+  }, [data, isIssuanceMode]);
 
   const exportPdf = async () => {
     if (!data || !reportUuid) {
@@ -134,8 +195,15 @@ export default function InventoryReportsPage() {
         payloadForChecksum: data,
         reportUuid,
       });
-      const isIssuanceMode = ISSUANCE_MODES.has(mode);
       const qr = await qrDataUrl(registered.report_uuid);
+      const headers = visibleColumns.map((c) => c.label);
+      const rows = previewRows.map((row) =>
+        visibleColumns.map((c) => {
+          const v = (row as Record<string, unknown>)[c.id];
+          if (v == null || v === '') return '—';
+          return String(v);
+        })
+      );
       exportTabularPdf({
         title: 'Inventory Report',
         subtitle: INVENTORY_MODES.find((m) => m.value === mode)?.label || mode,
@@ -146,56 +214,8 @@ export default function InventoryReportsPage() {
         softwareVersion: APP_VERSION,
         qrDataUrl: qr,
         orientation: 'landscape',
-        columns: isIssuanceMode
-          ? [
-              'Name',
-              'Part No.',
-              'Serial',
-              'Qty',
-              'Whom',
-              'Issued By',
-              'When',
-              'Entity',
-              'Status',
-            ]
-          : [
-              'Name',
-              'Type',
-              'Part No.',
-              'Serial',
-              'Qty',
-              'Available',
-              'Location',
-              'Status',
-              'SKU',
-            ],
-        rows: (data.items || []).map((i) =>
-          isIssuanceMode
-            ? [
-                i.name,
-                i.part_number || '—',
-                i.serial_number || '—',
-                i.quantity ?? '—',
-                i.issued_to_name || '—',
-                i.issued_by_name || '—',
-                i.issued_at ? formatReportDate(new Date(i.issued_at)) : '—',
-                entityDetail(i),
-                i.issuance_status || i.status_name
-                  ? displayInventoryStatus(i.issuance_status || i.status_name)
-                  : '—',
-              ]
-            : [
-                i.name,
-                i.inventory_type || '—',
-                i.part_number || '—',
-                i.serial_number || '—',
-                i.quantity ?? '—',
-                i.available_quantity ?? '—',
-                i.location || '—',
-                displayInventoryStatus(i.status_name),
-                i.sku || '—',
-              ]
-        ),
+        columns: headers,
+        rows,
         summaryLines: [
           `Total items: ${displayValue(data.summary?.total_items)}`,
           `Total quantity: ${displayValue(data.summary?.total_quantity)}`,
@@ -218,18 +238,26 @@ export default function InventoryReportsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Inventory Reports</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Stock levels, lookups, and inventory distribution.
+            Stock levels, open issuances, and movement history.
           </p>
         </div>
-        <ReportPreviewToolbar
-          onGenerate={generate}
-          onPrint={() => handlePrint()}
-          onExportPdf={exportPdf}
-          generating={generating}
-          exporting={exporting}
-          disableExport={!data}
-          disablePrint={!data}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <ColumnVisibilityMenu
+            columns={columnDefs}
+            visibleIds={visibleIds}
+            onToggle={toggleColumn}
+            onReset={resetColumns}
+          />
+          <ReportPreviewToolbar
+            onGenerate={generate}
+            onPrint={() => handlePrint()}
+            onExportPdf={exportPdf}
+            generating={generating}
+            exporting={exporting}
+            disableExport={!data}
+            disablePrint={!data}
+          />
+        </div>
       </div>
 
       <ReportFilterBar
@@ -242,35 +270,22 @@ export default function InventoryReportsPage() {
         onProjectChange={setProjectId}
         projects={projectOptions}
         extra={
-          <>
-            <div className="space-y-1.5">
-              <Label htmlFor="inv-location">Location</Label>
-              <Input
-                id="inv-location"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="Location"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="inv-pn">Part Number</Label>
-              <Input
-                id="inv-pn"
-                value={partNumber}
-                onChange={(e) => setPartNumber(e.target.value)}
-                placeholder="Part number"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="inv-sn">Serial Number</Label>
-              <Input
-                id="inv-sn"
-                value={serialNumber}
-                onChange={(e) => setSerialNumber(e.target.value)}
-                placeholder="Serial number"
-              />
-            </div>
-          </>
+          <div className="sm:col-span-2">
+            <CascadingLocationSelects
+              tree={definitions.inventory_location_tree}
+              value={{
+                location_room: locationRoom,
+                location_cabinet: locationCabinet,
+                location_rack: locationRack,
+              }}
+              onChange={(next) => {
+                setLocationRoom(next.location_room);
+                setLocationCabinet(next.location_cabinet);
+                setLocationRack(next.location_rack);
+                setLocation(next.location);
+              }}
+            />
+          </div>
         }
       />
 
@@ -300,9 +315,17 @@ export default function InventoryReportsPage() {
                 { key: 'value', header: 'Value' },
               ]}
               rows={[
-                { label: 'Mode', value: displayValue(data.mode) },
+                {
+                  label: 'Mode',
+                  value:
+                    INVENTORY_MODES.find((m) => m.value === mode)?.label ||
+                    displayValue(data.mode),
+                },
                 { label: 'Total Items', value: displayValue(data.summary?.total_items) },
                 { label: 'Total Quantity', value: displayValue(data.summary?.total_quantity) },
+                ...(location
+                  ? [{ label: 'Location filter', value: location }]
+                  : []),
               ]}
             />
             {data.placeholders?.length > 0 && (
@@ -314,50 +337,12 @@ export default function InventoryReportsPage() {
             )}
           </ReportSection>
 
-          <ReportSection title={ISSUANCE_MODES.has(mode) ? 'Issuance Ledger' : 'Inventory Items'}>
+          <ReportSection title={isIssuanceMode ? 'Issuance Ledger' : 'Inventory Items'}>
             <ReportTable
-              columns={
-                ISSUANCE_MODES.has(mode)
-                  ? [
-                      { key: 'name', header: 'Name' },
-                      { key: 'part_number', header: 'Part No.' },
-                      { key: 'serial_number', header: 'Serial' },
-                      { key: 'quantity', header: 'Qty' },
-                      { key: 'issued_to_name', header: 'Whom' },
-                      { key: 'issued_by_name', header: 'Issued By' },
-                      { key: 'issued_at', header: 'When' },
-                      { key: 'entity_detail', header: 'Entity' },
-                      { key: 'issuance_status', header: 'Status' },
-                    ]
-                  : [
-                      { key: 'name', header: 'Name' },
-                      { key: 'inventory_type', header: 'Type' },
-                      { key: 'part_number', header: 'Part No.' },
-                      { key: 'serial_number', header: 'Serial' },
-                      { key: 'quantity', header: 'Qty' },
-                      { key: 'available_quantity', header: 'Available' },
-                      { key: 'location', header: 'Location' },
-                      { key: 'status_name', header: 'Status' },
-                      { key: 'sku', header: 'SKU' },
-                    ]
-              }
-              rows={
-                (ISSUANCE_MODES.has(mode)
-                  ? (data.items || []).map((i) => ({
-                      ...i,
-                      entity_detail: entityDetail(i),
-                      issued_at: i.issued_at
-                        ? formatReportDate(new Date(i.issued_at))
-                        : '—',
-                      issuance_status: displayInventoryStatus(
-                        i.issuance_status || i.status_name
-                      ),
-                    }))
-                  : (data.items || []).map((i) => ({
-                      ...i,
-                      status_name: displayInventoryStatus(i.status_name),
-                    }))) as unknown as Record<string, unknown>[]
-              }
+              columns={columnDefs
+                .filter((c) => isVisible(c.id))
+                .map((c) => ({ key: c.id, header: c.label }))}
+              rows={previewRows}
             />
           </ReportSection>
         </ReportLayout>

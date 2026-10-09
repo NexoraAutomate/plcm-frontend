@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -39,6 +39,8 @@ import { useListPageLoader } from '@/hooks/use-list-page-loader';
 import { ParentEntityLink } from '@/components/entity-link';
 import { buildHierarchyPageUrl } from '@/lib/hierarchy-page-filters';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-menu';
+import { useColumnVisibility, type ColumnVisibilityDef } from '@/hooks/use-column-visibility';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { getUnitsDashboardConfig, UNIT_STATUS_NAMES } from '@/lib/hierarchy-dashboard-configs';
 import { Can } from '@/components/auth/can';
@@ -55,8 +57,16 @@ import {
   resolveInstallerFilterId,
 } from '@/components/installer-filter-select';
 
+const COLUMN_DEFS: ColumnVisibilityDef[] = [
+  { id: 'name', label: 'Name', alwaysVisible: true },
+  { id: 'module_id', label: 'Module' },
+  { id: 'status_id', label: 'Status' },
+  { id: 'components', label: 'Components' },
+];
+
 export default function UnitsPage() {
   const { entityLabel } = useAppDefinitions();
+  const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility('units-list', COLUMN_DEFS);
   const { showStats, setShowStats } = useListStatsVisibility();
 
   const router = useRouter();
@@ -436,6 +446,14 @@ export default function UnitsPage() {
           <CardDescription>
             Showing {units.length} on this page · {pagination.total} matching
           </CardDescription>
+          <CardAction>
+            <ColumnVisibilityMenu
+              columns={COLUMN_DEFS}
+              visibleIds={visibleIds}
+              onToggle={toggleColumn}
+              onReset={resetColumns}
+            />
+          </CardAction>
         </CardHeader>
         <CardContent>
           <ListContentSuspense loading={pagination.fetching}>
@@ -443,17 +461,23 @@ export default function UnitsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Name</SortableTableHead>
-                  <SortableTableHead column="module_id" sort={sort} onSort={cycleSort}>{entityLabel('module')}</SortableTableHead>
-                  <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
-                  <TableHead>{entityLabel('component', true)}</TableHead>
+                  {isVisible('name') && (
+                    <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Name</SortableTableHead>
+                  )}
+                  {isVisible('module_id') && (
+                    <SortableTableHead column="module_id" sort={sort} onSort={cycleSort}>{entityLabel('module')}</SortableTableHead>
+                  )}
+                  {isVisible('status_id') && (
+                    <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
+                  )}
+                  {isVisible('components') && <TableHead>{entityLabel('component', true)}</TableHead>}
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {units.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={visibleIds.length + 1} className="text-center text-muted-foreground py-8">
                       {`No ${entityLabel('unit', true).toLowerCase()} found`}
                     </TableCell>
                   </TableRow>
@@ -479,43 +503,51 @@ export default function UnitsPage() {
                         )}
                         onClick={() => router.push(`/units/${unit.id}`)}
                       >
-                        <TableCell className="font-medium">
-                          <EntityNameWithFault
-                            name={unit.name}
-                            entityType="unit"
-                            entityId={unit.id}
-                            faultMap={faultMap}
-                          />
-                          {showOwnInstallBadge({
-                            isInventoryManager: inventoryManager,
-                            currentUserId: user?.id,
-                            installedById: unit.installed_by_id,
-                            isCurrentInstall: unit.is_current_install,
-                          }) ? (
-                            <p className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
-                              Installed by you
-                            </p>
-                          ) : null}
-                        </TableCell>
-                        <TableCell>
-                          {module ? (
-                            <ParentEntityLink
-                              href={`/modules/${module.id}`}
-                              label={module.name}
+                        {isVisible('name') && (
+                          <TableCell className="font-medium">
+                            <EntityNameWithFault
+                              name={unit.name}
+                              entityType="unit"
+                              entityId={unit.id}
+                              faultMap={faultMap}
                             />
-                          ) : (
-                            'N/A'
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge status={getStatusName(unit)} />
-                        </TableCell>
-                        <TableCell>
-                          <EntityCountCell
-                            count={getCount(componentCountByUnit, unit.id)}
-                            label="Total components"
-                          />
-                        </TableCell>
+                            {showOwnInstallBadge({
+                              isInventoryManager: inventoryManager,
+                              currentUserId: user?.id,
+                              installedById: unit.installed_by_id,
+                              isCurrentInstall: unit.is_current_install,
+                            }) ? (
+                              <p className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                                Installed by you
+                              </p>
+                            ) : null}
+                          </TableCell>
+                        )}
+                        {isVisible('module_id') && (
+                          <TableCell>
+                            {module ? (
+                              <ParentEntityLink
+                                href={`/modules/${module.id}`}
+                                label={module.name}
+                              />
+                            ) : (
+                              'N/A'
+                            )}
+                          </TableCell>
+                        )}
+                        {isVisible('status_id') && (
+                          <TableCell>
+                            <StatusBadge status={getStatusName(unit)} />
+                          </TableCell>
+                        )}
+                        {isVisible('components') && (
+                          <TableCell>
+                            <EntityCountCell
+                              count={getCount(componentCountByUnit, unit.id)}
+                              label="Total components"
+                            />
+                          </TableCell>
+                        )}
                         <TableCell className="text-right">
                           <div className="flex gap-2 justify-end">
                             <Link href={`/units/${unit.id}`} onClick={(e) => e.stopPropagation()}>

@@ -1,22 +1,24 @@
-# Current Feature: Project Delete — Revert vs Discard
+# Current Feature: Inventory Reports Cleanup & Selectable Columns
 
 ## Status
 
-Complete
+In Progress
 
 ## Goals
 
-- Anyone with `delete_projects` can delete past reserve/assign via revert or discard
-- Revert: release reserved stock, open recall tasks, mark delete requested; hard-delete only after inventory cleared
-- Discard: immediate hard-delete of project + purge ledger; leave InventoryItem rows untouched
-- Audit who/when and inventory disposition (reverted vs discarded vs released)
-- Notify Inventory Manager on delete request and on final delete; notify requester when ready to finalize
+- [x] Trim inventory report modes to significant ones only (drop stubs/duplicates)
+- [x] Remove redundant Part Number / Serial Number filters and report columns (and Part/Serial Lookup mode)
+- [x] Location filter/entry uses saved location tree dropdown (Room→Cabinet→Rack), linked to inventory records
+- [x] Report table columns adapt by report type
+- [x] Selectable column visibility works across application tables (shared control + persistence)
 
 ## Notes
 
-- Reuses Spec 11 `clear_project_inventory` cascade for revert path
-- Permission: `delete_projects` (not Admin-only)
-- No auto hard-delete when recalls finish — user clicks Delete again once cleared
+- Keep inventory master fields for part/serial in create/edit if still used for unit identity; remove from reports UI as redundant with search/SKU
+- Redundant modes today: by_project/by_system/by_location/lookup ≡ current; issued ≡ reserved; valuation is stub
+- Keep: current, low, out, available, one open-issuance mode, movements
+- Location master: `inventory_location_tree` + `CascadingLocationSelects`
+- No shared DataTable today — add reusable column-visibility hook/UI and wire into EntityTable, ReportTable, and major list pages
 
 ## History
 
@@ -33,3 +35,6 @@ Split domain/hierarchy contexts; list-page hierarchy slices; merged as `c0252ad`
 
 ### Frontend OOM — Resolution History (Phase 1)
 Scoped resolution-history loads; LRU caches; concurrency caps; merged as `aabc935`.
+
+### Project Delete — Revert vs Discard
+Anyone with `delete_projects` can delete via revert or discard; inventory disposition + notifications.

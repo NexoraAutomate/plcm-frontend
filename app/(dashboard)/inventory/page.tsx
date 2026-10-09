@@ -2,7 +2,7 @@
 
 import { Fragment, useState, useMemo, useEffect, useRef, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -49,6 +49,8 @@ import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
 import { ListContentSuspense } from '@/components/list-content-suspense';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-menu';
+import { useColumnVisibility, type ColumnVisibilityDef } from '@/hooks/use-column-visibility';
 import {
   getInventorySerialNumbers,
   inventoryUsesInstances,
@@ -342,13 +344,25 @@ function enrichInventoryItems(
   });
 }
 
+const COLUMN_DEFS: ColumnVisibilityDef[] = [
+  { id: 'name', label: 'Category', alwaysVisible: true },
+  { id: 'inventory_type', label: 'Type' },
+  { id: 'total_used', label: 'Total Used' },
+  { id: 'quantity', label: 'Quantity' },
+  { id: 'holder_user_id', label: 'Inventory Holder' },
+  { id: 'location', label: 'Location' },
+];
+
 export default function InventoryPage() {
   const { definitions, entityLabel } = useAppDefinitions();
+  const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility('inventory-list', COLUMN_DEFS);
   const { showStats, setShowStats } = useListStatsVisibility();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, can, isInventoryManager } = useAuth();
   const inventoryManager = isInventoryManager();
+  // [select checkbox] + expand + visible data columns + actions
+  const inventoryTableColSpan = (inventoryManager ? 1 : 0) + 1 + visibleIds.length + 1;
   const canCreateInventory = inventoryManager && can(P.create_inventory);
   const canEditInventory = inventoryManager && can(P.edit_inventory);
   const canAddStock = canCreateInventory || canEditInventory;
@@ -1171,7 +1185,7 @@ export default function InventoryPage() {
             value="part-number"
             className="rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
           >
-            Part Number
+            OEM / SKU
           </TabsTrigger>
           <TabsTrigger
             value="holder"
@@ -1343,41 +1357,6 @@ export default function InventoryPage() {
       </TabsContent>
 
       <TabsContent value="part-number" className={formTabClassName}>
-        <div>
-          <Label>
-            Serial Number
-            {inventoryUsesInstances(selectedEntityType) &&
-            selectedEntityType !== 'component' &&
-            mode === 'create'
-              ? ' *'
-              : ''}
-          </Label>
-          <Input
-            value={formData.serial_number}
-            onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
-            placeholder="e.g., SN-2024-001"
-          />
-          {inventoryUsesInstances(selectedEntityType) ? (
-            <p className="text-xs text-muted-foreground">
-              {mode === 'create'
-                ? 'Identity of the unit. For more than one quantity, only enter the serial number of the first item.'
-                : 'Identity of the unit.'}
-            </p>
-          ) : null}
-        </div>
-
-        <div>
-          <Label>
-            Part Number
-            {inventoryUsesInstances(selectedEntityType) ? ' *' : ''}
-          </Label>
-          <Input
-            value={formData.part_number}
-            onChange={(e) => setFormData({ ...formData, part_number: e.target.value })}
-            placeholder="e.g., MPN-12345"
-          />
-        </div>
-
         {mode === 'edit' && selectedEntityType === 'component' ? (
           <div>
             <Label>SKU</Label>
@@ -1399,8 +1378,8 @@ export default function InventoryPage() {
             placeholder="Short acronym for {vendor} token, e.g. AMP"
           />
           <p className="text-xs text-muted-foreground">
-            Used as the {'{vendor}'} token when Part # / Serial # are generated from the name.
-            Changing it later does not rewrite existing Part # or Serial #.
+            Part # / Serial # are generated automatically from the item name and this OEM
+            acronym. They are not entered manually.
           </p>
         </div>
       </TabsContent>
@@ -1932,6 +1911,14 @@ export default function InventoryPage() {
           <CardDescription>
             Showing {inventory.length} on this page · {pagination.total} total in database
           </CardDescription>
+          <CardAction>
+            <ColumnVisibilityMenu
+              columns={COLUMN_DEFS}
+              visibleIds={visibleIds}
+              onToggle={toggleColumn}
+              onReset={resetColumns}
+            />
+          </CardAction>
           {inventoryManager && selectingAll ? (
             <p className="text-sm text-muted-foreground pt-2">
               Selecting all {pagination.total} matching items…
@@ -1969,14 +1956,26 @@ export default function InventoryPage() {
                     </TableHead>
                   ) : null}
                   <TableHead className="w-10" />
-                  <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Category</SortableTableHead>
-                  <SortableTableHead className="w-28" column="inventory_type" sort={sort} onSort={cycleSort}>Type</SortableTableHead>
-                  <TableHead className="w-24" title="Units of this part number already installed into entities">
-                    Total Used
-                  </TableHead>
-                  <SortableTableHead className="w-28" column="quantity" sort={sort} onSort={cycleSort}>Quantity</SortableTableHead>
-                  <SortableTableHead column="holder_user_id" sort={sort} onSort={cycleSort}>Inventory Holder</SortableTableHead>
-                  <SortableTableHead column="location" sort={sort} onSort={cycleSort}>Location</SortableTableHead>
+                  {isVisible('name') && (
+                    <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Category</SortableTableHead>
+                  )}
+                  {isVisible('inventory_type') && (
+                    <SortableTableHead className="w-28" column="inventory_type" sort={sort} onSort={cycleSort}>Type</SortableTableHead>
+                  )}
+                  {isVisible('total_used') && (
+                    <TableHead className="w-24" title="Units of this part number already installed into entities">
+                      Total Used
+                    </TableHead>
+                  )}
+                  {isVisible('quantity') && (
+                    <SortableTableHead className="w-28" column="quantity" sort={sort} onSort={cycleSort}>Quantity</SortableTableHead>
+                  )}
+                  {isVisible('holder_user_id') && (
+                    <SortableTableHead column="holder_user_id" sort={sort} onSort={cycleSort}>Inventory Holder</SortableTableHead>
+                  )}
+                  {isVisible('location') && (
+                    <SortableTableHead column="location" sort={sort} onSort={cycleSort}>Location</SortableTableHead>
+                  )}
                   <TableHead className="sticky right-0 top-0 z-30 w-64 text-right">
                     Actions
                   </TableHead>
@@ -1985,7 +1984,7 @@ export default function InventoryPage() {
               <TableBody>
                 {inventory.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={inventoryManager ? 9 : 8} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={inventoryTableColSpan} className="text-center text-muted-foreground py-8">
                       No inventory items found
                     </TableCell>
                   </TableRow>
@@ -2048,48 +2047,58 @@ export default function InventoryPage() {
                               </Button>
                             ) : null}
                           </TableCell>
-                          <TableCell className="max-w-0 truncate font-medium" title={item.entityName || 'N/A'}>
-                            {item.entityName || 'N/A'}
-                          </TableCell>
-                          <TableCell>
-                            {item.inventory_type ? (
-                              <StatusBadge
-                                status={
-                                  item.inventory_type.charAt(0).toUpperCase() +
-                                  item.inventory_type.slice(1)
-                                }
-                              />
-                            ) : (
-                              '—'
-                            )}
-                          </TableCell>
-                          <TableCell>{item.totalUsed ?? 0}</TableCell>
-                          <TableCell>
-                            <div className="flex flex-col gap-0.5">
-                              <span>{item.quantity}</span>
-                              {(item.reserved_quantity ?? 0) > 0 ||
-                              (item.instances ?? []).some(isProjectReservedInstance) ? (
-                                <Badge variant="secondary" className="w-fit text-[10px]">
-                                  {item.available_quantity ??
-                                    Math.max(0, item.quantity - (item.reserved_quantity ?? 0))}{' '}
-                                  avail
-                                  {(item.instances ?? []).filter(isProjectReservedInstance).length >
-                                  0
-                                    ? ` · ${(item.instances ?? []).filter(isProjectReservedInstance).length} reserved`
-                                    : ''}
-                                  {(item.reserved_quantity ?? 0) > 0
-                                    ? ` · ${item.reserved_quantity} issued`
-                                    : ''}
-                                </Badge>
-                              ) : null}
-                            </div>
-                          </TableCell>
-                          <TableCell className="max-w-0 truncate" title={item.holderName || '—'}>
-                            {item.holderName || '—'}
-                          </TableCell>
-                          <TableCell className="max-w-0 truncate" title={item.displayLocation || '—'}>
-                            {item.displayLocation || '—'}
-                          </TableCell>
+                          {isVisible('name') && (
+                            <TableCell className="max-w-0 truncate font-medium" title={item.entityName || 'N/A'}>
+                              {item.entityName || 'N/A'}
+                            </TableCell>
+                          )}
+                          {isVisible('inventory_type') && (
+                            <TableCell>
+                              {item.inventory_type ? (
+                                <StatusBadge
+                                  status={
+                                    item.inventory_type.charAt(0).toUpperCase() +
+                                    item.inventory_type.slice(1)
+                                  }
+                                />
+                              ) : (
+                                '—'
+                              )}
+                            </TableCell>
+                          )}
+                          {isVisible('total_used') && <TableCell>{item.totalUsed ?? 0}</TableCell>}
+                          {isVisible('quantity') && (
+                            <TableCell>
+                              <div className="flex flex-col gap-0.5">
+                                <span>{item.quantity}</span>
+                                {(item.reserved_quantity ?? 0) > 0 ||
+                                (item.instances ?? []).some(isProjectReservedInstance) ? (
+                                  <Badge variant="secondary" className="w-fit text-[10px]">
+                                    {item.available_quantity ??
+                                      Math.max(0, item.quantity - (item.reserved_quantity ?? 0))}{' '}
+                                    avail
+                                    {(item.instances ?? []).filter(isProjectReservedInstance).length >
+                                    0
+                                      ? ` · ${(item.instances ?? []).filter(isProjectReservedInstance).length} reserved`
+                                      : ''}
+                                    {(item.reserved_quantity ?? 0) > 0
+                                      ? ` · ${item.reserved_quantity} issued`
+                                      : ''}
+                                  </Badge>
+                                ) : null}
+                              </div>
+                            </TableCell>
+                          )}
+                          {isVisible('holder_user_id') && (
+                            <TableCell className="max-w-0 truncate" title={item.holderName || '—'}>
+                              {item.holderName || '—'}
+                            </TableCell>
+                          )}
+                          {isVisible('location') && (
+                            <TableCell className="max-w-0 truncate" title={item.displayLocation || '—'}>
+                              {item.displayLocation || '—'}
+                            </TableCell>
+                          )}
                           <TableCell
                             className={cn(
                               'sticky right-0 z-10 w-64 text-right group-hover:bg-muted/50',
@@ -2270,7 +2279,7 @@ export default function InventoryPage() {
                         </TableRow>
                         {isExpanded && isExpandable ? (
                           <TableRow className="bg-muted/20 hover:bg-muted/20">
-                            <TableCell colSpan={inventoryManager ? 9 : 8} className="min-w-0 overflow-x-hidden p-0">
+                            <TableCell colSpan={inventoryTableColSpan} className="min-w-0 overflow-x-hidden p-0">
                               <div className="min-w-0 overflow-x-hidden px-4 py-3">
                                 <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
                                   <h4 className="text-sm font-semibold">

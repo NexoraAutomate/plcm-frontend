@@ -37,6 +37,8 @@ import { ListPageError } from '@/components/list-page-error';
 import { useListPageLoader } from '@/hooks/use-list-page-loader';
 import { ProjectsMiniDashboard } from '@/components/lazy/list-dashboards';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-menu';
+import { useColumnVisibility, type ColumnVisibilityDef } from '@/hooks/use-column-visibility';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { toDateInputValue } from '@/lib/hierarchy-install-fields';
 import { workflowStatusLabel } from '@/lib/workflow-status';
@@ -58,9 +60,24 @@ import { ExistingProjectBadge } from '@/components/projects/existing-project-bad
 import { isExistingProject } from '@/lib/project-existing';
 import { validateProjectCreateForm, validateProjectEditForm } from '@/lib/form-validation';
 
-const PROJECT_TABLE_COL_SPAN = 9;
+const COLUMN_DEFS: ColumnVisibilityDef[] = [
+  { id: 'serial', label: '#' },
+  { id: 'name', label: 'Name', alwaysVisible: true },
+  { id: 'owner_id', label: 'Owner' },
+  { id: 'status_id', label: 'Status' },
+  { id: 'start_date', label: 'Start Date' },
+  { id: 'end_date', label: 'End Date' },
+  { id: 'systems', label: 'Systems' },
+  { id: 'progress', label: '% Progress' },
+];
 
-function ProjectSystemProgressRows({ projectId }: { projectId: number }) {
+function ProjectSystemProgressRows({
+  projectId,
+  colSpan,
+}: {
+  projectId: number;
+  colSpan: number;
+}) {
   const { data, isLoading, isError } = useProjectProgressQuery(projectId);
   const systems = useMemo(() => {
     if (!data) return [];
@@ -77,7 +94,7 @@ function ProjectSystemProgressRows({ projectId }: { projectId: number }) {
 
   return (
     <TableRow className="bg-muted/20 hover:bg-muted/20">
-      <TableCell colSpan={PROJECT_TABLE_COL_SPAN} className="px-4 py-3">
+      <TableCell colSpan={colSpan} className="px-4 py-3">
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading system progress…</p>
         ) : isError ? (
@@ -125,6 +142,8 @@ export default function ProjectsPage(){
   const router = useRouter();
   const { entityLabel } = useAppDefinitions();
   const { showStats, setShowStats } = useListStatsVisibility();
+  const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility('projects-list', COLUMN_DEFS);
+  const projectTableColSpan = visibleIds.length + 1;
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({
     open: false,
     id: null,
@@ -311,79 +330,93 @@ export default function ProjectsPage(){
           className={cn('cursor-pointer', systemsExpanded && 'bg-muted/30')}
           onClick={() => router.push(`/projects/${project.id}`)}
         >
-          <TableCell className="w-12 text-center tabular-nums text-muted-foreground">
-            {serial}
-          </TableCell>
-          <TableCell className={cn('font-medium', options?.indented && 'pl-10')}>
-            <div className="flex items-center gap-2">
-              <EntityNameWithFault
-                name={project.name}
-                entityType="project"
-                entityId={project.id}
-                faultMap={faultMap}
-              />
-              {isExistingProject(project) ? <ExistingProjectBadge /> : null}
-              {project.delete_requested_at ? (
-                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-900 dark:bg-amber-950 dark:text-amber-100">
-                  Pending delete
+          {isVisible('serial') && (
+            <TableCell className="w-12 text-center tabular-nums text-muted-foreground">
+              {serial}
+            </TableCell>
+          )}
+          {isVisible('name') && (
+            <TableCell className={cn('font-medium', options?.indented && 'pl-10')}>
+              <div className="flex items-center gap-2">
+                <EntityNameWithFault
+                  name={project.name}
+                  entityType="project"
+                  entityId={project.id}
+                  faultMap={faultMap}
+                />
+                {isExistingProject(project) ? <ExistingProjectBadge /> : null}
+                {project.delete_requested_at ? (
+                  <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+                    Pending delete
+                  </span>
+                ) : null}
+              </div>
+            </TableCell>
+          )}
+          {isVisible('owner_id') && <TableCell>{owner?.full_name || 'N/A'}</TableCell>}
+          {isVisible('status_id') && (
+            <TableCell>
+              <StatusBadge status={status?.status_name || 'Unknown'} />
+            </TableCell>
+          )}
+          {isVisible('start_date') && (
+            <TableCell className="text-sm text-muted-foreground">
+              {new Date(project.start_date).toLocaleDateString()}
+            </TableCell>
+          )}
+          {isVisible('end_date') && (
+            <TableCell className="text-sm text-muted-foreground">
+              {new Date(project.end_date).toLocaleDateString()}
+            </TableCell>
+          )}
+          {isVisible('systems') && (
+            <TableCell>
+              <div className="flex items-center justify-between gap-1.5">
+                <EntityCountCell
+                  count={systemCount}
+                  label="Total systems"
+                />
+                {canExpandSystems ? (
+                  <button
+                    type="button"
+                    className="rounded p-0.5 hover:bg-muted"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleSystemProgress(project.id);
+                    }}
+                    aria-expanded={systemsExpanded}
+                    aria-label={
+                      systemsExpanded
+                        ? 'Collapse system progress'
+                        : `Show progress for ${systemCount} systems`
+                    }
+                    title={
+                      systemsExpanded
+                        ? 'Collapse system progress'
+                        : 'View each system progress'
+                    }
+                  >
+                    <ChevronDown
+                      className={cn(
+                        'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
+                        systemsExpanded && 'rotate-180'
+                      )}
+                    />
+                  </button>
+                ) : null}
+              </div>
+            </TableCell>
+          )}
+          {isVisible('progress') && (
+            <TableCell className="min-w-40">
+              <div className="flex items-center gap-2 rounded-md p-1">
+                <Progress value={project.progress ?? 0} className="h-2 min-w-16 flex-1" />
+                <span className="w-10 shrink-0 text-right text-xs font-medium tabular-nums">
+                  {project.progress ?? 0}%
                 </span>
-              ) : null}
-            </div>
-          </TableCell>
-          <TableCell>{owner?.full_name || 'N/A'}</TableCell>
-          <TableCell>
-            <StatusBadge status={status?.status_name || 'Unknown'} />
-          </TableCell>
-          <TableCell className="text-sm text-muted-foreground">
-            {new Date(project.start_date).toLocaleDateString()}
-          </TableCell>
-          <TableCell className="text-sm text-muted-foreground">
-            {new Date(project.end_date).toLocaleDateString()}
-          </TableCell>
-          <TableCell>
-            <div className="flex items-center justify-between gap-1.5">
-              <EntityCountCell
-                count={systemCount}
-                label="Total systems"
-              />
-              {canExpandSystems ? (
-                <button
-                  type="button"
-                  className="rounded p-0.5 hover:bg-muted"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleSystemProgress(project.id);
-                  }}
-                  aria-expanded={systemsExpanded}
-                  aria-label={
-                    systemsExpanded
-                      ? 'Collapse system progress'
-                      : `Show progress for ${systemCount} systems`
-                  }
-                  title={
-                    systemsExpanded
-                      ? 'Collapse system progress'
-                      : 'View each system progress'
-                  }
-                >
-                  <ChevronDown
-                    className={cn(
-                      'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
-                      systemsExpanded && 'rotate-180'
-                    )}
-                  />
-                </button>
-              ) : null}
-            </div>
-          </TableCell>
-          <TableCell className="min-w-40">
-            <div className="flex items-center gap-2 rounded-md p-1">
-              <Progress value={project.progress ?? 0} className="h-2 min-w-16 flex-1" />
-              <span className="w-10 shrink-0 text-right text-xs font-medium tabular-nums">
-                {project.progress ?? 0}%
-              </span>
-            </div>
-          </TableCell>
+              </div>
+            </TableCell>
+          )}
           <TableCell className="text-right">
             <div className="flex gap-2 justify-end">
               <Link
@@ -422,7 +455,7 @@ export default function ProjectsPage(){
             </div>
           </TableCell>
         </TableRow>
-        {systemsExpanded ? <ProjectSystemProgressRows projectId={project.id} /> : null}
+        {systemsExpanded ? <ProjectSystemProgressRows projectId={project.id} colSpan={projectTableColSpan} /> : null}
       </Fragment>
     );
   }
@@ -843,6 +876,12 @@ export default function ProjectsPage(){
                 Group by {entityLabel('project').toLowerCase()} name
               </Label>
             </div>
+            <ColumnVisibilityMenu
+              columns={COLUMN_DEFS}
+              visibleIds={visibleIds}
+              onToggle={toggleColumn}
+              onReset={resetColumns}
+            />
             <Button variant="outline" size="sm" className="shrink-0" asChild>
               <Link href="/hierarchy-dashboard">
                 <GitBranch className="mr-2 h-4 w-4" />
@@ -856,14 +895,26 @@ export default function ProjectsPage(){
           <Table containerClassName="rounded-md border">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12 text-center">#</TableHead>
-                  <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Name</SortableTableHead>
-                  <SortableTableHead column="owner_id" sort={sort} onSort={cycleSort}>Owner</SortableTableHead>
-                  <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
-                  <SortableTableHead column="start_date" sort={sort} onSort={cycleSort}>Start Date</SortableTableHead>
-                  <SortableTableHead column="end_date" sort={sort} onSort={cycleSort}>End Date</SortableTableHead>
-                  <TableHead>Systems</TableHead>
-                  <SortableTableHead column="progress" sort={sort} onSort={cycleSort}>% Progress</SortableTableHead>
+                  {isVisible('serial') && <TableHead className="w-12 text-center">#</TableHead>}
+                  {isVisible('name') && (
+                    <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Name</SortableTableHead>
+                  )}
+                  {isVisible('owner_id') && (
+                    <SortableTableHead column="owner_id" sort={sort} onSort={cycleSort}>Owner</SortableTableHead>
+                  )}
+                  {isVisible('status_id') && (
+                    <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
+                  )}
+                  {isVisible('start_date') && (
+                    <SortableTableHead column="start_date" sort={sort} onSort={cycleSort}>Start Date</SortableTableHead>
+                  )}
+                  {isVisible('end_date') && (
+                    <SortableTableHead column="end_date" sort={sort} onSort={cycleSort}>End Date</SortableTableHead>
+                  )}
+                  {isVisible('systems') && <TableHead>Systems</TableHead>}
+                  {isVisible('progress') && (
+                    <SortableTableHead column="progress" sort={sort} onSort={cycleSort}>% Progress</SortableTableHead>
+                  )}
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -871,7 +922,7 @@ export default function ProjectsPage(){
                 {projects.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={PROJECT_TABLE_COL_SPAN}
+                      colSpan={projectTableColSpan}
                       className="text-center text-muted-foreground py-8"
                     >
                       No projects found
@@ -889,7 +940,7 @@ export default function ProjectsPage(){
                         key={`group-${group.key}`}
                         className="bg-muted/30 hover:bg-muted/50"
                       >
-                        <TableCell colSpan={PROJECT_TABLE_COL_SPAN} className="p-0">
+                        <TableCell colSpan={projectTableColSpan} className="p-0">
                           <button
                             type="button"
                             className="flex w-full items-center gap-2 px-4 py-3 text-left font-medium"

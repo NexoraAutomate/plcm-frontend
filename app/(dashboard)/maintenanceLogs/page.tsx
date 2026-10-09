@@ -13,8 +13,10 @@ import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
 import { ListContentSuspense } from '@/components/list-content-suspense';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-menu';
+import { useColumnVisibility, type ColumnVisibilityDef } from '@/hooks/use-column-visibility';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -24,7 +26,15 @@ import { Plus, Eye, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { validateMaintenanceLogForm } from '@/lib/form-validation';
 
+const COLUMN_DEFS: ColumnVisibilityDef[] = [
+  { id: 'entity_id', label: 'Entity', alwaysVisible: true },
+  { id: 'maintenance_type', label: 'Type' },
+  { id: 'performed_by', label: 'Technician' },
+  { id: 'performed_at', label: 'Date' },
+];
+
 export default function MaintenancePage() {
+  const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility('maintenance-logs-list', COLUMN_DEFS);
   const { users, createMaintenanceLog } = useDataStore();
   const { sort, cycleSort, listFilterPatch } = useTableSorting();
   const [search, setSearch] = useState('');
@@ -304,6 +314,14 @@ export default function MaintenancePage() {
           <CardDescription>
             Showing {filtered.length} on this page · {pagination.total} total in database
           </CardDescription>
+          <CardAction>
+            <ColumnVisibilityMenu
+              columns={COLUMN_DEFS}
+              visibleIds={visibleIds}
+              onToggle={toggleColumn}
+              onReset={resetColumns}
+            />
+          </CardAction>
         </CardHeader>
         <CardContent>
           <ListContentSuspense loading={pagination.fetching}>
@@ -311,17 +329,25 @@ export default function MaintenancePage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <SortableTableHead column="entity_id" sort={sort} onSort={cycleSort}>Entity</SortableTableHead>
-                  <SortableTableHead column="maintenance_type" sort={sort} onSort={cycleSort}>Type</SortableTableHead>
-                  <SortableTableHead column="performed_by" sort={sort} onSort={cycleSort}>Technician</SortableTableHead>
-                  <SortableTableHead column="performed_at" sort={sort} onSort={cycleSort}>Date</SortableTableHead>
+                  {isVisible('entity_id') && (
+                    <SortableTableHead column="entity_id" sort={sort} onSort={cycleSort}>Entity</SortableTableHead>
+                  )}
+                  {isVisible('maintenance_type') && (
+                    <SortableTableHead column="maintenance_type" sort={sort} onSort={cycleSort}>Type</SortableTableHead>
+                  )}
+                  {isVisible('performed_by') && (
+                    <SortableTableHead column="performed_by" sort={sort} onSort={cycleSort}>Technician</SortableTableHead>
+                  )}
+                  {isVisible('performed_at') && (
+                    <SortableTableHead column="performed_at" sort={sort} onSort={cycleSort}>Date</SortableTableHead>
+                  )}
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={visibleIds.length + 1} className="text-center text-muted-foreground py-8">
                       No maintenanceLogs records found
                     </TableCell>
                   </TableRow>
@@ -331,12 +357,20 @@ export default function MaintenancePage() {
                     const technician = users.find((u) => u.id === log.performed_by);
                     return (
                       <TableRow key={log.id}>
-                        <TableCell className="font-medium">{entityName}</TableCell>
-                        <TableCell className="capitalize">{log.maintenance_type}</TableCell>
-                        <TableCell>{technician?.full_name || 'N/A'}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {new Date(log.created_at).toLocaleDateString()}
-                        </TableCell>
+                        {isVisible('entity_id') && (
+                          <TableCell className="font-medium">{entityName}</TableCell>
+                        )}
+                        {isVisible('maintenance_type') && (
+                          <TableCell className="capitalize">{log.maintenance_type}</TableCell>
+                        )}
+                        {isVisible('performed_by') && (
+                          <TableCell>{technician?.full_name || 'N/A'}</TableCell>
+                        )}
+                        {isVisible('performed_at') && (
+                          <TableCell className="text-sm text-muted-foreground">
+                            {new Date(log.created_at).toLocaleDateString()}
+                          </TableCell>
+                        )}
                         <TableCell className="text-right">
                           <Button
                             size="sm"

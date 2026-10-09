@@ -5,7 +5,7 @@ import { Download, History, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -41,6 +41,8 @@ import { Can } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
 import { PageRefreshButton } from '@/components/page-data-refresh';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-menu';
+import { useColumnVisibility, type ColumnVisibilityDef } from '@/hooks/use-column-visibility';
 import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 const PAGE_SIZE = 20;
@@ -72,7 +74,17 @@ function roleLabel(code: string) {
   return WORKFLOW_AUDIT_ROLE_LABELS[code] || code;
 }
 
+const COLUMN_DEFS: ColumnVisibilityDef[] = [
+  { id: 'occurred_at', label: 'When', alwaysVisible: true },
+  { id: 'actor_username', label: 'Actor' },
+  { id: 'action', label: 'Action' },
+  { id: 'entity_type', label: 'Entity' },
+  { id: 'old_new', label: 'Old → New' },
+  { id: 'remarks', label: 'Remarks' },
+];
+
 export default function AuditTrailPage() {
+  const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility('audit-list', COLUMN_DEFS);
   const [rows, setRows] = useState<WorkflowAuditEvent[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -191,6 +203,14 @@ export default function AuditTrailPage() {
           <CardDescription>
             Filter by actor, entity, action, role, project, or date. Rows cannot be edited or deleted.
           </CardDescription>
+          <CardAction>
+            <ColumnVisibilityMenu
+              columns={COLUMN_DEFS}
+              visibleIds={visibleIds}
+              onToggle={toggleColumn}
+              onReset={resetColumns}
+            />
+          </CardAction>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -335,56 +355,78 @@ export default function AuditTrailPage() {
                 <Table containerClassName="rounded-md border">
                   <TableHeader>
                     <TableRow>
-                      <SortableTableHead column="occurred_at" sort={sort} onSort={cycleSort}>
-                        When
-                      </SortableTableHead>
-                      <SortableTableHead column="actor_username" sort={sort} onSort={cycleSort}>
-                        Actor
-                      </SortableTableHead>
-                      <SortableTableHead column="action" sort={sort} onSort={cycleSort}>
-                        Action
-                      </SortableTableHead>
-                      <SortableTableHead column="entity_type" sort={sort} onSort={cycleSort}>
-                        Entity
-                      </SortableTableHead>
-                      <TableHead>Old → New</TableHead>
-                      <SortableTableHead column="remarks" sort={sort} onSort={cycleSort}>
-                        Remarks
-                      </SortableTableHead>
+                      {isVisible('occurred_at') && (
+                        <SortableTableHead column="occurred_at" sort={sort} onSort={cycleSort}>
+                          When
+                        </SortableTableHead>
+                      )}
+                      {isVisible('actor_username') && (
+                        <SortableTableHead column="actor_username" sort={sort} onSort={cycleSort}>
+                          Actor
+                        </SortableTableHead>
+                      )}
+                      {isVisible('action') && (
+                        <SortableTableHead column="action" sort={sort} onSort={cycleSort}>
+                          Action
+                        </SortableTableHead>
+                      )}
+                      {isVisible('entity_type') && (
+                        <SortableTableHead column="entity_type" sort={sort} onSort={cycleSort}>
+                          Entity
+                        </SortableTableHead>
+                      )}
+                      {isVisible('old_new') && <TableHead>Old → New</TableHead>}
+                      {isVisible('remarks') && (
+                        <SortableTableHead column="remarks" sort={sort} onSort={cycleSort}>
+                          Remarks
+                        </SortableTableHead>
+                      )}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {sortedRows.map((row) => (
                       <TableRow key={row.id}>
-                        <TableCell className="whitespace-nowrap text-xs">
-                          {formatDateTime(row.occurred_at)}
-                          {row.ip_address ? (
-                            <div className="text-muted-foreground">{row.ip_address}</div>
-                          ) : null}
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm">{row.actor_username || row.actor_user_id}</div>
-                          <Badge variant="outline" className="mt-1 text-[10px]">
-                            {roleLabel(row.actor_role)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {actionLabel(row.action, row.action_label)}
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          <div>
-                            {row.entity_type} #{row.entity_id}
-                          </div>
-                          {row.project_id ? (
-                            <div className="text-muted-foreground">Project {row.project_id}</div>
-                          ) : null}
-                        </TableCell>
-                        <TableCell className="max-w-70 wrap-break-word text-xs">
-                          {formatJson(row.old_value)} → {formatJson(row.new_value)}
-                        </TableCell>
-                        <TableCell className="max-w-45 wrap-break-word text-xs">
-                          {row.remarks || '—'}
-                        </TableCell>
+                        {isVisible('occurred_at') && (
+                          <TableCell className="whitespace-nowrap text-xs">
+                            {formatDateTime(row.occurred_at)}
+                            {row.ip_address ? (
+                              <div className="text-muted-foreground">{row.ip_address}</div>
+                            ) : null}
+                          </TableCell>
+                        )}
+                        {isVisible('actor_username') && (
+                          <TableCell>
+                            <div className="text-sm">{row.actor_username || row.actor_user_id}</div>
+                            <Badge variant="outline" className="mt-1 text-[10px]">
+                              {roleLabel(row.actor_role)}
+                            </Badge>
+                          </TableCell>
+                        )}
+                        {isVisible('action') && (
+                          <TableCell className="text-sm">
+                            {actionLabel(row.action, row.action_label)}
+                          </TableCell>
+                        )}
+                        {isVisible('entity_type') && (
+                          <TableCell className="text-xs">
+                            <div>
+                              {row.entity_type} #{row.entity_id}
+                            </div>
+                            {row.project_id ? (
+                              <div className="text-muted-foreground">Project {row.project_id}</div>
+                            ) : null}
+                          </TableCell>
+                        )}
+                        {isVisible('old_new') && (
+                          <TableCell className="max-w-70 wrap-break-word text-xs">
+                            {formatJson(row.old_value)} → {formatJson(row.new_value)}
+                          </TableCell>
+                        )}
+                        {isVisible('remarks') && (
+                          <TableCell className="max-w-45 wrap-break-word text-xs">
+                            {row.remarks || '—'}
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>

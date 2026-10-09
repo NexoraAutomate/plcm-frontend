@@ -41,6 +41,8 @@ import { usePageDataRefresh } from '@/components/page-data-refresh';
 import { RejectInstallationDialog } from '@/components/inventory/reject-installation-dialog';
 import { RejectionReasonsDialog } from '@/components/inventory/rejection-reasons-dialog';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-menu';
+import { useColumnVisibility, type ColumnVisibilityDef } from '@/hooks/use-column-visibility';
 import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 function formatWhen(value?: string | null) {
@@ -109,7 +111,17 @@ function rowMatchesStatusFilter(row: ItemInstallState, filter: VerifyQueueStatus
   }
 }
 
+const COLUMN_DEFS: ColumnVisibilityDef[] = [
+  { id: 'entity_name', label: 'Item', alwaysVisible: true },
+  { id: 'project_name', label: 'Project' },
+  { id: 'assigned_developer_name', label: 'Developer' },
+  { id: 'serial_number', label: 'Serial' },
+  { id: 'item_status', label: 'Status' },
+  { id: 'complete_reported_at', label: 'Complete reported' },
+];
+
 export function VerifyQueuePanel() {
+  const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility('verify-queue-list', COLUMN_DEFS);
   const queryClient = useQueryClient();
   const [rows, setRows] = useState<ItemInstallState[]>([]);
   const [loading, setLoading] = useState(true);
@@ -394,13 +406,21 @@ export function VerifyQueuePanel() {
           </div>
         </div>
         {rows.length > 0 ? (
-          <p className="text-xs text-muted-foreground">
-            Showing {filteredRows.length} of {rows.length} item
-            {rows.length === 1 ? '' : 's'} awaiting verification
-            {statusFilter !== FILTER_ALL
-              ? ` · ${STATUS_FILTER_DEFS.find((d) => d.key === statusFilter)?.label ?? statusFilter}`
-              : ''}
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">
+              Showing {filteredRows.length} of {rows.length} item
+              {rows.length === 1 ? '' : 's'} awaiting verification
+              {statusFilter !== FILTER_ALL
+                ? ` · ${STATUS_FILTER_DEFS.find((d) => d.key === statusFilter)?.label ?? statusFilter}`
+                : ''}
+            </p>
+            <ColumnVisibilityMenu
+              columns={COLUMN_DEFS}
+              visibleIds={visibleIds}
+              onToggle={toggleColumn}
+              onReset={resetColumns}
+            />
+          </div>
         ) : null}
       </div>
       <ListContentSuspense loading={loading}>
@@ -423,46 +443,66 @@ export function VerifyQueuePanel() {
           <Table>
             <TableHeader>
               <TableRow>
-                <SortableTableHead column="entity_name" sort={sort} onSort={cycleSort}>
-                  Item
-                </SortableTableHead>
-                <SortableTableHead column="project_name" sort={sort} onSort={cycleSort}>
-                  Project
-                </SortableTableHead>
-                <SortableTableHead column="assigned_developer_name" sort={sort} onSort={cycleSort}>
-                  Developer
-                </SortableTableHead>
-                <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>
-                  Serial
-                </SortableTableHead>
-                <SortableTableHead column="item_status" sort={sort} onSort={cycleSort}>
-                  Status
-                </SortableTableHead>
-                <SortableTableHead column="complete_reported_at" sort={sort} onSort={cycleSort}>
-                  Complete reported
-                </SortableTableHead>
+                {isVisible('entity_name') && (
+                  <SortableTableHead column="entity_name" sort={sort} onSort={cycleSort}>
+                    Item
+                  </SortableTableHead>
+                )}
+                {isVisible('project_name') && (
+                  <SortableTableHead column="project_name" sort={sort} onSort={cycleSort}>
+                    Project
+                  </SortableTableHead>
+                )}
+                {isVisible('assigned_developer_name') && (
+                  <SortableTableHead column="assigned_developer_name" sort={sort} onSort={cycleSort}>
+                    Developer
+                  </SortableTableHead>
+                )}
+                {isVisible('serial_number') && (
+                  <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>
+                    Serial
+                  </SortableTableHead>
+                )}
+                {isVisible('item_status') && (
+                  <SortableTableHead column="item_status" sort={sort} onSort={cycleSort}>
+                    Status
+                  </SortableTableHead>
+                )}
+                {isVisible('complete_reported_at') && (
+                  <SortableTableHead column="complete_reported_at" sort={sort} onSort={cycleSort}>
+                    Complete reported
+                  </SortableTableHead>
+                )}
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedRows.map((row) => (
                 <TableRow key={row.issuance_id}>
-                  <TableCell>
-                    <div className="font-medium">
-                      {row.entity_name || `${row.entity_type} #${row.entity_id}`}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {row.entity_type}
-                      {row.part_number ? ` · ${row.part_number}` : ''}
-                    </div>
-                  </TableCell>
-                  <TableCell>{row.project_name || '—'}</TableCell>
-                  <TableCell>{row.assigned_developer_name || '—'}</TableCell>
-                  <TableCell>{row.serial_number || '—'}</TableCell>
-                  <TableCell>
-                    <StatusBadge status={row.item_status || 'UNDER_TESTING_REVIEW'} />
-                  </TableCell>
-                  <TableCell>{formatWhen(row.complete_reported_at)}</TableCell>
+                  {isVisible('entity_name') && (
+                    <TableCell>
+                      <div className="font-medium">
+                        {row.entity_name || `${row.entity_type} #${row.entity_id}`}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {row.entity_type}
+                        {row.part_number ? ` · ${row.part_number}` : ''}
+                      </div>
+                    </TableCell>
+                  )}
+                  {isVisible('project_name') && <TableCell>{row.project_name || '—'}</TableCell>}
+                  {isVisible('assigned_developer_name') && (
+                    <TableCell>{row.assigned_developer_name || '—'}</TableCell>
+                  )}
+                  {isVisible('serial_number') && <TableCell>{row.serial_number || '—'}</TableCell>}
+                  {isVisible('item_status') && (
+                    <TableCell>
+                      <StatusBadge status={row.item_status || 'UNDER_TESTING_REVIEW'} />
+                    </TableCell>
+                  )}
+                  {isVisible('complete_reported_at') && (
+                    <TableCell>{formatWhen(row.complete_reported_at)}</TableCell>
+                  )}
                   <TableCell className="text-right">
                     <WorkflowCan role={['HM', 'ADMIN']} permission={P.item_verify}>
                       <div className="flex flex-wrap justify-end gap-1">

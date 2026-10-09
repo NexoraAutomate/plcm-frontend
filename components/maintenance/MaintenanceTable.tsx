@@ -22,6 +22,8 @@ import { FaultyEntityTable } from './FaultyEntityTable';
 import { MaintenanceActionTable } from './MaintenanceActionTable';
 import { MaintenanceDeliveryTable } from './MaintenanceDeliveryTable';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-menu';
+import { useColumnVisibility, type ColumnVisibilityDef } from '@/hooks/use-column-visibility';
 import { useTableSorting } from '@/hooks/use-table-sorting';
 import { EMPTY_SORT, sortRowsByState, type TableSortState } from '@/lib/sorting';
 
@@ -46,6 +48,14 @@ interface ExpandedRow {
   isLoading: boolean;
 }
 
+const COLUMN_DEFS: ColumnVisibilityDef[] = [
+  { id: 'case_number', label: 'Case Number', alwaysVisible: true },
+  { id: 'project_id', label: 'Project' },
+  { id: 'description', label: 'Description' },
+  { id: 'status', label: 'Status' },
+  { id: 'reported_at', label: 'Reported At' },
+];
+
 export function MaintenanceTable({
   cases,
   onEdit,
@@ -58,6 +68,7 @@ export function MaintenanceTable({
   sort = EMPTY_SORT,
   onSort,
 }: MaintenanceTableProps) {
+  const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility('maintenance-cases-list', COLUMN_DEFS);
   const internalSorting = useTableSorting();
   const parentControlsSort = onSort != null;
   const effectiveSort = parentControlsSort ? sort : internalSorting.sort;
@@ -175,26 +186,44 @@ export function MaintenanceTable({
 
   return (
     <>
+      <div className="mb-2 flex justify-end">
+        <ColumnVisibilityMenu
+          columns={COLUMN_DEFS}
+          visibleIds={visibleIds}
+          onToggle={toggleColumn}
+          onReset={resetColumns}
+        />
+      </div>
       <div className="overflow-x-visible rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-12"></TableHead>
-              <SortableTableHead column="case_number" sort={effectiveSort} onSort={effectiveOnSort}>
-                Case Number
-              </SortableTableHead>
-              <SortableTableHead column="project_id" sort={effectiveSort} onSort={effectiveOnSort}>
-                Project
-              </SortableTableHead>
-              <SortableTableHead column="description" sort={effectiveSort} onSort={effectiveOnSort}>
-                Description
-              </SortableTableHead>
-              <SortableTableHead column="status" sort={effectiveSort} onSort={effectiveOnSort}>
-                Status
-              </SortableTableHead>
-              <SortableTableHead column="reported_at" sort={effectiveSort} onSort={effectiveOnSort}>
-                Reported At
-              </SortableTableHead>
+              {isVisible('case_number') && (
+                <SortableTableHead column="case_number" sort={effectiveSort} onSort={effectiveOnSort}>
+                  Case Number
+                </SortableTableHead>
+              )}
+              {isVisible('project_id') && (
+                <SortableTableHead column="project_id" sort={effectiveSort} onSort={effectiveOnSort}>
+                  Project
+                </SortableTableHead>
+              )}
+              {isVisible('description') && (
+                <SortableTableHead column="description" sort={effectiveSort} onSort={effectiveOnSort}>
+                  Description
+                </SortableTableHead>
+              )}
+              {isVisible('status') && (
+                <SortableTableHead column="status" sort={effectiveSort} onSort={effectiveOnSort}>
+                  Status
+                </SortableTableHead>
+              )}
+              {isVisible('reported_at') && (
+                <SortableTableHead column="reported_at" sort={effectiveSort} onSort={effectiveOnSort}>
+                  Reported At
+                </SortableTableHead>
+              )}
               <TableHead className="w-32">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -226,21 +255,31 @@ export function MaintenanceTable({
                         />
                       </Button>
                     </TableCell>
-                    <TableCell className="text-sm font-medium">
-                      {caseItem.case_number}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {caseItem.project_id}
-                    </TableCell>
-                    <TableCell className="text-sm max-w-xs truncate">
-                      {caseItem.description}
-                    </TableCell>
-                    <TableCell>
-                      <MaintenanceCaseStatusBadge apiStatus={caseItem.status} />
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {new Date(caseItem.reported_at).toLocaleDateString()}
-                    </TableCell>
+                    {isVisible('case_number') && (
+                      <TableCell className="text-sm font-medium">
+                        {caseItem.case_number}
+                      </TableCell>
+                    )}
+                    {isVisible('project_id') && (
+                      <TableCell className="text-sm">
+                        {caseItem.project_id}
+                      </TableCell>
+                    )}
+                    {isVisible('description') && (
+                      <TableCell className="text-sm max-w-xs truncate">
+                        {caseItem.description}
+                      </TableCell>
+                    )}
+                    {isVisible('status') && (
+                      <TableCell>
+                        <MaintenanceCaseStatusBadge apiStatus={caseItem.status} />
+                      </TableCell>
+                    )}
+                    {isVisible('reported_at') && (
+                      <TableCell className="text-sm text-muted-foreground">
+                        {new Date(caseItem.reported_at).toLocaleDateString()}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <div className="flex items-center gap-1">
                         {onView && (
@@ -279,7 +318,7 @@ export function MaintenanceTable({
 
                   {isExpanded && expanded && (
                     <TableRow className="bg-muted/30 border-b">
-                      <TableCell colSpan={7} className="p-0">
+                      <TableCell colSpan={visibleIds.length + 2} className="p-0">
                         <div className="px-6 py-4">
                           {expanded.isLoading ? (
                             <div className="text-sm text-muted-foreground">

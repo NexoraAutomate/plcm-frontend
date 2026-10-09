@@ -38,6 +38,8 @@ import { RejectionReasonsDialog } from '@/components/inventory/rejection-reasons
 import { usePageDataRefresh } from '@/components/page-data-refresh';
 import { invalidatePendingActionCounts } from '@/hooks/use-pending-action-counts';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-menu';
+import { useColumnVisibility, type ColumnVisibilityDef } from '@/hooks/use-column-visibility';
 import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 function rowKey(row: DeveloperAssignedWork) {
@@ -169,7 +171,15 @@ function rowMatchesSearch(row: DeveloperAssignedWork, query: string) {
   return haystack.includes(q);
 }
 
+const COLUMN_DEFS: ColumnVisibilityDef[] = [
+  { id: 'name', label: 'Item', alwaysVisible: true },
+  { id: 'project_name', label: 'Project' },
+  { id: 'serial_number', label: 'Serial' },
+  { id: 'item_status', label: 'Status' },
+];
+
 export function MyAssignmentsPanel() {
+  const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility('my-assignments-list', COLUMN_DEFS);
   const [rows, setRows] = useState<DeveloperAssignedWork[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -474,13 +484,21 @@ export function MyAssignmentsPanel() {
           </div>
         </div>
         {rows.length > 0 ? (
-          <p className="text-xs text-muted-foreground">
-            Showing {filteredRows.length} of {rows.length} assignment
-            {rows.length === 1 ? '' : 's'}
-            {statusFilter !== FILTER_ALL
-              ? ` · ${STATUS_FILTER_DEFS.find((d) => d.key === statusFilter)?.label ?? statusFilter}`
-              : ''}
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">
+              Showing {filteredRows.length} of {rows.length} assignment
+              {rows.length === 1 ? '' : 's'}
+              {statusFilter !== FILTER_ALL
+                ? ` · ${STATUS_FILTER_DEFS.find((d) => d.key === statusFilter)?.label ?? statusFilter}`
+                : ''}
+            </p>
+            <ColumnVisibilityMenu
+              columns={COLUMN_DEFS}
+              visibleIds={visibleIds}
+              onToggle={toggleColumn}
+              onReset={resetColumns}
+            />
+          </div>
         ) : null}
       </div>
       <div className="flex flex-wrap gap-2">
@@ -556,18 +574,26 @@ export function MyAssignmentsPanel() {
                     aria-label="Select all requestable items"
                   />
                 </TableHead>
-                <SortableTableHead column="name" sort={sort} onSort={cycleSort}>
-                  Item
-                </SortableTableHead>
-                <SortableTableHead column="project_name" sort={sort} onSort={cycleSort}>
-                  Project
-                </SortableTableHead>
-                <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>
-                  Serial
-                </SortableTableHead>
-                <SortableTableHead column="item_status" sort={sort} onSort={cycleSort}>
-                  Status
-                </SortableTableHead>
+                {isVisible('name') && (
+                  <SortableTableHead column="name" sort={sort} onSort={cycleSort}>
+                    Item
+                  </SortableTableHead>
+                )}
+                {isVisible('project_name') && (
+                  <SortableTableHead column="project_name" sort={sort} onSort={cycleSort}>
+                    Project
+                  </SortableTableHead>
+                )}
+                {isVisible('serial_number') && (
+                  <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>
+                    Serial
+                  </SortableTableHead>
+                )}
+                {isVisible('item_status') && (
+                  <SortableTableHead column="item_status" sort={sort} onSort={cycleSort}>
+                    Status
+                  </SortableTableHead>
+                )}
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
@@ -586,48 +612,52 @@ export function MyAssignmentsPanel() {
                         aria-label={`Select ${row.name || row.entity_type}`}
                       />
                     </TableCell>
-                    <TableCell>
-                      <div className="font-medium">
-                        {row.name || `${row.entity_type} #${row.entity_id}`}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {row.entity_type}
-                        {row.part_number ? ` · ${row.part_number}` : ''}
-                      </div>
-                    </TableCell>
-                    <TableCell>{row.project_name || '—'}</TableCell>
-                    <TableCell>{row.serial_number || '—'}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {row.item_status ? (
-                          <StatusBadge status={row.item_status} />
-                        ) : row.issued ? (
-                          <StatusBadge status="ISSUED" />
-                        ) : (
-                          <StatusBadge status="Assigned" />
-                        )}
-                        {row.reserved && !row.issued ? (
-                          <Badge variant="secondary">Reserved</Badge>
-                        ) : null}
-                        {row.request_status === 'pending' ? (
-                          <Badge variant="outline">Requested</Badge>
-                        ) : null}
-                        {row.test_result === 'pass' && !row.verified ? (
-                          <Badge variant="outline">Pass</Badge>
-                        ) : null}
-                        {row.defect_pending ? (
-                          <Badge variant="destructive">Fail</Badge>
-                        ) : null}
-                        {row.rework_stage ? (
-                          <Badge variant="outline">
-                            Attempt {row.rework_attempt_count || 1} · {row.rework_stage}
-                          </Badge>
-                        ) : null}
-                        {row.complete_reported && !row.verified ? (
-                          <Badge variant="secondary">Complete reported</Badge>
-                        ) : null}
-                      </div>
-                    </TableCell>
+                    {isVisible('name') && (
+                      <TableCell>
+                        <div className="font-medium">
+                          {row.name || `${row.entity_type} #${row.entity_id}`}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {row.entity_type}
+                          {row.part_number ? ` · ${row.part_number}` : ''}
+                        </div>
+                      </TableCell>
+                    )}
+                    {isVisible('project_name') && <TableCell>{row.project_name || '—'}</TableCell>}
+                    {isVisible('serial_number') && <TableCell>{row.serial_number || '—'}</TableCell>}
+                    {isVisible('item_status') && (
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {row.item_status ? (
+                            <StatusBadge status={row.item_status} />
+                          ) : row.issued ? (
+                            <StatusBadge status="ISSUED" />
+                          ) : (
+                            <StatusBadge status="Assigned" />
+                          )}
+                          {row.reserved && !row.issued ? (
+                            <Badge variant="secondary">Reserved</Badge>
+                          ) : null}
+                          {row.request_status === 'pending' ? (
+                            <Badge variant="outline">Requested</Badge>
+                          ) : null}
+                          {row.test_result === 'pass' && !row.verified ? (
+                            <Badge variant="outline">Pass</Badge>
+                          ) : null}
+                          {row.defect_pending ? (
+                            <Badge variant="destructive">Fail</Badge>
+                          ) : null}
+                          {row.rework_stage ? (
+                            <Badge variant="outline">
+                              Attempt {row.rework_attempt_count || 1} · {row.rework_stage}
+                            </Badge>
+                          ) : null}
+                          {row.complete_reported && !row.verified ? (
+                            <Badge variant="secondary">Complete reported</Badge>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                    )}
                     <TableCell className="text-right">
                       {row.can_request ? (
                         <Button

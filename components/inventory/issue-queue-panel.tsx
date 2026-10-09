@@ -51,6 +51,8 @@ import { invalidatePendingActionCounts } from '@/hooks/use-pending-action-counts
 import { uploadIssuanceProformaIfNeeded } from '@/lib/issuance-signature';
 import { useQueryClient } from '@tanstack/react-query';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-menu';
+import { useColumnVisibility, type ColumnVisibilityDef } from '@/hooks/use-column-visibility';
 import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 function formatWhen(value?: string | null) {
@@ -109,7 +111,17 @@ function rowMatchesStatusFilter(row: ItemIssueRequest, filter: IssueQueueStatusF
   return true;
 }
 
+const COLUMN_DEFS: ColumnVisibilityDef[] = [
+  { id: 'inventory_name', label: 'Item', alwaysVisible: true },
+  { id: 'project_name', label: 'Project' },
+  { id: 'serial_number', label: 'Serial' },
+  { id: 'target_entity_name', label: 'Hierarchy' },
+  { id: 'assigned_developer_name', label: 'Developer' },
+  { id: 'requested_at', label: 'Requested' },
+];
+
 export function IssueQueuePanel() {
+  const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility('issue-queue-list', COLUMN_DEFS);
   const [rows, setRows] = useState<ItemIssueRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -432,13 +444,21 @@ export function IssueQueuePanel() {
           </div>
         </div>
         {rows.length > 0 ? (
-          <p className="text-xs text-muted-foreground">
-            Showing {filteredRows.length} of {rows.length} pending request
-            {rows.length === 1 ? '' : 's'}
-            {statusFilter !== FILTER_ALL
-              ? ` · ${STATUS_FILTER_DEFS.find((d) => d.key === statusFilter)?.label ?? statusFilter}`
-              : ''}
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">
+              Showing {filteredRows.length} of {rows.length} pending request
+              {rows.length === 1 ? '' : 's'}
+              {statusFilter !== FILTER_ALL
+                ? ` · ${STATUS_FILTER_DEFS.find((d) => d.key === statusFilter)?.label ?? statusFilter}`
+                : ''}
+            </p>
+            <ColumnVisibilityMenu
+              columns={COLUMN_DEFS}
+              visibleIds={visibleIds}
+              onToggle={toggleColumn}
+              onReset={resetColumns}
+            />
+          </div>
         ) : null}
       </div>
       <ListContentSuspense loading={loading}>
@@ -461,46 +481,66 @@ export function IssueQueuePanel() {
           <Table>
             <TableHeader>
               <TableRow>
-                <SortableTableHead column="inventory_name" sort={sort} onSort={cycleSort}>
-                  Item
-                </SortableTableHead>
-                <SortableTableHead column="project_name" sort={sort} onSort={cycleSort}>
-                  Project
-                </SortableTableHead>
-                <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>
-                  Serial
-                </SortableTableHead>
-                <SortableTableHead column="target_entity_name" sort={sort} onSort={cycleSort}>
-                  Hierarchy
-                </SortableTableHead>
-                <SortableTableHead column="assigned_developer_name" sort={sort} onSort={cycleSort}>
-                  Developer
-                </SortableTableHead>
-                <SortableTableHead column="requested_at" sort={sort} onSort={cycleSort}>
-                  Requested
-                </SortableTableHead>
+                {isVisible('inventory_name') && (
+                  <SortableTableHead column="inventory_name" sort={sort} onSort={cycleSort}>
+                    Item
+                  </SortableTableHead>
+                )}
+                {isVisible('project_name') && (
+                  <SortableTableHead column="project_name" sort={sort} onSort={cycleSort}>
+                    Project
+                  </SortableTableHead>
+                )}
+                {isVisible('serial_number') && (
+                  <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>
+                    Serial
+                  </SortableTableHead>
+                )}
+                {isVisible('target_entity_name') && (
+                  <SortableTableHead column="target_entity_name" sort={sort} onSort={cycleSort}>
+                    Hierarchy
+                  </SortableTableHead>
+                )}
+                {isVisible('assigned_developer_name') && (
+                  <SortableTableHead column="assigned_developer_name" sort={sort} onSort={cycleSort}>
+                    Developer
+                  </SortableTableHead>
+                )}
+                {isVisible('requested_at') && (
+                  <SortableTableHead column="requested_at" sort={sort} onSort={cycleSort}>
+                    Requested
+                  </SortableTableHead>
+                )}
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedRows.map((row) => (
                 <TableRow key={row.id}>
-                  <TableCell>
-                    <div className="font-medium">{row.inventory_name || '—'}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {row.part_number || '—'}
-                    </div>
-                  </TableCell>
-                  <TableCell>{row.project_name || (row.project_id ? `Project #${row.project_id}` : '—')}</TableCell>
-                  <TableCell>{row.serial_number || '—'}</TableCell>
-                  <TableCell>
-                    <div>{row.target_entity_name || `${row.target_entity_type} #${row.target_entity_id}`}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {row.flight_code || row.flight_name || '—'} / {row.sdls_code || row.sdls_name || '—'}
-                    </div>
-                  </TableCell>
-                  <TableCell>{row.assigned_developer_name || `User #${row.assigned_developer_id}`}</TableCell>
-                  <TableCell>{formatWhen(row.requested_at)}</TableCell>
+                  {isVisible('inventory_name') && (
+                    <TableCell>
+                      <div className="font-medium">{row.inventory_name || '—'}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {row.part_number || '—'}
+                      </div>
+                    </TableCell>
+                  )}
+                  {isVisible('project_name') && (
+                    <TableCell>{row.project_name || (row.project_id ? `Project #${row.project_id}` : '—')}</TableCell>
+                  )}
+                  {isVisible('serial_number') && <TableCell>{row.serial_number || '—'}</TableCell>}
+                  {isVisible('target_entity_name') && (
+                    <TableCell>
+                      <div>{row.target_entity_name || `${row.target_entity_type} #${row.target_entity_id}`}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {row.flight_code || row.flight_name || '—'} / {row.sdls_code || row.sdls_name || '—'}
+                      </div>
+                    </TableCell>
+                  )}
+                  {isVisible('assigned_developer_name') && (
+                    <TableCell>{row.assigned_developer_name || `User #${row.assigned_developer_id}`}</TableCell>
+                  )}
+                  {isVisible('requested_at') && <TableCell>{formatWhen(row.requested_at)}</TableCell>}
                   <TableCell className="text-right">
                     <Can permission={[P.inventory_issue_workflow, P.issue_inventory]}>
                       <Button size="sm" onClick={() => { signature.reset(); setSelected(row); }}>

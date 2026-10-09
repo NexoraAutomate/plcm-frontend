@@ -46,6 +46,8 @@ import {
   issuanceHasSignatureArtifacts,
 } from '@/lib/issuance-signature';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-menu';
+import { useColumnVisibility, type ColumnVisibilityDef } from '@/hooks/use-column-visibility';
 import { useClientTableSort } from '@/hooks/use-table-sorting';
 
 const STATUS_OPTIONS = [
@@ -68,7 +70,19 @@ function formatWhen(value?: string | null) {
   }
 }
 
+const COLUMN_DEFS: ColumnVisibilityDef[] = [
+  { id: 'inventory_name', label: 'Item', alwaysVisible: true },
+  { id: 'serial_number', label: 'Part / Serial' },
+  { id: 'quantity', label: 'Qty' },
+  { id: 'issued_to_name', label: 'Whom' },
+  { id: 'issued_by_name', label: 'Issued by' },
+  { id: 'issued_at', label: 'Issued' },
+  { id: 'closed_at', label: 'Return / Closed' },
+  { id: 'status', label: 'Status' },
+];
+
 export default function InventoryIssuancesPage() {
+  const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility('issuances-list', COLUMN_DEFS);
   const { users } = useDataStore();
   const { isInventoryManager } = useAuth();
   const inventoryManager = isInventoryManager();
@@ -245,6 +259,14 @@ export default function InventoryIssuancesPage() {
 
       <Card>
         <CardContent className="pt-6">
+          <div className="mb-3 flex justify-end">
+            <ColumnVisibilityMenu
+              columns={COLUMN_DEFS}
+              visibleIds={visibleIds}
+              onToggle={toggleColumn}
+              onReset={resetColumns}
+            />
+          </div>
           <ListContentSuspense loading={loading}>
           {rows.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">No issuances found.</p>
@@ -253,30 +275,46 @@ export default function InventoryIssuancesPage() {
               <Table containerClassName="rounded-md border">
                 <TableHeader>
                   <TableRow>
-                    <SortableTableHead column="inventory_name" sort={sort} onSort={cycleSort}>
-                      Item
-                    </SortableTableHead>
-                    <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>
-                      Part / Serial
-                    </SortableTableHead>
-                    <SortableTableHead column="quantity" sort={sort} onSort={cycleSort}>
-                      Qty
-                    </SortableTableHead>
-                    <SortableTableHead column="issued_to_name" sort={sort} onSort={cycleSort}>
-                      Whom
-                    </SortableTableHead>
-                    <SortableTableHead column="issued_by_name" sort={sort} onSort={cycleSort}>
-                      Issued by
-                    </SortableTableHead>
-                    <SortableTableHead column="issued_at" sort={sort} onSort={cycleSort}>
-                      Issued
-                    </SortableTableHead>
-                    <SortableTableHead column="closed_at" sort={sort} onSort={cycleSort}>
-                      Return / Closed
-                    </SortableTableHead>
-                    <SortableTableHead column="status" sort={sort} onSort={cycleSort}>
-                      Status
-                    </SortableTableHead>
+                    {isVisible('inventory_name') && (
+                      <SortableTableHead column="inventory_name" sort={sort} onSort={cycleSort}>
+                        Item
+                      </SortableTableHead>
+                    )}
+                    {isVisible('serial_number') && (
+                      <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>
+                        Part / Serial
+                      </SortableTableHead>
+                    )}
+                    {isVisible('quantity') && (
+                      <SortableTableHead column="quantity" sort={sort} onSort={cycleSort}>
+                        Qty
+                      </SortableTableHead>
+                    )}
+                    {isVisible('issued_to_name') && (
+                      <SortableTableHead column="issued_to_name" sort={sort} onSort={cycleSort}>
+                        Whom
+                      </SortableTableHead>
+                    )}
+                    {isVisible('issued_by_name') && (
+                      <SortableTableHead column="issued_by_name" sort={sort} onSort={cycleSort}>
+                        Issued by
+                      </SortableTableHead>
+                    )}
+                    {isVisible('issued_at') && (
+                      <SortableTableHead column="issued_at" sort={sort} onSort={cycleSort}>
+                        Issued
+                      </SortableTableHead>
+                    )}
+                    {isVisible('closed_at') && (
+                      <SortableTableHead column="closed_at" sort={sort} onSort={cycleSort}>
+                        Return / Closed
+                      </SortableTableHead>
+                    )}
+                    {isVisible('status') && (
+                      <SortableTableHead column="status" sort={sort} onSort={cycleSort}>
+                        Status
+                      </SortableTableHead>
+                    )}
                     <TableHead className="w-[1%] whitespace-nowrap text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -294,44 +332,58 @@ export default function InventoryIssuancesPage() {
                         setDetailsOpen(true);
                       }}
                     >
-                      <TableCell>
-                        <div className="font-medium">
-                          {row.inventory_name || `Inventory #${row.inventory_id}`}
-                        </div>
-                        <div className="text-xs text-muted-foreground">{row.inventory_type}</div>
-                      </TableCell>
-                      <TableCell>
-                        <div>{row.part_number || '—'}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {row.serial_number || '—'}
-                        </div>
-                      </TableCell>
-                      <TableCell>{row.quantity}</TableCell>
-                      <TableCell>
-                        {row.issued_to_name || `User #${row.issued_to_user_id}`}
-                      </TableCell>
-                      <TableCell>
-                        {row.issued_by_name || `User #${row.issued_by_user_id}`}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-sm">
-                        {formatWhen(row.issued_at)}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-sm">
-                        {row.status === 'return_pending' ? (
-                          <span title="Return requested">
-                            Req {formatWhen(row.return_requested_at)}
-                          </span>
-                        ) : row.closed_at ? (
-                          <span title={row.status}>{formatWhen(row.closed_at)}</span>
-                        ) : (
-                          '—'
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={displayStatusBadgeVariant(displayStatus)}>
-                          {displayStatus}
-                        </Badge>
-                      </TableCell>
+                      {isVisible('inventory_name') && (
+                        <TableCell>
+                          <div className="font-medium">
+                            {row.inventory_name || `Inventory #${row.inventory_id}`}
+                          </div>
+                          <div className="text-xs text-muted-foreground">{row.inventory_type}</div>
+                        </TableCell>
+                      )}
+                      {isVisible('serial_number') && (
+                        <TableCell>
+                          <div>{row.part_number || '—'}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {row.serial_number || '—'}
+                          </div>
+                        </TableCell>
+                      )}
+                      {isVisible('quantity') && <TableCell>{row.quantity}</TableCell>}
+                      {isVisible('issued_to_name') && (
+                        <TableCell>
+                          {row.issued_to_name || `User #${row.issued_to_user_id}`}
+                        </TableCell>
+                      )}
+                      {isVisible('issued_by_name') && (
+                        <TableCell>
+                          {row.issued_by_name || `User #${row.issued_by_user_id}`}
+                        </TableCell>
+                      )}
+                      {isVisible('issued_at') && (
+                        <TableCell className="whitespace-nowrap text-sm">
+                          {formatWhen(row.issued_at)}
+                        </TableCell>
+                      )}
+                      {isVisible('closed_at') && (
+                        <TableCell className="whitespace-nowrap text-sm">
+                          {row.status === 'return_pending' ? (
+                            <span title="Return requested">
+                              Req {formatWhen(row.return_requested_at)}
+                            </span>
+                          ) : row.closed_at ? (
+                            <span title={row.status}>{formatWhen(row.closed_at)}</span>
+                          ) : (
+                            '—'
+                          )}
+                        </TableCell>
+                      )}
+                      {isVisible('status') && (
+                        <TableCell>
+                          <Badge variant={displayStatusBadgeVariant(displayStatus)}>
+                            {displayStatus}
+                          </Badge>
+                        </TableCell>
+                      )}
                       <TableCell
                         className="text-right align-top"
                         onClick={(e) => e.stopPropagation()}

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { Search, Plus, Edit,UserRoundPen ,Check,X, Trash2 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -32,6 +32,8 @@ import { getOrderCountByCustomerId, getProjectCountByCustomerId, getCount } from
 import { EntityCountCell } from '@/components/entity-count-cell';
 import { CustomersListDashboard } from '@/components/lazy/list-dashboards';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-menu';
+import { useColumnVisibility, type ColumnVisibilityDef } from '@/hooks/use-column-visibility';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Can } from '@/components/auth/can';
@@ -65,8 +67,18 @@ type CustomerForm = {
   status_id?: number;
 };
 
+const COLUMN_DEFS: ColumnVisibilityDef[] = [
+  { id: 'customer_code', label: 'Code' },
+  { id: 'name', label: 'Customer', alwaysVisible: true },
+  { id: 'primary_contact_name', label: 'Contact' },
+  { id: 'status_id', label: 'Status' },
+  { id: 'orders', label: 'Orders' },
+  { id: 'projects', label: 'Projects' },
+];
+
 export default function CustomersPage() {
   const { showStats, setShowStats } = useListStatsVisibility();
+  const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility('customers-list', COLUMN_DEFS);
   const {
     orders,
     projects,
@@ -505,6 +517,14 @@ export default function CustomersPage() {
           <CardDescription>
             Showing {customers.length} on this page · {pagination.total} matching
           </CardDescription>
+          <CardAction>
+            <ColumnVisibilityMenu
+              columns={COLUMN_DEFS}
+              visibleIds={visibleIds}
+              onToggle={toggleColumn}
+              onReset={resetColumns}
+            />
+          </CardAction>
         </CardHeader>
         <CardContent>
           <ListContentSuspense loading={pagination.fetching}>
@@ -512,19 +532,27 @@ export default function CustomersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <SortableTableHead column="customer_code" sort={sort} onSort={cycleSort}>Code</SortableTableHead>
-                  <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Customer</SortableTableHead>
-                  <SortableTableHead column="primary_contact_name" sort={sort} onSort={cycleSort}>Contact</SortableTableHead>
-                  <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
-                  <TableHead>Orders</TableHead>
-                  <TableHead>Projects</TableHead>
+                  {isVisible('customer_code') && (
+                    <SortableTableHead column="customer_code" sort={sort} onSort={cycleSort}>Code</SortableTableHead>
+                  )}
+                  {isVisible('name') && (
+                    <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Customer</SortableTableHead>
+                  )}
+                  {isVisible('primary_contact_name') && (
+                    <SortableTableHead column="primary_contact_name" sort={sort} onSort={cycleSort}>Contact</SortableTableHead>
+                  )}
+                  {isVisible('status_id') && (
+                    <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
+                  )}
+                  {isVisible('orders') && <TableHead>Orders</TableHead>}
+                  {isVisible('projects') && <TableHead>Projects</TableHead>}
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {customers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={visibleIds.length + 1} className="text-center text-muted-foreground py-8">
                       No customers found
                     </TableCell>
                   </TableRow>
@@ -535,38 +563,42 @@ export default function CustomersPage() {
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => router.push(`/customers/${customer.id}`)}
                     >
-                      <TableCell>{customer.customer_code}</TableCell>
+                      {isVisible('customer_code') && <TableCell>{customer.customer_code}</TableCell>}
 
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{customer.name}</p>
-                          {customer.organization_type && (
-                            <p className="text-xs text-muted-foreground">
-                              {customer.organization_type}
-                            </p>
-                          )}
-                        </div>
-                      </TableCell>
+                      {isVisible('name') && (
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{customer.name}</p>
+                            {customer.organization_type && (
+                              <p className="text-xs text-muted-foreground">
+                                {customer.organization_type}
+                              </p>
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
 
-                      <TableCell>
-                        <div>
-                          {customer.primary_contact_name && (
-                            <p>{customer.primary_contact_name}</p>
-                          )}
+                      {isVisible('primary_contact_name') && (
+                        <TableCell>
+                          <div>
+                            {customer.primary_contact_name && (
+                              <p>{customer.primary_contact_name}</p>
+                            )}
 
-                          {customer.phone && (
-                            <p className="text-xs text-muted-foreground">
-                              {customer.phone}
-                            </p>
-                          )}
+                            {customer.phone && (
+                              <p className="text-xs text-muted-foreground">
+                                {customer.phone}
+                              </p>
+                            )}
 
-                          {customer.email && (
-                            <p className="text-xs text-muted-foreground">
-                              {customer.email}
-                            </p>
-                          )}
-                        </div>
-                      </TableCell>
+                            {customer.email && (
+                              <p className="text-xs text-muted-foreground">
+                                {customer.email}
+                              </p>
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
 
                       {/* <TableCell>
                         <Badge
@@ -584,7 +616,8 @@ export default function CustomersPage() {
                         </Badge>
                       </TableCell> */}
 
-                      <TableCell>
+                      {isVisible('status_id') && (
+                        <TableCell>
                           <Badge
                             className={
                                   customer.status_name === "Active"
@@ -601,19 +634,24 @@ export default function CustomersPage() {
                             {customer.status_name}
                           </Badge>
                         </TableCell>
-  
-                      <TableCell>
-                        <EntityCountCell
-                          count={getCount(orderCountByCustomer, customer.id)}
-                          label="Total orders"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <EntityCountCell
-                          count={getCount(projectCountByCustomer, customer.id)}
-                          label="Total projects"
-                        />
-                      </TableCell>
+                      )}
+
+                      {isVisible('orders') && (
+                        <TableCell>
+                          <EntityCountCell
+                            count={getCount(orderCountByCustomer, customer.id)}
+                            label="Total orders"
+                          />
+                        </TableCell>
+                      )}
+                      {isVisible('projects') && (
+                        <TableCell>
+                          <EntityCountCell
+                            count={getCount(projectCountByCustomer, customer.id)}
+                            label="Total projects"
+                          />
+                        </TableCell>
+                      )}
 
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2 text-accent">

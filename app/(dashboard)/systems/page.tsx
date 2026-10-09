@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -39,6 +39,8 @@ import { ListPageError } from '@/components/list-page-error';
 import { useListPageLoader } from '@/hooks/use-list-page-loader';
 import { SystemsListDashboard } from '@/components/lazy/list-dashboards';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-menu';
+import { useColumnVisibility, type ColumnVisibilityDef } from '@/hooks/use-column-visibility';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { ParentEntityLink } from '@/components/entity-link';
 import { Can } from '@/components/auth/can';
@@ -60,8 +62,18 @@ import {
 
 const SYSTEM_STATUS_NAMES = ['Design', 'Development', 'Testing', 'Operational', 'Retired'];
 
+const COLUMN_DEFS: ColumnVisibilityDef[] = [
+  { id: 'name', label: 'Name', alwaysVisible: true },
+  { id: 'project_id', label: 'Project' },
+  { id: 'status_id', label: 'Status' },
+  { id: 'installation_date', label: 'Install Date' },
+  { id: 'installed_by_id', label: 'Installer' },
+  { id: 'subsystems', label: 'Subsystems' },
+];
+
 export default function SystemsPage() {
   const { entityLabel } = useAppDefinitions();
+  const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility('systems-list', COLUMN_DEFS);
   const { showStats, setShowStats } = useListStatsVisibility();
 
   const router = useRouter();
@@ -517,6 +529,14 @@ export default function SystemsPage() {
           <CardDescription>
             Showing {systems.length} on this page · {pagination.total} matching
           </CardDescription>
+          <CardAction>
+            <ColumnVisibilityMenu
+              columns={COLUMN_DEFS}
+              visibleIds={visibleIds}
+              onToggle={toggleColumn}
+              onReset={resetColumns}
+            />
+          </CardAction>
         </CardHeader>
         <CardContent>
           <ListContentSuspense loading={pagination.fetching}>
@@ -524,19 +544,29 @@ export default function SystemsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Name</SortableTableHead>
-                  <SortableTableHead column="project_id" sort={sort} onSort={cycleSort}>Project</SortableTableHead>
-                  <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
-                  <SortableTableHead column="installation_date" sort={sort} onSort={cycleSort}>Install Date</SortableTableHead>
-                  <SortableTableHead column="installed_by_id" sort={sort} onSort={cycleSort}>Installer</SortableTableHead>
-                  <TableHead>{entityLabel('subsystem', true)}</TableHead>
+                  {isVisible('name') && (
+                    <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Name</SortableTableHead>
+                  )}
+                  {isVisible('project_id') && (
+                    <SortableTableHead column="project_id" sort={sort} onSort={cycleSort}>Project</SortableTableHead>
+                  )}
+                  {isVisible('status_id') && (
+                    <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
+                  )}
+                  {isVisible('installation_date') && (
+                    <SortableTableHead column="installation_date" sort={sort} onSort={cycleSort}>Install Date</SortableTableHead>
+                  )}
+                  {isVisible('installed_by_id') && (
+                    <SortableTableHead column="installed_by_id" sort={sort} onSort={cycleSort}>Installer</SortableTableHead>
+                  )}
+                  {isVisible('subsystems') && <TableHead>{entityLabel('subsystem', true)}</TableHead>}
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {systems.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={visibleIds.length + 1} className="text-center text-muted-foreground py-8">
                       No systems found
                     </TableCell>
                   </TableRow>
@@ -564,44 +594,56 @@ export default function SystemsPage() {
                         )}
                         onClick={() => router.push(`/systems/${system.id}`)}
                       >
-                        <TableCell className="font-medium">
-                          <EntityNameWithFault
-                            name={system.name}
-                            entityType="system"
-                            entityId={system.id}
-                            faultMap={faultMap}
-                          />
-                          {!inventoryManager && mine && system.is_current_install !== false ? (
-                            <p className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
-                              Installed by you
-                            </p>
-                          ) : null}
-                        </TableCell>
-                        <TableCell>
-                          {project ? (
-                            <ParentEntityLink
-                              href={`/projects/${project.id}`}
-                              label={project.name}
+                        {isVisible('name') && (
+                          <TableCell className="font-medium">
+                            <EntityNameWithFault
+                              name={system.name}
+                              entityType="system"
+                              entityId={system.id}
+                              faultMap={faultMap}
                             />
-                          ) : (
-                            'N/A'
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge status={getStatusName(system)} />
-                        </TableCell>
-                        <TableCell>
-                          {system.installation_date
-                            ? new Date(system.installation_date).toLocaleDateString()
-                            : '—'}
-                        </TableCell>
-                        <TableCell>{installerLabel(system.installed_by_id)}</TableCell>
-                        <TableCell>
-                          <EntityCountCell
-                            count={getCount(subsystemCountBySystem, system.id)}
-                            label="Total subsystems"
-                          />
-                        </TableCell>
+                            {!inventoryManager && mine && system.is_current_install !== false ? (
+                              <p className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                                Installed by you
+                              </p>
+                            ) : null}
+                          </TableCell>
+                        )}
+                        {isVisible('project_id') && (
+                          <TableCell>
+                            {project ? (
+                              <ParentEntityLink
+                                href={`/projects/${project.id}`}
+                                label={project.name}
+                              />
+                            ) : (
+                              'N/A'
+                            )}
+                          </TableCell>
+                        )}
+                        {isVisible('status_id') && (
+                          <TableCell>
+                            <StatusBadge status={getStatusName(system)} />
+                          </TableCell>
+                        )}
+                        {isVisible('installation_date') && (
+                          <TableCell>
+                            {system.installation_date
+                              ? new Date(system.installation_date).toLocaleDateString()
+                              : '—'}
+                          </TableCell>
+                        )}
+                        {isVisible('installed_by_id') && (
+                          <TableCell>{installerLabel(system.installed_by_id)}</TableCell>
+                        )}
+                        {isVisible('subsystems') && (
+                          <TableCell>
+                            <EntityCountCell
+                              count={getCount(subsystemCountBySystem, system.id)}
+                              label="Total subsystems"
+                            />
+                          </TableCell>
+                        )}
                         <TableCell className="text-right">
                           <div className="flex gap-2 justify-end">
                             <Link href={`/systems/${system.id}`} onClick={(e) => e.stopPropagation()}>

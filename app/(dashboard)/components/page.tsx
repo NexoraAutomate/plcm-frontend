@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -40,6 +40,8 @@ import { HierarchyListDashboard } from '@/components/lazy/list-dashboards';
 import { ParentEntityLink } from '@/components/entity-link';
 import { buildHierarchyPageUrl } from '@/lib/hierarchy-page-filters';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-menu';
+import { useColumnVisibility, type ColumnVisibilityDef } from '@/hooks/use-column-visibility';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import {
   getComponentsDashboardConfig,
@@ -204,8 +206,18 @@ function ComponentGroupDetailTable({
   );
 }
 
+const COLUMN_DEFS: ColumnVisibilityDef[] = [
+  { id: 'name', label: 'Name', alwaysVisible: true },
+  { id: 'part_number', label: 'Part Number', defaultVisible: false },
+  { id: 'serial_number', label: 'Serial Number' },
+  { id: 'unit_id', label: 'Unit' },
+  { id: 'status_id', label: 'Status' },
+  { id: 'inventory_qty', label: 'Inventory Qty' },
+];
+
 export default function ComponentsPage() {
   const { entityLabel } = useAppDefinitions();
+  const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility('components-list', COLUMN_DEFS);
   const { showStats, setShowStats } = useListStatsVisibility();
 
   const router = useRouter();
@@ -674,6 +686,14 @@ export default function ComponentsPage() {
           <CardDescription>
             Showing {components.length} on this page · {pagination.total} matching
           </CardDescription>
+          <CardAction>
+            <ColumnVisibilityMenu
+              columns={COLUMN_DEFS}
+              visibleIds={visibleIds}
+              onToggle={toggleColumn}
+              onReset={resetColumns}
+            />
+          </CardAction>
         </CardHeader>
         <CardContent>
           <ListContentSuspense loading={pagination.fetching || allComponentsQuery.isFetching}>
@@ -682,19 +702,29 @@ export default function ComponentsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10" />
-                  <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Name</SortableTableHead>
-                  <SortableTableHead column="part_number" sort={sort} onSort={cycleSort}>Part Number</SortableTableHead>
-                  <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>Serial Number</SortableTableHead>
-                  <SortableTableHead column="unit_id" sort={sort} onSort={cycleSort}>{entityLabel('unit')}</SortableTableHead>
-                  <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
-                  <TableHead>Inventory Qty</TableHead>
+                  {isVisible('name') && (
+                    <SortableTableHead column="name" sort={sort} onSort={cycleSort}>Name</SortableTableHead>
+                  )}
+                  {isVisible('part_number') && (
+                    <SortableTableHead column="part_number" sort={sort} onSort={cycleSort}>Part Number</SortableTableHead>
+                  )}
+                  {isVisible('serial_number') && (
+                    <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>Serial Number</SortableTableHead>
+                  )}
+                  {isVisible('unit_id') && (
+                    <SortableTableHead column="unit_id" sort={sort} onSort={cycleSort}>{entityLabel('unit')}</SortableTableHead>
+                  )}
+                  {isVisible('status_id') && (
+                    <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>Status</SortableTableHead>
+                  )}
+                  {isVisible('inventory_qty') && <TableHead>Inventory Qty</TableHead>}
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {components.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={visibleIds.length + 2} className="text-center text-muted-foreground py-8">
                       {`No ${entityLabel('component', true).toLowerCase()} found`}
                     </TableCell>
                   </TableRow>
@@ -745,40 +775,52 @@ export default function ComponentsPage() {
                                 />
                               </Button>
                             </TableCell>
-                            <TableCell className="font-medium">
-                              {group.length} {entityLabel('component', true).toLowerCase()}
-                            </TableCell>
-                            <TableCell>{firstComponent.part_number?.trim() || '—'}</TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {group.length} serial numbers
-                            </TableCell>
-                            <TableCell>
-                              {groupUnitIds.size === 1 && groupUnit ? (
-                                <ParentEntityLink href={`/units/${groupUnit.id}`} label={groupUnit.name} />
-                              ) : (
-                                'Multiple units'
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {groupStatusNames.size === 1 ? (
-                                <StatusBadge status={getStatusName(firstComponent)} />
-                              ) : (
-                                'Multiple'
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <EntityCountCell
-                                count={groupInventoryQuantity}
-                                label="Inventory quantity for this part number"
-                              />
-                            </TableCell>
+                            {isVisible('name') && (
+                              <TableCell className="font-medium">
+                                {group.length} {entityLabel('component', true).toLowerCase()}
+                              </TableCell>
+                            )}
+                            {isVisible('part_number') && (
+                              <TableCell>{firstComponent.part_number?.trim() || '—'}</TableCell>
+                            )}
+                            {isVisible('serial_number') && (
+                              <TableCell className="text-sm text-muted-foreground">
+                                {group.length} serial numbers
+                              </TableCell>
+                            )}
+                            {isVisible('unit_id') && (
+                              <TableCell>
+                                {groupUnitIds.size === 1 && groupUnit ? (
+                                  <ParentEntityLink href={`/units/${groupUnit.id}`} label={groupUnit.name} />
+                                ) : (
+                                  'Multiple units'
+                                )}
+                              </TableCell>
+                            )}
+                            {isVisible('status_id') && (
+                              <TableCell>
+                                {groupStatusNames.size === 1 ? (
+                                  <StatusBadge status={getStatusName(firstComponent)} />
+                                ) : (
+                                  'Multiple'
+                                )}
+                              </TableCell>
+                            )}
+                            {isVisible('inventory_qty') && (
+                              <TableCell>
+                                <EntityCountCell
+                                  count={groupInventoryQuantity}
+                                  label="Inventory quantity for this part number"
+                                />
+                              </TableCell>
+                            )}
                             <TableCell className="text-right text-xs text-muted-foreground">
                               {isExpanded ? 'Hide details' : 'View details'}
                             </TableCell>
                           </TableRow>
                           {isExpanded ? (
                             <TableRow className="bg-muted/20 hover:bg-muted/20">
-                              <TableCell colSpan={8} className="p-0">
+                              <TableCell colSpan={visibleIds.length + 2} className="p-0">
                                 <div className="px-6 py-3">
                                   <p className="mb-2 text-xs font-medium text-muted-foreground">
                                     Components with part number {firstComponent.part_number?.trim() || '—'}
@@ -821,47 +863,59 @@ export default function ComponentsPage() {
                         onClick={() => router.push(`/components/${component.id}`)}
                       >
                         <TableCell />
-                        <TableCell className="font-medium">
-                          <EntityNameWithFault
-                            name={component.name}
-                            entityType="component"
-                            entityId={component.id}
-                            faultMap={faultMap}
-                          />
-                          {showOwnInstallBadge({
-                            isInventoryManager: inventoryManager,
-                            currentUserId: user?.id,
-                            installedById: component.installed_by_id,
-                            isCurrentInstall: component.is_current_install,
-                          }) ? (
-                            <p className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
-                              Installed by you
-                            </p>
-                          ) : null}
-                        </TableCell>
-                        <TableCell>{component.part_number?.trim() || '—'}</TableCell>
-                        <TableCell className="font-mono text-sm">
-                          {component.serial_number?.trim() || '—'}
-                        </TableCell>
-                        <TableCell>
-                          {unit ? (
-                            <ParentEntityLink
-                              href={`/units/${unit.id}`}
-                              label={unit.name}
+                        {isVisible('name') && (
+                          <TableCell className="font-medium">
+                            <EntityNameWithFault
+                              name={component.name}
+                              entityType="component"
+                              entityId={component.id}
+                              faultMap={faultMap}
                             />
-                          ) : (
-                            'N/A'
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge status={getStatusName(component)} />
-                        </TableCell>
-                        <TableCell>
-                          <EntityCountCell
-                            count={getCount(inventoryQtyByComponent, component.id)}
-                            label="Inventory quantity"
-                          />
-                        </TableCell>
+                            {showOwnInstallBadge({
+                              isInventoryManager: inventoryManager,
+                              currentUserId: user?.id,
+                              installedById: component.installed_by_id,
+                              isCurrentInstall: component.is_current_install,
+                            }) ? (
+                              <p className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                                Installed by you
+                              </p>
+                            ) : null}
+                          </TableCell>
+                        )}
+                        {isVisible('part_number') && (
+                          <TableCell>{component.part_number?.trim() || '—'}</TableCell>
+                        )}
+                        {isVisible('serial_number') && (
+                          <TableCell className="font-mono text-sm">
+                            {component.serial_number?.trim() || '—'}
+                          </TableCell>
+                        )}
+                        {isVisible('unit_id') && (
+                          <TableCell>
+                            {unit ? (
+                              <ParentEntityLink
+                                href={`/units/${unit.id}`}
+                                label={unit.name}
+                              />
+                            ) : (
+                              'N/A'
+                            )}
+                          </TableCell>
+                        )}
+                        {isVisible('status_id') && (
+                          <TableCell>
+                            <StatusBadge status={getStatusName(component)} />
+                          </TableCell>
+                        )}
+                        {isVisible('inventory_qty') && (
+                          <TableCell>
+                            <EntityCountCell
+                              count={getCount(inventoryQtyByComponent, component.id)}
+                              label="Inventory quantity"
+                            />
+                          </TableCell>
+                        )}
                         <TableCell className="text-right">
                           {renderComponentActions(component)}
                         </TableCell>
