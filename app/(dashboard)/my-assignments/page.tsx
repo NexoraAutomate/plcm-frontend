@@ -1,10 +1,31 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { ListChecks } from 'lucide-react';
-import { MyAssignmentsPanel } from '@/components/inventory/my-assignments-panel';
-import { RecallQueuePanel } from '@/components/inventory/recall-queue-panel';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageDataRefreshProvider, PageRefreshButton } from '@/components/page-data-refresh';
+
+const MyAssignmentsPanel = dynamic(
+  () =>
+    import('@/components/inventory/my-assignments-panel').then((m) => m.MyAssignmentsPanel),
+  {
+    ssr: false,
+    loading: () => (
+      <p className="py-8 text-center text-sm text-muted-foreground">Loading assignments…</p>
+    ),
+  }
+);
+
+const RecallQueuePanel = dynamic(
+  () =>
+    import('@/components/inventory/recall-queue-panel').then((m) => m.RecallQueuePanel),
+  {
+    ssr: false,
+    loading: () => (
+      <p className="py-8 text-center text-sm text-muted-foreground">Loading recall returns…</p>
+    ),
+  }
+);
 
 export default function MyAssignmentsPage() {
   return (

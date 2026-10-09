@@ -13,10 +13,15 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUp,
+  Minus,
   Pencil,
+  Plus,
   Trash2,
 } from 'lucide-react';
-import type { ConfigTreeNodeData } from '@/lib/config-tree-layout';
+import {
+  DEFAULT_CONFIG_TREE_NODE_FIELD_VISIBILITY,
+  type ConfigTreeNodeData,
+} from '@/lib/config-tree-layout';
 import { InventorySourceToggle } from '@/components/settings/config-tree/inventory-source-toggle';
 import { LEVEL_NODE_STYLE } from '@/lib/config-tree-level-styles';
 import { cn } from '@/lib/utils';
@@ -29,6 +34,7 @@ export type ConfigTreeNodeActions = {
   onAddSiblingAbove: (clientKey: string) => void;
   onAddSiblingBelow: (clientKey: string) => void;
   onAddParentPeer: (clientKey: string) => void;
+  onToggleChildren: (clientKey: string) => void;
 };
 
 type Props = NodeProps<Node<ConfigTreeNodeData>> & {
@@ -51,12 +57,32 @@ export const ConfigTreeFlowNode = memo(function ConfigTreeFlowNode({
   actions,
 }: Props) {
   const [hovered, setHovered] = useState(false);
-  const { draft, label, levelLabel, isDraft, locked, readOnly, canAddChild, layoutDirection } =
-    data;
+  const {
+    draft,
+    label,
+    levelLabel,
+    isDraft,
+    locked,
+    readOnly,
+    canAddChild,
+    layoutDirection,
+    hasChildren,
+    childrenExpanded,
+  } = data;
+  const fieldVisibility =
+    data.fieldVisibility ?? DEFAULT_CONFIG_TREE_NODE_FIELD_VISIBILITY;
   const interactive = !locked && !readOnly;
   const showResize = interactive && (hovered || selected);
   const isVertical = layoutDirection === 'TB';
   const levelStyle = LEVEL_NODE_STYLE[draft.level];
+  const showAbbreviation = fieldVisibility.abbreviation;
+  const showLevel = fieldVisibility.level;
+  const metaParts = [
+    showAbbreviation ? (draft.abbreviation || '—').toUpperCase() : null,
+    showLevel ? levelLabel : null,
+  ].filter(Boolean);
+  const description = draft.description?.trim() ?? '';
+  const showDescription = fieldVisibility.description && description.length > 0;
 
   return (
     <div
@@ -65,6 +91,41 @@ export const ConfigTreeFlowNode = memo(function ConfigTreeFlowNode({
       onMouseLeave={() => setHovered(false)}
       title={interactive ? 'Click to select · Double-click to edit' : undefined}
     >
+      {hasChildren ? (
+        <button
+          type="button"
+          className={cn(
+            'absolute z-30 inline-flex h-5 w-5 items-center justify-center rounded-full border border-border bg-background text-foreground shadow-sm nodrag nopan',
+            'hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+            isVertical
+              ? 'bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2'
+              : 'right-0 top-1/2 translate-x-1/2 -translate-y-1/2'
+          )}
+          title={
+            childrenExpanded
+              ? 'Collapse immediate children'
+              : 'Expand immediate children'
+          }
+          aria-label={
+            childrenExpanded
+              ? 'Collapse immediate children'
+              : 'Expand immediate children'
+          }
+          aria-expanded={childrenExpanded}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            actions.onToggleChildren(draft.client_key);
+          }}
+        >
+          {childrenExpanded ? (
+            <Minus className={iconClass} aria-hidden />
+          ) : (
+            <Plus className={iconClass} aria-hidden />
+          )}
+        </button>
+      ) : null}
+
       <div
         className={cn(
           'relative flex h-full w-full flex-col justify-center overflow-hidden rounded-md border px-2 py-1 shadow-sm transition-colors',
@@ -131,18 +192,27 @@ export const ConfigTreeFlowNode = memo(function ConfigTreeFlowNode({
               </span>
             ) : null}
           </div>
-          <div className="truncate text-[10px] leading-tight opacity-70">
-            {(draft.abbreviation || '—').toUpperCase()} · {levelLabel}
-          </div>
-          <InventorySourceToggle
-            size="node"
-            value={draft.inventory_source}
-            canBuild={data.canBuildFromChildren}
-            disabled={!interactive}
-            onDenied={(_, reason) => {
-              if (interactive) toast.error(reason);
-            }}
-          />
+          {metaParts.length > 0 ? (
+            <div className="truncate text-[10px] leading-tight opacity-70">
+              {metaParts.join(' · ')}
+            </div>
+          ) : null}
+          {showDescription ? (
+            <div className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground">
+              {description}
+            </div>
+          ) : null}
+          {fieldVisibility.inventorySource ? (
+            <InventorySourceToggle
+              size="node"
+              value={draft.inventory_source}
+              canBuild={data.canBuildFromChildren}
+              disabled={!interactive}
+              onDenied={(_, reason) => {
+                if (interactive) toast.error(reason);
+              }}
+            />
+          ) : null}
         </div>
       </div>
 

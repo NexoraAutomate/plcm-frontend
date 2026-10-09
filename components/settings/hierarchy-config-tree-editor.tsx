@@ -5,7 +5,7 @@
  * Features aligned with React Flow examples: lock, resize, move, arrows,
  * add-on-edge-drop, easy-connect, intersections, proximity connect,
  * animated edges, entity DnD, edge delete, H/V layout, eraser/selection,
- * download image.
+ * download PDF.
  */
 
 import {
@@ -42,6 +42,7 @@ import '@xyflow/react/dist/style.css';
 import {
   Columns2,
   Copy,
+  GitBranch,
   Lock,
   LockOpen,
   Maximize2,
@@ -83,16 +84,22 @@ import {
 import {
   buildGraphFromDraft,
   canLinkLevels,
+  CONFIG_TREE_FIELD_VISIBILITY_KEYS,
+  DEFAULT_CONFIG_TREE_NODE_FIELD_VISIBILITY,
   DEFAULT_NODE_HEIGHT,
   DEFAULT_NODE_WIDTH,
   descendantsOf,
+  filterVisibleHierarchyNodes,
   hasSystemNode,
   isDraftNode,
   isEntityAssigned,
+  isHierarchyFullyExpanded,
   layoutHandleIds,
+  parentKeysWithChildren,
   siblingsOf,
   type ConfigTreeEdgeData,
   type ConfigTreeNodeData,
+  type ConfigTreeNodeFieldVisibility,
   type LayoutDirection,
 } from '@/lib/config-tree-layout';
 import { LEVEL_LEGEND_DOT, LEVEL_NODE_STYLE } from '@/lib/config-tree-level-styles';
@@ -104,7 +111,11 @@ import { ConfigAnimatedEdge } from '@/components/settings/config-tree/config-ani
 import { ConfigTreeEraser } from '@/components/settings/config-tree/config-tree-eraser';
 import { ConfigTreeEntitySidebar, ENTITY_DND_MIME, type EntityDragPayload } from '@/components/settings/config-tree/config-tree-entity-sidebar';
 import { ConfigEntityTypeTree } from '@/components/settings/config-tree/config-entity-type-tree';
-import { ConfigTreeDownloadButton } from '@/components/settings/config-tree/config-tree-download-button';
+import { ConfigTreeNodeLegend } from '@/components/settings/config-tree/config-tree-node-legend';
+import {
+  ConfigTreeDownloadButton,
+  type ConfigTreePdfMeta,
+} from '@/components/settings/config-tree/config-tree-download-button';
 import { InventorySourceToggle } from '@/components/settings/config-tree/inventory-source-toggle';
 import { cn } from '@/lib/utils';
 
@@ -169,6 +180,7 @@ type CanvasProps = {
   requestDeleteNode: (clientKey: string) => void;
   layoutNonce: number;
   pendingPositions: MutableRefObject<Map<string, { x: number; y: number }>>;
+  pdfMeta?: ConfigTreePdfMeta;
 };
 
 function ConfigTreeCanvasInner({
@@ -191,6 +203,7 @@ function ConfigTreeCanvasInner({
   requestDeleteNode,
   layoutNonce,
   pendingPositions,
+  pdfMeta,
 }: CanvasProps) {
   const { screenToFlowPosition, getInternalNode, fitView, getNodes } =
     useReactFlow();
@@ -211,7 +224,7 @@ function ConfigTreeCanvasInner({
       draftNodes
         .map(
           (n) =>
-            `${n.client_key}:${n.name}:${n.abbreviation ?? ''}:${normalizeInventorySource(n.inventory_source)}`
+            `${n.client_key}:${n.name}:${n.abbreviation ?? ''}:${n.description ?? ''}:${normalizeInventorySource(n.inventory_source)}`
         )
         .join('|'),
     [draftNodes]
@@ -219,16 +232,51 @@ function ConfigTreeCanvasInner({
   const lastLayoutNonce = useRef(layoutNonce);
   const lastStructureKey = useRef(structureKey);
   const lastDirection = useRef(direction);
+  /** Empty = system/roots only; keys = parents whose immediate children are shown. */
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set());
+  const lastExpandedKey = useRef('');
+  const [fieldVisibility, setFieldVisibility] =
+    useState<ConfigTreeNodeFieldVisibility>(
+      () => ({ ...DEFAULT_CONFIG_TREE_NODE_FIELD_VISIBILITY })
+    );
+  const fieldVisibilitySig = useMemo(
+    () =>
+      CONFIG_TREE_FIELD_VISIBILITY_KEYS.map((k) =>
+        fieldVisibility[k] ? '1' : '0'
+      ).join(''),
+    [fieldVisibility]
+  );
+  const lastFieldVisibilitySig = useRef(fieldVisibilitySig);
+
+  const parentsWithKids = useMemo(
+    () => parentKeysWithChildren(draftNodes),
+    [draftNodes]
+  );
+  const showFullHierarchy = useMemo(
+    () => isHierarchyFullyExpanded(draftNodes, expandedKeys),
+    [draftNodes, expandedKeys]
+  );
+  const visibleDraftNodes = useMemo(
+    () => filterVisibleHierarchyNodes(draftNodes, expandedKeys),
+    [draftNodes, expandedKeys]
+  );
+  const expandedKeySig = useMemo(
+    () => [...expandedKeys].sort().join('|'),
+    [expandedKeys]
+  );
 
   const initial = useMemo(
     () =>
       buildGraphFromDraft({
-        nodes: draftNodes,
+        nodes: filterVisibleHierarchyNodes(draftNodes, new Set()),
         levelLabel,
         locked,
         readOnly,
         direction,
         applyAutoLayout: true,
+        parentsWithChildren: parentKeysWithChildren(draftNodes),
+        expandedKeys: new Set(),
+        fieldVisibility: DEFAULT_CONFIG_TREE_NODE_FIELD_VISIBILITY,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- bootstrap once; sync effect handles updates
     []
@@ -245,6 +293,56 @@ function ConfigTreeCanvasInner({
   }, [draftNodes]);
 
   const systemExists = useMemo(() => hasSystemNode(draftNodes), [draftNodes]);
+
+  const toggleFullHierarchy = useCallback(() => {
+    setExpandedKeys(() =>
+      showFullHierarchy ? new Set() : new Set(parentsWithKids)
+    );
+  }, [parentsWithKids, showFullHierarchy]);
+
+  const ensureExpanded = useCallback((clientKey: string | null | undefined) => {
+    if (!clientKey) return;
+    setExpandedKeys((prev) => {
+      if (prev.has(clientKey)) return prev;
+      const next = new Set(prev);
+      next.add(clientKey);
+      return next;
+    });
+  }, []);
+
+  const toggleNodeChildren = useCallback(
+    (clientKey: string) => {
+      if (!parentsWithKids.has(clientKey)) return;
+      setExpandedKeys((prev) => {
+        const next = new Set(prev);
+        if (next.has(clientKey)) {
+          next.delete(clientKey);
+          // Keep grandchildren collapsed when this node is re-expanded later.
+          for (const key of descendantsOf(draftNodes, clientKey)) {
+            if (key !== clientKey) next.delete(key);
+          }
+        } else {
+          next.add(clientKey);
+        }
+        return next;
+      });
+    },
+    [draftNodes, parentsWithKids]
+  );
+
+  // Drop expand state for nodes that no longer have children; auto-expand when a
+  // new child is linked under a parent that was just created via place/connect.
+  useEffect(() => {
+    setExpandedKeys((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const key of prev) {
+        if (parentsWithKids.has(key)) next.add(key);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [parentsWithKids]);
 
   const selectedParent = selectedParentKey
     ? nodesByKey.get(selectedParentKey) ?? null
@@ -274,9 +372,13 @@ function ConfigTreeCanvasInner({
     const structureChanged = lastStructureKey.current !== structureKey;
     const directionChanged = lastDirection.current !== direction;
     const layoutChanged = lastLayoutNonce.current !== layoutNonce;
+    const expandChanged = lastExpandedKey.current !== expandedKeySig;
+    const visibilityChanged = lastFieldVisibilitySig.current !== fieldVisibilitySig;
     lastStructureKey.current = structureKey;
     lastDirection.current = direction;
     lastLayoutNonce.current = layoutNonce;
+    lastExpandedKey.current = expandedKeySig;
+    lastFieldVisibilitySig.current = fieldVisibilitySig;
 
     // Drop freehand pending spots — new nodes always snap into the active layout
     pendingPositions.current.clear();
@@ -294,16 +396,18 @@ function ConfigTreeCanvasInner({
       ])
     );
 
-    // Re-run Dagre whenever hierarchy or orientation changes so siblings/children
-    // land on the correct parallel rank. Preserve positions only for lock toggles.
+    // Re-run Dagre whenever hierarchy, orientation, or expand/collapse changes so
+    // siblings/children land on the correct parallel rank. Field-visibility toggles
+    // only refresh node data and keep the current layout.
     const applyAutoLayout =
       structureChanged ||
       directionChanged ||
       layoutChanged ||
+      expandChanged ||
       positionById.size === 0;
 
     const next = buildGraphFromDraft({
-      nodes: draftNodes,
+      nodes: visibleDraftNodes,
       levelLabel,
       locked,
       readOnly,
@@ -311,13 +415,26 @@ function ConfigTreeCanvasInner({
       sizeById,
       positionById: applyAutoLayout ? undefined : positionById,
       applyAutoLayout,
+      parentsWithChildren: parentsWithKids,
+      expandedKeys,
+      fieldVisibility,
     });
     setNodes(next.flowNodes);
     setEdges(next.edges);
+    if (visibilityChanged && !applyAutoLayout) return;
     const t = window.setTimeout(() => void fitView({ padding: 0.2, duration: 200 }), 40);
     return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [structureKey, contentKey, locked, readOnly, direction, layoutNonce]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- rebuild on structure/content/layout/expand/visibility signatures
+  }, [
+    structureKey,
+    contentKey,
+    locked,
+    readOnly,
+    direction,
+    layoutNonce,
+    expandedKeySig,
+    fieldVisibilitySig,
+  ]);
 
   const deleteEdgeById = useCallback(
     (edgeId: string) => {
@@ -363,6 +480,7 @@ function ConfigTreeCanvasInner({
       onDelete: requestDeleteNode,
       onAddChild: (key) => {
         setSelectedParentKey(key);
+        ensureExpanded(key);
         addChild(key);
       },
       onAddSiblingAbove: (key) => {
@@ -387,14 +505,17 @@ function ConfigTreeCanvasInner({
         }
         addParentPeer(key);
       },
+      onToggleChildren: toggleNodeChildren,
     }),
     [
       addChild,
       addParentPeer,
       addSibling,
+      ensureExpanded,
       nodesByKey,
       openNodeForm,
       requestDeleteNode,
+      toggleNodeChildren,
     ]
   );
 
@@ -417,6 +538,7 @@ function ConfigTreeCanvasInner({
         return false;
       }
       // Let structure sync re-run Dagre so the linked nodes sit on the active layout
+      ensureExpanded(sourceId);
       onChange(
         syncInventorySources(
           draftNodes.map((n) =>
@@ -428,7 +550,7 @@ function ConfigTreeCanvasInner({
       );
       return true;
     },
-    [draftNodes, levelLabel, nodesByKey, onChange]
+    [draftNodes, ensureExpanded, levelLabel, nodesByKey, onChange]
   );
 
   const onConnect = useCallback(
@@ -465,13 +587,22 @@ function ConfigTreeCanvasInner({
           : (event as MouseEvent);
       const position = screenToFlowPosition({ x: clientX, y: clientY });
       setSelectedParentKey(fromId);
+      ensureExpanded(fromId);
       placeNode({
         level: childLevel,
         parentKey: fromId,
         position,
       });
     },
-    [locked, mode, nodesByKey, placeNode, readOnly, screenToFlowPosition]
+    [
+      ensureExpanded,
+      locked,
+      mode,
+      nodesByKey,
+      placeNode,
+      readOnly,
+      screenToFlowPosition,
+    ]
   );
 
   const getClosestEdge = useCallback(
@@ -665,6 +796,7 @@ function ConfigTreeCanvasInner({
         parentKey = best.id;
       }
 
+      ensureExpanded(parentKey);
       placeNode({
         level: payload.level,
         parentKey,
@@ -678,6 +810,7 @@ function ConfigTreeCanvasInner({
     },
     [
       draftNodes,
+      ensureExpanded,
       getNodes,
       levelLabel,
       locked,
@@ -828,9 +961,29 @@ function ConfigTreeCanvasInner({
                 return LEVEL_NODE_STYLE[level].minimap;
               }}
             />
-            <ConfigTreeDownloadButton />
+            <ConfigTreeDownloadButton meta={pdfMeta} />
+            <ConfigTreeNodeLegend
+              visibility={fieldVisibility}
+              onChange={setFieldVisibility}
+            />
 
             <Panel position="top-left" className="z-50 flex flex-wrap gap-1.5">
+              <Button
+                type="button"
+                size="sm"
+                variant={showFullHierarchy ? 'default' : 'secondary'}
+                className="h-8"
+                disabled={!parentsWithKids.size}
+                onClick={toggleFullHierarchy}
+                title={
+                  showFullHierarchy
+                    ? 'Show system nodes only'
+                    : 'Show full hierarchy'
+                }
+              >
+                <GitBranch className="mr-1 h-3.5 w-3.5" />
+                {showFullHierarchy ? 'System only' : 'Show full hierarchy'}
+              </Button>
               <Button
                 type="button"
                 size="sm"
@@ -942,6 +1095,8 @@ export type HierarchyConfigTreeEditorProps = {
   draftDescription?: string;
   /** Current draft name (prefill create dialog when already typed in the form). */
   draftName?: string;
+  /** Metadata shown in the PDF header/footer when downloading the tree. */
+  pdfMeta?: ConfigTreePdfMeta;
   /** True when the proposed name clashes with another configuration. */
   isNameTaken?: (name: string) => boolean;
   /**
@@ -969,6 +1124,7 @@ export function HierarchyConfigTreeEditor({
   suggestedDuplicateName = '',
   draftDescription = '',
   draftName = '',
+  pdfMeta,
   isNameTaken,
   onSave,
   onDuplicate,
@@ -1357,6 +1513,7 @@ export function HierarchyConfigTreeEditor({
     requestDeleteNode: setDeleteKey,
     layoutNonce,
     pendingPositions,
+    pdfMeta,
   };
 
   const actionButtons =

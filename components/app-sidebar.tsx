@@ -395,7 +395,7 @@ function PendingBadge({
   return (
     <span
       className={cn(
-        "absolute -left-1 -top-1 z-10 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-white shadow-sm",
+        "absolute -right-1 -top-1 z-10 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-normal leading-none text-white shadow-sm",
         className
       )}
       aria-label={`${count} pending`}
@@ -429,11 +429,15 @@ function NavLink({
           : "border-transparent text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
       )}
     >
-      <span className="relative shrink-0">
+      <item.icon className="h-4.5 w-4.5 shrink-0" />
+      {!collapsed ? (
+        <span className="relative min-w-0 max-w-full">
+          <span className="block truncate pr-3">{item.label}</span>
+          <PendingBadge count={badgeCount} />
+        </span>
+      ) : (
         <PendingBadge count={badgeCount} />
-        <item.icon className="h-4.5 w-4.5" />
-      </span>
-      {!collapsed && <span className="truncate">{item.label}</span>}
+      )}
     </Link>
   );
 
@@ -468,10 +472,10 @@ function CollapsibleGroupHeader({
   href?: string;
   badgeCount?: number;
 }) {
-  const iconWithBadge = (
-    <span className="relative shrink-0">
+  const labelWithBadge = (
+    <span className="relative min-w-0 max-w-full">
+      <span className="block truncate pr-3">{label}</span>
       <PendingBadge count={badgeCount} />
-      <Icon className="h-4.5 w-4.5" />
     </span>
   );
 
@@ -489,8 +493,8 @@ function CollapsibleGroupHeader({
           href={href}
           className="relative flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5"
         >
-          {iconWithBadge}
-          <span className="truncate">{label}</span>
+          <Icon className="h-4.5 w-4.5 shrink-0" />
+          {labelWithBadge}
         </Link>
       ) : (
         <button
@@ -498,8 +502,8 @@ function CollapsibleGroupHeader({
           onClick={onToggle}
           className="relative flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left"
         >
-          {iconWithBadge}
-          <span className="truncate">{label}</span>
+          <Icon className="h-4.5 w-4.5 shrink-0" />
+          {labelWithBadge}
         </button>
       )}
       <button
@@ -675,11 +679,14 @@ export function AppSidebar() {
                 : "border-transparent text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
             )}
           >
-            <span className="relative shrink-0">
-              <PendingBadge count={badgeCount} className="-left-1.5 -top-1.5 h-3.5 min-w-3.5 text-[9px]" />
-              <item.icon className="h-3.5 w-3.5" />
+            <item.icon className="h-3.5 w-3.5 shrink-0" />
+            <span className="relative min-w-0 max-w-full">
+              <span className="block truncate pr-3">{item.label}</span>
+              <PendingBadge
+                count={badgeCount}
+                className="-right-0.5 -top-1.5 h-3.5 min-w-3.5 text-[9px]"
+              />
             </span>
-            <span className="truncate">{item.label}</span>
           </Link>
         );
       })}

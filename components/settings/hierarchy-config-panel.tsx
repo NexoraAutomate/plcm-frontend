@@ -63,6 +63,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { usePageDataRefresh } from '@/components/page-data-refresh';
 import * as api from '@/lib/api';
+import { formatUserRef } from '@/lib/user-display';
 import type {
   HierarchyConfigNode,
   HierarchyConfigProductType,
@@ -85,7 +86,13 @@ export type HierarchyConfigPanelProps = {
   readOnly?: boolean;
 };
 
-type Draft = HierarchyConfigurationWrite & { id?: number };
+type Draft = HierarchyConfigurationWrite & {
+  id?: number;
+  version?: number;
+  created_at?: string;
+  updated_at?: string;
+  created_by_id?: number | null;
+};
 
 const TEMPLATE_LEVEL_SET = new Set<string>(TEMPLATE_NODE_LEVELS);
 const CONFIG_PAGE_SIZE = 10;
@@ -178,6 +185,10 @@ function toDraft(config: HierarchyConfiguration): Draft {
     description: config.description ?? '',
     notes: null,
     is_available: config.is_available,
+    version: config.version,
+    created_at: config.created_at,
+    updated_at: config.updated_at,
+    created_by_id: config.created_by_id ?? null,
     product_types: config.product_types.map((pt, index) => ({
       code: pt.code,
       name: pt.name,
@@ -339,7 +350,7 @@ export function HierarchyConfigPanel({
   embedded: _embedded = false,
   readOnly = false,
 }: HierarchyConfigPanelProps) {
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const queryClient = useQueryClient();
   const canManage = can(P.hierarchy_config_manage) && !readOnly;
   const canListAll = can(P.hierarchy_config_manage);
@@ -520,6 +531,10 @@ export function HierarchyConfigPanel({
     const named: Draft = {
       ...draft,
       id: undefined,
+      version: undefined,
+      created_at: undefined,
+      updated_at: undefined,
+      created_by_id: undefined,
       name,
       description: input.description.trim() || (draft.description ?? ''),
       code: '',
@@ -568,6 +583,10 @@ export function HierarchyConfigPanel({
     next.code = '';
     next.name = uniqueCopyName(configs, config.name);
     next.is_available = true;
+    next.version = undefined;
+    next.created_at = undefined;
+    next.updated_at = undefined;
+    next.created_by_id = undefined;
     setBaselineFingerprint(draftFingerprint(emptyDraft()));
     setDraft(next);
     setEditorKey((k) => k + 1);
@@ -842,6 +861,17 @@ export function HierarchyConfigPanel({
             configId={draft.id}
             draftName={draft.name}
             draftDescription={draft.description ?? ''}
+            pdfMeta={{
+              name: draft.name,
+              code: draft.code,
+              version: draft.version,
+              description: draft.description,
+              createdAt: draft.created_at,
+              updatedAt: draft.updated_at,
+              createdById: draft.created_by_id,
+              exportedBy: user ? formatUserRef(user) : undefined,
+              isAvailable: draft.is_available,
+            }}
             suggestedDuplicateName={uniqueCopyName(
               configs,
               draft.name || 'Configuration'

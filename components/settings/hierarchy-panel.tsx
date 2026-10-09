@@ -268,7 +268,10 @@ export function HierarchyPanel({
       setValidationResult({ valid: false, message: nameError });
       return;
     }
-    if (selectedLevel !== "system" && !currentParentId) {
+    // Entity List is a flat catalog. System, subsystem, module, unit, and
+    // component names are registered on their own; parent links belong to
+    // configurations and installed hardware, not this catalog.
+    if (!isEntityList && selectedLevel !== "system" && !currentParentId) {
       setValidationResult({ valid: false, message: `Select a parent ${entityLabel(PARENT_LEVEL[selectedLevel] as HierarchyLevel)}.` });
       return;
     }
@@ -278,7 +281,7 @@ export function HierarchyPanel({
         name: newName.trim(),
         hierarchy_type: selectedLevel,
         abbreviation: newAbbr.trim() || undefined,
-        parent_id: currentParentId ?? undefined,
+        parent_id: isEntityList ? null : (currentParentId ?? undefined),
       });
       await loadData();
       invalidateEntityList();

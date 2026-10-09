@@ -2,13 +2,27 @@ import dagre from '@dagrejs/dagre';
 import { Position, type Edge, type Node } from '@xyflow/react';
 import { CHILD_TEMPLATE_LEVEL, type TemplateDraftNode } from '@/lib/hierarchy-config';
 import { isDraftNode } from '@/lib/config-tree-draft';
+import {
+  DEFAULT_CONFIG_TREE_NODE_FIELD_VISIBILITY,
+  type ConfigTreeNodeFieldVisibility,
+} from '@/lib/config-tree-node-fields';
+
+export type { ConfigTreeNodeFieldVisibility } from '@/lib/config-tree-node-fields';
+export {
+  CONFIG_TREE_FIELD_VISIBILITY_KEYS,
+  DEFAULT_CONFIG_TREE_NODE_FIELD_VISIBILITY,
+} from '@/lib/config-tree-node-fields';
 
 export {
   canLinkLevels,
+  childrenOf,
   descendantsOf,
+  filterVisibleHierarchyNodes,
   hasSystemNode,
   isDraftNode,
   isEntityAssigned,
+  isHierarchyFullyExpanded,
+  parentKeysWithChildren,
   siblingsOf,
 } from '@/lib/config-tree-draft';
 
@@ -50,6 +64,11 @@ export type ConfigTreeNodeData = {
   readOnly: boolean;
   canAddChild: boolean;
   canBuildFromChildren: boolean;
+  /** True when this node has at least one direct child in the full draft. */
+  hasChildren: boolean;
+  /** Whether immediate children are currently expanded (ignored when full hierarchy). */
+  childrenExpanded: boolean;
+  fieldVisibility: ConfigTreeNodeFieldVisibility;
   layoutDirection: LayoutDirection;
   intersecting?: boolean;
   toBeDeleted?: boolean;
@@ -119,6 +138,11 @@ export function buildGraphFromDraft(input: {
   sizeById?: Map<string, { width: number; height: number }>;
   positionById?: Map<string, { x: number; y: number }>;
   applyAutoLayout: boolean;
+  /** Parents that have children in the full (unfiltered) draft. */
+  parentsWithChildren?: ReadonlySet<string>;
+  /** Nodes whose immediate children are expanded. */
+  expandedKeys?: ReadonlySet<string>;
+  fieldVisibility?: ConfigTreeNodeFieldVisibility;
 }): { flowNodes: Node<ConfigTreeNodeData>[]; edges: Edge<ConfigTreeEdgeData>[] } {
   const {
     nodes,
@@ -129,6 +153,9 @@ export function buildGraphFromDraft(input: {
     sizeById,
     positionById,
     applyAutoLayout,
+    parentsWithChildren,
+    expandedKeys,
+    fieldVisibility = DEFAULT_CONFIG_TREE_NODE_FIELD_VISIBILITY,
   } = input;
 
   const positions =
@@ -149,15 +176,17 @@ export function buildGraphFromDraft(input: {
           return map;
         })();
 
-  const parentKeysWithChildren = new Set<string>();
+  const parentsFromVisible = new Set<string>();
   for (const node of nodes) {
-    if (node.parent_client_key) parentKeysWithChildren.add(node.parent_client_key);
+    if (node.parent_client_key) parentsFromVisible.add(node.parent_client_key);
   }
+  const parentsWithKids = parentsWithChildren ?? parentsFromVisible;
 
   const handles = layoutHandleIds(direction);
   const flowNodes: Node<ConfigTreeNodeData>[] = nodes.map((node) => {
     const size = sizeById?.get(node.client_key);
     const pos = positions.get(node.client_key) ?? { x: 0, y: 0 };
+    const hasChildren = parentsWithKids.has(node.client_key);
     return {
       id: node.client_key,
       type: 'configTree',
@@ -175,8 +204,10 @@ export function buildGraphFromDraft(input: {
         locked,
         readOnly,
         canAddChild: !!CHILD_TEMPLATE_LEVEL[node.level],
-        canBuildFromChildren:
-          node.level !== 'component' && parentKeysWithChildren.has(node.client_key),
+        canBuildFromChildren: node.level !== 'component' && hasChildren,
+        hasChildren,
+        childrenExpanded: hasChildren && (expandedKeys?.has(node.client_key) ?? false),
+        fieldVisibility,
         layoutDirection: direction,
       },
       sourcePosition: handles.sourcePosition,

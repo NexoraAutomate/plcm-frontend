@@ -51,6 +51,59 @@ export function siblingsOf(
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 }
 
+/** Immediate children only (not grandchildren). */
+export function childrenOf(
+  nodes: TemplateDraftNode[],
+  parentKey: string
+): TemplateDraftNode[] {
+  return siblingsOf(nodes, parentKey);
+}
+
+/** Client keys that have at least one direct child in the full draft. */
+export function parentKeysWithChildren(nodes: TemplateDraftNode[]): Set<string> {
+  const keys = new Set<string>();
+  for (const node of nodes) {
+    if (node.parent_client_key) keys.add(node.parent_client_key);
+  }
+  return keys;
+}
+
+/**
+ * Visible subset for expand/collapse: roots always show; a non-root node shows
+ * only when every ancestor is in `expandedKeys` (immediate-children expand).
+ */
+export function filterVisibleHierarchyNodes(
+  nodes: TemplateDraftNode[],
+  expandedKeys: ReadonlySet<string>
+): TemplateDraftNode[] {
+  if (!nodes.length) return nodes;
+  if (!expandedKeys.size) {
+    return nodes.filter((n) => !n.parent_client_key);
+  }
+
+  const byKey = new Map(nodes.map((n) => [n.client_key, n]));
+  return nodes.filter((node) => {
+    let parentKey = node.parent_client_key;
+    while (parentKey) {
+      if (!expandedKeys.has(parentKey)) return false;
+      parentKey = byKey.get(parentKey)?.parent_client_key ?? null;
+    }
+    return true;
+  });
+}
+
+export function isHierarchyFullyExpanded(
+  nodes: TemplateDraftNode[],
+  expandedKeys: ReadonlySet<string>
+): boolean {
+  const parents = parentKeysWithChildren(nodes);
+  if (!parents.size) return false;
+  for (const key of parents) {
+    if (!expandedKeys.has(key)) return false;
+  }
+  return true;
+}
+
 export function canLinkLevels(
   parentLevel: TemplateNodeLevel,
   childLevel: TemplateNodeLevel
