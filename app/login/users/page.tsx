@@ -16,8 +16,12 @@ import { validateUserCreateForm, validateUserEditForm } from '@/lib/form-validat
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { useClientTableSort } from '@/hooks/use-table-sorting';
 
+function primaryRole(user: { roles?: string[] | null }) {
+  return user.roles?.[0] || '—';
+}
+
 export default function UsersPage() {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, hasAccess } = useAuth();
   const { users, loading, createUser, updateUser, deleteUser } = useDataStore();
   const [search, setSearch] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -41,10 +45,14 @@ export default function UsersPage() {
       u.email.toLowerCase().includes(search.toLowerCase()) ||
       u.username.toLowerCase().includes(search.toLowerCase())
   );
-  const { sort, cycleSort, sortedRows } = useClientTableSort(filtered);
+  const sortableUsers = filtered.map((user) => ({
+    ...user,
+    role: primaryRole(user),
+  }));
+  const { sort, cycleSort, sortedRows } = useClientTableSort(sortableUsers);
 
   // Admin-only access
-  if (currentUser?.role !== 'admin') {
+  if (!currentUser || !hasAccess(['admin', 'ADMIN'])) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <ShieldAlert className="h-12 w-12 text-muted-foreground mb-4" />
@@ -106,14 +114,14 @@ export default function UsersPage() {
     }
   }
 
-  function openEdit(user: typeof users[0]) {
+  function openEdit(user: (typeof users)[0]) {
     setEditingId(user.id);
     setFormData({
       username: user.username,
       password: '',
       full_name: user.full_name,
       email: user.email,
-      role: user.role,
+      role: primaryRole(user) === '—' ? 'user' : primaryRole(user),
     });
     setIsEditOpen(true);
   }
@@ -233,7 +241,7 @@ export default function UsersPage() {
                       <TableCell className="font-medium">{user.full_name}</TableCell>
                       <TableCell className="font-mono text-sm">{user.username}</TableCell>
                       <TableCell>{user.email}</TableCell>
-                      <TableCell className="capitalize">{user.role}</TableCell>
+                      <TableCell className="capitalize">{primaryRole(user)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
                           <Button

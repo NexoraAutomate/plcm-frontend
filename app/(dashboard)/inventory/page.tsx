@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState, useMemo, useEffect, useRef } from 'react';
+import { Fragment, useState, useMemo, useEffect, useRef, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -41,7 +41,8 @@ import { useHierarchiesQuery } from '@/hooks/queries';
 import { fetchAllMatchingInventoryIds, fetchInventoryPage } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
 import { usePaginatedList } from '@/hooks/use-paginated-list';
-import { useTableSorting } from '@/hooks/use-table-sorting';
+import { useClientTableSort, useTableSorting } from '@/hooks/use-table-sorting';
+import { sortRowsByState } from '@/lib/sorting';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { EntityListPagination } from '@/components/entity-list-pagination';
@@ -226,6 +227,76 @@ function instanceSerialNumber(instance: InventoryInstance): string {
   return instance.serial_number?.trim() || instance.original_serial_number?.trim() || '';
 }
 
+type ExpandedInventoryUnitsTableProps = {
+  serialInstances: InventoryInstance[];
+  users: User[];
+  containerClassName?: string;
+  children: (sortedInstances: InventoryInstance[]) => ReactNode;
+};
+
+function ExpandedInventoryUnitsTable({
+  serialInstances,
+  users,
+  containerClassName,
+  children,
+}: ExpandedInventoryUnitsTableProps) {
+  const { sort, cycleSort } = useTableSorting();
+  const sortedInstances = useMemo(
+    () =>
+      sortRowsByState(
+        serialInstances as unknown as Record<string, unknown>[],
+        sort,
+        {
+          serial_number: (row) => instanceSerialNumber(row as unknown as InventoryInstance),
+          holder_user_id: (row) =>
+            displayUserName(
+              users,
+              (row as unknown as InventoryInstance).holder_user_id,
+              (row as unknown as InventoryInstance).holder_name
+            ),
+          location: (row) => (row as unknown as InventoryInstance).location?.trim() || '—',
+          status: (row) => {
+            const instance = row as unknown as InventoryInstance;
+            if (instance.is_reserved) return instance.status_name || 'ISSUED';
+            if (isProjectReservedInstance(instance)) return 'RESERVED';
+            return 'AVAILABLE';
+          },
+        }
+      ) as unknown as InventoryInstance[],
+    [serialInstances, sort, users]
+  );
+
+  return (
+    <Table className="table-fixed" containerClassName={containerClassName}>
+      <colgroup>
+        <col style={{ width: '30%' }} />
+        <col style={{ width: '26%' }} />
+        <col />
+        <col style={{ width: '7rem' }} />
+        <col style={{ width: '11rem' }} />
+      </colgroup>
+      <TableHeader>
+        <TableRow>
+          <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>
+            Unit Identity
+          </SortableTableHead>
+          <SortableTableHead column="holder_user_id" sort={sort} onSort={cycleSort}>
+            Inventory Holder
+          </SortableTableHead>
+          <SortableTableHead column="location" sort={sort} onSort={cycleSort}>
+            Location
+          </SortableTableHead>
+          <SortableTableHead column="status" sort={sort} onSort={cycleSort} className="w-28">
+            Status
+          </SortableTableHead>
+          <TableHead className="w-44 text-right">Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>{children(sortedInstances)}</TableBody>
+    </Table>
+  );
+}
+
 /** Serial numbers for expandable rows, optionally scoped to the active stock quick-filter. */
 function getExpandableSerialInstances(
   item: Inventory,
@@ -353,6 +424,11 @@ export default function InventoryPage() {
   const [editingInstanceId, setEditingInstanceId] = useState<number | null>(null);
   const [editingGroup, setEditingGroup] = useState<Inventory | null>(null);
   const [instances, setInstances] = useState<InventoryInstance[]>([]);
+  const {
+    sort: instanceEditorSort,
+    cycleSort: cycleInstanceEditorSort,
+    sortedRows: sortedEditorInstances,
+  } = useClientTableSort(instances);
   const [deleteTarget, setDeleteTarget] = useState<InventoryItem | null>(null);
   const [addChildrenItem, setAddChildrenItem] = useState<InventoryItem | null>(null);
   const [hierarchySerialSelectItem, setHierarchySerialSelectItem] = useState<InventoryItem | null>(
@@ -1511,8 +1587,20 @@ export default function InventoryPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Unit Identity</TableHead>
-                  <TableHead>Location</TableHead>
+                  <SortableTableHead
+                    column="serial_number"
+                    sort={instanceEditorSort}
+                    onSort={cycleInstanceEditorSort}
+                  >
+                    Unit Identity
+                  </SortableTableHead>
+                  <SortableTableHead
+                    column="location"
+                    sort={instanceEditorSort}
+                    onSort={cycleInstanceEditorSort}
+                  >
+                    Location
+                  </SortableTableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -1524,7 +1612,7 @@ export default function InventoryPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  instances.map((instance) => (
+                  sortedEditorInstances.map((instance) => (
                     <TableRow
                       key={instance.id}
                       className={editingInstanceId === instance.id ? 'bg-muted/50' : undefined}
@@ -2196,32 +2284,17 @@ export default function InventoryPage() {
                                     {serialInstances.length === 1 ? '' : 's'}
                                   </span>
                                 </div>
-                                <Table
-                                  className="table-fixed"
+                                <ExpandedInventoryUnitsTable
+                                  serialInstances={serialInstances}
+                                  users={users}
                                   containerClassName={cn(
                                     'min-w-0 rounded-md border bg-background overflow-x-hidden',
                                     serialInstances.length > MAX_VISIBLE_EXPANDED_UNITS &&
                                       EXPANDED_UNITS_SCROLL_CLASS
                                   )}
                                 >
-                                  <colgroup>
-                                    <col style={{ width: '30%' }} />
-                                    <col style={{ width: '26%' }} />
-                                    <col />
-                                    <col style={{ width: '7rem' }} />
-                                    <col style={{ width: '11rem' }} />
-                                  </colgroup>
-                                  <TableHeader>
-                                    <TableRow>
-                                      <TableHead>Unit Identity</TableHead>
-                                      <TableHead>Inventory Holder</TableHead>
-                                      <TableHead>Location</TableHead>
-                                      <TableHead className="w-28">Status</TableHead>
-                                      <TableHead className="w-44 text-right">Actions</TableHead>
-                                    </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                    {serialInstances.map((instance, index) => {
+                                  {(sortedSerialInstances) =>
+                                    sortedSerialInstances.map((instance, index) => {
                                       const serialLabel =
                                         instanceSerialNumber(instance) || `Unit ${index + 1}`;
                                       const holderLabel = displayUserName(
@@ -2386,9 +2459,9 @@ export default function InventoryPage() {
                                           </TableCell>
                                         </TableRow>
                                       );
-                                    })}
-                                  </TableBody>
-                                </Table>
+                                    })
+                                  }
+                                </ExpandedInventoryUnitsTable>
                               </div>
                             </TableCell>
                           </TableRow>

@@ -23,6 +23,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useClientTableSort } from '@/hooks/use-table-sorting';
 import { useDataStore } from '@/lib/data-store';
 import { filterInventoryForReplacement } from '@/lib/inventory-filter';
 import { buildReplacementStockRows, type ReplacementStockRow } from '@/lib/entity-replacement';
@@ -134,6 +136,8 @@ export function ReplaceFromInventoryDialog({
     );
   }, [search, stockRows]);
 
+  const { sort, cycleSort, sortedRows: sortedFilteredRows } = useClientTableSort(filteredRows);
+
   const handleReplace = async () => {
     if (!target || !selectedRow) {
       toast.error('Select a replacement item from stock.');
@@ -240,14 +244,20 @@ export function ReplaceFromInventoryDialog({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Sr.</TableHead>
-                    <TableHead>Part #</TableHead>
-                    <TableHead>Serial #</TableHead>
-                    <TableHead>OEM</TableHead>
+                    <SortableTableHead column="partNumber" sort={sort} onSort={cycleSort}>
+                      Part #
+                    </SortableTableHead>
+                    <SortableTableHead column="serialNumber" sort={sort} onSort={cycleSort}>
+                      Serial #
+                    </SortableTableHead>
+                    <SortableTableHead column="oemName" sort={sort} onSort={cycleSort}>
+                      OEM
+                    </SortableTableHead>
                     <TableHead className="text-right">Select</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredRows.map((row) => {
+                  {sortedFilteredRows.map((row) => {
                     const isSelected =
                       selectedRow?.srNo === row.srNo &&
                       selectedRow.inventoryId === row.inventoryId &&

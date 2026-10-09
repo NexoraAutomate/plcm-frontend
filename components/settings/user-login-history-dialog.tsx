@@ -174,14 +174,24 @@ export function UserLoginHistoryDialog({ open, onOpenChange, user }: Props) {
                 <SortableTableHead column="session_duration" sort={sort} onSort={cycleSort}>
                   Duration
                 </SortableTableHead>
-                <TableHead>Browser</TableHead>
-                <TableHead>Device</TableHead>
-                <TableHead>OS</TableHead>
-                <TableHead>IP</TableHead>
+                <SortableTableHead column="browser" sort={sort} onSort={cycleSort}>
+                  Browser
+                </SortableTableHead>
+                <SortableTableHead column="device_name" sort={sort} onSort={cycleSort}>
+                  Device
+                </SortableTableHead>
+                <SortableTableHead column="operating_system" sort={sort} onSort={cycleSort}>
+                  OS
+                </SortableTableHead>
+                <SortableTableHead column="ip_address" sort={sort} onSort={cycleSort}>
+                  IP
+                </SortableTableHead>
                 <SortableTableHead column="login_status" sort={sort} onSort={cycleSort}>
                   Status
                 </SortableTableHead>
-                <TableHead>Failure Reason</TableHead>
+                <SortableTableHead column="failure_reason" sort={sort} onSort={cycleSort}>
+                  Failure Reason
+                </SortableTableHead>
                 <SortableTableHead column="last_activity" sort={sort} onSort={cycleSort}>
                   Last Activity
                 </SortableTableHead>

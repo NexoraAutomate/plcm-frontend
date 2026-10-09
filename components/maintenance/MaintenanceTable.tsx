@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Edit, Trash2, ChevronDown, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,7 +22,8 @@ import { FaultyEntityTable } from './FaultyEntityTable';
 import { MaintenanceActionTable } from './MaintenanceActionTable';
 import { MaintenanceDeliveryTable } from './MaintenanceDeliveryTable';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
-import { EMPTY_SORT, type TableSortState } from '@/lib/sorting';
+import { useTableSorting } from '@/hooks/use-table-sorting';
+import { EMPTY_SORT, sortRowsByState, type TableSortState } from '@/lib/sorting';
 
 interface MaintenanceTableProps {
   cases: MaintenanceCase[];
@@ -57,6 +58,18 @@ export function MaintenanceTable({
   sort = EMPTY_SORT,
   onSort,
 }: MaintenanceTableProps) {
+  const internalSorting = useTableSorting();
+  const parentControlsSort = onSort != null;
+  const effectiveSort = parentControlsSort ? sort : internalSorting.sort;
+  const effectiveOnSort = parentControlsSort ? onSort : internalSorting.cycleSort;
+  const displayCases = useMemo(() => {
+    if (parentControlsSort) return cases;
+    return sortRowsByState(
+      cases as unknown as Record<string, unknown>[],
+      internalSorting.sort
+    ) as unknown as MaintenanceCase[];
+  }, [cases, internalSorting.sort, parentControlsSort]);
+
   const { can } = useAuth();
   const canEditCase = can(P.edit_maintenance_cases);
   const canDeleteCase = can(P.delete_maintenance_cases);
@@ -167,28 +180,26 @@ export function MaintenanceTable({
           <TableHeader>
             <TableRow>
               <TableHead className="w-12"></TableHead>
-              {onSort ? (
-                <>
-                  <SortableTableHead column="case_number" sort={sort} onSort={onSort}>Case Number</SortableTableHead>
-                  <SortableTableHead column="project_id" sort={sort} onSort={onSort}>Project</SortableTableHead>
-                  <SortableTableHead column="description" sort={sort} onSort={onSort}>Description</SortableTableHead>
-                  <SortableTableHead column="status" sort={sort} onSort={onSort}>Status</SortableTableHead>
-                  <SortableTableHead column="reported_at" sort={sort} onSort={onSort}>Reported At</SortableTableHead>
-                </>
-              ) : (
-                <>
-                  <TableHead>Case Number</TableHead>
-                  <TableHead>Project</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Reported At</TableHead>
-                </>
-              )}
+              <SortableTableHead column="case_number" sort={effectiveSort} onSort={effectiveOnSort}>
+                Case Number
+              </SortableTableHead>
+              <SortableTableHead column="project_id" sort={effectiveSort} onSort={effectiveOnSort}>
+                Project
+              </SortableTableHead>
+              <SortableTableHead column="description" sort={effectiveSort} onSort={effectiveOnSort}>
+                Description
+              </SortableTableHead>
+              <SortableTableHead column="status" sort={effectiveSort} onSort={effectiveOnSort}>
+                Status
+              </SortableTableHead>
+              <SortableTableHead column="reported_at" sort={effectiveSort} onSort={effectiveOnSort}>
+                Reported At
+              </SortableTableHead>
               <TableHead className="w-32">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {cases.map((caseItem) => {
+            {displayCases.map((caseItem) => {
               const isExpanded = expandedRows.has(caseItem.id);
               const expanded = expandedRows.get(caseItem.id);
 

@@ -1,6 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useTableSorting } from '@/hooks/use-table-sorting';
+import { sortRowsByState } from '@/lib/sorting';
 import { Eye, Edit, Trash2, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -50,6 +53,13 @@ export function EntityTable({
   getMaintenanceLogs,
   isLoading = false,
 }: EntityTableProps) {
+  const { sort, cycleSort } = useTableSorting();
+  const sortedData = useMemo(
+    () =>
+      sortRowsByState(data as unknown as Record<string, unknown>[], sort) as typeof data,
+    [data, sort]
+  );
+
   const [expandedRows, setExpandedRows] = useState<Map<number, ExpandedRow>>(new Map());
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({ open: false, id: null });
 
@@ -120,14 +130,16 @@ export function EntityTable({
           <TableHeader>
             <TableRow>
               {getMaintenanceLogs && <TableHead className="w-12"></TableHead>}
-              {columns.map(col => (
-                <TableHead key={col.key}>{col.label}</TableHead>
+              {columns.map((col) => (
+                <SortableTableHead key={col.key} column={col.key} sort={sort} onSort={cycleSort}>
+                  {col.label}
+                </SortableTableHead>
               ))}
               <TableHead className="w-32">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((row) => {
+            {sortedData.map((row) => {
               const isExpanded = expandedRows.has(row.id);
               const expanded = expandedRows.get(row.id);
               

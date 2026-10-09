@@ -18,7 +18,7 @@ export function TableSortIcon({ column, sort, className }: TableSortIconProps) {
   return (
     <Icon
       className={cn(
-        'ml-1 inline-block h-3.5 w-3.5 shrink-0 opacity-50',
+        'inline-block h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-70',
         isActive && 'opacity-100 text-foreground',
         className
       )}

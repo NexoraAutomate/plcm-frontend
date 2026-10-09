@@ -27,6 +27,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useTableSorting } from '@/hooks/use-table-sorting';
+import { sortRowsByState } from '@/lib/sorting';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -90,6 +93,28 @@ export default function InventoryAddChildrenPage() {
     if (!inventoryItem) return undefined;
     return resolveInventoryInstanceSerial(inventoryItem, parentInstanceId);
   }, [inventoryItem, parentInstanceId, parentSerialOverride]);
+
+  const { sort, cycleSort } = useTableSorting();
+  const sortedChildSlots = useMemo(
+    () =>
+      sortRowsByState(
+        childHierarchies as unknown as Record<string, unknown>[],
+        sort,
+        {
+          child_category: (row) => (row as unknown as ChildInstallSlot).childName,
+          inventory_stock: (row) => {
+            const slot = row as unknown as ChildInstallSlot;
+            const stock = childInventory.find(
+              (item) => String(item.id) === slot.selectedInventoryId
+            );
+            return stock ? inventoryStockLabel(stock) : '';
+          },
+          serial_number: (row) =>
+            (row as unknown as ChildInstallSlot).selectedInstanceSerial ?? '',
+        }
+      ) as unknown as ChildInstallSlot[],
+    [childHierarchies, childInventory, sort]
+  );
 
   useEffect(() => {
     if (!Number.isFinite(inventoryId)) {
@@ -428,14 +453,20 @@ export default function InventoryAddChildrenPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Child Category</TableHead>
-                      <TableHead>Inventory Stock</TableHead>
-                      <TableHead>Serial Number</TableHead>
+                      <SortableTableHead column="child_category" sort={sort} onSort={cycleSort}>
+                        Child Category
+                      </SortableTableHead>
+                      <SortableTableHead column="inventory_stock" sort={sort} onSort={cycleSort}>
+                        Inventory Stock
+                      </SortableTableHead>
+                      <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>
+                        Serial Number
+                      </SortableTableHead>
                       <TableHead className="w-24 text-center">Skip</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {childHierarchies.map((slot, index) => {
+                    {sortedChildSlots.map((slot) => {
                       const options = filterInventoryForChildCategory(
                         childInventory,
                         childType,
@@ -467,8 +498,8 @@ export default function InventoryAddChildrenPage() {
                                 const stock = options.find((item) => String(item.id) === value);
                                 const instances = stock ? getSelectableInstances(stock) : [];
                                 setChildHierarchies((prev) =>
-                                  prev.map((row, rowIndex) =>
-                                    rowIndex === index
+                                  prev.map((row) =>
+                                    row.hierarchyId === slot.hierarchyId
                                       ? {
                                           ...row,
                                           selectedInventoryId: value,
@@ -524,8 +555,8 @@ export default function InventoryAddChildrenPage() {
                                       (entry) => String(entry.id) === value
                                     );
                                     setChildHierarchies((prev) =>
-                                      prev.map((row, rowIndex) =>
-                                        rowIndex === index
+                                      prev.map((row) =>
+                                        row.hierarchyId === slot.hierarchyId
                                           ? {
                                               ...row,
                                               selectedInstanceId: value,
@@ -562,8 +593,8 @@ export default function InventoryAddChildrenPage() {
                               checked={slot.skipped}
                               onCheckedChange={(checked) => {
                                 setChildHierarchies((prev) =>
-                                  prev.map((row, rowIndex) =>
-                                    rowIndex === index
+                                  prev.map((row) =>
+                                    row.hierarchyId === slot.hierarchyId
                                       ? {
                                           ...row,
                                           skipped: checked === true,

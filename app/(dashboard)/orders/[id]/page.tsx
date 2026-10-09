@@ -15,7 +15,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { StatusBadge } from '@/components/status-badge';
 import { EntityNameWithFault } from '@/components/entity-fault-ping';
 import { useEntityFaultMap } from '@/hooks/use-entity-fault-map';
@@ -112,7 +112,9 @@ export default function OrderDetailPage() {
             <div>
               <p className="text-sm text-muted-foreground">Status</p>
               <div className="mt-1">
-                <StatusBadge status={order.status_name || order.status?.status_name} />
+                <StatusBadge
+                  status={order.status_name || order.status?.status_name || 'Unknown'}
+                />
               </div>
             </div>
             <div>
@@ -229,7 +231,7 @@ export default function OrderDetailPage() {
                     >
                       <TableCell className="font-medium">{project.name}</TableCell>
                       <TableCell>
-                        <StatusBadge status={project.status_name} />
+                        <StatusBadge status={project.status_name || 'Unknown'} />
                       </TableCell>
                       <TableCell>{formatDate(project.start_date)}</TableCell>
                       <TableCell>{formatDate(project.end_date)}</TableCell>

@@ -1,6 +1,8 @@
 'use client';
 
 import React from 'react';
+import { SortableTableHead } from '@/components/data-table/sortable-table-head';
+import { useClientTableSort } from '@/hooks/use-table-sorting';
 import { Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,6 +29,8 @@ export function MaintenanceTable({
   onDelete,
   isLoading = false,
 }: MaintenanceTableProps) {
+  const { sort, cycleSort, sortedRows } = useClientTableSort(logs);
+
   if (isLoading) {
     return <div className="text-sm text-muted-foreground py-4">Loading maintenance logs...</div>;
   }
@@ -44,16 +48,26 @@ export function MaintenanceTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Notes</TableHead>
-            <TableHead>Performed By</TableHead>
-            <TableHead>Performed At</TableHead>
-            <TableHead>Next Due</TableHead>
-            <TableHead>Status</TableHead>
+            <SortableTableHead column="notes" sort={sort} onSort={cycleSort}>
+              Notes
+            </SortableTableHead>
+            <SortableTableHead column="performed_by" sort={sort} onSort={cycleSort}>
+              Performed By
+            </SortableTableHead>
+            <SortableTableHead column="performed_at" sort={sort} onSort={cycleSort}>
+              Performed At
+            </SortableTableHead>
+            <SortableTableHead column="next_due" sort={sort} onSort={cycleSort}>
+              Next Due
+            </SortableTableHead>
+            <SortableTableHead column="maintenance_type" sort={sort} onSort={cycleSort}>
+              Type
+            </SortableTableHead>
             <TableHead className="w-20">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {logs.map((log) => (
+          {sortedRows.map((log) => (
             <TableRow key={log.id} className="hover:bg-muted/50">
               <TableCell className="text-sm">{log.notes || '-'}</TableCell>
               <TableCell className="text-sm">
@@ -70,7 +84,7 @@ export function MaintenanceTable({
                   : '-'}
               </TableCell>
               <TableCell>
-                <StatusBadge status={log.status || 'Open'} />
+                <StatusBadge status={log.maintenance_type || 'Open'} />
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-1">

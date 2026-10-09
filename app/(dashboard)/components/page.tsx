@@ -1,7 +1,7 @@
 'use client';
 
 import { useAppDefinitions } from '@/lib/app-definitions-context';
-import { Fragment, useState, useEffect, useMemo } from 'react';
+import { Fragment, useState, useEffect, useMemo, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
@@ -19,7 +19,7 @@ import { StatusBadge } from '@/components/status-badge';
 import Link from 'next/link';
 import * as api from '@/lib/api';
 import { listTemplateNames } from '@/lib/hierarchy-template-names';
-import type { Component, Hierarchy } from '@/lib/models';
+import type { Component, FaultyEntityStatus, Hierarchy, Unit } from '@/lib/models';
 import { getInventoryQuantityByComponentId, getCount } from '@/lib/entity-counts';
 import { EntityCountCell } from '@/components/entity-count-cell';
 import { EntityNameWithFault } from '@/components/entity-fault-ping';
@@ -31,6 +31,7 @@ import { queryKeys } from '@/hooks/queries/query-keys';
 import { usePaginatedList } from '@/hooks/use-paginated-list';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useTableSorting } from '@/hooks/use-table-sorting';
+import { sortRowsByState } from '@/lib/sorting';
 import { EntityListPagination } from '@/components/entity-list-pagination';
 import { PageLoader } from '@/components/page-loader';
 import { ListContentSuspense } from '@/components/list-content-suspense';
@@ -94,6 +95,113 @@ function groupComponentsByPartNumber(components: Component[]): ComponentPartNumb
   }
 
   return Array.from(groups.values());
+}
+
+type ComponentGroupDetailTableProps = {
+  group: Component[];
+  units: Unit[];
+  faultMap: Map<string, FaultyEntityStatus>;
+  unitColumnLabel: string;
+  getStatusName: (component: Component) => string;
+  inventoryQtyByComponent: Map<number, number>;
+  renderComponentActions: (component: Component) => ReactNode;
+  onRowClick: (componentId: number) => void;
+};
+
+function ComponentGroupDetailTable({
+  group,
+  units,
+  faultMap,
+  unitColumnLabel,
+  getStatusName,
+  inventoryQtyByComponent,
+  renderComponentActions,
+  onRowClick,
+}: ComponentGroupDetailTableProps) {
+  const { sort, cycleSort } = useTableSorting();
+  const sortedGroup = useMemo(
+    () =>
+      sortRowsByState(
+        group as unknown as Record<string, unknown>[],
+        sort,
+        {
+          unit_id: (row) => {
+            const component = row as unknown as Component;
+            return units.find((unit) => unit.id === component.unit_id)?.name ?? '';
+          },
+          status_id: (row) => getStatusName(row as unknown as Component),
+          inventory_qty: (row) =>
+            getCount(inventoryQtyByComponent, (row as unknown as Component).id),
+        }
+      ) as unknown as Component[],
+    [group, sort, units, getStatusName, inventoryQtyByComponent]
+  );
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <SortableTableHead column="name" sort={sort} onSort={cycleSort}>
+            Name
+          </SortableTableHead>
+          <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>
+            Serial Number
+          </SortableTableHead>
+          <SortableTableHead column="unit_id" sort={sort} onSort={cycleSort}>
+            {unitColumnLabel}
+          </SortableTableHead>
+          <SortableTableHead column="status_id" sort={sort} onSort={cycleSort}>
+            Status
+          </SortableTableHead>
+          <SortableTableHead column="inventory_qty" sort={sort} onSort={cycleSort}>
+            Inventory Qty
+          </SortableTableHead>
+          <TableHead className="text-right">Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {sortedGroup.map((component) => {
+          const unit = units.find((u) => u.id === component.unit_id);
+          return (
+            <TableRow
+              key={component.id}
+              className="cursor-pointer"
+              onClick={() => onRowClick(component.id)}
+            >
+              <TableCell className="font-medium">
+                <EntityNameWithFault
+                  name={component.name}
+                  entityType="component"
+                  entityId={component.id}
+                  faultMap={faultMap}
+                />
+              </TableCell>
+              <TableCell className="font-mono text-sm">
+                {component.serial_number?.trim() || '—'}
+              </TableCell>
+              <TableCell>
+                {unit ? (
+                  <ParentEntityLink href={`/units/${unit.id}`} label={unit.name} />
+                ) : (
+                  'N/A'
+                )}
+              </TableCell>
+              <TableCell>
+                <StatusBadge status={getStatusName(component)} />
+              </TableCell>
+              <TableCell>
+                <EntityCountCell
+                  count={getCount(inventoryQtyByComponent, component.id)}
+                  label="Inventory quantity"
+                />
+              </TableCell>
+              <TableCell className="text-right">{renderComponentActions(component)}</TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
+  );
 }
 
 export default function ComponentsPage() {
@@ -676,64 +784,18 @@ export default function ComponentsPage() {
                                     Components with part number {firstComponent.part_number?.trim() || '—'}
                                   </p>
                                   <div className="overflow-x-visible rounded-md border bg-background">
-                                    <Table>
-                                      <TableHeader>
-                                        <TableRow>
-                                          <TableHead>Name</TableHead>
-                                          <TableHead>Serial Number</TableHead>
-                                          <TableHead>{entityLabel('unit')}</TableHead>
-                                          <TableHead>Status</TableHead>
-                                          <TableHead>Inventory Qty</TableHead>
-                                          <TableHead className="text-right">Actions</TableHead>
-                                        </TableRow>
-                                      </TableHeader>
-                                      <TableBody>
-                                        {group.map((component) => {
-                                          const unit = units.find((u) => u.id === component.unit_id);
-                                          return (
-                                            <TableRow
-                                              key={component.id}
-                                              className="cursor-pointer"
-                                              onClick={() => router.push(`/components/${component.id}`)}
-                                            >
-                                              <TableCell className="font-medium">
-                                                <EntityNameWithFault
-                                                  name={component.name}
-                                                  entityType="component"
-                                                  entityId={component.id}
-                                                  faultMap={faultMap}
-                                                />
-                                              </TableCell>
-                                              <TableCell className="font-mono text-sm">
-                                                {component.serial_number?.trim() || '—'}
-                                              </TableCell>
-                                              <TableCell>
-                                                {unit ? (
-                                                  <ParentEntityLink
-                                                    href={`/units/${unit.id}`}
-                                                    label={unit.name}
-                                                  />
-                                                ) : (
-                                                  'N/A'
-                                                )}
-                                              </TableCell>
-                                              <TableCell>
-                                                <StatusBadge status={getStatusName(component)} />
-                                              </TableCell>
-                                              <TableCell>
-                                                <EntityCountCell
-                                                  count={getCount(inventoryQtyByComponent, component.id)}
-                                                  label="Inventory quantity"
-                                                />
-                                              </TableCell>
-                                              <TableCell className="text-right">
-                                                {renderComponentActions(component)}
-                                              </TableCell>
-                                            </TableRow>
-                                          );
-                                        })}
-                                      </TableBody>
-                                    </Table>
+                                    <ComponentGroupDetailTable
+                                      group={group}
+                                      units={units}
+                                      faultMap={faultMap}
+                                      unitColumnLabel={entityLabel('unit')}
+                                      getStatusName={getStatusName}
+                                      inventoryQtyByComponent={inventoryQtyByComponent}
+                                      renderComponentActions={renderComponentActions}
+                                      onRowClick={(componentId) =>
+                                        router.push(`/components/${componentId}`)
+                                      }
+                                    />
                                   </div>
                                 </div>
                               </TableCell>
