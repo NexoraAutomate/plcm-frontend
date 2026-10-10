@@ -37,11 +37,11 @@ export function UploadedFileRow({
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 rounded-lg border bg-background px-3 py-2.5',
+        'flex w-full min-w-0 max-w-full items-center justify-between gap-3 overflow-hidden rounded-lg border bg-background px-3 py-2.5',
         className
       )}
     >
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 overflow-hidden">
         {onView ? (
           <button
             type="button"
@@ -183,7 +183,7 @@ export function FileDropZone({
   // Single-file: replace the drop zone with a compact file row once selected.
   if (!multiple && selectedLabel) {
     return (
-      <div className={cn('space-y-2', className)}>
+      <div className={cn('w-full min-w-0 max-w-full space-y-2', className)}>
         <UploadedFileRow
           name={selectedLabel}
           disabled={disabled}
@@ -194,7 +194,7 @@ export function FileDropZone({
   }
 
   return (
-    <div className={cn('space-y-2', className)}>
+    <div className={cn('w-full min-w-0 max-w-full space-y-2', className)}>
       <label
         htmlFor={inputId}
         onDragOver={handleDragOver}

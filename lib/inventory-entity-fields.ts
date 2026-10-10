@@ -309,7 +309,8 @@ export function inventoryFormFromInstance(instance: InventoryInstance, group: In
     shelf_life_expires_at: instance.shelf_life_expires_at
       ? instance.shelf_life_expires_at.slice(0, 10)
       : '',
-    picture_url: instance.picture_url || '',
+    // Catalog photo identifies the inventory look; prefer group over unit.
+    picture_url: group.picture_url || instance.picture_url || '',
     installation_date: instance.installation_date
       ? instance.installation_date.slice(0, 10)
       : group.installation_date

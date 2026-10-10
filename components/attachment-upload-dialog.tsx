@@ -88,13 +88,13 @@ export function AttachmentUploadDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md overflow-hidden">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4 overflow-hidden">
           <div className="space-y-2">
             <Label htmlFor="attachment-type">Attachment Type</Label>
             <Select
@@ -125,7 +125,7 @@ export function AttachmentUploadDialog({
           </div>
 
           {requireFile ? (
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2 overflow-hidden">
               <Label>File</Label>
               <FileDropZone
                 disabled={submitting}
@@ -136,8 +136,10 @@ export function AttachmentUploadDialog({
               />
             </div>
           ) : attachment ? (
-            <div className="rounded-md border px-3 py-2 text-sm text-muted-foreground">
-              File: {attachment.file_name}
+            <div className="min-w-0 overflow-hidden rounded-md border px-3 py-2 text-sm text-muted-foreground">
+              <span className="block truncate" title={attachment.file_name}>
+                File: {attachment.file_name}
+              </span>
             </div>
           ) : null}
         </div>

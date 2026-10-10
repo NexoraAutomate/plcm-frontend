@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -99,12 +99,13 @@ import {
 import { InventoryKpiDashboard } from '@/components/inventory/inventory-kpi-dashboard';
 import { CascadingLocationSelects } from '@/components/inventory/cascading-location-selects';
 import { useInventoryStatsSummary } from '@/hooks/use-inventory-stats-summary';
+import { FileDropZone } from '@/components/ui/file-drop-zone';
 import {
-  FileDropZone,
-  UPLOAD_ACCENT,
-  pillTabsListClassName,
-  pillTabsTriggerClassName,
-} from '@/components/ui/file-drop-zone';
+  AnimatedPillTabsList,
+  animatedPillTabsTriggerClassName,
+} from '@/components/ui/animated-pill-tabs';
+import { InventoryPictureThumb } from '@/components/inventory/inventory-picture-thumb';
+import { EntityPicture } from '@/components/entity-picture';
 
 const ACTION_BTN =
   'h-7 w-7 bg-transparent shadow-none border-0 hover:bg-transparent';
@@ -858,19 +859,24 @@ export default function InventoryPage() {
     return itemInstances[itemInstances.length - 1]?.id;
   };
 
-  async function syncMedia(ownerType: 'inventory' | 'inventory_instance', ownerId: number) {
+  async function syncCatalogPicture(inventoryId: number) {
     if (removePicture) {
-      await api.pictures.remove(ownerType, ownerId);
+      await api.pictures.remove('inventory', inventoryId);
     } else if (pendingPictureFile) {
-      await api.pictures.upload(ownerType, ownerId, pendingPictureFile);
+      await api.pictures.upload('inventory', inventoryId, pendingPictureFile);
     }
-    if (pendingAttachments.length > 0) {
-      for (const attachment of pendingAttachments) {
-        await api.attachments.upload(ownerType, ownerId, attachment.file, {
-          attachment_type: attachment.attachment_type,
-          description: attachment.description,
-        });
-      }
+  }
+
+  async function syncAttachments(
+    ownerType: 'inventory' | 'inventory_instance',
+    ownerId: number
+  ) {
+    if (pendingAttachments.length === 0) return;
+    for (const attachment of pendingAttachments) {
+      await api.attachments.upload(ownerType, ownerId, attachment.file, {
+        attachment_type: attachment.attachment_type,
+        description: attachment.description,
+      });
     }
   }
 
@@ -906,12 +912,13 @@ export default function InventoryPage() {
       const payload = buildInventoryPayload();
       const created = await api.inventory.create(payload);
       if (created.data?.id) {
-        const mediaOwnerType = usesInstances ? 'inventory_instance' : 'inventory';
-        const mediaOwnerId = usesInstances
+        await syncCatalogPicture(created.data.id);
+        const attachOwnerType = usesInstances ? 'inventory_instance' : 'inventory';
+        const attachOwnerId = usesInstances
           ? getLatestInstanceId(created.data)
           : created.data.id;
-        if (mediaOwnerId) {
-          await syncMedia(mediaOwnerType, mediaOwnerId);
+        if (attachOwnerId) {
+          await syncAttachments(attachOwnerType, attachOwnerId);
         }
       }
       toastFulfillments(created.data?.fcfs_fulfillments);
@@ -961,6 +968,8 @@ export default function InventoryPage() {
       const updated = await api.inventory.update(editingId, buildGroupPayload());
       toastFulfillments(updated.data?.fcfs_fulfillments);
 
+      await syncCatalogPicture(editingId);
+
       if (usesInstances && editingInstanceId) {
         const instancePayload = buildInstancePayload();
         const {
@@ -970,10 +979,9 @@ export default function InventoryPage() {
           ...editableInstanceFields
         } = instancePayload;
         await api.inventory.updateInstance(editingInstanceId, editableInstanceFields);
-        const mediaOwnerId = editingInstanceId;
-        await syncMedia('inventory_instance', mediaOwnerId);
+        await syncAttachments('inventory_instance', editingInstanceId);
       } else if (!usesInstances) {
-        await syncMedia('inventory', editingId);
+        await syncAttachments('inventory', editingId);
       }
 
       toast.success('Inventory item updated');
@@ -1166,17 +1174,14 @@ export default function InventoryPage() {
 
   const formTabSingleClassName = 'mt-0 space-y-5 p-1 [&>div]:space-y-2';
 
-  const tabTriggerClassName = cn(
-    pillTabsTriggerClassName,
-    'data-[state=active]:bg-[var(--upload-accent)]'
-  );
-
-  const pillTabsStyle = {
-    borderColor: UPLOAD_ACCENT,
-    ['--upload-accent' as string]: UPLOAD_ACCENT,
-  };
+  const tabTriggerClassName = animatedPillTabsTriggerClassName;
 
   const getEntityDisplayName = (entityType: EntityType) => entityLabel(entityType);
+
+  const headerPicturePending =
+    !removePicture && pendingPictureFile ? pendingPictureFile : null;
+  const headerPictureUrl =
+    !removePicture && !pendingPictureFile ? formData.picture_url || null : null;
 
   const editingInstance = instances.find((instance) => instance.id === editingInstanceId) ?? null;
   const editStatusLabel = resolveInventoryInstanceStatus(editingInstance);
@@ -1228,8 +1233,8 @@ export default function InventoryPage() {
     >
       <div className="sticky top-0 z-20 shrink-0 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/80">
         {options?.stickyHeader}
-        <div className="px-6 py-3" style={pillTabsStyle}>
-          <TabsList className={pillTabsListClassName} style={{ borderColor: UPLOAD_ACCENT }}>
+        <div className="px-6 py-3">
+          <AnimatedPillTabsList value={formTab}>
             <TabsTrigger value="general" className={tabTriggerClassName}>
               General
             </TabsTrigger>
@@ -1244,7 +1249,7 @@ export default function InventoryPage() {
                 Units
               </TabsTrigger>
             ) : null}
-          </TabsList>
+          </AnimatedPillTabsList>
         </div>
       </div>
 
@@ -1358,7 +1363,7 @@ export default function InventoryPage() {
             </p>
           </div>
 
-          {selectedEntityType === 'component' ? (
+          {mode === 'edit' && selectedEntityType === 'component' ? (
             <div>
               <Label>SKU</Label>
               <Input
@@ -1367,9 +1372,7 @@ export default function InventoryPage() {
                 placeholder="Component SKU"
               />
             </div>
-          ) : (
-            <div />
-          )}
+          ) : null}
 
           {mode === 'edit' && editingSerialOnly ? (
             <div className="sm:col-span-2 rounded-lg border bg-muted/20 p-4">
@@ -1861,11 +1864,22 @@ export default function InventoryPage() {
               {renderInventoryFormTabs('create', {
                 stickyHeader: (
                   <DialogHeader className="space-y-1 px-6 pt-5 pb-1 text-left">
-                    <DialogTitle>Add Inventory Item</DialogTitle>
-                    <DialogDescription>
-                      Choose the type and category, then set quantity and location for the new
-                      stock.
-                    </DialogDescription>
+                    <div className="flex items-start gap-3">
+                      <InventoryPictureThumb
+                        pendingFile={headerPicturePending}
+                        pictureUrl={null}
+                        alt={formData.name || 'New inventory item'}
+                        size="md"
+                        showPlaceholder
+                      />
+                      <div className="min-w-0 space-y-1">
+                        <DialogTitle>Add Inventory Item</DialogTitle>
+                        <DialogDescription>
+                          Choose the type and category, then set quantity and location for the new
+                          stock.
+                        </DialogDescription>
+                      </div>
+                    </div>
                   </DialogHeader>
                 ),
               })}
@@ -2039,8 +2053,24 @@ export default function InventoryPage() {
                             ) : null}
                           </TableCell>
                           {isVisible('name') && (
-                            <TableCell className="max-w-0 truncate font-medium" title={item.entityName || 'N/A'}>
-                              {item.entityName || 'N/A'}
+                            <TableCell
+                              className="max-w-0"
+                              title={item.entityName || 'N/A'}
+                            >
+                              <div className="flex min-w-0 items-center gap-2">
+                                {item.picture_url ? (
+                                  <EntityPicture
+                                    src={item.picture_url}
+                                    ownerType="inventory"
+                                    ownerId={item.id}
+                                    alt={item.entityName || item.name || 'Inventory'}
+                                    className="h-7 w-7 shrink-0 rounded-md border object-cover"
+                                  />
+                                ) : null}
+                                <span className="truncate font-medium">
+                                  {item.entityName || 'N/A'}
+                                </span>
+                              </div>
                             </TableCell>
                           )}
                           {isVisible('inventory_type') && (
@@ -2456,53 +2486,66 @@ export default function InventoryPage() {
           {renderInventoryFormTabs('edit', {
             stickyHeader: (
               <DialogHeader className="space-y-2 bg-sky-50/40 px-6 pt-5 pb-1 text-left dark:bg-sky-950/20">
-                <DialogTitle>Edit Inventory Item</DialogTitle>
-                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-                  <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    {getEntityDisplayName(selectedEntityType)}
-                  </span>
-                  <span className="text-base font-semibold tracking-tight text-foreground">
-                    {formData.name || '—'}
-                  </span>
-                  {editingSerialOnly && editStatusLabel !== '—' ? (
-                    <span
-                      className="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium"
-                      style={editStatusSoftStyle}
-                    >
-                      {editStatusAvailable ? (
-                        <LockOpen className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
-                      ) : (
-                        <Lock className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
-                      )}
-                      {editStatusLabel}
-                    </span>
-                  ) : null}
-                  {editingSerialOnly ? (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            className="inline-flex text-muted-foreground/70 hover:text-muted-foreground"
-                            aria-label="Status is managed by workflow"
-                          >
-                            <Info className="h-3.5 w-3.5" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="max-w-xs">
-                          {editStatusAvailable
-                            ? 'Available for use (unlocked). Status changes automatically when reserved, issued, or installed.'
-                            : 'Not available (locked) because this unit is reserved, issued, or installed. Status is set by workflow.'}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  ) : null}
+                <div className="flex items-start gap-3">
+                  <InventoryPictureThumb
+                    pendingFile={headerPicturePending}
+                    pictureUrl={headerPictureUrl}
+                    ownerType="inventory"
+                    ownerId={editingId}
+                    alt={formData.name || 'Inventory item'}
+                    size="md"
+                    showPlaceholder
+                  />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <DialogTitle>Edit Inventory Item</DialogTitle>
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {getEntityDisplayName(selectedEntityType)}
+                      </span>
+                      <span className="text-base font-semibold tracking-tight text-foreground">
+                        {formData.name || '—'}
+                      </span>
+                      {editingSerialOnly && editStatusLabel !== '—' ? (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium"
+                          style={editStatusSoftStyle}
+                        >
+                          {editStatusAvailable ? (
+                            <LockOpen className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
+                          ) : (
+                            <Lock className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
+                          )}
+                          {editStatusLabel}
+                        </span>
+                      ) : null}
+                      {editingSerialOnly ? (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                className="inline-flex text-muted-foreground/70 hover:text-muted-foreground"
+                                aria-label="Status is managed by workflow"
+                              >
+                                <Info className="h-3.5 w-3.5" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs">
+                              {editStatusAvailable
+                                ? 'Available for use (unlocked). Status changes automatically when reserved, issued, or installed.'
+                                : 'Not available (locked) because this unit is reserved, issued, or installed. Status is set by workflow.'}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : null}
+                    </div>
+                    {editingSerialOnly && editingSerialLabel ? (
+                      <p className="font-mono text-xs text-muted-foreground">
+                        Serial {editingSerialLabel}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
-                {editingSerialOnly && editingSerialLabel ? (
-                  <p className="font-mono text-xs text-muted-foreground">
-                    Serial {editingSerialLabel}
-                  </p>
-                ) : null}
                 <DialogDescription className="sr-only">
                   Edit {getEntityDisplayName(selectedEntityType)}
                   {formData.name ? ` ${formData.name}` : ''}
