@@ -309,12 +309,17 @@ export function validateIssueInventoryForm(input: {
 export function validateShortageReceiveForm(input: {
   quantity: unknown;
   partNumber: string;
+  requireLocation?: boolean;
+  location?: string;
 }): string | null {
   const quantity = Number(input.quantity);
   if (!Number.isInteger(quantity) || quantity < 1) {
     return 'Enter a quantity of at least 1';
   }
   if (isBlank(input.partNumber)) return requiredMessage('Part number');
+  if (input.requireLocation && isBlank(input.location)) {
+    return requiredMessage('Room / Cabinet / Rack');
+  }
   return null;
 }
 

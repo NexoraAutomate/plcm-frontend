@@ -2,25 +2,56 @@
 
 import { WORKFLOW_POLL_MS } from '@/lib/data-loading';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { validateShortageReceiveForm } from '@/lib/form-validation';
-import { AlertTriangle, Ban, PackagePlus } from 'lucide-react';
+import { AlertTriangle, Ban, PackagePlus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { CascadingLocationSelects } from '@/components/inventory/cascading-location-selects';
 import { Can } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
 import { useAuth } from '@/lib/auth-context';
+import { useAppDefinitions } from '@/lib/app-definitions-context';
+import { composeInventoryLocation } from '@/lib/inventory-entity-fields';
 import { canUseProjectDetail } from '@/lib/notification-href';
 import { cn } from '@/lib/utils';
 import * as api from '@/lib/api';
 import type { InventoryShortage } from '@/lib/models';
 import { parseApiDate } from '@/lib/parse-api-date';
 import { usePageDataRefresh } from '@/components/page-data-refresh';
+
+function shortageMatchesSearch(row: InventoryShortage, query: string) {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const haystack = [
+    row.lru_name,
+    row.target_entity_type,
+    row.target_entity_id != null ? String(row.target_entity_id) : '',
+    row.part_number,
+    row.suggested_part_number,
+    row.suggested_serial_number,
+    row.status,
+    row.project_name,
+    row.project_id != null ? String(row.project_id) : '',
+    row.flight_name,
+    row.flight_code,
+    row.flight_id != null ? String(row.flight_id) : '',
+    row.sdls_name,
+    row.sdls_code,
+    row.sdls_id != null ? String(row.sdls_id) : '',
+    row.requested_by_name,
+    row.notes,
+    row.qty_short != null ? String(row.qty_short) : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return haystack.includes(q);
+}
 
 type Props = {
   projectId?: number;
@@ -58,14 +89,22 @@ export function ShortageListPanel({
   onRowsChange,
 }: Props) {
   const { can, user } = useAuth();
+  const { definitions } = useAppDefinitions();
   const showProjectLink = canUseProjectDetail(user?.roles) && can(P.view_projects);
   const [rows, setRows] = useState<InventoryShortage[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [busyId, setBusyId] = useState<number | null>(null);
   const [receiveTarget, setReceiveTarget] = useState<InventoryShortage | null>(null);
-  const [receiveQuantity, setReceiveQuantity] = useState('1');
   const [receivePartNumber, setReceivePartNumber] = useState('');
   const [receiveSerialNumber, setReceiveSerialNumber] = useState('');
-  const [receiveLocation, setReceiveLocation] = useState('');
+  const [receiveLocationRoom, setReceiveLocationRoom] = useState('');
+  const [receiveLocationCabinet, setReceiveLocationCabinet] = useState('');
+  const [receiveLocationRack, setReceiveLocationRack] = useState('');
+
+  const filteredRows = useMemo(
+    () => rows.filter((row) => shortageMatchesSearch(row, searchQuery)),
+    [rows, searchQuery]
+  );
 
   const refresh = useCallback(async () => {
     if (inventoryScope) {
@@ -126,33 +165,44 @@ export function ShortageListPanel({
 
   function openReceive(row: InventoryShortage) {
     setReceiveTarget(row);
-    setReceiveQuantity('1');
     setReceivePartNumber(row.suggested_part_number || row.part_number || '');
     setReceiveSerialNumber(row.suggested_serial_number || '');
-    setReceiveLocation('');
+    setReceiveLocationRoom('');
+    setReceiveLocationCabinet('');
+    setReceiveLocationRack('');
   }
 
   async function handleReceive() {
     if (!receiveTarget) return;
+    const needsLocation = receiveTarget.target_entity_type !== 'component';
+    const location = composeInventoryLocation(
+      receiveLocationRoom,
+      receiveLocationCabinet,
+      receiveLocationRack
+    );
     const validationError = validateShortageReceiveForm({
-      quantity: receiveQuantity,
+      quantity: 1,
       partNumber: receivePartNumber,
+      requireLocation: needsLocation,
+      location,
     });
     if (validationError) {
       toast.error(validationError);
       return;
     }
-    const quantity = Number(receiveQuantity);
 
     setBusyId(receiveTarget.id);
     try {
       const res = await api.inventory.receiveShortage(receiveTarget.id, {
-        quantity,
+        quantity: 1,
         part_number: receivePartNumber.trim() || undefined,
         serial_numbers: receiveSerialNumber.trim()
           ? [receiveSerialNumber.trim()]
           : undefined,
-        location: receiveLocation.trim() || undefined,
+        location: location || undefined,
+        location_room: receiveLocationRoom.trim() || undefined,
+        location_cabinet: receiveLocationCabinet.trim() || undefined,
+        location_rack: receiveLocationRack.trim() || undefined,
       });
       const fulfilled = res.data.fcfs_fulfillments?.length ?? 0;
       toast.success(
@@ -177,76 +227,97 @@ export function ShortageListPanel({
 
   return (
     <>
-      <ul className="space-y-2 text-sm">
-        {rows.map((row) => (
-          <li
-            key={row.id}
-            id={`shortage-${row.id}`}
-            className={cn(
-              'flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 px-3 py-2',
-              highlightId === row.id && 'border-primary ring-2 ring-primary/30'
-            )}
-          >
-            <div>
-              <div className="flex flex-wrap items-center gap-2 font-medium">
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-                {row.lru_name || row.target_entity_type}
-                <Badge variant={statusVariant(row.status)}>{row.status}</Badge>
+      <div className="mb-3 relative">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          id="shortage-list-search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search by item, type, PN, serial, project, flight, SDLS…"
+          className="pl-9"
+          aria-label="Search shortages"
+        />
+      </div>
+      {searchQuery.trim() && filteredRows.length !== rows.length ? (
+        <p className="mb-2 text-xs text-muted-foreground">
+          Showing {filteredRows.length} of {rows.length} shortage
+          {rows.length === 1 ? '' : 's'}
+        </p>
+      ) : null}
+      {filteredRows.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No shortages match your search.</p>
+      ) : (
+        <ul className="space-y-2 text-sm">
+          {filteredRows.map((row) => (
+            <li
+              key={row.id}
+              id={`shortage-${row.id}`}
+              className={cn(
+                'flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 px-3 py-2',
+                highlightId === row.id && 'border-primary ring-2 ring-primary/30'
+              )}
+            >
+              <div>
+                <div className="flex flex-wrap items-center gap-2 font-medium">
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                  {row.lru_name || row.target_entity_type}
+                  <Badge variant={statusVariant(row.status)}>{row.status}</Badge>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  PN {row.part_number || '—'} · Qty {row.qty_short}
+                  {row.qty_original !== row.qty_short ? ` of ${row.qty_original}` : ''}
+                  {' · '}
+                  {row.flight_name || row.flight_code || `Flight #${row.flight_id}`}
+                  {' / '}
+                  {row.sdls_name || row.sdls_code || `SDLS #${row.sdls_id}`}
+                  {inventoryScope && row.project_name ? (
+                    <>
+                      {' · '}
+                      {showProjectLink && row.project_id != null ? (
+                        <Link className="underline" href={`/projects/${row.project_id}?tab=reservations`}>
+                          {row.project_name}
+                        </Link>
+                      ) : (
+                        row.project_name
+                      )}
+                    </>
+                  ) : null}
+                  {' · '}
+                  requested {parseApiDate(row.requested_at).toLocaleString()}
+                  {row.requested_by_name ? ` by ${row.requested_by_name}` : ''}
+                </div>
               </div>
-              <div className="text-xs text-muted-foreground">
-                PN {row.part_number || '—'} · Qty {row.qty_short}
-                {row.qty_original !== row.qty_short ? ` of ${row.qty_original}` : ''}
-                {' · '}
-                {row.flight_name || row.flight_code || `Flight #${row.flight_id}`}
-                {' / '}
-                {row.sdls_name || row.sdls_code || `SDLS #${row.sdls_id}`}
-                {inventoryScope && row.project_name ? (
-                  <>
-                    {' · '}
-                    {showProjectLink && row.project_id != null ? (
-                      <Link className="underline" href={`/projects/${row.project_id}?tab=reservations`}>
-                        {row.project_name}
-                      </Link>
-                    ) : (
-                      row.project_name
-                    )}
-                  </>
+              <div className="flex flex-wrap gap-2">
+                {inventoryScope && (row.status === 'OPEN' || row.status === 'PARTIAL') ? (
+                  <Can permission={P.inventory_receive}>
+                    <Button
+                      size="sm"
+                      disabled={busyId === row.id}
+                      onClick={() => openReceive(row)}
+                    >
+                      <PackagePlus className="mr-1 h-3.5 w-3.5" />
+                      Add stock
+                    </Button>
+                  </Can>
                 ) : null}
-                {' · '}
-                requested {parseApiDate(row.requested_at).toLocaleString()}
-                {row.requested_by_name ? ` by ${row.requested_by_name}` : ''}
+                {row.status === 'OPEN' || row.status === 'PARTIAL' ? (
+                  <Can permission={P.inventory_reserve}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busyId === row.id}
+                      onClick={() => void handleCancel(row)}
+                    >
+                      <Ban className="mr-1 h-3.5 w-3.5" />
+                      Cancel
+                    </Button>
+                  </Can>
+                ) : null}
               </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {inventoryScope && (row.status === 'OPEN' || row.status === 'PARTIAL') ? (
-                <Can permission={P.inventory_receive}>
-                  <Button
-                    size="sm"
-                    disabled={busyId === row.id}
-                    onClick={() => openReceive(row)}
-                  >
-                    <PackagePlus className="mr-1 h-3.5 w-3.5" />
-                    Add stock
-                  </Button>
-                </Can>
-              ) : null}
-              {row.status === 'OPEN' || row.status === 'PARTIAL' ? (
-                <Can permission={P.inventory_reserve}>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busyId === row.id}
-                    onClick={() => void handleCancel(row)}
-                  >
-                    <Ban className="mr-1 h-3.5 w-3.5" />
-                    Cancel
-                  </Button>
-                </Can>
-              ) : null}
-            </div>
-          </li>
-        ))}
-      </ul>
+            </li>
+          ))}
+        </ul>
+      )}
       <Dialog
         open={receiveTarget != null}
         onOpenChange={(open) => {
@@ -262,49 +333,42 @@ export function ShortageListPanel({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <Label htmlFor="shortage-receive-part-number">Part number (generated)</Label>
-              <Input
-                id="shortage-receive-part-number"
-                value={receivePartNumber}
-                placeholder="Generated from entity"
-                disabled={busyId != null}
-                readOnly
-              />
-            </div>
-            <div>
-              <Label htmlFor="shortage-receive-quantity">Quantity (new unit)</Label>
-              <Input
-                id="shortage-receive-quantity"
-                type="number"
-                value="1"
-                disabled={busyId != null}
-                readOnly
-              />
+            <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm space-y-1">
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Part number</span>
+                <span className="font-mono text-right">
+                  {receivePartNumber || '—'}
+                </span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Quantity</span>
+                <span>1</span>
+              </div>
+              {receiveTarget?.target_entity_type !== 'component' ? (
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Serial number</span>
+                  <span className="font-mono text-right">
+                    {receiveSerialNumber || 'Generated on receive'}
+                  </span>
+                </div>
+              ) : null}
             </div>
             {receiveTarget?.target_entity_type !== 'component' ? (
-              <>
-                <div>
-                  <Label htmlFor="shortage-receive-serial">Unit identity (optional)</Label>
-                  <Input
-                    id="shortage-receive-serial"
-                    value={receiveSerialNumber}
-                    placeholder="Generated from entity sequence"
-                    disabled={busyId != null}
-                    readOnly
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="shortage-receive-location">Location</Label>
-                  <Input
-                    id="shortage-receive-location"
-                    value={receiveLocation}
-                    onChange={(event) => setReceiveLocation(event.target.value)}
-                    placeholder="Warehouse location"
-                    disabled={busyId != null}
-                  />
-                </div>
-              </>
+              <CascadingLocationSelects
+                tree={definitions.inventory_location_tree}
+                required
+                disabled={busyId != null}
+                value={{
+                  location_room: receiveLocationRoom,
+                  location_cabinet: receiveLocationCabinet,
+                  location_rack: receiveLocationRack,
+                }}
+                onChange={(next) => {
+                  setReceiveLocationRoom(next.location_room);
+                  setReceiveLocationCabinet(next.location_cabinet);
+                  setReceiveLocationRack(next.location_rack);
+                }}
+              />
             ) : null}
             <div className="flex justify-end gap-2">
               <Button
