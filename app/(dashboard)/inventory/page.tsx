@@ -2410,6 +2410,30 @@ export default function InventoryPage() {
                                 Unit Identity therefore starts under the Type column.
                               */}
                               <div className="min-w-0 overflow-x-hidden py-3 pr-3">
+                                <div
+                                  className={cn(
+                                    'mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5',
+                                    inventoryManager && isVisible('name')
+                                      ? 'pl-[calc(5rem+min(11rem,22%))]'
+                                      : !inventoryManager && isVisible('name')
+                                        ? 'pl-[calc(2.5rem+min(11rem,22%))]'
+                                        : inventoryManager
+                                          ? 'pl-20'
+                                          : 'pl-10'
+                                  )}
+                                >
+                                  <h4 className="text-sm font-semibold">
+                                    Part Number{' '}
+                                    <span className="font-mono">
+                                      {item.partNumber || '—'}
+                                    </span>
+                                  </h4>
+                                  <span className="text-xs text-muted-foreground">
+                                    {serialInstances.length} unit
+                                    {serialInstances.length === 1 ? '' : 's'}
+                                  </span>
+                                </div>
+                                {/* Photo column stretches to the same height as the serials table border. */}
                                 <div className="flex min-w-0 items-stretch gap-0">
                                   <div
                                     className={cn(
@@ -2419,7 +2443,7 @@ export default function InventoryPage() {
                                     aria-hidden
                                   />
                                   {isVisible('name') ? (
-                                    <div className="flex w-[min(11rem,22%)] shrink-0 flex-col items-center justify-center px-2">
+                                    <div className="flex w-[min(11rem,22%)] shrink-0 items-center justify-center self-stretch rounded-none border border-r-0 bg-background px-2">
                                       {item.picture_url ? (
                                         <EntityPicture
                                           src={item.picture_url}
@@ -2428,11 +2452,11 @@ export default function InventoryPage() {
                                           alt={
                                             item.entityName || item.name || 'Inventory'
                                           }
-                                          className="h-24 w-24 rounded-none border object-cover"
+                                          className="h-24 w-24 rounded-none object-cover"
                                         />
                                       ) : (
                                         <div
-                                          className="flex h-24 w-24 items-center justify-center rounded-none border bg-muted/40 text-muted-foreground"
+                                          className="flex h-24 w-24 items-center justify-center rounded-none bg-muted/40 text-muted-foreground"
                                           aria-hidden
                                         >
                                           <ImageIcon className="h-8 w-8" />
@@ -2440,24 +2464,12 @@ export default function InventoryPage() {
                                       )}
                                     </div>
                                   ) : null}
-                                  <div className="min-w-0 flex-1 space-y-2">
-                                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                                      <h4 className="text-sm font-semibold">
-                                        Part Number{' '}
-                                        <span className="font-mono">
-                                          {item.partNumber || '—'}
-                                        </span>
-                                      </h4>
-                                      <span className="text-xs text-muted-foreground">
-                                        {serialInstances.length} unit
-                                        {serialInstances.length === 1 ? '' : 's'}
-                                      </span>
-                                    </div>
+                                  <div className="min-w-0 flex-1">
                                     <ExpandedInventoryUnitsTable
                                       serialInstances={serialInstances}
                                       users={users}
                                       containerClassName={cn(
-                                        'min-w-0 rounded-md border bg-background overflow-x-hidden',
+                                        'min-w-0 rounded-none border bg-background overflow-x-hidden',
                                         serialInstances.length >
                                           MAX_VISIBLE_EXPANDED_UNITS &&
                                           EXPANDED_UNITS_SCROLL_CLASS
