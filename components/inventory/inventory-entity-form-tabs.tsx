@@ -1,7 +1,6 @@
 'use client';
 
-import { Trash2, Upload } from 'lucide-react';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,6 +16,7 @@ import type { InventoryEntityFormType } from '@/hooks/use-inventory-entity-form'
 import type { emptyInventoryEntityForm } from '@/lib/inventory-entity-fields';
 import { workflowStatusLabel } from '@/lib/workflow-status';
 import { CascadingLocationSelects } from '@/components/inventory/cascading-location-selects';
+import { FileDropZone } from '@/components/ui/file-drop-zone';
 import { useAppDefinitions } from '@/lib/app-definitions-context';
 
 export type InventoryEntityFormData = typeof emptyInventoryEntityForm;
@@ -95,7 +95,6 @@ export function InventoryEntityFormTabs({
   const isHierarchy = context === 'hierarchy';
   /** Existing-project edit: no General tab; Description lives on Part Number. */
   const hideGeneralTab = isHierarchy;
-  const pictureInputRef = useRef<HTMLInputElement>(null);
   const pendingFile = pendingPictureFiles[0] ?? pendingPictureFile ?? null;
   const selectedPictures = pendingFile ? [pendingFile] : [];
   const pendingPreviewSrc = useMemo(() => {
@@ -530,135 +529,50 @@ export function InventoryEntityFormTabs({
               : formTabClassName
           }
         >
-          {hideGeneralTab ? (
-            <>
-              <input
-                ref={pictureInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const files = Array.from(e.target.files ?? []);
-                  onPendingPictureFilesChange?.(files);
-                  onPendingPictureFileChange(files[0] ?? null);
-                  onRemovePictureChange(false);
-                  e.target.value = '';
-                }}
-              />
-              {showHierarchyPicture ? (
-                <div className="flex w-full max-w-md flex-col items-center gap-3">
-                  {pendingPreviewSrc ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={pendingPreviewSrc}
-                      alt="Selected primary photo"
-                      className="max-h-48 rounded-md border object-cover"
-                    />
-                  ) : (
-                    <EntityPicture
-                      src={formData.picture_url}
-                      ownerType={selectedEntityType}
-                      ownerId={entityId}
-                      alt={`${formData.name || 'Entity'} photo`}
-                      className="max-h-48 rounded-md border object-cover"
-                    />
-                  )}
-                  {selectedPictures[0] ? (
-                    <p className="max-w-full truncate text-sm text-muted-foreground">
-                      {selectedPictures[0].name}
-                    </p>
-                  ) : null}
-                  <div className="flex flex-wrap items-center justify-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="gap-2"
-                      onClick={() => pictureInputRef.current?.click()}
-                    >
-                      <Upload className="h-4 w-4" />
-                      {hasExistingPicture || selectedPictures.length > 0
-                        ? 'Replace Picture'
-                        : 'Upload Picture'}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive"
-                      onClick={() => {
-                        onPendingPictureFilesChange?.([]);
-                        onPendingPictureFileChange(null);
-                        onFormDataChange({ ...formData, picture_url: '' });
-                        onRemovePictureChange(true);
-                      }}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Remove
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="gap-2"
-                    onClick={() => pictureInputRef.current?.click()}
-                  >
-                    <Upload className="h-4 w-4" />
-                    Upload Picture
-                  </Button>
-                  <p className="text-sm text-muted-foreground">
-                    Select the primary photo of this entity
-                  </p>
-                </>
-              )}
-            </>
-          ) : (
-            <>
-              <div>
-                <Label>Picture</Label>
-                <Input
-                  value={formData.picture_url}
-                  onChange={(e) => {
-                    onFormDataChange({ ...formData, picture_url: e.target.value });
-                    onRemovePictureChange(false);
-                  }}
-                  placeholder="Path or URL to item photo"
-                />
+          <div className="sm:col-span-2 w-full max-w-md space-y-3">
+            {showHierarchyPicture ? (
+              <div className="flex flex-col items-center gap-3">
+                {pendingPreviewSrc ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={pendingPreviewSrc}
+                    alt="Selected primary photo"
+                    className="max-h-48 rounded-md border object-cover"
+                  />
+                ) : (
+                  <EntityPicture
+                    src={formData.picture_url}
+                    ownerType={selectedEntityType}
+                    ownerId={entityId}
+                    alt={`${formData.name || 'Entity'} photo`}
+                    className="max-h-48 rounded-md border object-cover"
+                  />
+                )}
               </div>
-
-              <div>
-                <Label>Or Upload Photo</Label>
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    onPendingPictureFileChange(e.target.files?.[0] ?? null);
-                    onRemovePictureChange(false);
-                  }}
-                />
-              </div>
-
-              {(formData.picture_url || pendingPictureFile) && !removePicture ? (
-                <div className="sm:col-span-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      onFormDataChange({ ...formData, picture_url: '' });
-                      onPendingPictureFileChange(null);
-                      onRemovePictureChange(true);
-                    }}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Remove photo
-                  </Button>
-                </div>
-              ) : null}
-            </>
-          )}
+            ) : null}
+            <FileDropZone
+              accept="image/*"
+              restLabel="photo files or drop"
+              hint="(jpg, png, webp, etc)"
+              selectedLabel={
+                removePicture
+                  ? null
+                  : selectedPictures[0]?.name ||
+                    (hasExistingPicture ? 'Current photo on file' : null)
+              }
+              onClear={() => {
+                onPendingPictureFilesChange?.([]);
+                onPendingPictureFileChange(null);
+                onFormDataChange({ ...formData, picture_url: '' });
+                onRemovePictureChange(true);
+              }}
+              onFiles={(files) => {
+                onPendingPictureFilesChange?.(files);
+                onPendingPictureFileChange(files[0] ?? null);
+                onRemovePictureChange(false);
+              }}
+            />
+          </div>
         </TabsContent>
 
         <TabsContent value="attachments" className={formTabSingleClassName}>

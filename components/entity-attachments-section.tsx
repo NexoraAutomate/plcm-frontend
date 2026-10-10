@@ -1,9 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Pencil, Plus, Trash2, Upload } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AttachmentUploadDialog } from '@/components/attachment-upload-dialog';
+import { FileDropZone, UploadedFileRow } from '@/components/ui/file-drop-zone';
 import { attachmentDisplayTitle, attachmentTypeLabel } from '@/lib/attachment-types';
 import type { EntityAttachment } from '@/lib/models';
 import * as api from '@/lib/api';
@@ -39,6 +40,13 @@ function pendingLabel(item: PendingAttachmentUpload): string {
   return item.description?.trim() || item.file.name;
 }
 
+function openLocalFile(file: File) {
+  const url = URL.createObjectURL(file);
+  window.open(url, '_blank', 'noopener,noreferrer');
+  // Revoke after the tab has a chance to load the blob.
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 export function EntityAttachmentsSection({
   ownerType,
   ownerId,
@@ -52,8 +60,15 @@ export function EntityAttachmentsSection({
   const [attachments, setAttachments] = useState<EntityAttachment[]>([]);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
+  const [seedFile, setSeedFile] = useState<File | null>(null);
   const [editingAttachment, setEditingAttachment] = useState<EntityAttachment | null>(null);
   const canManage = Boolean(ownerId);
+
+  function openUploadWithFile(file: File | null, queued: boolean) {
+    setSeedFile(file);
+    if (queued) setQueueOpen(true);
+    else setUploadOpen(true);
+  }
 
   const loadAttachments = useCallback(async () => {
     if (!ownerId) {
@@ -146,60 +161,40 @@ export function EntityAttachmentsSection({
 
   if (!canManage) {
     return (
-      <div className="space-y-2 rounded-lg border bg-muted/70 p-4 dark:bg-muted/40">
-        {pendingAttachments.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              No attachments queued. They will upload when you save the item.
-            </p>
-            {onPendingAttachmentsChange && canUpload ? (
-              <Button type="button" variant="outline" size="sm" onClick={() => setQueueOpen(true)}>
-                <Upload className="mr-2 h-4 w-4" />
-                Upload
-              </Button>
-            ) : null}
-          </div>
+      <div className="space-y-3 rounded-lg border bg-muted/40 p-4">
+        <p className="text-sm font-medium">Upload</p>
+        {onPendingAttachmentsChange && canUpload ? (
+          <FileDropZone
+            multiple
+            hint="(docx, pdf, images, etc)"
+            onFiles={(files) => openUploadWithFile(files[0] ?? null, true)}
+          />
         ) : (
-          <>
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium">Queued files</p>
-              {onPendingAttachmentsChange && canUpload ? (
-                <Button type="button" variant="outline" size="sm" onClick={() => setQueueOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add
-                </Button>
-              ) : null}
-            </div>
-            <ul className="space-y-2">
-              {pendingAttachments.map((item) => (
-                <li
-                  key={item.id}
-                  className="flex items-center justify-between gap-2 rounded-md border bg-background/60 px-3 py-2 text-sm"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{pendingLabel(item)}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {attachmentTypeLabel(item.attachment_type)} · {item.file.name}
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0"
-                    onClick={() => removePending(item.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          </>
+          <p className="text-sm text-muted-foreground">
+            No attachments queued. They will upload when you save the item.
+          </p>
         )}
+        {pendingAttachments.length > 0 ? (
+          <div className="space-y-2">
+            {pendingAttachments.map((item) => (
+              <UploadedFileRow
+                key={item.id}
+                name={pendingLabel(item)}
+                subtitle={`${attachmentTypeLabel(item.attachment_type)} · ${item.file.name}`}
+                onView={() => openLocalFile(item.file)}
+                onDelete={() => removePending(item.id)}
+              />
+            ))}
+          </div>
+        ) : null}
 
         <AttachmentUploadDialog
           open={queueOpen}
-          onOpenChange={setQueueOpen}
+          onOpenChange={(open) => {
+            setQueueOpen(open);
+            if (!open) setSeedFile(null);
+          }}
+          initialFile={seedFile}
           onSubmit={handleQueueUpload}
         />
       </div>
@@ -207,85 +202,61 @@ export function EntityAttachmentsSection({
   }
 
   return (
-    <div className="space-y-2 rounded-lg border bg-muted/70 p-4 dark:bg-muted/40">
+    <div className="space-y-3 rounded-lg border bg-muted/40 p-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-medium">Upload</p>
+        {canUpload && attachments.length > 0 ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => openUploadWithFile(null, false)}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add
+          </Button>
+        ) : null}
+      </div>
+      {canUpload ? (
+        <FileDropZone
+          multiple
+          hint="(docx, pdf, images, etc)"
+          onFiles={(files) => openUploadWithFile(files[0] ?? null, false)}
+        />
+      ) : null}
       {attachments.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-          <p className="text-sm text-muted-foreground">No attachments yet.</p>
-          {canUpload ? (
-            <Button type="button" variant="outline" size="sm" onClick={() => setUploadOpen(true)}>
-              <Upload className="mr-2 h-4 w-4" />
-              Upload
-            </Button>
-          ) : null}
-        </div>
+        <p className="text-sm text-muted-foreground">No attachments yet.</p>
       ) : (
-        <>
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-medium">Files</p>
-            {canUpload ? (
-              <Button type="button" variant="outline" size="sm" onClick={() => setUploadOpen(true)}>
-                <Upload className="mr-2 h-4 w-4" />
-                Upload
-              </Button>
-            ) : null}
-          </div>
-          <ul className="space-y-2">
-            {attachments.map((attachment) => (
-              <li
-                key={attachment.id}
-                className="flex items-center justify-between gap-2 rounded-md border bg-background/60 px-3 py-2 text-sm"
-              >
-                <div className="min-w-0 flex-1">
-                  {canDownload ? (
-                    <button
-                      type="button"
-                      className="truncate text-left font-medium text-primary hover:underline"
-                      onClick={() =>
-                        void api.attachments.download(attachment.id, attachment.file_name)
-                      }
-                    >
-                      {attachmentDisplayTitle(attachment)}
-                    </button>
-                  ) : (
-                    <p className="truncate font-medium">{attachmentDisplayTitle(attachment)}</p>
-                  )}
-                  <p className="truncate text-xs text-muted-foreground">
-                    {attachmentTypeLabel(attachment.attachment_type)} · {attachment.file_name}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  {canUpload ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setEditingAttachment(attachment)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  ) : null}
-                  {canDelete ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => void handleDeleteAttachment(attachment.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  ) : null}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </>
+        <div className="space-y-2">
+          {attachments.map((attachment) => (
+            <UploadedFileRow
+              key={attachment.id}
+              name={attachmentDisplayTitle(attachment)}
+              subtitle={`${attachmentTypeLabel(attachment.attachment_type)} · ${attachment.file_name}`}
+              onView={
+                canDownload
+                  ? () =>
+                      void api.attachments.download(attachment.id, attachment.file_name)
+                  : undefined
+              }
+              onEdit={canUpload ? () => setEditingAttachment(attachment) : undefined}
+              onDelete={
+                canDelete
+                  ? () => void handleDeleteAttachment(attachment.id)
+                  : undefined
+              }
+            />
+          ))}
+        </div>
       )}
 
       <AttachmentUploadDialog
         open={uploadOpen}
-        onOpenChange={setUploadOpen}
+        onOpenChange={(open) => {
+          setUploadOpen(open);
+          if (!open) setSeedFile(null);
+        }}
+        initialFile={seedFile}
         onSubmit={handleUpload}
       />
 

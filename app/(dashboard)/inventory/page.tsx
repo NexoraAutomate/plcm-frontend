@@ -99,6 +99,12 @@ import {
 import { InventoryKpiDashboard } from '@/components/inventory/inventory-kpi-dashboard';
 import { CascadingLocationSelects } from '@/components/inventory/cascading-location-selects';
 import { useInventoryStatsSummary } from '@/hooks/use-inventory-stats-summary';
+import {
+  FileDropZone,
+  UPLOAD_ACCENT,
+  pillTabsListClassName,
+  pillTabsTriggerClassName,
+} from '@/components/ui/file-drop-zone';
 
 const ACTION_BTN =
   'h-7 w-7 bg-transparent shadow-none border-0 hover:bg-transparent';
@@ -617,8 +623,7 @@ export default function InventoryPage() {
     }
   }
 
-  async function handleImportFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null;
+  async function handleImportFileSelected(file: File | null) {
     setImportFile(file);
     setImportPreview(null);
     if (!file) return;
@@ -1154,15 +1159,22 @@ export default function InventoryPage() {
   }
 
   const inventoryDialogClassName =
-    'top-[4vh] max-h-[92vh] w-[min(100vw-1.5rem,56rem)] translate-y-0 gap-0 overflow-y-auto p-0 sm:max-w-4xl';
+    'top-[4vh] flex max-h-[92vh] w-[min(100vw-1.5rem,56rem)] translate-y-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl';
 
   const formTabClassName =
     'mt-0 grid grid-cols-1 gap-x-6 gap-y-5 p-1 sm:grid-cols-2 [&>div]:space-y-2 [&>p]:col-span-full';
 
   const formTabSingleClassName = 'mt-0 space-y-5 p-1 [&>div]:space-y-2';
 
-  const tabTriggerClassName =
-    'rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm';
+  const tabTriggerClassName = cn(
+    pillTabsTriggerClassName,
+    'data-[state=active]:bg-[var(--upload-accent)]'
+  );
+
+  const pillTabsStyle = {
+    borderColor: UPLOAD_ACCENT,
+    ['--upload-accent' as string]: UPLOAD_ACCENT,
+  };
 
   const getEntityDisplayName = (entityType: EntityType) => entityLabel(entityType);
 
@@ -1205,28 +1217,38 @@ export default function InventoryPage() {
     } as const;
   })();
 
-  const renderInventoryFormTabs = (mode: 'create' | 'edit') => (
-    <Tabs value={formTab} onValueChange={setFormTab} className="w-full">
-      <div className="border-b bg-muted/20 px-6 pt-2 pb-0">
-        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 rounded-none bg-transparent p-0">
-          <TabsTrigger value="general" className={tabTriggerClassName}>
-            General
-          </TabsTrigger>
-          <TabsTrigger value="holder" className={tabTriggerClassName}>
-            Location
-          </TabsTrigger>
-          <TabsTrigger value="attachments" className={tabTriggerClassName}>
-            Attachments
-          </TabsTrigger>
-          {mode === 'edit' && showEditUnitsTab ? (
-            <TabsTrigger value="units" className={tabTriggerClassName}>
-              Units
+  const renderInventoryFormTabs = (
+    mode: 'create' | 'edit',
+    options?: { stickyHeader?: ReactNode }
+  ) => (
+    <Tabs
+      value={formTab}
+      onValueChange={setFormTab}
+      className="flex min-h-0 flex-1 flex-col"
+    >
+      <div className="sticky top-0 z-20 shrink-0 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/80">
+        {options?.stickyHeader}
+        <div className="px-6 py-3" style={pillTabsStyle}>
+          <TabsList className={pillTabsListClassName} style={{ borderColor: UPLOAD_ACCENT }}>
+            <TabsTrigger value="general" className={tabTriggerClassName}>
+              General
             </TabsTrigger>
-          ) : null}
-        </TabsList>
+            <TabsTrigger value="holder" className={tabTriggerClassName}>
+              Location
+            </TabsTrigger>
+            <TabsTrigger value="attachments" className={tabTriggerClassName}>
+              Attachments
+            </TabsTrigger>
+            {mode === 'edit' && showEditUnitsTab ? (
+              <TabsTrigger value="units" className={tabTriggerClassName}>
+                Units
+              </TabsTrigger>
+            ) : null}
+          </TabsList>
+        </div>
       </div>
 
-      <div className="px-6 py-6">
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
         <TabsContent value="general" className={formTabClassName}>
           {mode === 'create' ? (
             <>
@@ -1349,7 +1371,7 @@ export default function InventoryPage() {
             <div />
           )}
 
-          {mode === 'edit' ? (
+          {mode === 'edit' && editingSerialOnly ? (
             <div className="sm:col-span-2 rounded-lg border bg-muted/20 p-4">
               <p className="mb-3 text-sm font-medium">Installation</p>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1372,44 +1394,28 @@ export default function InventoryPage() {
             </div>
           ) : null}
 
-          <div className="sm:col-span-2 space-y-3 rounded-lg border p-4">
-            <div>
-              <Label>Picture</Label>
-              <Input
-                value={formData.picture_url}
-                onChange={(e) => {
-                  setFormData({ ...formData, picture_url: e.target.value });
-                  setRemovePicture(false);
-                }}
-                placeholder="Path or URL to item photo"
-              />
-            </div>
-            <div>
-              <Label>Or upload photo</Label>
-              <Input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  setPendingPictureFile(e.target.files?.[0] ?? null);
-                  setRemovePicture(false);
-                }}
-              />
-            </div>
-            {(formData.picture_url || pendingPictureFile) && !removePicture ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setFormData({ ...formData, picture_url: '' });
-                  setPendingPictureFile(null);
-                  setRemovePicture(true);
-                }}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Remove photo
-              </Button>
-            ) : null}
+          <div className="sm:col-span-2 space-y-3">
+            <Label>Picture</Label>
+            <FileDropZone
+              accept="image/*"
+              restLabel="photo files or drop"
+              hint="(jpg, png, webp, etc)"
+              selectedLabel={
+                removePicture
+                  ? null
+                  : pendingPictureFile?.name ||
+                    (formData.picture_url ? 'Current photo on file' : null)
+              }
+              onClear={() => {
+                setFormData({ ...formData, picture_url: '' });
+                setPendingPictureFile(null);
+                setRemovePicture(true);
+              }}
+              onFiles={(files) => {
+                setPendingPictureFile(files[0] ?? null);
+                setRemovePicture(false);
+              }}
+            />
           </div>
         </TabsContent>
 
@@ -1852,21 +1858,22 @@ export default function InventoryPage() {
               </Can>
             ) : null}
             <DialogContent className={inventoryDialogClassName}>
-              <DialogHeader className="space-y-1 border-b px-6 py-5 text-left">
-                <DialogTitle>Add Inventory Item</DialogTitle>
-                <DialogDescription>
-                  Choose the type and category, then set quantity and location for the new stock.
-                </DialogDescription>
-              </DialogHeader>
-              <div>
-                {renderInventoryFormTabs('create')}
-
-                <div className="flex justify-end gap-3 border-t px-6 py-4">
-                  <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleCreate}>Add to inventory</Button>
-                </div>
+              {renderInventoryFormTabs('create', {
+                stickyHeader: (
+                  <DialogHeader className="space-y-1 px-6 pt-5 pb-1 text-left">
+                    <DialogTitle>Add Inventory Item</DialogTitle>
+                    <DialogDescription>
+                      Choose the type and category, then set quantity and location for the new
+                      stock.
+                    </DialogDescription>
+                  </DialogHeader>
+                ),
+              })}
+              <div className="flex shrink-0 justify-end gap-3 border-t bg-background px-6 py-4">
+                <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleCreate}>Add to inventory</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -2446,67 +2453,71 @@ export default function InventoryPage() {
         }}
       >
         <DialogContent className={inventoryDialogClassName}>
-          <DialogHeader className="space-y-2 border-b bg-sky-50/40 px-6 py-5 text-left dark:bg-sky-950/20">
-            <DialogTitle>Edit Inventory Item</DialogTitle>
-            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                {getEntityDisplayName(selectedEntityType)}
-              </span>
-              <span className="text-base font-semibold tracking-tight text-foreground">
-                {formData.name || '—'}
-              </span>
-              {editStatusLabel !== '—' ? (
-                <span
-                  className="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium"
-                  style={editStatusSoftStyle}
-                >
-                  {editStatusAvailable ? (
-                    <LockOpen className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
-                  ) : (
-                    <Lock className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
-                  )}
-                  {editStatusLabel}
-                </span>
-              ) : null}
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      className="inline-flex text-muted-foreground/70 hover:text-muted-foreground"
-                      aria-label="Status is managed by workflow"
+          {renderInventoryFormTabs('edit', {
+            stickyHeader: (
+              <DialogHeader className="space-y-2 bg-sky-50/40 px-6 pt-5 pb-1 text-left dark:bg-sky-950/20">
+                <DialogTitle>Edit Inventory Item</DialogTitle>
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+                  <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {getEntityDisplayName(selectedEntityType)}
+                  </span>
+                  <span className="text-base font-semibold tracking-tight text-foreground">
+                    {formData.name || '—'}
+                  </span>
+                  {editingSerialOnly && editStatusLabel !== '—' ? (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium"
+                      style={editStatusSoftStyle}
                     >
-                      <Info className="h-3.5 w-3.5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-xs">
-                    {editStatusAvailable
-                      ? 'Available for use (unlocked). Status changes automatically when reserved, issued, or installed.'
-                      : 'Not available (locked) because this unit is reserved, issued, or installed. Status is set by workflow.'}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            {editingSerialOnly && editingSerialLabel ? (
-              <p className="font-mono text-xs text-muted-foreground">
-                Serial {editingSerialLabel}
-              </p>
-            ) : null}
-            <DialogDescription className="sr-only">
-              Edit {getEntityDisplayName(selectedEntityType)}
-              {formData.name ? ` ${formData.name}` : ''}
-              {editingSerialOnly && editingSerialLabel ? `, serial ${editingSerialLabel}` : ''}
-            </DialogDescription>
-          </DialogHeader>
-          <div>
-            {renderInventoryFormTabs('edit')}
-
-            <div className="flex justify-end gap-3 border-t px-6 py-4">
-              <Button variant="outline" onClick={() => setIsEditOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleUpdate}>Save changes</Button>
-            </div>
+                      {editStatusAvailable ? (
+                        <LockOpen className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
+                      ) : (
+                        <Lock className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
+                      )}
+                      {editStatusLabel}
+                    </span>
+                  ) : null}
+                  {editingSerialOnly ? (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="inline-flex text-muted-foreground/70 hover:text-muted-foreground"
+                            aria-label="Status is managed by workflow"
+                          >
+                            <Info className="h-3.5 w-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          {editStatusAvailable
+                            ? 'Available for use (unlocked). Status changes automatically when reserved, issued, or installed.'
+                            : 'Not available (locked) because this unit is reserved, issued, or installed. Status is set by workflow.'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : null}
+                </div>
+                {editingSerialOnly && editingSerialLabel ? (
+                  <p className="font-mono text-xs text-muted-foreground">
+                    Serial {editingSerialLabel}
+                  </p>
+                ) : null}
+                <DialogDescription className="sr-only">
+                  Edit {getEntityDisplayName(selectedEntityType)}
+                  {formData.name ? ` ${formData.name}` : ''}
+                  {editingSerialOnly && editingSerialLabel
+                    ? `, serial ${editingSerialLabel}`
+                    : ''}
+                </DialogDescription>
+              </DialogHeader>
+            ),
+          })}
+          <div className="flex shrink-0 justify-end gap-3 border-t bg-background px-6 py-4">
+            <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdate}>Save changes</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -2614,33 +2625,18 @@ export default function InventoryPage() {
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            <div className="flex items-center gap-3">
-              <Label
-                htmlFor="inventory-import-file-input"
-                className="flex items-center gap-2 cursor-pointer rounded-md border border-dashed px-4 py-3 text-sm text-muted-foreground hover:bg-muted/50 transition-colors flex-1"
-              >
-                <FileText className="h-4 w-4 shrink-0" />
-                {importFile ? importFile.name : 'Choose CSV or JSON file…'}
-              </Label>
-              <input
-                id="inventory-import-file-input"
-                type="file"
-                accept=".csv,.json,text/csv,application/json"
-                className="hidden"
-                onChange={handleImportFileChange}
-                disabled={importSubmitting}
-              />
-              {importFile && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => { setImportFile(null); setImportPreview(null); }}
-                  disabled={importSubmitting}
-                >
-                  Clear
-                </Button>
-              )}
-            </div>
+            <FileDropZone
+              accept=".csv,.json,text/csv,application/json"
+              disabled={importSubmitting || importValidating}
+              restLabel="CSV or JSON files or drop"
+              hint="(.csv, .json)"
+              selectedLabel={importFile?.name ?? null}
+              onClear={() => {
+                setImportFile(null);
+                setImportPreview(null);
+              }}
+              onFiles={(files) => void handleImportFileSelected(files[0] ?? null)}
+            />
 
             {importValidating && (
               <p className="text-sm text-muted-foreground flex items-center gap-2">

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronDown, ImagePlus, Pencil, Upload, Trash2, Replace, Network } from 'lucide-react';
+import { ChevronDown, Pencil, Upload, Trash2, Replace, Network } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AttachmentUploadDialog } from '@/components/attachment-upload-dialog';
+import { FileDropZone } from '@/components/ui/file-drop-zone';
 import { useDataStoreDomain } from '@/lib/data-store';
 import { attachmentDisplayTitle, attachmentTypeLabel } from '@/lib/attachment-types';
 import type { EntityAttachment, EntityReplacementChainItem, HierarchyInstallFields, ItemInstallRejection } from '@/lib/models';
@@ -153,7 +154,6 @@ export function EntityInstallMetadataCard({
     history: ItemInstallRejection[];
   } | null>(null);
   const [pictureUploading, setPictureUploading] = useState(false);
-  const pictureInputRef = useRef<HTMLInputElement>(null);
   const [replacementChain, setReplacementChain] = useState<EntityReplacementChainItem[]>([]);
   const [replacementLoading, setReplacementLoading] = useState(false);
   const [detailsTab, setDetailsTab] = useState('hardware');
@@ -476,9 +476,6 @@ export function EntityInstallMetadataCard({
       toast.error('Failed to upload photo');
     } finally {
       setPictureUploading(false);
-      if (pictureInputRef.current) {
-        pictureInputRef.current.value = '';
-      }
     }
   };
 
@@ -786,72 +783,45 @@ export function EntityInstallMetadataCard({
                 ) : null}
 
                 <TabsContent value="picture" className="mt-0">
-                  <div className="space-y-3 rounded-lg border bg-muted/70 p-4 dark:bg-muted/40">
-                    <input
-                      ref={pictureInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        if (file) void handleUploadPicture(file);
-                      }}
-                    />
+                  <div className="space-y-3 rounded-lg border bg-muted/40 p-4">
+                    <p className="text-sm font-medium">Upload</p>
                     {effectivePictureUrl ? (
-                      <>
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-medium">Primary photo</p>
-                          {canMutateInstall ? (
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                disabled={pictureUploading}
-                                onClick={() => pictureInputRef.current?.click()}
-                              >
-                                <ImagePlus className="mr-2 h-4 w-4" />
-                                {pictureUploading ? 'Uploading…' : 'Replace'}
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => void handleRemovePicture()}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Remove
-                              </Button>
-                            </div>
-                          ) : null}
-                        </div>
-                        <EntityPicture
-                          src={effectivePictureUrl}
-                          ownerType={ownerType}
-                          ownerId={entity.id}
-                          alt={`${entity.name} photo`}
-                          className="max-h-56 rounded-md border object-cover"
-                        />
-                      </>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-                        <p className="text-sm text-muted-foreground">
-                          No picture added for this item yet.
-                        </p>
-                        {canMutateInstall ? (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled={pictureUploading}
-                            onClick={() => pictureInputRef.current?.click()}
-                          >
-                            <ImagePlus className="mr-2 h-4 w-4" />
-                            {pictureUploading ? 'Uploading…' : 'Add picture'}
-                          </Button>
-                        ) : null}
-                      </div>
-                    )}
+                      <EntityPicture
+                        src={effectivePictureUrl}
+                        ownerType={ownerType}
+                        ownerId={entity.id}
+                        alt={`${entity.name} photo`}
+                        className="max-h-56 rounded-md border object-cover"
+                      />
+                    ) : null}
+                    {canMutateInstall ? (
+                      <FileDropZone
+                        accept="image/*"
+                        disabled={pictureUploading}
+                        restLabel="photo files or drop"
+                        hint="(jpg, png, webp, etc)"
+                        selectedLabel={
+                          pictureUploading
+                            ? 'Uploading…'
+                            : effectivePictureUrl
+                              ? 'Current photo on file'
+                              : null
+                        }
+                        onClear={
+                          pictureUploading
+                            ? undefined
+                            : () => void handleRemovePicture()
+                        }
+                        onFiles={(files) => {
+                          const file = files[0];
+                          if (file) void handleUploadPicture(file);
+                        }}
+                      />
+                    ) : !effectivePictureUrl ? (
+                      <p className="text-sm text-muted-foreground">
+                        No picture added for this item yet.
+                      </p>
+                    ) : null}
                   </div>
                 </TabsContent>
 

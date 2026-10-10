@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { FileDropZone, UPLOAD_ACCENT } from '@/components/ui/file-drop-zone';
 import { ATTACHMENT_TYPES, type AttachmentType } from '@/lib/attachment-types';
 import type { EntityAttachment, EntityAttachmentMetadata } from '@/lib/models';
 import { toast } from 'sonner';
@@ -31,6 +32,8 @@ interface AttachmentUploadDialogProps {
   description?: string;
   submitLabel?: string;
   initialValues?: Partial<EntityAttachmentMetadata>;
+  /** Pre-selected file from an outer drop zone. */
+  initialFile?: File | null;
   attachment?: EntityAttachment;
   requireFile?: boolean;
   onSubmit: (payload: EntityAttachmentMetadata & { file?: File }) => Promise<void>;
@@ -43,6 +46,7 @@ export function AttachmentUploadDialog({
   description = 'Choose the attachment type, add a descriptive name, and select a file.',
   submitLabel = 'Upload',
   initialValues,
+  initialFile = null,
   attachment,
   requireFile = true,
   onSubmit,
@@ -56,9 +60,9 @@ export function AttachmentUploadDialog({
     if (!open) return;
     setAttachmentType((initialValues?.attachment_type as AttachmentType) ?? attachment?.attachment_type ?? 'other');
     setLabel(initialValues?.description ?? attachment?.description ?? '');
-    setFile(null);
+    setFile(initialFile ?? null);
     setSubmitting(false);
-  }, [open, initialValues, attachment]);
+  }, [open, initialValues, initialFile, attachment]);
 
   const handleSubmit = async () => {
     const validationError = validateAttachmentForm({ requireFile, file });
@@ -122,11 +126,13 @@ export function AttachmentUploadDialog({
 
           {requireFile ? (
             <div className="space-y-2">
-              <Label htmlFor="attachment-file">File</Label>
-              <Input
-                id="attachment-file"
-                type="file"
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              <Label>File</Label>
+              <FileDropZone
+                disabled={submitting}
+                hint="(docx, pdf, images, etc)"
+                selectedLabel={file?.name ?? null}
+                onClear={() => setFile(null)}
+                onFiles={(files) => setFile(files[0] ?? null)}
               />
             </div>
           ) : attachment ? (
@@ -144,6 +150,11 @@ export function AttachmentUploadDialog({
             type="button"
             onClick={() => void handleSubmit()}
             disabled={submitting || (requireFile && !file)}
+            style={
+              !submitting && !(requireFile && !file)
+                ? { backgroundColor: UPLOAD_ACCENT, borderColor: UPLOAD_ACCENT }
+                : undefined
+            }
           >
             {submitting ? 'Saving…' : isEditMode ? 'Save' : submitLabel}
           </Button>

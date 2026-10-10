@@ -1,9 +1,8 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -11,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { FileDropZone } from '@/components/ui/file-drop-zone';
 import { SignaturePad } from '@/components/inventory/signature-pad';
 
 export type SignatureKind = 'DIGITAL' | 'HARD_COPY';
@@ -38,8 +38,6 @@ export function IssueSignatureFields({
   onProformaFileChange,
   disabled,
 }: Props) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   return (
     <div className="space-y-3">
       <div className="space-y-2">
@@ -75,28 +73,16 @@ export function IssueSignatureFields({
             <span>I confirm a signed hard-copy issue sheet is on file.</span>
           </label>
           <div className="space-y-2">
-            <Label htmlFor="issuance-proforma-upload">
-              Scanned Inventory Issuance Proforma
-            </Label>
-            <Input
-              id="issuance-proforma-upload"
-              ref={fileInputRef}
-              type="file"
+            <Label>Scanned Inventory Issuance Proforma</Label>
+            <FileDropZone
               accept=".pdf,.png,.jpg,.jpeg,.webp,.tif,.tiff"
               disabled={disabled}
-              required
-              onChange={(event) => {
-                const file = event.target.files?.[0] ?? null;
-                onProformaFileChange(file);
-              }}
+              restLabel="scan files or drop"
+              hint="(pdf, png, jpg, etc)"
+              selectedLabel={proformaFile?.name ?? null}
+              onClear={() => onProformaFileChange(null)}
+              onFiles={(files) => onProformaFileChange(files[0] ?? null)}
             />
-            {proformaFile ? (
-              <p className="text-xs text-muted-foreground">{proformaFile.name}</p>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Upload a scan of the signed hard-copy issue sheet.
-              </p>
-            )}
           </div>
         </div>
       )}
