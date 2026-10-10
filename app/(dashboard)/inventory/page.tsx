@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Plus, Edit, Trash2, Search, ChevronDown, ListOrdered, Undo2, RefreshCw, Download, Upload, FileText, AlertCircle, CheckCircle2, Tag, ScanLine, QrCode, Lock, Info } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, ChevronDown, ListOrdered, Undo2, RefreshCw, Download, Upload, FileText, AlertCircle, CheckCircle2, Tag, ScanLine, QrCode, Lock, LockOpen, Info } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
@@ -246,12 +246,32 @@ function isInventoryFullyDeletable(item: Inventory): boolean {
 }
 
 function isInstanceDeletable(instance: InventoryInstance): boolean {
+  return isInventoryInstanceAvailable(instance);
+}
+
+/** True when the unit is free warehouse stock (not reserved / issued / return-pending). */
+function isInventoryInstanceAvailable(instance?: InventoryInstance | null): boolean {
+  if (!instance?.id) return false;
   return (
-    Boolean(instance.id) &&
     !instance.is_reserved &&
     !isProjectReservedInstance(instance) &&
     instance.open_issuance_status !== 'return_pending'
   );
+}
+
+/**
+ * Utilization status for table + edit header.
+ * Driven by reservation/issuance flags — not stale status_id on the form.
+ */
+function resolveInventoryInstanceStatus(instance?: InventoryInstance | null): string {
+  if (!instance) return '—';
+  if (instance.is_reserved) {
+    return workflowStatusLabel(instance.status_name?.trim() || 'ISSUED');
+  }
+  if (isProjectReservedInstance(instance)) {
+    return workflowStatusLabel('RESERVED');
+  }
+  return workflowStatusLabel('AVAILABLE');
 }
 
 function instanceSerialNumber(instance: InventoryInstance): string {
@@ -287,12 +307,8 @@ function ExpandedInventoryUnitsTable({
             ),
           location: (row) =>
             formatInventoryLocationAbbrev(row as unknown as InventoryInstance),
-          status: (row) => {
-            const instance = row as unknown as InventoryInstance;
-            if (instance.is_reserved) return instance.status_name || 'ISSUED';
-            if (isProjectReservedInstance(instance)) return 'RESERVED';
-            return 'AVAILABLE';
-          },
+          status: (row) =>
+            resolveInventoryInstanceStatus(row as unknown as InventoryInstance),
         }
       ) as unknown as InventoryInstance[],
     [serialInstances, sort, users]
@@ -1150,18 +1166,9 @@ export default function InventoryPage() {
 
   const getEntityDisplayName = (entityType: EntityType) => entityLabel(entityType);
 
-  const editStatusLabel = (() => {
-    const byId = statuses.find((status) => String(status.id) === formData.status_id);
-    if (byId?.status_name) return workflowStatusLabel(byId.status_name);
-    const selectedInstance = instances.find((instance) => instance.id === editingInstanceId);
-    if (selectedInstance?.is_reserved) {
-      return workflowStatusLabel(selectedInstance.status_name || 'ISSUED');
-    }
-    if (selectedInstance && isProjectReservedInstance(selectedInstance)) {
-      return 'Reserved';
-    }
-    return formData.status_id ? 'Available' : '—';
-  })();
+  const editingInstance = instances.find((instance) => instance.id === editingInstanceId) ?? null;
+  const editStatusLabel = resolveInventoryInstanceStatus(editingInstance);
+  const editStatusAvailable = isInventoryInstanceAvailable(editingInstance);
 
   const installerLabel = (() => {
     if (!formData.installed_by_id) return '—';
@@ -1540,11 +1547,7 @@ export default function InventoryPage() {
                     </TableRow>
                   ) : (
                     sortedEditorInstances.map((instance) => {
-                      const unitStatus = instance.is_reserved
-                        ? instance.status_name || 'ISSUED'
-                        : isProjectReservedInstance(instance)
-                          ? 'RESERVED'
-                          : 'AVAILABLE';
+                      const unitStatus = resolveInventoryInstanceStatus(instance);
                       return (
                         <TableRow
                           key={instance.id}
@@ -2309,13 +2312,8 @@ export default function InventoryPage() {
                                             {locationLabel}
                                           </TableCell>
                                           <TableCell className="w-28 overflow-hidden">
-                                            {instance.is_reserved ? (
-                                              <StatusBadge
-                                                status={
-                                                  instance.status_name || 'ISSUED'
-                                                }
-                                              />
-                                            ) : isProjectReservedInstance(instance) ? (
+                                            {isProjectReservedInstance(instance) &&
+                                            !instance.is_reserved ? (
                                               <button
                                                 type="button"
                                                 className="cursor-pointer rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -2324,10 +2322,14 @@ export default function InventoryPage() {
                                                 }
                                                 title="View reservation details"
                                               >
-                                                <StatusBadge status="RESERVED" />
+                                                <StatusBadge
+                                                  status={resolveInventoryInstanceStatus(instance)}
+                                                />
                                               </button>
                                             ) : (
-                                              <StatusBadge status="AVAILABLE" />
+                                              <StatusBadge
+                                                status={resolveInventoryInstanceStatus(instance)}
+                                              />
                                             )}
                                           </TableCell>
                                           <TableCell className="w-44 p-1 text-right">
@@ -2458,7 +2460,11 @@ export default function InventoryPage() {
                   className="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium"
                   style={editStatusSoftStyle}
                 >
-                  <Lock className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
+                  {editStatusAvailable ? (
+                    <LockOpen className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
+                  ) : (
+                    <Lock className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
+                  )}
                   {editStatusLabel}
                 </span>
               ) : null}
@@ -2474,8 +2480,9 @@ export default function InventoryPage() {
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-xs">
-                    Status is set automatically by reservation, issuance, and installation
-                    workflows and cannot be changed here.
+                    {editStatusAvailable
+                      ? 'Available for use (unlocked). Status changes automatically when reserved, issued, or installed.'
+                      : 'Not available (locked) because this unit is reserved, issued, or installed. Status is set by workflow.'}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>

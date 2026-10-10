@@ -65,7 +65,18 @@ export function composeInventoryLocation(
   return (fallback || '').trim();
 }
 
-/** Compact location for list columns: first letter of room, cabinet, rack (e.g. R-C-R). */
+/** Compact one location segment: first letter + trailing number (Lab 1 → L1, Cabinet 2 → C2). */
+export function abbreviateLocationSegment(part?: string | null): string {
+  const trimmed = (part || '').trim();
+  if (!trimmed) return '';
+  const withNumber = trimmed.match(/^([A-Za-z].*?)[\s_-]*(\d+)$/);
+  if (withNumber) {
+    return `${withNumber[1].trim().charAt(0).toUpperCase()}${withNumber[2]}`;
+  }
+  return trimmed.charAt(0).toUpperCase();
+}
+
+/** Compact location for list columns: room-cabinet-rack codes (e.g. L1-C1-R1). */
 export function formatInventoryLocationAbbrev(source?: {
   location?: string | null;
   location_room?: string | null;
@@ -73,11 +84,10 @@ export function formatInventoryLocationAbbrev(source?: {
   location_rack?: string | null;
 }): string {
   const parts = parseInventoryLocationParts(source);
-  const letters = [parts.location_room, parts.location_cabinet, parts.location_rack]
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase());
-  return letters.length > 0 ? letters.join('-') : '—';
+  const codes = [parts.location_room, parts.location_cabinet, parts.location_rack]
+    .map((part) => abbreviateLocationSegment(part))
+    .filter(Boolean);
+  return codes.length > 0 ? codes.join('-') : '—';
 }
 
 export function parseInventoryLocationParts(source?: {
