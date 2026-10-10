@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,6 +34,7 @@ import {
 import { usePageDataRefresh } from '@/components/page-data-refresh';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { useClientTableSort } from '@/hooks/use-table-sorting';
+import { toast } from 'sonner';
 
 export type SecurityPanelProps = {
   embedded?: boolean;
@@ -53,12 +54,15 @@ export function SecurityPanel({ embedded = false }: SecurityPanelProps) {
     loading,
     saving,
     saveSettings,
+    saveAdminSessionSuperPassword,
     updatePasswordPolicy,
     updateTwoFactor,
     reload: reloadSettings,
   } = useSecuritySettings();
   const { sessions, loading: sessionsLoading, refresh: refreshSessions, terminateSession, terminateAllSessions } =
     useActiveSessions();
+  const [superPassword, setSuperPassword] = useState('');
+  const [superPasswordConfirm, setSuperPasswordConfirm] = useState('');
   const refresh = useCallback(
     () => Promise.all([reloadSettings(), refreshSessions()]).then(() => undefined),
     [reloadSettings, refreshSessions]
@@ -67,9 +71,25 @@ export function SecurityPanel({ embedded = false }: SecurityPanelProps) {
   usePageDataRefresh(refresh);
   const { sort, cycleSort, sortedRows } = useClientTableSort(sessions);
 
+  async function handleSaveSuperPassword() {
+    if (!superPassword.trim()) {
+      toast.error('Enter a super password');
+      return;
+    }
+    if (superPassword !== superPasswordConfirm) {
+      toast.error('Super passwords do not match');
+      return;
+    }
+    const ok = await saveAdminSessionSuperPassword(superPassword);
+    if (ok) {
+      setSuperPassword('');
+      setSuperPasswordConfirm('');
+    }
+  }
+
   if (loading) return <PageLoader />;
 
-  const { passwordPolicy, twoFactor } = settings;
+  const { passwordPolicy, twoFactor, adminSessionSuperPasswordSet } = settings;
 
   return (
     <div className="space-y-8">
@@ -291,6 +311,50 @@ export function SecurityPanel({ embedded = false }: SecurityPanelProps) {
               },
             ]}
           />
+        </SettingsCard>
+      </SettingsSection>
+
+      <SettingsSection
+        title="Admin Session Super Password"
+        description="Required when signing into an Admin account that is already active on another device. Protects the live admin session from credential-only takeover."
+        actions={
+          <Button size="sm" disabled={saving} onClick={() => void handleSaveSuperPassword()}>
+            {saving ? 'Saving...' : 'Update Super Password'}
+          </Button>
+        }
+      >
+        <SettingsCard>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="admin-session-super-password">New super password</Label>
+              <Input
+                id="admin-session-super-password"
+                type="password"
+                autoComplete="new-password"
+                value={superPassword}
+                onChange={(e) => setSuperPassword(e.target.value)}
+                placeholder="Enter super password"
+                disabled={saving}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="admin-session-super-password-confirm">Confirm super password</Label>
+              <Input
+                id="admin-session-super-password-confirm"
+                type="password"
+                autoComplete="new-password"
+                value={superPasswordConfirm}
+                onChange={(e) => setSuperPasswordConfirm(e.target.value)}
+                placeholder="Re-enter super password"
+                disabled={saving}
+              />
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            {adminSessionSuperPasswordSet
+              ? 'A super password is configured. Updating replaces the current value.'
+              : 'No super password is configured yet. Set one before relying on Admin session protection.'}
+          </p>
         </SettingsCard>
       </SettingsSection>
 

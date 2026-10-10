@@ -416,7 +416,8 @@ export function useAppNotifications(options?: { search?: string }) {
           n.id === noticeId
             ? {
                 ...n,
-                read_at: updated?.read_at ?? new Date().toISOString(),
+                // Prefer server clock; fall back to created_at (also server-sourced).
+                read_at: updated?.read_at ?? n.read_at ?? n.created_at,
               }
             : n
         )
@@ -436,7 +437,7 @@ export function useAppNotifications(options?: { search?: string }) {
           n.id === noticeId
             ? {
                 ...n,
-                read_at: updated?.read_at ?? new Date().toISOString(),
+                read_at: updated?.read_at ?? n.read_at ?? n.created_at,
               }
             : n
         )
@@ -456,7 +457,7 @@ export function useAppNotifications(options?: { search?: string }) {
           n.id === noticeId
             ? {
                 ...n,
-                read_at: updated?.read_at ?? new Date().toISOString(),
+                read_at: updated?.read_at ?? n.read_at ?? n.created_at,
               }
             : n
         )
@@ -476,7 +477,7 @@ export function useAppNotifications(options?: { search?: string }) {
           n.id === noticeId
             ? {
                 ...n,
-                read_at: updated?.read_at ?? new Date().toISOString(),
+                read_at: updated?.read_at ?? n.read_at ?? n.created_at,
               }
             : n
         )
@@ -576,7 +577,7 @@ export function useAppNotifications(options?: { search?: string }) {
           setInstallerNotices((prev) =>
             prev.map((n) => ({
               ...n,
-              read_at: n.read_at ?? new Date().toISOString(),
+              read_at: n.read_at ?? n.created_at,
             }))
           );
         })
@@ -588,7 +589,7 @@ export function useAppNotifications(options?: { search?: string }) {
         setShortageNotices((prev) =>
           prev.map((n) => ({
             ...n,
-            read_at: n.read_at ?? new Date().toISOString(),
+            read_at: n.read_at ?? n.created_at,
           }))
         );
       })
@@ -599,7 +600,7 @@ export function useAppNotifications(options?: { search?: string }) {
         setExpiryNotices((prev) =>
           prev.map((n) => ({
             ...n,
-            read_at: n.read_at ?? new Date().toISOString(),
+            read_at: n.read_at ?? n.created_at,
           }))
         );
       })
@@ -611,7 +612,7 @@ export function useAppNotifications(options?: { search?: string }) {
           setServerAppNotices((prev) =>
             prev.map((n) => ({
               ...n,
-              read_at: n.read_at ?? new Date().toISOString(),
+              read_at: n.read_at ?? n.created_at,
             }))
           );
         })

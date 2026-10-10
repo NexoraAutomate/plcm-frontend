@@ -286,11 +286,13 @@ export function IssueQueuePanel() {
 
   async function handleIssue() {
     if (!selected) return;
-    const signed = signature.payload();
-    if (!signed) {
-      toast.error('Signature is required to issue');
+    const signatureError = signature.validationError();
+    if (signatureError) {
+      toast.error(signatureError);
       return;
     }
+    const signed = signature.payload();
+    if (!signed) return;
     setSubmitting(true);
     try {
       const res = await api.inventory.issueItemRequest(selected.id, signed);
@@ -565,7 +567,8 @@ export function IssueQueuePanel() {
           <DialogHeader>
             <DialogTitle>Issue with signature</DialogTitle>
             <DialogDescription>
-              Digital signature is required, or confirm a signed hard-copy sheet.
+              Provide a digital signature, or confirm a signed hard-copy sheet and
+              upload the scanned attachment.
             </DialogDescription>
           </DialogHeader>
           {selected ? (

@@ -79,6 +79,10 @@ export interface SecuritySettings {
   two_factor_enabled: boolean
   two_factor_require_all: boolean
   two_factor_require_admins_only: boolean
+  /** True when an Admin session-takeover super password is configured (hash never returned). */
+  admin_session_super_password_set?: boolean
+  /** Write-only on update; never returned by the API. */
+  admin_session_super_password?: string
   updated_at?: string | null
 }
 

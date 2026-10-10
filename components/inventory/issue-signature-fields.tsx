@@ -76,7 +76,7 @@ export function IssueSignatureFields({
           </label>
           <div className="space-y-2">
             <Label htmlFor="issuance-proforma-upload">
-              Scanned Inventory Issuance Proforma (optional)
+              Scanned Inventory Issuance Proforma
             </Label>
             <Input
               id="issuance-proforma-upload"
@@ -84,6 +84,7 @@ export function IssueSignatureFields({
               type="file"
               accept=".pdf,.png,.jpg,.jpeg,.webp,.tif,.tiff"
               disabled={disabled}
+              required
               onChange={(event) => {
                 const file = event.target.files?.[0] ?? null;
                 onProformaFileChange(file);
@@ -93,7 +94,7 @@ export function IssueSignatureFields({
               <p className="text-xs text-muted-foreground">{proformaFile.name}</p>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Upload a scan of the signed proforma if available.
+                Upload a scan of the signed hard-copy issue sheet.
               </p>
             )}
           </div>
@@ -116,12 +117,25 @@ export function useIssueSignature() {
     setProformaFile(null);
   }
 
-  function payload(): { signature_type: SignatureKind; signature_payload: string } | null {
+  function validationError(): string | null {
     if (signatureType === 'DIGITAL') {
-      if (!digitalPayload) return null;
+      if (!digitalPayload) return 'Digital signature is required to issue';
+      return null;
+    }
+    if (!hardCopyAck) {
+      return 'Confirm the hard-copy signature checkbox to issue';
+    }
+    if (!proformaFile) {
+      return 'Upload the scanned hard-copy attachment to issue';
+    }
+    return null;
+  }
+
+  function payload(): { signature_type: SignatureKind; signature_payload: string } | null {
+    if (validationError()) return null;
+    if (signatureType === 'DIGITAL') {
       return { signature_type: 'DIGITAL', signature_payload: digitalPayload };
     }
-    if (!hardCopyAck) return null;
     return { signature_type: 'HARD_COPY', signature_payload: 'HARD_COPY_CONFIRMED' };
   }
 
@@ -135,6 +149,7 @@ export function useIssueSignature() {
     proformaFile,
     setProformaFile,
     reset,
+    validationError,
     payload,
   };
 }

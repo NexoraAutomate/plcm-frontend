@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Bell, Wrench, AlertTriangle, CheckCircle2, Users, Rocket, Package, Clock, Unlock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { AppNotification } from '@/lib/app-notifications';
-import { parseApiDate } from '@/lib/parse-api-date';
+import { formatApiDateTime, formatApiDistanceToNow } from '@/lib/parse-api-date';
 import { cn } from '@/lib/utils';
 
 const TYPE_ICON: Record<string, typeof Bell> = {
@@ -132,10 +132,9 @@ export function NotificationRow({
         <p className="truncate text-xs text-muted-foreground">{item.message}</p>
         <p className="mt-1 text-[10px] text-muted-foreground">
           {(() => {
-            const date = parseApiDate(item.timestamp);
-            if (Number.isNaN(date.getTime())) return '—';
-            const relative = formatDistanceToNow(date, { addSuffix: true });
-            const absolute = date.toLocaleString();
+            const relative = formatApiDistanceToNow(item.timestamp, formatDistanceToNow);
+            const absolute = formatApiDateTime(item.timestamp);
+            if (relative === '—' && absolute === '—') return '—';
             return (
               <span title={absolute}>
                 {relative}

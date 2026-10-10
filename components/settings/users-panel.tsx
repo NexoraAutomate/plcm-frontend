@@ -494,7 +494,9 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
                 <SortableTableHead column="created_at" sort={sort} onSort={cycleSort}>
                   Created
                 </SortableTableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="w-[1%] whitespace-nowrap pr-3 text-right">
+                  Actions
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -536,38 +538,52 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
                         ? new Date(user.created_at).toLocaleDateString()
                         : '—'}
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
+                    <TableCell className="pr-3 text-right">
+                      <div className="inline-flex items-center justify-end gap-0.5">
                         <Button
-                          size="sm"
-                          variant="outline"
+                          size="icon-sm"
+                          variant="ghost"
                           onClick={() => setDetailsUser(user)}
                           title="View details"
+                          aria-label="View details"
+                          className="text-muted-foreground hover:bg-accent hover:text-foreground"
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-3.5 w-3.5" />
                         </Button>
                         {adminOnly && (
                           <Button
-                            size="sm"
-                            variant="outline"
+                            size="icon-sm"
+                            variant="ghost"
                             onClick={() => setHistoryUser(user)}
                             title="View login history"
+                            aria-label="View login history"
+                            className="text-muted-foreground hover:bg-accent hover:text-foreground"
                           >
-                            <History className="h-4 w-4" />
+                            <History className="h-3.5 w-3.5" />
                           </Button>
                         )}
                         <Can permission={P.edit_users}>
-                          <Button size="sm" variant="outline" onClick={() => openEdit(user)}>
-                            <Edit className="h-4 w-4" />
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            onClick={() => openEdit(user)}
+                            title="Edit user"
+                            aria-label="Edit user"
+                            className="text-muted-foreground hover:bg-accent hover:text-foreground"
+                          >
+                            <Edit className="h-3.5 w-3.5" />
                           </Button>
                         </Can>
                         <Can permission={P.delete_users}>
                           <Button
-                            size="sm"
-                            variant="destructive"
+                            size="icon-sm"
+                            variant="ghost"
                             onClick={() => setDeleteConfirm({ open: true, id: user.id })}
+                            title="Delete user"
+                            aria-label="Delete user"
+                            className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </Can>
                       </div>

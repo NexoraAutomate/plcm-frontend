@@ -11,7 +11,6 @@ import {
 } from '@/lib/auth-context';
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -34,6 +33,8 @@ export default function LoginPage() {
   const [sessionConflictOpen, setSessionConflictOpen] = useState(false);
   const [sessionConflictMessage, setSessionConflictMessage] = useState('');
   const [existingSession, setExistingSession] = useState<ExistingActiveSession | null>(null);
+  const [requiresSuperPassword, setRequiresSuperPassword] = useState(false);
+  const [superPassword, setSuperPassword] = useState('');
   const [pendingCredentials, setPendingCredentials] = useState<{
     username: string;
     password: string;
@@ -41,8 +42,12 @@ export default function LoginPage() {
   const { login, isAuthenticated, authReady, can, user } = useAuth();
   const router = useRouter();
 
-  async function completeLogin(username: string, password: string, forceSessionTakeover = false) {
-    await login(username, password, forceSessionTakeover ? { forceSessionTakeover: true } : undefined);
+  async function completeLogin(
+    username: string,
+    password: string,
+    options?: { forceSessionTakeover?: boolean; superPassword?: string }
+  ) {
+    await login(username, password, options);
     toast.success('Logged in successfully');
     const stored = localStorage.getItem('sat-user');
     let destination = '/executive-dashboard';
@@ -74,6 +79,13 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, authReady, router, can, user?.roles]);
 
+  function resetSessionConflict() {
+    setPendingCredentials(null);
+    setExistingSession(null);
+    setRequiresSuperPassword(false);
+    setSuperPassword('');
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (validateLoginForm(username, password)) {
@@ -89,6 +101,8 @@ export default function LoginPage() {
         setPendingCredentials({ username: username.trim(), password });
         setSessionConflictMessage(err.conflictMessage);
         setExistingSession(err.existingSession);
+        setRequiresSuperPassword(err.requiresSuperPassword);
+        setSuperPassword('');
         setSessionConflictOpen(true);
       } else {
         const message = err instanceof Error ? err.message : 'Authentication failed';
@@ -101,16 +115,18 @@ export default function LoginPage() {
 
   async function handleConfirmSessionTakeover() {
     if (!pendingCredentials) return;
-    setSessionConflictOpen(false);
+    if (requiresSuperPassword && !superPassword.trim()) {
+      toast.error('Enter the admin super password to continue');
+      return;
+    }
     setIsLoading(true);
     try {
-      await completeLogin(
-        pendingCredentials.username,
-        pendingCredentials.password,
-        true
-      );
-      setPendingCredentials(null);
-      setExistingSession(null);
+      await completeLogin(pendingCredentials.username, pendingCredentials.password, {
+        forceSessionTakeover: true,
+        ...(requiresSuperPassword ? { superPassword: superPassword.trim() } : {}),
+      });
+      setSessionConflictOpen(false);
+      resetSessionConflict();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Authentication failed';
       toast.error(message);
@@ -195,7 +211,13 @@ export default function LoginPage() {
         </CardContent>
       </Card>
 
-      <AlertDialog open={sessionConflictOpen} onOpenChange={setSessionConflictOpen}>
+      <AlertDialog
+        open={sessionConflictOpen}
+        onOpenChange={(open) => {
+          setSessionConflictOpen(open);
+          if (!open) resetSessionConflict();
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Already signed in elsewhere</AlertDialogTitle>
@@ -203,20 +225,54 @@ export default function LoginPage() {
               {sessionConflictMessage ||
                 'This user is already logged in on another PC. Signing in here will log them out from that session.'}
               {formatExistingSessionHint(existingSession)}
+              {requiresSuperPassword
+                ? ' This is an Administrator account. Enter the admin super password to continue.'
+                : ''}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {requiresSuperPassword ? (
+            <div className="space-y-2 py-1">
+              <Label htmlFor="admin-super-password">Super password</Label>
+              <Input
+                id="admin-super-password"
+                type="password"
+                autoComplete="off"
+                value={superPassword}
+                onChange={(e) => setSuperPassword(e.target.value)}
+                placeholder="Enter admin super password"
+                disabled={isLoading}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    void handleConfirmSessionTakeover();
+                  }
+                }}
+              />
+            </div>
+          ) : null}
           <AlertDialogFooter>
             <AlertDialogCancel
+              disabled={isLoading}
               onClick={() => {
-                setPendingCredentials(null);
-                setExistingSession(null);
+                resetSessionConflict();
               }}
             >
               Cancel
             </AlertDialogCancel>
-            <AlertDialogAction onClick={() => void handleConfirmSessionTakeover()}>
-              Sign in and sign out other device
-            </AlertDialogAction>
+            <Button
+              type="button"
+              disabled={isLoading || (requiresSuperPassword && !superPassword.trim())}
+              onClick={() => void handleConfirmSessionTakeover()}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                'Sign in and sign out other device'
+              )}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

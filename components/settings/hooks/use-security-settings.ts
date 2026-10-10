@@ -27,6 +27,7 @@ export type TwoFactorSettings = {
 export type SecuritySettingsState = {
   passwordPolicy: PasswordPolicySettings;
   twoFactor: TwoFactorSettings;
+  adminSessionSuperPasswordSet: boolean;
 };
 
 export type ActiveSession = {
@@ -60,6 +61,7 @@ export const DEFAULT_SECURITY_SETTINGS: SecuritySettingsState = {
     requireForAllUsers: false,
     requireForAdminsOnly: true,
   },
+  adminSessionSuperPasswordSet: false,
 };
 
 function fromApi(data: ApiSecuritySettings): SecuritySettingsState {
@@ -81,10 +83,14 @@ function fromApi(data: ApiSecuritySettings): SecuritySettingsState {
       requireForAllUsers: data.two_factor_require_all,
       requireForAdminsOnly: data.two_factor_require_admins_only,
     },
+    adminSessionSuperPasswordSet: Boolean(data.admin_session_super_password_set),
   };
 }
 
-function toApi(settings: SecuritySettingsState): Partial<ApiSecuritySettings> {
+function toApi(
+  settings: SecuritySettingsState,
+  options?: { adminSessionSuperPassword?: string }
+): Partial<ApiSecuritySettings> {
   return {
     min_password_length: settings.passwordPolicy.minLength,
     password_expiry_days: settings.passwordPolicy.expiryDays,
@@ -99,6 +105,9 @@ function toApi(settings: SecuritySettingsState): Partial<ApiSecuritySettings> {
     two_factor_enabled: settings.twoFactor.enabled,
     two_factor_require_all: settings.twoFactor.requireForAllUsers,
     two_factor_require_admins_only: settings.twoFactor.requireForAdminsOnly,
+    ...(options?.adminSessionSuperPassword
+      ? { admin_session_super_password: options.adminSessionSuperPassword }
+      : {}),
   };
 }
 
@@ -151,6 +160,31 @@ export function useSecuritySettings() {
     }
   }, []);
 
+  const saveAdminSessionSuperPassword = useCallback(
+    async (superPassword: string) => {
+      const trimmed = superPassword.trim();
+      if (!trimmed) {
+        toast.error('Enter a super password');
+        return false;
+      }
+      setSaving(true);
+      try {
+        const res = await api.auth.updateSecuritySettings(
+          toApi(settings, { adminSessionSuperPassword: trimmed })
+        );
+        setSettings(fromApi(res.data));
+        toast.success('Admin session super password updated');
+        return true;
+      } catch {
+        toast.error('Failed to update super password');
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [settings]
+  );
+
   const updatePasswordPolicy = useCallback(
     (patch: Partial<PasswordPolicySettings>) => {
       const next = {
@@ -181,6 +215,7 @@ export function useSecuritySettings() {
     loading,
     saving,
     saveSettings,
+    saveAdminSessionSuperPassword,
     updatePasswordPolicy,
     updateTwoFactor,
     reload,

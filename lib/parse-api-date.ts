@@ -1,9 +1,8 @@
 /**
  * Parse API datetime strings into absolute instants.
  *
- * Backend should send UTC with `Z` / offset. Naive ISO values (no zone) are
- * treated as UTC only when they already end with Z via normalization; values
- * with an explicit offset are respected as-is.
+ * Backend should send UTC with `Z` / offset (server time). Naive ISO values
+ * (no zone) are treated as UTC. Values with an explicit offset are respected.
  */
 export function parseApiDate(value: string | Date | null | undefined): Date {
   if (value == null || value === '') return new Date(NaN);
@@ -36,4 +35,11 @@ export function formatApiDistanceToNow(
   const date = parseApiDate(value);
   if (Number.isNaN(date.getTime())) return '—';
   return formatDistanceToNow(date, { addSuffix: true });
+}
+
+/** Absolute local display of a server UTC timestamp (empty → em dash). */
+export function formatApiDateTime(value: string | Date | null | undefined): string {
+  const date = parseApiDate(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString();
 }

@@ -140,11 +140,13 @@ export function InspectQueuePanel() {
         await api.inventory.repairCompleteReworkItem(selected.id);
         toast.success('Repair marked complete');
       } else {
-        const signed = signature.payload();
-        if (!signed) {
-          toast.error('Signature is required to issue');
+        const signatureError = signature.validationError();
+        if (signatureError) {
+          toast.error(signatureError);
           return;
         }
+        const signed = signature.payload();
+        if (!signed) return;
         const needsReplacement = selected.stage === 'scrapped' || selected.stage === 'reusable';
         if (needsReplacement && !replacementId) {
           toast.error('Select a replacement serial');

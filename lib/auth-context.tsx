@@ -27,18 +27,27 @@ export class ActiveSessionConflictError extends Error {
   readonly code = 'ACTIVE_SESSION_EXISTS';
   readonly conflictMessage: string;
   readonly existingSession: ExistingActiveSession;
+  /** Admin accounts require an extra super password before session takeover. */
+  readonly requiresSuperPassword: boolean;
 
-  constructor(message: string, existingSession: ExistingActiveSession) {
+  constructor(
+    message: string,
+    existingSession: ExistingActiveSession,
+    requiresSuperPassword = false
+  ) {
     super(message);
     this.name = 'ActiveSessionConflictError';
     this.conflictMessage = message;
     this.existingSession = existingSession;
+    this.requiresSuperPassword = requiresSuperPassword;
   }
 }
 
 export type LoginOptions = {
   /** End other devices' sessions and complete sign-in on this device. */
   forceSessionTakeover?: boolean;
+  /** Required when taking over an Admin session on another device. */
+  superPassword?: string;
 };
 
 interface AuthContextType {
@@ -240,6 +249,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const formData = new URLSearchParams();
       formData.append('username', username);
       formData.append('password', password);
+      if (options?.superPassword) {
+        formData.append('super_password', options.superPassword);
+      }
 
       const loginUrl = new URL(`${apiBase()}/auth/login`);
       if (options?.forceSessionTakeover) {
@@ -267,7 +279,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               typeof rawDetail.message === 'string'
                 ? rawDetail.message
                 : 'This account is already signed in on another device.',
-              (rawDetail.existing_session as ExistingActiveSession) ?? {}
+              (rawDetail.existing_session as ExistingActiveSession) ?? {},
+              Boolean(rawDetail.requires_super_password)
             );
           }
           if (typeof rawDetail === 'string' && rawDetail.trim()) {

@@ -35,14 +35,14 @@ function AppShellFrame({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden">
       {!hideSidebar ? <AppSidebar /> : null}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {!hideNavbar ? <Navbar /> : null}
         <main
           className={cn(
-            "relative min-h-0 flex-1 bg-background",
+            "relative min-h-0 min-w-0 flex-1 bg-background",
             isExecutiveCommand
               ? "flex flex-col overflow-hidden p-0"
-              : "overflow-y-auto p-6"
+              : "overflow-y-auto overflow-x-hidden p-6"
           )}
         >
           {hideNavbar ? (

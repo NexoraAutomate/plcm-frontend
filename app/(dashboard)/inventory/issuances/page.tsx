@@ -50,6 +50,11 @@ import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-
 import { useColumnVisibility, type ColumnVisibilityDef } from '@/hooks/use-column-visibility';
 import { useClientTableSort } from '@/hooks/use-table-sorting';
 
+const STICKY_ACTIONS_HEAD =
+  'sticky right-0 z-30 w-[1%] whitespace-nowrap bg-background text-right shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.15)]';
+const STICKY_ACTIONS_CELL =
+  'sticky right-0 z-10 bg-background text-right align-top shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.15)] group-hover:bg-muted/50';
+
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All (history)' },
   { value: 'issued', label: 'Issued (open)' },
@@ -176,7 +181,7 @@ export default function InventoryIssuancesPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="mb-1">
@@ -257,8 +262,8 @@ export default function InventoryIssuancesPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardContent className="pt-6">
+      <Card className="min-w-0 overflow-hidden">
+        <CardContent className="min-w-0 pt-6">
           <div className="mb-3 flex justify-end">
             <ColumnVisibilityMenu
               columns={COLUMN_DEFS}
@@ -271,8 +276,8 @@ export default function InventoryIssuancesPage() {
           {rows.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">No issuances found.</p>
           ) : (
-            <div className="overflow-x-visible">
-              <Table containerClassName="rounded-md border">
+            <div className="min-w-0 max-w-full">
+              <Table containerClassName="max-w-full overflow-x-auto rounded-md border">
                 <TableHeader>
                   <TableRow>
                     {isVisible('inventory_name') && (
@@ -315,7 +320,7 @@ export default function InventoryIssuancesPage() {
                         Status
                       </SortableTableHead>
                     )}
-                    <TableHead className="w-[1%] whitespace-nowrap text-right">Actions</TableHead>
+                    <TableHead className={STICKY_ACTIONS_HEAD}>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -326,7 +331,7 @@ export default function InventoryIssuancesPage() {
                     return (
                     <TableRow
                       key={row.id}
-                      className="cursor-pointer hover:bg-muted/50"
+                      className="group cursor-pointer hover:bg-muted/50"
                       onClick={() => {
                         setDetailsRow(row);
                         setDetailsOpen(true);
@@ -385,7 +390,7 @@ export default function InventoryIssuancesPage() {
                         </TableCell>
                       )}
                       <TableCell
-                        className="text-right align-top"
+                        className={STICKY_ACTIONS_CELL}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div className="flex flex-col items-end gap-2">

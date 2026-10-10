@@ -115,12 +115,18 @@ export function InventoryIssueDialog({
 
   const handleSubmit = async () => {
     if (!item) return;
+    const signatureError = signature.validationError();
+    if (signatureError) {
+      toast.error(signatureError);
+      return;
+    }
     const signed = signature.payload();
+    if (!signed) return;
     const developerId = Number(issuedToUserId);
     const qty = Math.max(1, Number(quantity) || 1);
     const resolvedInstanceId = usesInstances ? Number(instanceId) : undefined;
     const validationError = validateIssueInventoryForm({
-      signaturePresent: Boolean(signed),
+      signaturePresent: true,
       developerId,
       usesInstances,
       instanceId: resolvedInstanceId,
@@ -131,7 +137,6 @@ export function InventoryIssueDialog({
       toast.error(validationError);
       return;
     }
-    if (!signed) return;
     if (usesInstances && reservedHold && !matchingRequest) {
       toast.error('Developer must request this reserved item before it can be issued');
       return;
