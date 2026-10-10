@@ -110,6 +110,8 @@ export function InventoryAddMoreDialog({
         location,
       });
       onOpenChange(false);
+    } catch {
+      // Parent shows the error toast; keep dialog open for retry.
     } finally {
       setSubmitting(false);
     }

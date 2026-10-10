@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Plus, Edit, Trash2, Search, ChevronDown, ListOrdered, Undo2, RefreshCw, Download, Upload, FileText, AlertCircle, CheckCircle2, Tag, ScanLine, QrCode } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, ChevronDown, ListOrdered, Undo2, RefreshCw, Download, Upload, FileText, AlertCircle, CheckCircle2, Tag, ScanLine, QrCode, Lock, Info } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
@@ -84,7 +84,14 @@ import {
   suggestAbbreviation,
 } from '@/lib/app-definitions';
 import { P } from '@/lib/permission-codes';
-import { workflowStatusLabel } from '@/lib/workflow-status';
+import { workflowStatusColor, workflowStatusLabel } from '@/lib/workflow-status';
+import { DEFAULT_STATUS_COLOR_BY_NAME, hexToRgba } from '@/lib/status-colors';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {
   ListStatsVisibilityControls,
   useListStatsVisibility,
@@ -458,6 +465,8 @@ export default function InventoryPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingInstanceId, setEditingInstanceId] = useState<number | null>(null);
+  /** True when opened from a specific serial — show that unit only (no Units tab / stock qty). */
+  const [editingSerialOnly, setEditingSerialOnly] = useState(false);
   const [editingGroup, setEditingGroup] = useState<Inventory | null>(null);
   const [instances, setInstances] = useState<InventoryInstance[]>([]);
   const {
@@ -712,6 +721,28 @@ export default function InventoryPage() {
     setDeleteBlockedTarget({ item, instances: [instance] });
   }
 
+  function apiErrorDetail(err: unknown, fallback: string): string {
+    const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data
+      ?.detail;
+    if (typeof detail === 'string' && detail.trim()) return detail;
+    if (Array.isArray(detail)) {
+      const parts = detail
+        .map((entry) => {
+          if (typeof entry === 'string') return entry;
+          if (entry && typeof entry === 'object' && 'msg' in entry) {
+            return String((entry as { msg?: unknown }).msg ?? '');
+          }
+          return '';
+        })
+        .filter(Boolean);
+      if (parts.length) return parts.join('; ');
+    }
+    if (err instanceof Error && /network error/i.test(err.message)) {
+      return 'Could not reach the server. Check that the API is running and try again.';
+    }
+    return fallback;
+  }
+
   async function handleAddMore(payload: {
     quantity: number;
     location_room: string;
@@ -743,37 +774,38 @@ export default function InventoryPage() {
 
     const relatedEntities = inventoryEntitiesForType(addMoreItem.inventory_type, entityPools);
     const serials = allocateInventorySerials(addMoreItem, quantity, relatedEntities);
-
     const holderUserId = Number(inventoryHolderUserId);
+    const locationRoom = payload.location_room.trim() || undefined;
+    const locationCabinet = payload.location_cabinet.trim() || undefined;
+    const locationRack = payload.location_rack.trim() || undefined;
+
     try {
-      const created = await api.inventory.create({
-        name: addMoreItem.name,
-        inventory_type: addMoreItem.inventory_type,
-        description: addMoreItem.description,
-        oem_name: addMoreItem.oem_name,
-        part_number: addMoreItem.part_number,
-        configuration_item: addMoreItem.configuration_item,
-        status_id: addMoreItem.status_id,
-        sku: addMoreItem.sku,
-        quantity,
-        serial_number: serials[0],
-        original_serial_number: serials[0],
-        holder_user_id: holderUserId,
-        location: location || undefined,
-        location_room: payload.location_room.trim() || undefined,
-        location_cabinet: payload.location_cabinet.trim() || undefined,
-        location_rack: payload.location_rack.trim() || undefined,
-      });
-      toastFulfillments(created.data?.fcfs_fulfillments);
+      let added = 0;
+      for (let index = 0; index < quantity; index += 1) {
+        const serial = serials[index];
+        const created = await api.inventory.createInstance(addMoreItem.id, {
+          serial_number: serial || undefined,
+          original_serial_number: serial || undefined,
+          configuration_item:
+            addMoreItem.configuration_item || addMoreItem.part_number || addMoreItem.name,
+          holder_user_id: holderUserId,
+          location: location || undefined,
+          location_room: locationRoom,
+          location_cabinet: locationCabinet,
+          location_rack: locationRack,
+        });
+        toastFulfillments(created.data?.fcfs_fulfillments);
+        added += 1;
+      }
       toast.success(
-        quantity === 1
+        added === 1
           ? `Added another ${addMoreItem.name} to inventory`
-          : `Added ${quantity} ${addMoreItem.name} units to inventory`
+          : `Added ${added} ${addMoreItem.name} units to inventory`
       );
       pagination.invalidate();
     } catch (err) {
       console.error('Failed to add more inventory:', err);
-      toast.error('Failed to add inventory units');
+      toast.error(apiErrorDetail(err, 'Failed to add inventory units'));
       throw err;
     }
   }
@@ -788,6 +820,7 @@ export default function InventoryPage() {
     setRemovePicture(false);
     setSelectedEntityType('component');
     setEditingInstanceId(null);
+    setEditingSerialOnly(false);
     setEditingGroup(null);
     setInstances([]);
     setFormTab('general');
@@ -908,7 +941,14 @@ export default function InventoryPage() {
       toastFulfillments(updated.data?.fcfs_fulfillments);
 
       if (usesInstances && editingInstanceId) {
-        await api.inventory.updateInstance(editingInstanceId, buildInstancePayload());
+        const instancePayload = buildInstancePayload();
+        const {
+          status_id: _statusId,
+          installation_date: _installationDate,
+          installed_by_id: _installedById,
+          ...editableInstanceFields
+        } = instancePayload;
+        await api.inventory.updateInstance(editingInstanceId, editableInstanceFields);
         const mediaOwnerId = editingInstanceId;
         await syncMedia('inventory_instance', mediaOwnerId);
       } else if (!usesInstances) {
@@ -1020,18 +1060,27 @@ export default function InventoryPage() {
   async function handleDeleteInstance(instanceId: number) {
     try {
       await api.inventory.deleteInstance(instanceId);
-      const refreshed = editingId ? await api.inventory.get(editingId) : null;
+      if (!editingId) {
+        toast.success('Serialized unit removed');
+        pagination.invalidate();
+        return;
+      }
+      const refreshed = await api.inventory.get(editingId);
       if (!refreshed?.data) {
         pagination.invalidate();
         resetForm();
         setEditingId(null);
+        setEditingInstanceId(null);
+        setEditingGroup(null);
+        setInstances([]);
         setIsEditOpen(false);
         toast.success('Inventory group removed');
         return;
       }
       const nextInstances = refreshed.data.instances ?? [];
       setInstances(nextInstances);
-      if (nextInstances.length > 0 && refreshed.data) {
+      setEditingGroup(refreshed.data);
+      if (nextInstances.length > 0) {
         loadInstanceIntoForm(nextInstances[0], refreshed.data);
       } else {
         setEditingInstanceId(null);
@@ -1040,7 +1089,18 @@ export default function InventoryPage() {
       pagination.invalidate();
     } catch (err) {
       console.error('Failed to delete inventory unit:', err);
-      toast.error('Failed to delete serialized unit');
+      const detail = apiErrorDetail(err, 'Failed to delete serialized unit');
+      if (/reserved|issued|installed/i.test(detail) && editingGroup) {
+        const blocked = (editingGroup.instances ?? []).find(
+          (instance) => instance.id === instanceId
+        );
+        setDeleteBlockedTarget({
+          item: editingGroup,
+          instances: blocked ? [blocked] : getBlockedDeleteInstances(editingGroup),
+        });
+        return;
+      }
+      toast.error(detail);
     }
   }
 
@@ -1051,6 +1111,8 @@ export default function InventoryPage() {
     setPendingAttachments([]);
     setPendingPictureFile(null);
     setRemovePicture(false);
+    const serialOnly = instanceId != null;
+    setEditingSerialOnly(serialOnly);
 
     try {
       const res = await api.inventory.get(item.id);
@@ -1061,9 +1123,9 @@ export default function InventoryPage() {
       setFormData(inventoryFormFromItem(fullItem));
 
       if (inventoryUsesInstances(fullItem.inventory_type as EntityType) && itemInstances.length > 0) {
-        const selectedInstance =
-          (instanceId ? itemInstances.find((instance) => instance.id === instanceId) : null) ??
-          itemInstances[0];
+        const selectedInstance = serialOnly
+          ? itemInstances.find((instance) => instance.id === instanceId) ?? itemInstances[0]
+          : itemInstances[0];
         loadInstanceIntoForm(selectedInstance, fullItem);
       } else {
         setEditingInstanceId(null);
@@ -1083,53 +1145,74 @@ export default function InventoryPage() {
 
   const formTabSingleClassName = 'mt-0 space-y-5 p-1 [&>div]:space-y-2';
 
+  const tabTriggerClassName =
+    'rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm';
+
+  const getEntityDisplayName = (entityType: EntityType) => entityLabel(entityType);
+
+  const editStatusLabel = (() => {
+    const byId = statuses.find((status) => String(status.id) === formData.status_id);
+    if (byId?.status_name) return workflowStatusLabel(byId.status_name);
+    const selectedInstance = instances.find((instance) => instance.id === editingInstanceId);
+    if (selectedInstance?.is_reserved) {
+      return workflowStatusLabel(selectedInstance.status_name || 'ISSUED');
+    }
+    if (selectedInstance && isProjectReservedInstance(selectedInstance)) {
+      return 'Reserved';
+    }
+    return formData.status_id ? 'Available' : '—';
+  })();
+
+  const installerLabel = (() => {
+    if (!formData.installed_by_id) return '—';
+    const user = users.find((entry) => String(entry.id) === formData.installed_by_id);
+    return user ? user.full_name || user.username : '—';
+  })();
+
+  const installationDateLabel = formData.installation_date
+    ? new Date(`${formData.installation_date}T00:00:00`).toLocaleDateString()
+    : '—';
+
+  const editingSerialLabel =
+    formData.serial_number?.trim() ||
+    instances.find((instance) => instance.id === editingInstanceId)?.serial_number?.trim() ||
+    '';
+
+  const showEditUnitsTab =
+    inventoryUsesInstances(selectedEntityType) &&
+    !editingSerialOnly &&
+    instances.length > 1;
+
+  const showEditStockQuantity = !editingSerialOnly;
+
+  const editStatusSoftStyle = (() => {
+    if (!editStatusLabel || editStatusLabel === '—') return undefined;
+    const hex =
+      workflowStatusColor(editStatusLabel) ||
+      DEFAULT_STATUS_COLOR_BY_NAME[editStatusLabel] ||
+      '#5B9BD5';
+    return {
+      backgroundColor: hexToRgba(hex, 0.16),
+      color: hex,
+      borderColor: hexToRgba(hex, 0.35),
+    } as const;
+  })();
+
   const renderInventoryFormTabs = (mode: 'create' | 'edit') => (
     <Tabs value={formTab} onValueChange={setFormTab} className="w-full">
-      <div className="border-b bg-muted/30 px-6 pt-2 pb-0">
+      <div className="border-b bg-muted/20 px-6 pt-2 pb-0">
         <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 rounded-none bg-transparent p-0">
-          <TabsTrigger
-            value="general"
-            className="rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
-          >
+          <TabsTrigger value="general" className={tabTriggerClassName}>
             General
           </TabsTrigger>
-          <TabsTrigger
-            value="part-number"
-            className="rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
-          >
-            OEM / SKU
+          <TabsTrigger value="holder" className={tabTriggerClassName}>
+            Location
           </TabsTrigger>
-          <TabsTrigger
-            value="holder"
-            className="rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
-          >
-            Holder
-          </TabsTrigger>
-          {mode === 'edit' ? (
-            <TabsTrigger
-              value="install"
-              className="rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
-            >
-              Install
-            </TabsTrigger>
-          ) : null}
-          <TabsTrigger
-            value="picture"
-            className="rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
-          >
-            Picture
-          </TabsTrigger>
-          <TabsTrigger
-            value="attachments"
-            className="rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
-          >
+          <TabsTrigger value="attachments" className={tabTriggerClassName}>
             Attachments
           </TabsTrigger>
-          {mode === 'edit' && inventoryUsesInstances(selectedEntityType) ? (
-            <TabsTrigger
-              value="units"
-              className="rounded-md px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
-            >
+          {mode === 'edit' && showEditUnitsTab ? (
+            <TabsTrigger value="units" className={tabTriggerClassName}>
               Units
             </TabsTrigger>
           ) : null}
@@ -1137,416 +1220,389 @@ export default function InventoryPage() {
       </div>
 
       <div className="px-6 py-6">
-      <TabsContent value="general" className={formTabClassName}>
-        <div>
-          <Label>Inventory Type {mode === 'create' ? '*' : ''}</Label>
-          {mode === 'create' ? (
-            <Select
-              value={selectedEntityType}
-              onValueChange={(value) => {
-                const newType = value as EntityType;
-                setSelectedEntityType(newType);
-                setFormData({
-                  ...formData,
-                  inventory_type: value,
-                  name: '',
-                  part_number: '',
-                  serial_number: '',
-                  quantity: formData.quantity || 1,
-                });
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="system">{entityLabel('system')}</SelectItem>
-                <SelectItem value="subsystem">{entityLabel('subsystem')}</SelectItem>
-                <SelectItem value="module">{entityLabel('module')}</SelectItem>
-                <SelectItem value="unit">{entityLabel('unit')}</SelectItem>
-                <SelectItem value="component">{entityLabel('component')}</SelectItem>
-              </SelectContent>
-            </Select>
-          ) : (
-            <Input value={getEntityDisplayName(selectedEntityType)} disabled />
-          )}
-        </div>
-
-        <div>
-          <Label>
-            {getEntityDisplayName(selectedEntityType)} Category
-            {mode === 'create' ? ' (Entity List)' : ''} {mode === 'create' ? '*' : ''}
-          </Label>
-          {mode === 'create' ? (
-            <Select
-              value={formData.name}
-              onValueChange={(value) => {
-                setFormData((prev) =>
-                  applyDefinitionIdentifiers(selectedEntityType, value, prev.oem_name, prev)
-                );
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue
-                  placeholder={`Select from Entity List (${entityLabel(selectedEntityType)})`}
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {entityListNames.length === 0 ? (
-                  <SelectItem value="__none__" disabled>
-                    {`No ${entityLabel(selectedEntityType, true).toLowerCase()} in Entity List — add in Definitions`}
-                  </SelectItem>
-                ) : (
-                  entityListNames.map((entry) => (
-                    <SelectItem key={entry.id} value={entry.name}>
-                      {entry.name}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-          ) : (
-            <Input value={formData.name || ''} disabled />
-          )}
-        </div>
-
-        {mode === 'create' ? (
-          <div>
-            <Label>Quantity *</Label>
-            <Input
-              type="number"
-              min="1"
-              value={formData.quantity || ''}
-              onChange={(e) => {
-                const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
-                setFormData({ ...formData, quantity: isNaN(val) ? 0 : val });
-              }}
-              placeholder="Enter quantity"
-            />
-            <p className="text-xs text-muted-foreground">
-              Enter how many units to add to this inventory group.
-            </p>
-          </div>
-        ) : (
-          <div>
-            <Label>Quantity</Label>
-            <Input value={String(formData.quantity || 0)} disabled />
-            <p className="text-xs text-muted-foreground">
-              Quantity cannot be changed here. Use Add Stock to increase it.
-            </p>
-          </div>
-        )}
-
-        {mode === 'edit' ? (
-          <div>
-            <Label>Status</Label>
-            <Select
-              value={formData.status_id || ''}
-              onValueChange={(value) => setFormData({ ...formData, status_id: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                {statuses.map((status) => (
-                  <SelectItem key={status.id} value={String(status.id)}>
-                    {workflowStatusLabel(status.status_name)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : null}
-
-        <div className="sm:col-span-2">
-          <Label>Description</Label>
-          <Input
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            placeholder="Item description"
-          />
-        </div>
-      </TabsContent>
-
-      <TabsContent value="part-number" className={formTabClassName}>
-        {mode === 'edit' && selectedEntityType === 'component' ? (
-          <div>
-            <Label>SKU</Label>
-            <Input
-              value={formData.sku}
-              onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-              placeholder="Component SKU"
-            />
-          </div>
-        ) : null}
-
-        <div className={mode === 'edit' ? undefined : 'sm:col-span-2'}>
-          <Label>Vendor / OEM acronym</Label>
-          <Input
-            value={formData.oem_name}
-            onChange={(e) => {
-              setFormData({ ...formData, oem_name: e.target.value });
-            }}
-            placeholder="Short acronym for {vendor} token, e.g. AMP"
-          />
-          <p className="text-xs text-muted-foreground">
-            Part # / Serial # are generated automatically from the item name and this OEM
-            acronym. They are not entered manually.
-          </p>
-        </div>
-      </TabsContent>
-
-      <TabsContent value="holder" className={formTabClassName}>
-        {inventoryUsesInstances(selectedEntityType) && mode === 'edit' && editingInstanceId ? (
-          <p className="text-sm text-muted-foreground">
-            Holder details apply to the selected serialized unit.
-          </p>
-        ) : null}
-        {inventoryUsesInstances(selectedEntityType) && mode === 'create' ? (
-          <p className="text-sm text-muted-foreground">
-            Holder details apply to the serialized unit being added.
-          </p>
-        ) : null}
-        <div>
-          <Label>Inventory Holder</Label>
+        <TabsContent value="general" className={formTabClassName}>
           {mode === 'create' ? (
             <>
-              <Input value={inventoryHolderLabel} disabled />
-              <p className="text-xs text-muted-foreground">
-                Warehouse stock is held by the Inventory Manager who adds the item.
-              </p>
+              <div>
+                <Label>Inventory Type *</Label>
+                <Select
+                  value={selectedEntityType}
+                  onValueChange={(value) => {
+                    const newType = value as EntityType;
+                    setSelectedEntityType(newType);
+                    setFormData({
+                      ...formData,
+                      inventory_type: value,
+                      name: '',
+                      part_number: '',
+                      serial_number: '',
+                      quantity: formData.quantity || 1,
+                    });
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="system">{entityLabel('system')}</SelectItem>
+                    <SelectItem value="subsystem">{entityLabel('subsystem')}</SelectItem>
+                    <SelectItem value="module">{entityLabel('module')}</SelectItem>
+                    <SelectItem value="unit">{entityLabel('unit')}</SelectItem>
+                    <SelectItem value="component">{entityLabel('component')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>{getEntityDisplayName(selectedEntityType)} Category *</Label>
+                <Select
+                  value={formData.name}
+                  onValueChange={(value) => {
+                    setFormData((prev) =>
+                      applyDefinitionIdentifiers(selectedEntityType, value, prev.oem_name, prev)
+                    );
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={`Select from Entity List (${entityLabel(selectedEntityType)})`}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {entityListNames.length === 0 ? (
+                      <SelectItem value="__none__" disabled>
+                        {`No ${entityLabel(selectedEntityType, true).toLowerCase()} in Entity List — add in Definitions`}
+                      </SelectItem>
+                    ) : (
+                      entityListNames.map((entry) => (
+                        <SelectItem key={entry.id} value={entry.name}>
+                          {entry.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Quantity *</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={formData.quantity || ''}
+                  onChange={(e) => {
+                    const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
+                    setFormData({ ...formData, quantity: isNaN(val) ? 0 : val });
+                  }}
+                  placeholder="Enter quantity"
+                />
+              </div>
             </>
-          ) : (
-            <Select
-              value={formData.holder_user_id || ''}
-              onValueChange={(value) => setFormData({ ...formData, holder_user_id: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select inventory holder" />
-              </SelectTrigger>
-              <SelectContent>
-                {users.map((user) => (
-                  <SelectItem key={user.id} value={String(user.id)}>
-                    {user.full_name || user.username}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
+          ) : showEditStockQuantity ? (
+            <div>
+              <Label>Quantity in stock</Label>
+              <Input value={String(formData.quantity || 0)} disabled />
+              <p className="text-xs text-muted-foreground">
+                Use Add More (+) on the inventory list to restock.
+              </p>
+            </div>
+          ) : null}
 
-        <CascadingLocationSelects
-          tree={definitions.inventory_location_tree}
-          required={mode === 'create'}
-          value={{
-            location_room: formData.location_room,
-            location_cabinet: formData.location_cabinet,
-            location_rack: formData.location_rack,
-          }}
-          onChange={(next) => setFormData({ ...formData, ...next })}
-        />
-
-        <div>
-          <Label>Added Date</Label>
-          <Input
-            type="date"
-            value={formData.added_date}
-            onChange={(e) => setFormData({ ...formData, added_date: e.target.value })}
-          />
-        </div>
-
-        <div>
-          <Label>Shelf Life Expires</Label>
-          <Input
-            type="date"
-            value={formData.shelf_life_expires_at}
-            onChange={(e) =>
-              setFormData({ ...formData, shelf_life_expires_at: e.target.value })
-            }
-          />
-        </div>
-      </TabsContent>
-
-      {mode === 'edit' ? (
-        <TabsContent value="install" className={formTabClassName}>
-          <div>
-            <Label>Installation Date</Label>
+          <div className="sm:col-span-2">
+            <Label>Description</Label>
             <Input
-              type="date"
-              value={formData.installation_date}
-              onChange={(e) => setFormData({ ...formData, installation_date: e.target.value })}
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Short description of this item"
             />
           </div>
+
           <div>
-            <Label>Installed By</Label>
-            <Select
-              value={formData.installed_by_id || ''}
-              onValueChange={(value) => setFormData({ ...formData, installed_by_id: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select installer" />
-              </SelectTrigger>
-              <SelectContent>
-                {users.map((user) => (
-                  <SelectItem key={user.id} value={String(user.id)}>
-                    {user.full_name || user.username}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </TabsContent>
-      ) : null}
-
-      <TabsContent value="picture" className={formTabClassName}>
-        <div>
-          <Label>Picture</Label>
-          <Input
-            value={formData.picture_url}
-            onChange={(e) => {
-              setFormData({ ...formData, picture_url: e.target.value });
-              setRemovePicture(false);
-            }}
-            placeholder="Path or URL to item photo"
-          />
-        </div>
-
-        <div>
-          <Label>Or Upload Photo</Label>
-          <Input
-            type="file"
-            accept="image/*"
-            onChange={(e) => {
-              setPendingPictureFile(e.target.files?.[0] ?? null);
-              setRemovePicture(false);
-            }}
-          />
-        </div>
-
-        {(formData.picture_url || pendingPictureFile) && !removePicture ? (
-          <div className="sm:col-span-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setFormData({ ...formData, picture_url: '' });
-                setPendingPictureFile(null);
-                setRemovePicture(true);
-              }}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Remove photo
-            </Button>
-          </div>
-        ) : null}
-      </TabsContent>
-
-      <TabsContent value="attachments" className={formTabSingleClassName}>
-        <EntityAttachmentsSection
-          ownerType={
-            inventoryUsesInstances(selectedEntityType) && editingInstanceId
-              ? 'inventory_instance'
-              : 'inventory'
-          }
-          ownerId={
-            mode === 'edit'
-              ? inventoryUsesInstances(selectedEntityType)
-                ? editingInstanceId
-                : editingId
-              : null
-          }
-          pendingAttachments={pendingAttachments}
-          onPendingAttachmentsChange={setPendingAttachments}
-        />
-      </TabsContent>
-
-      {mode === 'edit' && inventoryUsesInstances(selectedEntityType) ? (
-        <TabsContent value="units" className={formTabSingleClassName}>
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm text-muted-foreground">
-              {instances.length} inventory unit{instances.length === 1 ? '' : 's'} in this group
+            <Label>Vendor / OEM acronym</Label>
+            <Input
+              value={formData.oem_name}
+              onChange={(e) => setFormData({ ...formData, oem_name: e.target.value })}
+              placeholder="e.g. AMP"
+            />
+            <p className="text-xs text-muted-foreground">
+              Used when generating part and serial numbers.
             </p>
-            {canCreateInventory ? (
-              <Button type="button" size="sm" variant="outline" onClick={handleAddInstance}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Unit
+          </div>
+
+          {selectedEntityType === 'component' ? (
+            <div>
+              <Label>SKU</Label>
+              <Input
+                value={formData.sku}
+                onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                placeholder="Component SKU"
+              />
+            </div>
+          ) : (
+            <div />
+          )}
+
+          {mode === 'edit' ? (
+            <div className="sm:col-span-2 rounded-lg border bg-muted/20 p-4">
+              <p className="mb-3 text-sm font-medium">Installation</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Installation date
+                  </p>
+                  <p className="text-sm">{installationDateLabel}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Installed by
+                  </p>
+                  <p className="text-sm">{installerLabel}</p>
+                </div>
+              </div>
+              <p className="mt-3 text-xs text-muted-foreground">
+                Filled automatically when a developer starts install and HM/PD verifies it.
+              </p>
+            </div>
+          ) : null}
+
+          <div className="sm:col-span-2 space-y-3 rounded-lg border p-4">
+            <div>
+              <Label>Picture</Label>
+              <Input
+                value={formData.picture_url}
+                onChange={(e) => {
+                  setFormData({ ...formData, picture_url: e.target.value });
+                  setRemovePicture(false);
+                }}
+                placeholder="Path or URL to item photo"
+              />
+            </div>
+            <div>
+              <Label>Or upload photo</Label>
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  setPendingPictureFile(e.target.files?.[0] ?? null);
+                  setRemovePicture(false);
+                }}
+              />
+            </div>
+            {(formData.picture_url || pendingPictureFile) && !removePicture ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setFormData({ ...formData, picture_url: '' });
+                  setPendingPictureFile(null);
+                  setRemovePicture(true);
+                }}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Remove photo
               </Button>
             ) : null}
           </div>
-          <div className="overflow-x-visible rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <SortableTableHead
-                    column="serial_number"
-                    sort={instanceEditorSort}
-                    onSort={cycleInstanceEditorSort}
-                  >
-                    Unit Identity
-                  </SortableTableHead>
-                  <SortableTableHead
-                    column="location"
-                    sort={instanceEditorSort}
-                    onSort={cycleInstanceEditorSort}
-                  >
-                    Location
-                  </SortableTableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {instances.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={3} className="text-center text-muted-foreground py-6">
-                      No inventory units yet
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  sortedEditorInstances.map((instance) => (
-                    <TableRow
-                      key={instance.id}
-                      className={editingInstanceId === instance.id ? 'bg-muted/50' : undefined}
-                    >
-                      <TableCell>{instance.serial_number || '—'}</TableCell>
-                      <TableCell>{instance.location || '—'}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Can permission={P.edit_inventory}>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => editingGroup && loadInstanceIntoForm(instance, editingGroup)}
-                            >
-                              Edit
-                            </Button>
-                          </Can>
-                          <Can permission={P.delete_inventory}>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleDeleteInstance(instance.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </Can>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+        </TabsContent>
+
+        <TabsContent value="holder" className={formTabClassName}>
+          {inventoryUsesInstances(selectedEntityType) && mode === 'edit' && editingInstanceId ? (
+            <p className="text-sm text-muted-foreground">
+              Location and holder apply to the selected unit.
+            </p>
+          ) : null}
+          {inventoryUsesInstances(selectedEntityType) && mode === 'create' ? (
+            <p className="text-sm text-muted-foreground">
+              Location and holder apply to each new unit being added.
+            </p>
+          ) : null}
+          <div>
+            <Label>Inventory Holder</Label>
+            {mode === 'create' ? (
+              <>
+                <Input value={inventoryHolderLabel} disabled />
+                <p className="text-xs text-muted-foreground">
+                  Warehouse stock is held by the Inventory Manager who adds the item.
+                </p>
+              </>
+            ) : (
+              <Select
+                value={formData.holder_user_id || ''}
+                onValueChange={(value) => setFormData({ ...formData, holder_user_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select inventory holder" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={String(user.id)}>
+                      {user.full_name || user.username}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          <CascadingLocationSelects
+            tree={definitions.inventory_location_tree}
+            required={mode === 'create'}
+            value={{
+              location_room: formData.location_room,
+              location_cabinet: formData.location_cabinet,
+              location_rack: formData.location_rack,
+            }}
+            onChange={(next) => setFormData({ ...formData, ...next })}
+          />
+
+          <div>
+            <Label>Added Date</Label>
+            <Input
+              type="date"
+              value={formData.added_date}
+              onChange={(e) => setFormData({ ...formData, added_date: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <Label>Shelf Life Expires</Label>
+            <Input
+              type="date"
+              value={formData.shelf_life_expires_at}
+              onChange={(e) =>
+                setFormData({ ...formData, shelf_life_expires_at: e.target.value })
+              }
+            />
           </div>
         </TabsContent>
-      ) : null}
+
+        <TabsContent value="attachments" className={formTabSingleClassName}>
+          <EntityAttachmentsSection
+            ownerType={
+              inventoryUsesInstances(selectedEntityType) && editingInstanceId
+                ? 'inventory_instance'
+                : 'inventory'
+            }
+            ownerId={
+              mode === 'edit'
+                ? inventoryUsesInstances(selectedEntityType)
+                  ? editingInstanceId
+                  : editingId
+                : null
+            }
+            pendingAttachments={pendingAttachments}
+            onPendingAttachmentsChange={setPendingAttachments}
+          />
+        </TabsContent>
+
+        {mode === 'edit' && showEditUnitsTab ? (
+          <TabsContent value="units" className={formTabSingleClassName}>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm text-muted-foreground">
+                {instances.length} unit{instances.length === 1 ? '' : 's'} in this group
+              </p>
+              {canCreateInventory ? (
+                <Button type="button" size="sm" variant="outline" onClick={handleAddInstance}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Unit
+                </Button>
+              ) : null}
+            </div>
+            <div className="overflow-x-visible rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <SortableTableHead
+                      column="serial_number"
+                      sort={instanceEditorSort}
+                      onSort={cycleInstanceEditorSort}
+                    >
+                      Unit Identity
+                    </SortableTableHead>
+                    <SortableTableHead
+                      column="location"
+                      sort={instanceEditorSort}
+                      onSort={cycleInstanceEditorSort}
+                    >
+                      Location
+                    </SortableTableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {instances.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="py-6 text-center text-muted-foreground">
+                        No inventory units yet
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    sortedEditorInstances.map((instance) => {
+                      const unitStatus = instance.is_reserved
+                        ? instance.status_name || 'ISSUED'
+                        : isProjectReservedInstance(instance)
+                          ? 'RESERVED'
+                          : 'AVAILABLE';
+                      return (
+                        <TableRow
+                          key={instance.id}
+                          className={
+                            editingInstanceId === instance.id ? 'bg-muted/50' : undefined
+                          }
+                        >
+                          <TableCell className="font-mono text-sm">
+                            {instance.serial_number || '—'}
+                          </TableCell>
+                          <TableCell title={instance.location || undefined}>
+                            {formatInventoryLocationAbbrev(instance)}
+                          </TableCell>
+                          <TableCell>
+                            <StatusBadge status={unitStatus} />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Can permission={P.edit_inventory}>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() =>
+                                    editingGroup && loadInstanceIntoForm(instance, editingGroup)
+                                  }
+                                >
+                                  Edit
+                                </Button>
+                              </Can>
+                              <Can permission={P.delete_inventory}>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => {
+                                    if (!editingGroup) return;
+                                    requestDeleteInstance(editingGroup, instance);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </Can>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+        ) : null}
       </div>
     </Tabs>
   );
 
-  const getEntityDisplayName = (entityType: EntityType) => entityLabel(entityType);
 
   function findExistingStockGroup(type: EntityType, name: string): InventoryItem | undefined {
     const normalized = name.trim().toLowerCase();
@@ -1793,9 +1849,11 @@ export default function InventoryPage() {
               </Can>
             ) : null}
             <DialogContent className={inventoryDialogClassName}>
-              <DialogHeader className="space-y-1.5 border-b px-6 py-5 text-left">
+              <DialogHeader className="space-y-1 border-b px-6 py-5 text-left">
                 <DialogTitle>Add Inventory Item</DialogTitle>
-                <DialogDescription>Add a new inventory item for any entity type</DialogDescription>
+                <DialogDescription>
+                  Choose the type and category, then set quantity and location for the new stock.
+                </DialogDescription>
               </DialogHeader>
               <div>
                 {renderInventoryFormTabs('create')}
@@ -1804,7 +1862,7 @@ export default function InventoryPage() {
                   <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                     Cancel
                   </Button>
-                  <Button onClick={handleCreate}>Add</Button>
+                  <Button onClick={handleCreate}>Add to inventory</Button>
                 </div>
               </div>
             </DialogContent>
@@ -2376,11 +2434,62 @@ export default function InventoryPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+      <Dialog
+        open={isEditOpen}
+        onOpenChange={(open) => {
+          setIsEditOpen(open);
+          if (!open) {
+            setEditingSerialOnly(false);
+          }
+        }}
+      >
         <DialogContent className={inventoryDialogClassName}>
-          <DialogHeader className="space-y-1.5 border-b px-6 py-5 text-left">
+          <DialogHeader className="space-y-2 border-b bg-sky-50/40 px-6 py-5 text-left dark:bg-sky-950/20">
             <DialogTitle>Edit Inventory Item</DialogTitle>
-            <DialogDescription>Update inventory details</DialogDescription>
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                {getEntityDisplayName(selectedEntityType)}
+              </span>
+              <span className="text-base font-semibold tracking-tight text-foreground">
+                {formData.name || '—'}
+              </span>
+              {editStatusLabel !== '—' ? (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium"
+                  style={editStatusSoftStyle}
+                >
+                  <Lock className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
+                  {editStatusLabel}
+                </span>
+              ) : null}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex text-muted-foreground/70 hover:text-muted-foreground"
+                      aria-label="Status is managed by workflow"
+                    >
+                      <Info className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    Status is set automatically by reservation, issuance, and installation
+                    workflows and cannot be changed here.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            {editingSerialOnly && editingSerialLabel ? (
+              <p className="font-mono text-xs text-muted-foreground">
+                Serial {editingSerialLabel}
+              </p>
+            ) : null}
+            <DialogDescription className="sr-only">
+              Edit {getEntityDisplayName(selectedEntityType)}
+              {formData.name ? ` ${formData.name}` : ''}
+              {editingSerialOnly && editingSerialLabel ? `, serial ${editingSerialLabel}` : ''}
+            </DialogDescription>
           </DialogHeader>
           <div>
             {renderInventoryFormTabs('edit')}
@@ -2389,7 +2498,7 @@ export default function InventoryPage() {
               <Button variant="outline" onClick={() => setIsEditOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleUpdate}>Update</Button>
+              <Button onClick={handleUpdate}>Save changes</Button>
             </div>
           </div>
         </DialogContent>
