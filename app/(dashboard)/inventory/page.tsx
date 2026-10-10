@@ -60,11 +60,9 @@ import {
   calculateInventoryTotalUsed,
   canSuggestInventorySerial,
   inventoryEntitiesForType,
-  allocateInventorySerials,
   suggestNextInventorySerial,
 } from '@/lib/inventory-serial';
 import { getAvailableInstances, isProjectReservedInstance } from '@/lib/inventory-install';
-import { InventoryAddMoreDialog } from '@/components/inventory-add-more-dialog';
 import { InventoryDeleteDialog } from '@/components/inventory-delete-dialog';
 import { InventoryDeleteBlockedDialog } from '@/components/inventory-delete-blocked-dialog';
 import { InventoryReservationHoldDialog } from '@/components/inventory-reservation-hold-dialog';
@@ -106,6 +104,13 @@ import {
 } from '@/components/ui/animated-pill-tabs';
 import { InventoryPictureThumb } from '@/components/inventory/inventory-picture-thumb';
 import { EntityPicture } from '@/components/entity-picture';
+import {
+  costTabToPayload,
+  InventoryCostTab,
+  validateInventoryCostTab,
+  type InventoryCostTabValue,
+} from '@/components/inventory/inventory-cost-tab';
+import { formatInventoryMoney } from '@/lib/inventory-currencies';
 
 const ACTION_BTN =
   'h-7 w-7 bg-transparent shadow-none border-0 hover:bg-transparent';
@@ -402,6 +407,7 @@ const COLUMN_DEFS: ColumnVisibilityDef[] = [
   { id: 'inventory_type', label: 'Type' },
   { id: 'total_used', label: 'Total Used' },
   { id: 'quantity', label: 'Quantity' },
+  { id: 'total_stock_cost', label: 'Total Cost' },
   { id: 'holder_user_id', label: 'Inventory Holder' },
   { id: 'location', label: 'Location' },
 ];
@@ -503,7 +509,13 @@ export default function InventoryPage() {
     instances: InventoryInstance[];
   } | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
-  const [addMoreItem, setAddMoreItem] = useState<InventoryItem | null>(null);
+  /** When set, create dialog is restocking this catalog row (same UI as Add Item). */
+  const [restockInventoryId, setRestockInventoryId] = useState<number | null>(null);
+  const openingRestockRef = useRef(false);
+  const [unitCostLines, setUnitCostLines] = useState<string[]>([]);
+  const [existingUnitCostEdits, setExistingUnitCostEdits] = useState<
+    Record<number, string>
+  >({});
   const [reservationHoldInstance, setReservationHoldInstance] =
     useState<InventoryInstance | null>(null);
   const [returnIssuanceId, setReturnIssuanceId] = useState<number | null>(null);
@@ -720,8 +732,60 @@ export default function InventoryPage() {
     });
   }
 
-  function openAddMore(item: InventoryItem) {
-    setAddMoreItem(item);
+  async function openAddMore(item: InventoryItem) {
+    openingRestockRef.current = true;
+    setFormTab('general');
+    setPendingAttachments([]);
+    setPendingPictureFile(null);
+    setRemovePicture(false);
+    setEditingId(null);
+    setEditingInstanceId(null);
+    setEditingSerialOnly(false);
+    setRestockInventoryId(item.id);
+    setSelectedEntityType(item.inventory_type as EntityType);
+    try {
+      const res = await api.inventory.get(item.id);
+      const full = res.data ?? item;
+      setEditingGroup(full);
+      setInstances(full.instances ?? []);
+      const nextForm = {
+        ...inventoryFormFromItem(full),
+        quantity: 1,
+        holder_user_id: inventoryHolderUserId,
+        cost_mode: 'batch' as const,
+      };
+      setFormData(nextForm);
+      setUnitCostLines(
+        nextForm.unit_cost ? [nextForm.unit_cost] : ['']
+      );
+      setExistingUnitCostEdits({});
+      setIsCreateOpen(true);
+    } catch (err) {
+      console.error('Failed to load inventory for restock:', err);
+      toast.error('Failed to load inventory details');
+      setRestockInventoryId(null);
+    }
+  }
+
+  function costTabValueFromForm(): InventoryCostTabValue {
+    return {
+      currency: formData.currency || 'PKR',
+      costMode: formData.cost_mode === 'unit' ? 'unit' : 'batch',
+      bulkQuoteCost: formData.bulk_quote_cost,
+      unitCost: formData.unit_cost,
+      unitCosts: unitCostLines,
+    };
+  }
+
+  function applyCostTabValue(next: InventoryCostTabValue) {
+    setFormData((prev) => ({
+      ...prev,
+      currency: next.currency,
+      cost_mode: next.costMode,
+      bulk_quote_cost: next.bulkQuoteCost,
+      unit_cost: next.unitCost || next.unitCosts[0] || prev.unit_cost,
+    }));
+    setUnitCostLines(next.unitCosts);
   }
 
   function requestDeleteItem(item: InventoryItem) {
@@ -765,80 +829,6 @@ export default function InventoryPage() {
     return fallback;
   }
 
-  async function handleAddMore(payload: {
-    quantity: number;
-    location_room: string;
-    location_cabinet: string;
-    location_rack: string;
-    location: string;
-    unit_cost: number;
-  }) {
-    if (!addMoreItem) return;
-
-    const quantity = Math.floor(Number(payload.quantity) || 0);
-    if (quantity < 1) {
-      toast.error('Enter a quantity of at least 1');
-      return;
-    }
-    if (quantity > 100) {
-      toast.error('Quantity cannot exceed 100 units per restock');
-      return;
-    }
-    const unitCost = Number(payload.unit_cost);
-    if (!Number.isFinite(unitCost) || unitCost < 0) {
-      toast.error('Enter a unit cost (PKR) of 0 or greater');
-      return;
-    }
-    if (!inventoryHolderUserId) {
-      toast.error('You must be signed in as Inventory Manager to restock');
-      return;
-    }
-
-    const location = payload.location;
-    if (addMoreItem.inventory_type !== 'component' && !location) {
-      toast.error('Room / Cabinet / Rack are required for each serialized unit');
-      return;
-    }
-
-    const relatedEntities = inventoryEntitiesForType(addMoreItem.inventory_type, entityPools);
-    const serials = allocateInventorySerials(addMoreItem, quantity, relatedEntities);
-    const holderUserId = Number(inventoryHolderUserId);
-    const locationRoom = payload.location_room.trim() || undefined;
-    const locationCabinet = payload.location_cabinet.trim() || undefined;
-    const locationRack = payload.location_rack.trim() || undefined;
-
-    try {
-      let added = 0;
-      for (let index = 0; index < quantity; index += 1) {
-        const serial = serials[index];
-        const created = await api.inventory.createInstance(addMoreItem.id, {
-          serial_number: serial || undefined,
-          original_serial_number: serial || undefined,
-          configuration_item:
-            addMoreItem.configuration_item || addMoreItem.part_number || addMoreItem.name,
-          holder_user_id: holderUserId,
-          location: location || undefined,
-          location_room: locationRoom,
-          location_cabinet: locationCabinet,
-          location_rack: locationRack,
-          unit_cost: unitCost,
-        });
-        toastFulfillments(created.data?.fcfs_fulfillments);
-        added += 1;
-      }
-      toast.success(
-        added === 1
-          ? `Added another ${addMoreItem.name} to inventory`
-          : `Added ${added} ${addMoreItem.name} units to inventory`
-      );
-      pagination.invalidate();
-    } catch (err) {
-      console.error('Failed to add more inventory:', err);
-      toast.error(apiErrorDetail(err, 'Failed to add inventory units'));
-      throw err;
-    }
-  }
-
   const resetForm = (options?: { forCreate?: boolean }) => {
     setFormData({
       ...emptyInventoryEntityForm,
@@ -852,6 +842,9 @@ export default function InventoryPage() {
     setEditingSerialOnly(false);
     setEditingGroup(null);
     setInstances([]);
+    setRestockInventoryId(null);
+    setUnitCostLines([]);
+    setExistingUnitCostEdits({});
     setFormTab('general');
   };
 
@@ -898,13 +891,13 @@ export default function InventoryPage() {
       formData.location_rack,
       formData.location
     );
+    const isRestock = restockInventoryId != null;
 
     const validationError = validateInventoryForm({
       name: formData.name,
       partNumber: formData.part_number,
       location,
       quantity: formData.quantity,
-      unitCost: formData.unit_cost,
       usesInstances,
       supportsQuantity: true,
       isComponent: selectedEntityType === 'component',
@@ -915,9 +908,23 @@ export default function InventoryPage() {
       toast.error(validationError);
       return;
     }
+    const costError = validateInventoryCostTab(
+      costTabValueFromForm(),
+      formData.quantity
+    );
+    if (costError) {
+      toast.error(costError);
+      setFormTab('cost');
+      return;
+    }
 
     try {
-      const payload = buildInventoryPayload();
+      const costPayload = costTabToPayload(costTabValueFromForm(), formData.quantity);
+      const payload = {
+        ...buildInventoryPayload(),
+        ...costPayload,
+        currency: costPayload.currency,
+      };
       const created = await api.inventory.create(payload);
       if (created.data?.id) {
         await syncCatalogPicture(created.data.id);
@@ -931,9 +938,11 @@ export default function InventoryPage() {
       }
       toastFulfillments(created.data?.fcfs_fulfillments);
       toast.success(
-        usesInstances
-          ? 'Serialized unit added to inventory group'
-          : 'Inventory item created'
+        isRestock
+          ? `Added stock to ${formData.name}`
+          : usesInstances
+            ? 'Serialized unit added to inventory group'
+            : 'Inventory item created'
       );
       pagination.invalidate();
 
@@ -941,7 +950,7 @@ export default function InventoryPage() {
       setIsCreateOpen(false);
     } catch (err) {
       console.error('Failed to create inventory item:', err);
-      toast.error('Failed to create inventory item');
+      toast.error(apiErrorDetail(err, 'Failed to create inventory item'));
     }
   }
 
@@ -973,10 +982,25 @@ export default function InventoryPage() {
     }
 
     try {
-      const updated = await api.inventory.update(editingId, buildGroupPayload());
+      const bulkRaw = formData.bulk_quote_cost.trim();
+      const bulk =
+        bulkRaw !== '' && Number.isFinite(Number(bulkRaw))
+          ? Number(bulkRaw)
+          : undefined;
+      const updated = await api.inventory.update(editingId, {
+        ...buildGroupPayload(),
+        currency: (formData.currency || 'PKR').trim().toUpperCase() || 'PKR',
+        ...(bulk !== undefined ? { bulk_quote_cost: bulk } : {}),
+      });
       toastFulfillments(updated.data?.fcfs_fulfillments);
 
       await syncCatalogPicture(editingId);
+
+      for (const [instanceId, costRaw] of Object.entries(existingUnitCostEdits)) {
+        const cost = Number(costRaw);
+        if (!Number.isFinite(cost) || cost < 0) continue;
+        await api.inventory.updateInstance(Number(instanceId), { unit_cost: cost });
+      }
 
       if (usesInstances && editingInstanceId) {
         const instancePayload = buildInstancePayload();
@@ -1148,6 +1172,8 @@ export default function InventoryPage() {
     setPendingAttachments([]);
     setPendingPictureFile(null);
     setRemovePicture(false);
+    setRestockInventoryId(null);
+    setUnitCostLines([]);
     const serialOnly = instanceId != null;
     setEditingSerialOnly(serialOnly);
 
@@ -1157,6 +1183,14 @@ export default function InventoryPage() {
       setEditingGroup(fullItem);
       const itemInstances = fullItem.instances ?? [];
       setInstances(itemInstances);
+      setExistingUnitCostEdits(
+        Object.fromEntries(
+          itemInstances.map((instance) => [
+            instance.id,
+            instance.unit_cost != null ? String(instance.unit_cost) : '',
+          ])
+        )
+      );
       setFormData(inventoryFormFromItem(fullItem));
 
       if (inventoryUsesInstances(fullItem.inventory_type as EntityType) && itemInstances.length > 0) {
@@ -1249,6 +1283,9 @@ export default function InventoryPage() {
             <TabsTrigger value="holder" className={tabTriggerClassName}>
               Location
             </TabsTrigger>
+            <TabsTrigger value="cost" className={tabTriggerClassName}>
+              Cost
+            </TabsTrigger>
             <TabsTrigger value="attachments" className={tabTriggerClassName}>
               Attachments
             </TabsTrigger>
@@ -1269,6 +1306,7 @@ export default function InventoryPage() {
                 <Label>Inventory Type *</Label>
                 <Select
                   value={selectedEntityType}
+                  disabled={restockInventoryId != null}
                   onValueChange={(value) => {
                     const newType = value as EntityType;
                     setSelectedEntityType(newType);
@@ -1299,6 +1337,7 @@ export default function InventoryPage() {
                 <Label>{getEntityDisplayName(selectedEntityType)} Category *</Label>
                 <Select
                   value={formData.name}
+                  disabled={restockInventoryId != null}
                   onValueChange={(value) => {
                     setFormData((prev) =>
                       applyDefinitionIdentifiers(selectedEntityType, value, prev.oem_name, prev)
@@ -1339,43 +1378,14 @@ export default function InventoryPage() {
                   placeholder="Enter quantity"
                 />
               </div>
-
-              <div>
-                <Label>Unit cost (PKR) *</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.unit_cost}
-                  onChange={(e) => setFormData({ ...formData, unit_cost: e.target.value })}
-                  placeholder="Cost per unit"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Applied to each new unit for project cost estimates.
-                </p>
-              </div>
             </>
           ) : showEditStockQuantity ? (
             <div>
               <Label>Quantity in stock</Label>
               <Input value={String(formData.quantity || 0)} disabled />
               <p className="text-xs text-muted-foreground">
-                Use Add More (+) on the inventory list to restock.
+                Use + on the inventory list to restock (opens Add Inventory with this item).
               </p>
-            </div>
-          ) : null}
-
-          {mode === 'edit' && editingSerialOnly ? (
-            <div>
-              <Label>Unit cost (PKR)</Label>
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={formData.unit_cost}
-                onChange={(e) => setFormData({ ...formData, unit_cost: e.target.value })}
-                placeholder="Cost per unit"
-              />
             </div>
           ) : null}
 
@@ -1528,6 +1538,43 @@ export default function InventoryPage() {
               }
             />
           </div>
+        </TabsContent>
+
+        <TabsContent value="cost" className={formTabSingleClassName}>
+          {mode === 'edit' && !restockInventoryId ? (
+            <InventoryCostTab
+              quantity={Math.max(instances.length, 1)}
+              value={costTabValueFromForm()}
+              onChange={applyCostTabValue}
+              existingUnits={
+                instances.length > 0
+                  ? instances.map((instance) => ({
+                      id: instance.id,
+                      label:
+                        instance.serial_number ||
+                        `Unit #${instance.id}`,
+                      cost:
+                        existingUnitCostEdits[instance.id] ??
+                        (instance.unit_cost != null
+                          ? String(instance.unit_cost)
+                          : ''),
+                    }))
+                  : undefined
+              }
+              onExistingUnitCostChange={(id, cost) => {
+                setExistingUnitCostEdits((prev) => ({
+                  ...prev,
+                  [Number(id)]: cost,
+                }));
+              }}
+            />
+          ) : (
+            <InventoryCostTab
+              quantity={formData.quantity || 1}
+              value={costTabValueFromForm()}
+              onChange={applyCostTabValue}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="attachments" className={formTabSingleClassName}>
@@ -1884,7 +1931,14 @@ export default function InventoryPage() {
             open={isCreateOpen}
             onOpenChange={(open) => {
               setIsCreateOpen(open);
-              if (open) resetForm({ forCreate: true });
+              if (open) {
+                if (!openingRestockRef.current) {
+                  resetForm({ forCreate: true });
+                }
+                openingRestockRef.current = false;
+              } else {
+                resetForm();
+              }
             }}
           >
             {canCreateInventory ? (
@@ -1904,16 +1958,27 @@ export default function InventoryPage() {
                     <div className="flex items-start gap-3">
                       <InventoryPictureThumb
                         pendingFile={headerPicturePending}
-                        pictureUrl={null}
+                        pictureUrl={
+                          restockInventoryId && !removePicture
+                            ? formData.picture_url || null
+                            : null
+                        }
+                        ownerType="inventory"
+                        ownerId={restockInventoryId}
                         alt={formData.name || 'New inventory item'}
                         size="md"
                         showPlaceholder
                       />
                       <div className="min-w-0 space-y-1">
-                        <DialogTitle>Add Inventory Item</DialogTitle>
+                        <DialogTitle>
+                          {restockInventoryId
+                            ? `Add stock — ${formData.name || 'Inventory'}`
+                            : 'Add Inventory Item'}
+                        </DialogTitle>
                         <DialogDescription>
-                          Choose the type and category, then set quantity and location for the new
-                          stock.
+                          {restockInventoryId
+                            ? 'Quantity, location, and cost apply to the new units for this catalog item.'
+                            : 'Choose the type and category, then set quantity, location, and cost for the new stock.'}
                         </DialogDescription>
                       </div>
                     </div>
@@ -1924,7 +1989,9 @@ export default function InventoryPage() {
                 <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleCreate}>Add to inventory</Button>
+                <Button onClick={handleCreate}>
+                  {restockInventoryId ? 'Add stock' : 'Add to inventory'}
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -2011,6 +2078,16 @@ export default function InventoryPage() {
                   )}
                   {isVisible('quantity') && (
                     <SortableTableHead className="w-28" column="quantity" sort={sort} onSort={cycleSort}>Quantity</SortableTableHead>
+                  )}
+                  {isVisible('total_stock_cost') && (
+                    <SortableTableHead
+                      className="w-32"
+                      column="total_stock_cost"
+                      sort={sort}
+                      onSort={cycleSort}
+                    >
+                      Total Cost
+                    </SortableTableHead>
                   )}
                   {isVisible('holder_user_id') && (
                     <SortableTableHead column="holder_user_id" sort={sort} onSort={cycleSort}>Inventory Holder</SortableTableHead>
@@ -2145,6 +2222,14 @@ export default function InventoryPage() {
                                   </Badge>
                                 ) : null}
                               </div>
+                            </TableCell>
+                          )}
+                          {isVisible('total_stock_cost') && (
+                            <TableCell className="tabular-nums">
+                              {formatInventoryMoney(
+                                item.total_stock_cost,
+                                item.currency || 'PKR'
+                              )}
                             </TableCell>
                           )}
                           {isVisible('holder_user_id') && (
@@ -2601,22 +2686,6 @@ export default function InventoryPage() {
           </div>
         </DialogContent>
       </Dialog>
-
-      <InventoryAddMoreDialog
-        item={addMoreItem}
-        open={addMoreItem != null}
-        holderLabel={inventoryHolderLabel}
-        locationTree={definitions.inventory_location_tree}
-        relatedEntities={
-          addMoreItem
-            ? inventoryEntitiesForType(addMoreItem.inventory_type, entityPools)
-            : []
-        }
-        onOpenChange={(open) => {
-          if (!open) setAddMoreItem(null);
-        }}
-        onConfirm={handleAddMore}
-      />
 
       <InventoryDeleteDialog
         item={deleteTarget}

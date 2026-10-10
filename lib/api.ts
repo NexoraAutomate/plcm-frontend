@@ -939,6 +939,10 @@ export const inventory = {
       location_room?: string
       location_cabinet?: string
       location_rack?: string
+      unit_cost?: number
+      unit_costs?: number[]
+      bulk_quote_cost?: number
+      currency?: string
     }
   ) =>
     api.post<Models.Inventory>('/inventory/shortages/' + shortageId + '/receive/', data),

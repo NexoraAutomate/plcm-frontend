@@ -1119,7 +1119,7 @@ export interface InventoryInstance extends HierarchyInstallFields {
   open_issuance_id?: number | null
   open_issuance_status?: string | null
   fcfs_fulfillments?: FCFSFulfillment[] | null
-  /** Acquisition cost for this unit (PKR). */
+  /** Acquisition cost for this unit. */
   unit_cost?: number | null
 }
 
@@ -1220,8 +1220,12 @@ export interface Inventory extends HierarchyInstallFields {
   instances?: InventoryInstance[]
   component?: Component
   fcfs_fulfillments?: FCFSFulfillment[] | null
-  /** Last known / list unit cost (PKR) for restock prefill. */
+  /** Last known / list unit cost for restock prefill. */
   default_unit_cost?: number | null
+  currency?: string | null
+  bulk_quote_cost?: number | null
+  /** Sum of instance unit_cost values for stocked units. */
+  total_stock_cost?: number | null
 }
 
 export interface InventoryStatsSummary {

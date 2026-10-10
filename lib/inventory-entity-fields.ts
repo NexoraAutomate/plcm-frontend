@@ -50,8 +50,12 @@ export const emptyInventoryEntityForm = {
   installed_by_id: '',
   original_part_number: '',
   original_serial_number: '',
-  /** Unit cost in PKR (string for controlled number inputs). */
+  /** Uniform / first unit cost (string for controlled number inputs). */
   unit_cost: '',
+  currency: 'PKR',
+  /** batch = supplier quote total; unit = per-unit pricing */
+  cost_mode: 'batch' as 'batch' | 'unit',
+  bulk_quote_cost: '',
 };
 
 function parseUnitCost(value?: string | null): number | undefined {
@@ -150,6 +154,11 @@ export function inventoryGroupFieldsFromForm(
     configuration_item: formData.configuration_item || partNumber || formData.name,
     status_id: formData.status_id ? Number(formData.status_id) : undefined,
     sku: selectedEntityType === 'component' ? formData.sku || undefined : undefined,
+    currency: (formData.currency || 'PKR').trim().toUpperCase() || 'PKR',
+    ...(formData.bulk_quote_cost.trim() !== '' &&
+    Number.isFinite(Number(formData.bulk_quote_cost))
+      ? { bulk_quote_cost: Number(formData.bulk_quote_cost) }
+      : {}),
     installation_date: formData.installation_date
       ? new Date(formData.installation_date).toISOString()
       : undefined,
@@ -305,6 +314,12 @@ export function inventoryFormFromItem(item: Inventory) {
     unit_cost:
       item.default_unit_cost != null && Number.isFinite(Number(item.default_unit_cost))
         ? String(item.default_unit_cost)
+        : '',
+    currency: item.currency?.trim() || 'PKR',
+    cost_mode: 'batch' as const,
+    bulk_quote_cost:
+      item.bulk_quote_cost != null && Number.isFinite(Number(item.bulk_quote_cost))
+        ? String(item.bulk_quote_cost)
         : '',
   };
 }

@@ -233,40 +233,22 @@ export function InventoryEntityFormTabs({
           </div>
 
           {!isHierarchy && mode === 'create' ? (
-            <>
-              <div>
-                <Label>Quantity *</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  value={formData.quantity || ''}
-                  onChange={(e) => {
-                    const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
-                    onFormDataChange({ ...formData, quantity: Number.isNaN(val) ? 0 : val });
-                  }}
-                  placeholder="Enter quantity"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Enter how many units to add to this inventory group.
-                </p>
-              </div>
-              <div>
-                <Label>Unit cost (PKR) *</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.unit_cost}
-                  onChange={(e) =>
-                    onFormDataChange({ ...formData, unit_cost: e.target.value })
-                  }
-                  placeholder="Cost per unit"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Applied to each new unit for project cost estimates.
-                </p>
-              </div>
-            </>
+            <div>
+              <Label>Quantity *</Label>
+              <Input
+                type="number"
+                min="1"
+                value={formData.quantity || ''}
+                onChange={(e) => {
+                  const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
+                  onFormDataChange({ ...formData, quantity: Number.isNaN(val) ? 0 : val });
+                }}
+                placeholder="Enter quantity"
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter how many units to add to this inventory group. Set cost on the Cost tab.
+              </p>
+            </div>
           ) : !isHierarchy ? (
             <div>
               <Label>Quantity</Label>

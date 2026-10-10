@@ -11,7 +11,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CascadingLocationSelects } from '@/components/inventory/cascading-location-selects';
+import {
+  costTabToPayload,
+  InventoryCostTab,
+  validateInventoryCostTab,
+  type InventoryCostTabValue,
+} from '@/components/inventory/inventory-cost-tab';
 import { Can } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
 import { useAuth } from '@/lib/auth-context';
@@ -100,6 +107,14 @@ export function ShortageListPanel({
   const [receiveLocationRoom, setReceiveLocationRoom] = useState('');
   const [receiveLocationCabinet, setReceiveLocationCabinet] = useState('');
   const [receiveLocationRack, setReceiveLocationRack] = useState('');
+  const [receiveTab, setReceiveTab] = useState('details');
+  const [receiveCost, setReceiveCost] = useState<InventoryCostTabValue>({
+    currency: 'PKR',
+    costMode: 'batch',
+    bulkQuoteCost: '',
+    unitCost: '',
+    unitCosts: [''],
+  });
 
   const filteredRows = useMemo(
     () => rows.filter((row) => shortageMatchesSearch(row, searchQuery)),
@@ -170,6 +185,14 @@ export function ShortageListPanel({
     setReceiveLocationRoom('');
     setReceiveLocationCabinet('');
     setReceiveLocationRack('');
+    setReceiveTab('details');
+    setReceiveCost({
+      currency: 'PKR',
+      costMode: 'batch',
+      bulkQuoteCost: '',
+      unitCost: '',
+      unitCosts: [''],
+    });
   }
 
   async function handleReceive() {
@@ -188,11 +211,19 @@ export function ShortageListPanel({
     });
     if (validationError) {
       toast.error(validationError);
+      setReceiveTab('details');
+      return;
+    }
+    const costError = validateInventoryCostTab(receiveCost, 1);
+    if (costError) {
+      toast.error(costError);
+      setReceiveTab('cost');
       return;
     }
 
     setBusyId(receiveTarget.id);
     try {
+      const costPayload = costTabToPayload(receiveCost, 1);
       const res = await api.inventory.receiveShortage(receiveTarget.id, {
         quantity: 1,
         part_number: receivePartNumber.trim() || undefined,
@@ -203,6 +234,7 @@ export function ShortageListPanel({
         location_room: receiveLocationRoom.trim() || undefined,
         location_cabinet: receiveLocationCabinet.trim() || undefined,
         location_rack: receiveLocationRack.trim() || undefined,
+        ...costPayload,
       });
       const fulfilled = res.data.fcfs_fulfillments?.length ?? 0;
       toast.success(
@@ -324,7 +356,7 @@ export function ShortageListPanel({
           if (!open && busyId == null) setReceiveTarget(null);
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Add stock for shortage</DialogTitle>
             <DialogDescription>
@@ -332,56 +364,70 @@ export function ShortageListPanel({
               Matching stock is auto-reserved FCFS.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm space-y-1">
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">Part number</span>
-                <span className="font-mono text-right">
-                  {receivePartNumber || '—'}
-                </span>
-              </div>
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">Quantity</span>
-                <span>1</span>
-              </div>
-              {receiveTarget?.target_entity_type !== 'component' ? (
+          <Tabs value={receiveTab} onValueChange={setReceiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="cost">Cost</TabsTrigger>
+            </TabsList>
+            <TabsContent value="details" className="mt-4 space-y-4">
+              <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm space-y-1">
                 <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">Serial number</span>
+                  <span className="text-muted-foreground">Part number</span>
                   <span className="font-mono text-right">
-                    {receiveSerialNumber || 'Generated on receive'}
+                    {receivePartNumber || '—'}
                   </span>
                 </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Quantity</span>
+                  <span>1</span>
+                </div>
+                {receiveTarget?.target_entity_type !== 'component' ? (
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Serial number</span>
+                    <span className="font-mono text-right">
+                      {receiveSerialNumber || 'Generated on receive'}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+              {receiveTarget?.target_entity_type !== 'component' ? (
+                <CascadingLocationSelects
+                  tree={definitions.inventory_location_tree}
+                  required
+                  disabled={busyId != null}
+                  value={{
+                    location_room: receiveLocationRoom,
+                    location_cabinet: receiveLocationCabinet,
+                    location_rack: receiveLocationRack,
+                  }}
+                  onChange={(next) => {
+                    setReceiveLocationRoom(next.location_room);
+                    setReceiveLocationCabinet(next.location_cabinet);
+                    setReceiveLocationRack(next.location_rack);
+                  }}
+                />
               ) : null}
-            </div>
-            {receiveTarget?.target_entity_type !== 'component' ? (
-              <CascadingLocationSelects
-                tree={definitions.inventory_location_tree}
-                required
+            </TabsContent>
+            <TabsContent value="cost" className="mt-4">
+              <InventoryCostTab
+                quantity={1}
+                value={receiveCost}
+                onChange={setReceiveCost}
                 disabled={busyId != null}
-                value={{
-                  location_room: receiveLocationRoom,
-                  location_cabinet: receiveLocationCabinet,
-                  location_rack: receiveLocationRack,
-                }}
-                onChange={(next) => {
-                  setReceiveLocationRoom(next.location_room);
-                  setReceiveLocationCabinet(next.location_cabinet);
-                  setReceiveLocationRack(next.location_rack);
-                }}
               />
-            ) : null}
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setReceiveTarget(null)}
-                disabled={busyId != null}
-              >
-                Cancel
-              </Button>
-              <Button onClick={() => void handleReceive()} disabled={busyId != null}>
-                {busyId != null ? 'Receiving…' : 'Receive stock'}
-              </Button>
-            </div>
+            </TabsContent>
+          </Tabs>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setReceiveTarget(null)}
+              disabled={busyId != null}
+            >
+              Cancel
+            </Button>
+            <Button onClick={() => void handleReceive()} disabled={busyId != null}>
+              {busyId != null ? 'Receiving…' : 'Receive stock'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
