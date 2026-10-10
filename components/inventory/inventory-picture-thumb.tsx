@@ -43,7 +43,7 @@ export function InventoryPictureThumb({
   const sizeClass = size === 'sm' ? 'h-7 w-7' : 'h-11 w-11';
   const frameClass = cn(
     sizeClass,
-    'shrink-0 rounded-md border object-cover bg-muted/40',
+    'shrink-0 rounded-none border object-cover bg-muted/40',
     className
   );
 

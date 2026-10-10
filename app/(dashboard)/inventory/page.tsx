@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Plus, Edit, Trash2, Search, ChevronDown, ListOrdered, Undo2, RefreshCw, Download, Upload, FileText, AlertCircle, CheckCircle2, Tag, ScanLine, QrCode, Lock, LockOpen, Info } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, ChevronDown, ListOrdered, Undo2, RefreshCw, Download, Upload, FileText, AlertCircle, CheckCircle2, Tag, ScanLine, QrCode, Lock, LockOpen, Info, ImageIcon } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
@@ -329,11 +329,11 @@ function ExpandedInventoryUnitsTable({
   return (
     <Table className="table-fixed" containerClassName={containerClassName}>
       <colgroup>
-        <col style={{ width: '30%' }} />
-        <col style={{ width: '26%' }} />
+        <col style={{ width: '28%' }} />
+        <col style={{ width: '22%' }} />
         <col />
         <col style={{ width: '7rem' }} />
-        <col style={{ width: '11rem' }} />
+        <col style={{ width: '7.5rem' }} />
       </colgroup>
       <TableHeader>
         <TableRow>
@@ -349,7 +349,7 @@ function ExpandedInventoryUnitsTable({
           <SortableTableHead column="status" sort={sort} onSort={cycleSort} className="w-28">
             Status
           </SortableTableHead>
-          <TableHead className="w-44 text-right">Actions</TableHead>
+          <TableHead className="w-[7.5rem] text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>{children(sortedInstances)}</TableBody>
@@ -2077,7 +2077,14 @@ export default function InventoryPage() {
                     </TableHead>
                   )}
                   {isVisible('quantity') && (
-                    <SortableTableHead className="w-28" column="quantity" sort={sort} onSort={cycleSort}>Quantity</SortableTableHead>
+                    <SortableTableHead
+                      className="w-36"
+                      column="quantity"
+                      sort={sort}
+                      onSort={cycleSort}
+                    >
+                      Quantity
+                    </SortableTableHead>
                   )}
                   {isVisible('total_stock_cost') && (
                     <SortableTableHead
@@ -2095,7 +2102,7 @@ export default function InventoryPage() {
                   {isVisible('location') && (
                     <SortableTableHead column="location" sort={sort} onSort={cycleSort}>Location</SortableTableHead>
                   )}
-                  <TableHead className="sticky right-0 top-0 z-30 w-64 text-right">
+                  <TableHead className="sticky right-0 top-0 z-30 w-[7.5rem] px-1 text-right">
                     Actions
                   </TableHead>
                 </TableRow>
@@ -2172,14 +2179,24 @@ export default function InventoryPage() {
                               title={item.entityName || 'N/A'}
                             >
                               <div className="flex min-w-0 items-center gap-2">
-                                {item.picture_url ? (
-                                  <EntityPicture
-                                    src={item.picture_url}
-                                    ownerType="inventory"
-                                    ownerId={item.id}
-                                    alt={item.entityName || item.name || 'Inventory'}
-                                    className="h-7 w-7 shrink-0 rounded-md border object-cover"
-                                  />
+                                {/* Hide catalog thumb (and placeholder) while serials are expanded. */}
+                                {!isExpanded ? (
+                                  item.picture_url ? (
+                                    <EntityPicture
+                                      src={item.picture_url}
+                                      ownerType="inventory"
+                                      ownerId={item.id}
+                                      alt={item.entityName || item.name || 'Inventory'}
+                                      className="h-7 w-7 shrink-0 rounded-none border object-cover"
+                                    />
+                                  ) : (
+                                    <div
+                                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-none border bg-muted/40 text-muted-foreground"
+                                      aria-hidden
+                                    >
+                                      <ImageIcon className="h-3.5 w-3.5" />
+                                    </div>
+                                  )
                                 ) : null}
                                 <span className="truncate font-medium">
                                   {item.entityName || 'N/A'}
@@ -2203,17 +2220,20 @@ export default function InventoryPage() {
                           )}
                           {isVisible('total_used') && <TableCell>{item.totalUsed ?? 0}</TableCell>}
                           {isVisible('quantity') && (
-                            <TableCell>
-                              <div className="flex flex-col gap-0.5">
-                                <span>{item.quantity}</span>
+                            <TableCell className="w-36 align-top">
+                              <div className="flex min-w-0 flex-col gap-0.5 whitespace-normal break-words">
+                                <span className="leading-tight">{item.quantity}</span>
                                 {(item.reserved_quantity ?? 0) > 0 ||
                                 (item.instances ?? []).some(isProjectReservedInstance) ? (
-                                  <Badge variant="secondary" className="w-fit text-[10px]">
+                                  <Badge
+                                    variant="secondary"
+                                    className="h-auto w-full max-w-full whitespace-normal break-words px-1.5 py-0.5 text-left text-[10px] leading-snug font-normal"
+                                  >
                                     {item.available_quantity ??
                                       Math.max(0, item.quantity - (item.reserved_quantity ?? 0))}{' '}
                                     avail
-                                    {(item.instances ?? []).filter(isProjectReservedInstance).length >
-                                    0
+                                    {(item.instances ?? []).filter(isProjectReservedInstance)
+                                      .length > 0
                                       ? ` · ${(item.instances ?? []).filter(isProjectReservedInstance).length} reserved`
                                       : ''}
                                     {(item.reserved_quantity ?? 0) > 0
@@ -2259,11 +2279,11 @@ export default function InventoryPage() {
                           )}
                           <TableCell
                             className={cn(
-                              'sticky right-0 z-10 w-64 text-right group-hover:bg-muted/50',
+                              'sticky right-0 z-10 w-[7.5rem] px-1 text-right group-hover:bg-muted/50',
                               isSelected ? 'bg-muted/50' : isExpanded ? 'bg-muted/30' : 'bg-background'
                             )}
                           >
-                            <div className="flex shrink-0 justify-end gap-0.5">
+                            <div className="flex flex-nowrap justify-end gap-0">
                               {item.quantity >= 0 && canAddStock ? (
                                 <Button
                                   size="icon-sm"
@@ -2385,30 +2405,66 @@ export default function InventoryPage() {
                         {isExpanded && isExpandable ? (
                           <TableRow className="bg-muted/20 hover:bg-muted/20">
                             <TableCell colSpan={inventoryTableColSpan} className="min-w-0 overflow-x-hidden p-0">
-                              <div className="min-w-0 overflow-x-hidden px-4 py-3">
-                                <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                                  <h4 className="text-sm font-semibold">
-                                    Part Number{' '}
-                                    <span className="font-mono">
-                                      {item.partNumber || '—'}
-                                    </span>
-                                  </h4>
-                                  <span className="text-xs text-muted-foreground">
-                                    {serialInstances.length} unit
-                                    {serialInstances.length === 1 ? '' : 's'}
-                                  </span>
-                                </div>
-                                <ExpandedInventoryUnitsTable
-                                  serialInstances={serialInstances}
-                                  users={users}
-                                  containerClassName={cn(
-                                    'min-w-0 rounded-md border bg-background overflow-x-hidden',
-                                    serialInstances.length > MAX_VISIBLE_EXPANDED_UNITS &&
-                                      EXPANDED_UNITS_SCROLL_CLASS
-                                  )}
-                                >
-                                  {(sortedSerialInstances) =>
-                                    sortedSerialInstances.map((instance, index) => {
+                              {/*
+                                Mirror catalog columns: [checkbox?][expand][Category/photo][Type→ serial table].
+                                Unit Identity therefore starts under the Type column.
+                              */}
+                              <div className="min-w-0 overflow-x-hidden py-3 pr-3">
+                                <div className="flex min-w-0 items-stretch gap-0">
+                                  <div
+                                    className={cn(
+                                      'shrink-0',
+                                      inventoryManager ? 'w-20' : 'w-10'
+                                    )}
+                                    aria-hidden
+                                  />
+                                  {isVisible('name') ? (
+                                    <div className="flex w-[min(11rem,22%)] shrink-0 flex-col items-center justify-center px-2">
+                                      {item.picture_url ? (
+                                        <EntityPicture
+                                          src={item.picture_url}
+                                          ownerType="inventory"
+                                          ownerId={item.id}
+                                          alt={
+                                            item.entityName || item.name || 'Inventory'
+                                          }
+                                          className="h-24 w-24 rounded-none border object-cover"
+                                        />
+                                      ) : (
+                                        <div
+                                          className="flex h-24 w-24 items-center justify-center rounded-none border bg-muted/40 text-muted-foreground"
+                                          aria-hidden
+                                        >
+                                          <ImageIcon className="h-8 w-8" />
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : null}
+                                  <div className="min-w-0 flex-1 space-y-2">
+                                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                                      <h4 className="text-sm font-semibold">
+                                        Part Number{' '}
+                                        <span className="font-mono">
+                                          {item.partNumber || '—'}
+                                        </span>
+                                      </h4>
+                                      <span className="text-xs text-muted-foreground">
+                                        {serialInstances.length} unit
+                                        {serialInstances.length === 1 ? '' : 's'}
+                                      </span>
+                                    </div>
+                                    <ExpandedInventoryUnitsTable
+                                      serialInstances={serialInstances}
+                                      users={users}
+                                      containerClassName={cn(
+                                        'min-w-0 rounded-md border bg-background overflow-x-hidden',
+                                        serialInstances.length >
+                                          MAX_VISIBLE_EXPANDED_UNITS &&
+                                          EXPANDED_UNITS_SCROLL_CLASS
+                                      )}
+                                    >
+                                      {(sortedSerialInstances) =>
+                                        sortedSerialInstances.map((instance, index) => {
                                       const serialLabel =
                                         instanceSerialNumber(instance) || `Unit ${index + 1}`;
                                       const holderLabel = displayUserName(
@@ -2491,8 +2547,8 @@ export default function InventoryPage() {
                                               />
                                             )}
                                           </TableCell>
-                                          <TableCell className="w-44 p-1 text-right">
-                                            <div className="flex flex-nowrap justify-end">
+                                          <TableCell className="w-[7.5rem] p-0.5 text-right">
+                                            <div className="flex flex-nowrap justify-end gap-0">
                                               <Can permission={[P.inventory_label_generate, P.inventory_label_print]}>
                                                 <Button
                                                   size="icon-sm"
@@ -2567,9 +2623,11 @@ export default function InventoryPage() {
                                           </TableCell>
                                         </TableRow>
                                       );
-                                    })
-                                  }
-                                </ExpandedInventoryUnitsTable>
+                                        })
+                                      }
+                                    </ExpandedInventoryUnitsTable>
+                                  </div>
+                                </div>
                               </div>
                             </TableCell>
                           </TableRow>
