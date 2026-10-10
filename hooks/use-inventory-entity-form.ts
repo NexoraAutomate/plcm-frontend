@@ -208,6 +208,7 @@ export function useInventoryEntityForm(options: {
       partNumber: formData.part_number,
       location: formData.location,
       quantity: formData.quantity,
+      unitCost: formData.unit_cost,
       usesInstances: inventoryUsesInstances(selectedEntityType),
       supportsQuantity: true,
       isHierarchy: context === 'hierarchy',

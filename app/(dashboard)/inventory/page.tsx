@@ -771,6 +771,7 @@ export default function InventoryPage() {
     location_cabinet: string;
     location_rack: string;
     location: string;
+    unit_cost: number;
   }) {
     if (!addMoreItem) return;
 
@@ -781,6 +782,11 @@ export default function InventoryPage() {
     }
     if (quantity > 100) {
       toast.error('Quantity cannot exceed 100 units per restock');
+      return;
+    }
+    const unitCost = Number(payload.unit_cost);
+    if (!Number.isFinite(unitCost) || unitCost < 0) {
+      toast.error('Enter a unit cost (PKR) of 0 or greater');
       return;
     }
     if (!inventoryHolderUserId) {
@@ -815,6 +821,7 @@ export default function InventoryPage() {
           location_room: locationRoom,
           location_cabinet: locationCabinet,
           location_rack: locationRack,
+          unit_cost: unitCost,
         });
         toastFulfillments(created.data?.fcfs_fulfillments);
         added += 1;
@@ -897,6 +904,7 @@ export default function InventoryPage() {
       partNumber: formData.part_number,
       location,
       quantity: formData.quantity,
+      unitCost: formData.unit_cost,
       usesInstances,
       supportsQuantity: true,
       isComponent: selectedEntityType === 'component',
@@ -1331,6 +1339,21 @@ export default function InventoryPage() {
                   placeholder="Enter quantity"
                 />
               </div>
+
+              <div>
+                <Label>Unit cost (PKR) *</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.unit_cost}
+                  onChange={(e) => setFormData({ ...formData, unit_cost: e.target.value })}
+                  placeholder="Cost per unit"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Applied to each new unit for project cost estimates.
+                </p>
+              </div>
             </>
           ) : showEditStockQuantity ? (
             <div>
@@ -1339,6 +1362,20 @@ export default function InventoryPage() {
               <p className="text-xs text-muted-foreground">
                 Use Add More (+) on the inventory list to restock.
               </p>
+            </div>
+          ) : null}
+
+          {mode === 'edit' && editingSerialOnly ? (
+            <div>
+              <Label>Unit cost (PKR)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={formData.unit_cost}
+                onChange={(e) => setFormData({ ...formData, unit_cost: e.target.value })}
+                placeholder="Cost per unit"
+              />
             </div>
           ) : null}
 

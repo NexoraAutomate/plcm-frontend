@@ -30,6 +30,7 @@ export type InventoryAddMorePayload = {
   location_cabinet: string;
   location_rack: string;
   location: string;
+  unit_cost: number;
 };
 
 type RelatedEntity = {
@@ -59,6 +60,7 @@ export function InventoryAddMoreDialog({
   onConfirm,
 }: InventoryAddMoreDialogProps) {
   const [quantity, setQuantity] = useState(1);
+  const [unitCost, setUnitCost] = useState('');
   const [locationRoom, setLocationRoom] = useState('');
   const [locationCabinet, setLocationCabinet] = useState('');
   const [locationRack, setLocationRack] = useState('');
@@ -70,7 +72,14 @@ export function InventoryAddMoreDialog({
     if (!open || !item) return;
     const locationSource = item.instances?.find((instance) => instance.location) ?? item;
     const locationParts = parseInventoryLocationParts(locationSource);
+    const lastCost =
+      item.default_unit_cost ??
+      [...(item.instances ?? [])]
+        .reverse()
+        .find((instance) => instance.unit_cost != null)?.unit_cost ??
+      null;
     setQuantity(1);
+    setUnitCost(lastCost != null && Number.isFinite(Number(lastCost)) ? String(lastCost) : '');
     setLocationRoom(locationParts.location_room);
     setLocationCabinet(locationParts.location_cabinet);
     setLocationRack(locationParts.location_rack);
@@ -90,7 +99,10 @@ export function InventoryAddMoreDialog({
   const codeMatches =
     confirmationCode.length === 4 && userInput === confirmationCode;
   const quantityOk = Number.isFinite(quantity) && quantity >= 1 && quantity <= 100;
-  const canSubmit = codeMatches && quantityOk && !submitting;
+  const parsedUnitCost = Number(unitCost);
+  const unitCostOk =
+    unitCost.trim() !== '' && Number.isFinite(parsedUnitCost) && parsedUnitCost >= 0;
+  const canSubmit = codeMatches && quantityOk && unitCostOk && !submitting;
 
   function close() {
     if (submitting) return;
@@ -108,6 +120,7 @@ export function InventoryAddMoreDialog({
         location_cabinet: locationCabinet,
         location_rack: locationRack,
         location,
+        unit_cost: parsedUnitCost,
       });
       onOpenChange(false);
     } catch {
@@ -168,6 +181,32 @@ export function InventoryAddMoreDialog({
                   : `Identities: ${serialPreview[0]} … ${serialPreview[serialPreview.length - 1]}`}
               </p>
             ) : null}
+          </div>
+          <div>
+            <Label htmlFor="add-more-unit-cost">Unit cost (PKR) *</Label>
+            <Input
+              id="add-more-unit-cost"
+              type="number"
+              min={0}
+              step="0.01"
+              value={unitCost}
+              onChange={(e) => setUnitCost(e.target.value)}
+              placeholder="Cost per unit"
+              disabled={submitting}
+            />
+            {unitCostOk && quantityOk ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Line total: {(parsedUnitCost * quantity).toLocaleString(undefined, {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 2,
+                })}{' '}
+                PKR
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Used for project cost estimates. Prefills from the last receipt when available.
+              </p>
+            )}
           </div>
           <div>
             <Label>Inventory Holder</Label>

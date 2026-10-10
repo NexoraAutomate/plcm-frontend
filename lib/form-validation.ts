@@ -199,6 +199,7 @@ export function validateInventoryForm(input: {
   partNumber?: string;
   location?: string;
   quantity?: number;
+  unitCost?: string | number | null;
   usesInstances: boolean;
   supportsQuantity: boolean;
   isHierarchy?: boolean;
@@ -221,6 +222,16 @@ export function validateInventoryForm(input: {
   }
   if (!isHierarchy && input.supportsQuantity && Number(input.quantity) <= 0) {
     return 'Please enter a quantity greater than 0';
+  }
+  if (!isHierarchy && input.supportsQuantity) {
+    const raw =
+      input.unitCost === null || input.unitCost === undefined
+        ? ''
+        : String(input.unitCost).trim();
+    const cost = Number(raw);
+    if (!raw || !Number.isFinite(cost) || cost < 0) {
+      return 'Please enter a unit cost (PKR) of 0 or greater';
+    }
   }
   return null;
 }

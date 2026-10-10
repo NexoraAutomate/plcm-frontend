@@ -50,7 +50,17 @@ export const emptyInventoryEntityForm = {
   installed_by_id: '',
   original_part_number: '',
   original_serial_number: '',
+  /** Unit cost in PKR (string for controlled number inputs). */
+  unit_cost: '',
 };
+
+function parseUnitCost(value?: string | null): number | undefined {
+  const trimmed = (value || '').trim();
+  if (!trimmed) return undefined;
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 0) return undefined;
+  return parsed;
+}
 
 export function composeInventoryLocation(
   room?: string | null,
@@ -240,6 +250,7 @@ export function inventoryInstanceFieldsFromForm(
     formData.location_rack,
     formData.location
   );
+  const unitCost = parseUnitCost(formData.unit_cost);
   return {
     serial_number: formData.serial_number,
     configuration_item: formData.configuration_item || partNumber || undefined,
@@ -260,6 +271,7 @@ export function inventoryInstanceFieldsFromForm(
     installed_by_id: formData.installed_by_id ? Number(formData.installed_by_id) : undefined,
     original_part_number: formData.original_part_number || undefined,
     original_serial_number: formData.original_serial_number || undefined,
+    ...(unitCost !== undefined ? { unit_cost: unitCost } : {}),
   };
 }
 
@@ -290,6 +302,10 @@ export function inventoryFormFromItem(item: Inventory) {
     installed_by_id: item.installed_by_id ? String(item.installed_by_id) : '',
     original_part_number: item.original_part_number || '',
     original_serial_number: item.original_serial_number || '',
+    unit_cost:
+      item.default_unit_cost != null && Number.isFinite(Number(item.default_unit_cost))
+        ? String(item.default_unit_cost)
+        : '',
   };
 }
 
@@ -323,5 +339,11 @@ export function inventoryFormFromInstance(instance: InventoryInstance, group: In
         : '',
     original_part_number: instance.original_part_number || group.original_part_number || '',
     original_serial_number: instance.original_serial_number || group.original_serial_number || '',
+    unit_cost:
+      instance.unit_cost != null && Number.isFinite(Number(instance.unit_cost))
+        ? String(instance.unit_cost)
+        : group.default_unit_cost != null && Number.isFinite(Number(group.default_unit_cost))
+          ? String(group.default_unit_cost)
+          : '',
   };
 }
