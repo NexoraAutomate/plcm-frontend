@@ -8,9 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Search, GitBranch, ChevronDown, Eye } from 'lucide-react';
+import { Edit, Trash2, Search, GitBranch, ChevronDown, Eye } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import {
@@ -48,6 +48,10 @@ import { Progress } from '@/components/ui/progress';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
 import { ProjectDeleteDialog } from '@/components/projects/project-delete-dialog';
+import {
+  CreateDraftProjectDialog,
+  type CreateDraftProjectFormData,
+} from '@/components/projects/create-draft-project-dialog';
 import {
   ListStatsVisibilityControls,
   useListStatsVisibility,
@@ -180,7 +184,7 @@ export default function ProjectsPage(){
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [availableConfigs, setAvailableConfigs] = useState<HierarchyConfigurationSummary[]>([]);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<CreateDraftProjectFormData>({
     name: '',
     description: '',
     start_date: '',
@@ -197,14 +201,14 @@ export default function ProjectsPage(){
   });
   const { data: statuses = [] } = useStatusesByTypeQuery('projects');
 
-  function resetCreateForm() {
+  function resetCreateForm(preferredOrderId?: number | null) {
     setFormData({
       name: '',
       description: '',
       start_date: '',
       end_date: '',
       owner_id: 0,
-      order_id: 0,
+      order_id: preferredOrderId && preferredOrderId > 0 ? preferredOrderId : 0,
       status_id: statuses[0]?.id ?? 0,
       hierarchy_config_id: 0,
       product_type: '',
@@ -213,6 +217,21 @@ export default function ProjectsPage(){
       sdls_counts_by_flight: [1],
       is_existing_project: false,
     });
+  }
+
+  function handleCreateDialogOpenChange(open: boolean) {
+    if (isCreating) return;
+    setIsCreateOpen(open);
+    if (open) {
+      setFormData((previous) => ({
+        ...previous,
+        order_id:
+          orderFilterId && orderFilterId > 0 ? orderFilterId : previous.order_id,
+        status_id: previous.status_id || statuses[0]?.id || 0,
+      }));
+      return;
+    }
+    resetCreateForm(orderFilterId);
   }
 
   useEffect(() => {
@@ -639,216 +658,18 @@ export default function ProjectsPage(){
             className="pl-10"
           />
         </div>
-        {/* Create New Project PoP up Window */}
-        <Dialog
+        <CreateDraftProjectDialog
           open={isCreateOpen}
-          onOpenChange={(open) => {
-            if (isCreating) return;
-            setIsCreateOpen(open);
-            if (!open) resetCreateForm();
-          }}
-        >
-          <Can permission={[P.project_create_draft, P.create_projects]}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="h-4 w-4" />
-                New Draft {entityLabel('project')}
-              </Button>
-            </DialogTrigger>
-          </Can>
-          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Create Draft {entityLabel('project')}</DialogTitle>
-              <DialogDescription>
-                Select an available Smart SDLS configuration and project scope. Status starts as
-                DRAFT until Project Director or Admin approval.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label>{entityLabel('project')} Name *</Label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Flight Program Alpha"
-                  disabled={isCreating}
-                />
-              </div>
-              <div>
-                <Label>Description</Label>
-                <Input
-                  value={formData.description ?? ''}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Project details"
-                  disabled={isCreating}
-                />
-              </div>
-              <div>
-                <Label>Hierarchy Configuration *</Label>
-                <Select
-                  value={formData.hierarchy_config_id ? String(formData.hierarchy_config_id) : ''}
-                  onValueChange={(v) => {
-                    const id = parseInt(v, 10);
-                    const cfg = availableConfigs.find((c) => c.id === id);
-                    setFormData({
-                      ...formData,
-                      hierarchy_config_id: id,
-                      product_type: cfg?.product_type_codes?.[0] || '',
-                    });
-                  }}
-                  disabled={isCreating}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select available configuration" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableConfigs.map((c) => (
-                      <SelectItem key={c.id} value={String(c.id)}>
-                        {c.name} ({c.code})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Flight count *</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={formData.flight_count}
-                  onChange={(e) => {
-                    const flightCount = Math.max(1, Number(e.target.value) || 1);
-                    setFormData((prev) => ({
-                      ...prev,
-                      flight_count: flightCount,
-                      sdls_counts_by_flight: Array.from(
-                        { length: flightCount },
-                        (_, index) => prev.sdls_counts_by_flight[index] ?? 1
-                      ),
-                    }));
-                  }}
-                  disabled={isCreating}
-                />
-              </div>
-              <div className="space-y-2 rounded-md border p-3">
-                <div>
-                  <Label>SDLS count for each flight *</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Set the SDLS count independently for every flight.
-                  </p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {formData.sdls_counts_by_flight.map((count, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <Label htmlFor={`flight-sdls-${index}`} className="min-w-20">
-                        Flight {index + 1}
-                      </Label>
-                      <Input
-                        id={`flight-sdls-${index}`}
-                        type="number"
-                        min={1}
-                        value={count}
-                        onChange={(e) => {
-                          const nextCount = Math.max(1, Number(e.target.value) || 1);
-                          setFormData((prev) => {
-                            const counts = [...prev.sdls_counts_by_flight];
-                            counts[index] = nextCount;
-                            return {
-                              ...prev,
-                              sdls_per_flight: Math.max(...counts),
-                              sdls_counts_by_flight: counts,
-                            };
-                          });
-                        }}
-                        disabled={isCreating}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Start Date</Label>
-                  <Input
-                    type="date"
-                    value={formData.start_date}
-                    onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                    disabled={isCreating}
-                  />
-                </div>
-                <div>
-                  <Label>End Date</Label>
-                  <Input
-                    type="date"
-                    value={formData.end_date}
-                    onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                    disabled={isCreating}
-                  />
-                </div>
-              </div>
-              <div>
-                <Label>Order *</Label>
-                <Select
-                  value={formData.order_id ? formData.order_id.toString() : ''}
-                  onValueChange={(v) =>
-                    setFormData({
-                      ...formData,
-                      order_id: parseInt(v, 10),
-                    })
-                  }
-                  disabled={isCreating}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select order" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {orders.map((o) => (
-                      <SelectItem key={o.id} value={o.id.toString()}>
-                        {o.order_number}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="add-as-existing-project"
-                  checked={formData.is_existing_project}
-                  onCheckedChange={(checked) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      is_existing_project: checked === true,
-                    }))
-                  }
-                  disabled={isCreating}
-                />
-                <Label
-                  htmlFor="add-as-existing-project"
-                  className="cursor-pointer text-sm font-normal"
-                >
-                  Add as Existing Project
-                </Label>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {formData.is_existing_project
-                  ? 'The project will be auto-approved, you will be assigned as Hierarchy Manager, and the hierarchy shells will be generated from the selected configuration.'
-                  : 'Status will be set to DRAFT. Generate Hierarchy stays disabled until Project Director or Admin approval (Spec 03).'}
-              </p>
-              <div className="flex gap-2 justify-end pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsCreateOpen(false)}
-                  disabled={isCreating}
-                >
-                  Cancel
-                </Button>
-                <Button onClick={() => void handleCreate()} disabled={isCreating}>
-                  {isCreating ? 'Creating…' : 'Create Draft'}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+          onOpenChange={handleCreateDialogOpenChange}
+          formData={formData}
+          onFormChange={setFormData}
+          orders={orders}
+          availableConfigs={availableConfigs}
+          isCreating={isCreating}
+          onSubmit={handleCreate}
+          projectLabel={entityLabel('project')}
+          projectLabelPlural={entityLabel('project', true)}
+        />
       </div>
 
       <Card>

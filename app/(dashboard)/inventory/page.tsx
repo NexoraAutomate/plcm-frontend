@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Plus, Edit, Trash2, Search, Layers, Network, Copy, ChevronDown, PackageMinus, ListOrdered, Undo2, RefreshCw, Download, Upload, FileText, AlertCircle, CheckCircle2, Tag, ScanLine, QrCode } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, ChevronDown, ListOrdered, Undo2, RefreshCw, Download, Upload, FileText, AlertCircle, CheckCircle2, Tag, ScanLine, QrCode } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
@@ -28,6 +28,7 @@ import {
   buildInventoryCreatePayload,
   composeInventoryLocation,
   emptyInventoryEntityForm,
+  formatInventoryLocationAbbrev,
   inventoryFormFromInstance,
   inventoryFormFromItem,
   inventoryGroupFieldsFromForm,
@@ -62,17 +63,10 @@ import {
   allocateInventorySerials,
   suggestNextInventorySerial,
 } from '@/lib/inventory-serial';
-import {
-  canAddInventoryChildren,
-  resolveInventoryInstanceSerial,
-} from '@/lib/inventory-child-install';
-import { getAvailableInstances, getSelectableInstances, isProjectReservedInstance, needsSerialSelection } from '@/lib/inventory-install';
-import { duplicateInventoryEntity } from '@/lib/inventory-duplicate';
-import { InventorySerialSelectDialog } from '@/components/inventory-serial-select-dialog';
+import { getAvailableInstances, isProjectReservedInstance } from '@/lib/inventory-install';
 import { InventoryAddMoreDialog } from '@/components/inventory-add-more-dialog';
 import { InventoryDeleteDialog } from '@/components/inventory-delete-dialog';
-import { InventoryHierarchyDialog } from '@/components/lazy/heavy-editors';
-import { InventoryIssueDialog } from '@/components/inventory-issue-dialog';
+import { InventoryDeleteBlockedDialog } from '@/components/inventory-delete-blocked-dialog';
 import { InventoryReservationHoldDialog } from '@/components/inventory-reservation-hold-dialog';
 import { IssuanceRemarksDialog } from '@/components/inventory/issuance-remarks-dialog';
 import { InventoryLabelDialog } from '@/components/inventory/inventory-label-dialog';
@@ -110,9 +104,6 @@ const EXPANDED_CELL_TRUNCATE = 'max-w-0 truncate';
 
 const ACTION_ICON = {
   add: 'size-3.5 text-muted-foreground transition-colors group-hover/add:text-emerald-600',
-  children: 'size-3.5 text-muted-foreground transition-colors group-hover/children:text-violet-600',
-  hierarchy: 'size-3.5 text-muted-foreground transition-colors group-hover/hierarchy:text-cyan-600',
-  duplicate: 'size-3.5 text-muted-foreground transition-colors group-hover/duplicate:text-amber-600',
   issue: 'size-3.5 text-muted-foreground transition-colors group-hover/issue:text-orange-600',
   edit: 'size-3.5 text-muted-foreground transition-colors group-hover/edit:text-blue-600',
   delete: 'size-3.5 text-muted-foreground transition-colors group-hover/delete:text-red-600',
@@ -197,11 +188,6 @@ type HierarchyEntityPools = {
   components: { part_number?: string | null; original_part_number?: string | null; serial_number?: string | null; original_serial_number?: string | null }[];
 };
 
-function resolveInventoryHolderId(item: Inventory): number | undefined {
-  if (item.holder_user_id) return item.holder_user_id;
-  return item.instances?.find((instance) => instance.holder_user_id)?.holder_user_id;
-}
-
 function resolveInventoryHolderLabel(item: Inventory, users: User[]): string {
   const fromInstances = [
     ...new Set(
@@ -217,12 +203,48 @@ function resolveInventoryHolderLabel(item: Inventory, users: User[]): string {
 }
 
 function resolveInventoryLocation(item: Inventory): string {
-  if (item.location?.trim()) return item.location;
+  const fromItem = formatInventoryLocationAbbrev(item);
+  if (fromItem !== '—') return fromItem;
   const locations = (item.instances ?? [])
-    .map((instance) => instance.location?.trim())
-    .filter((location): location is string => Boolean(location));
+    .map((instance) => formatInventoryLocationAbbrev(instance))
+    .filter((location) => location !== '—');
   if (locations.length === 0) return '—';
   return [...new Set(locations)].join(', ');
+}
+
+function getBlockedDeleteInstances(item: Inventory): InventoryInstance[] {
+  const availableIds = new Set(getAvailableInstances(item).map((instance) => instance.id));
+  return (item.instances ?? []).filter(
+    (instance) => Boolean(instance.id) && !availableIds.has(instance.id)
+  );
+}
+
+function canDeleteInventoryItem(item: Inventory): boolean {
+  const instances = (item.instances ?? []).filter((instance) => Boolean(instance.id));
+  if (instances.length > 0) {
+    return getAvailableInstances(item).length > 0;
+  }
+  const reserved = item.reserved_quantity ?? 0;
+  const available = item.available_quantity ?? Math.max(0, item.quantity - reserved);
+  return available > 0 || item.quantity === 0;
+}
+
+/** True when the whole catalog row (every unit) may be bulk-deleted. */
+function isInventoryFullyDeletable(item: Inventory): boolean {
+  const instances = (item.instances ?? []).filter((instance) => Boolean(instance.id));
+  if (instances.length === 0) {
+    return (item.reserved_quantity ?? 0) === 0;
+  }
+  return getAvailableInstances(item).length === instances.length;
+}
+
+function isInstanceDeletable(instance: InventoryInstance): boolean {
+  return (
+    Boolean(instance.id) &&
+    !instance.is_reserved &&
+    !isProjectReservedInstance(instance) &&
+    instance.open_issuance_status !== 'return_pending'
+  );
 }
 
 function instanceSerialNumber(instance: InventoryInstance): string {
@@ -256,7 +278,8 @@ function ExpandedInventoryUnitsTable({
               (row as unknown as InventoryInstance).holder_user_id,
               (row as unknown as InventoryInstance).holder_name
             ),
-          location: (row) => (row as unknown as InventoryInstance).location?.trim() || '—',
+          location: (row) =>
+            formatInventoryLocationAbbrev(row as unknown as InventoryInstance),
           status: (row) => {
             const instance = row as unknown as InventoryInstance;
             if (instance.is_reserved) return instance.status_name || 'ISSUED';
@@ -366,7 +389,6 @@ export default function InventoryPage() {
   const canCreateInventory = inventoryManager && can(P.create_inventory);
   const canEditInventory = inventoryManager && can(P.edit_inventory);
   const canAddStock = canCreateInventory || canEditInventory;
-  const canIssue = inventoryManager && can([P.issue_inventory, P.inventory_issue_workflow]);
   const ENTITY_TYPE_FILTERS = useMemo(
     () =>
       ENTITY_TYPE_FILTER_STYLES.map((filter) => ({
@@ -444,35 +466,12 @@ export default function InventoryPage() {
     sortedRows: sortedEditorInstances,
   } = useClientTableSort(instances);
   const [deleteTarget, setDeleteTarget] = useState<InventoryItem | null>(null);
-  const [addChildrenItem, setAddChildrenItem] = useState<InventoryItem | null>(null);
-  const [hierarchySerialSelectItem, setHierarchySerialSelectItem] = useState<InventoryItem | null>(
-    null
-  );
-  const [hierarchyView, setHierarchyView] = useState<{
+  const [deleteBlockedTarget, setDeleteBlockedTarget] = useState<{
     item: InventoryItem;
-    instanceId?: number;
+    instances: InventoryInstance[];
   } | null>(null);
-  const [duplicateSerialSelectItem, setDuplicateSerialSelectItem] = useState<InventoryItem | null>(
-    null
-  );
-  const [duplicateTarget, setDuplicateTarget] = useState<{
-    item: InventoryItem;
-    instanceId?: number;
-  } | null>(null);
-  const [duplicating, setDuplicating] = useState(false);
-  const [duplicateForm, setDuplicateForm] = useState({
-    serial_number: '',
-    holder_user_id: '',
-    location_room: '',
-    location_cabinet: '',
-    location_rack: '',
-  });
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [addMoreItem, setAddMoreItem] = useState<InventoryItem | null>(null);
-  const [issueTarget, setIssueTarget] = useState<{
-    item: InventoryItem;
-    instanceId?: number;
-  } | null>(null);
   const [reservationHoldInstance, setReservationHoldInstance] =
     useState<InventoryInstance | null>(null);
   const [returnIssuanceId, setReturnIssuanceId] = useState<number | null>(null);
@@ -690,114 +689,27 @@ export default function InventoryPage() {
     });
   }
 
-  function navigateToAddChildren(item: InventoryItem, instanceId?: number) {
-    const query = instanceId != null ? `?instanceId=${instanceId}` : '';
-    router.push(`/inventory/${item.id}/add-children${query}`);
+  function openAddMore(item: InventoryItem) {
+    setAddMoreItem(item);
   }
 
-  function handleAddChildrenClick(item: InventoryItem) {
-    if (needsSerialSelection(item)) {
-      setAddChildrenItem(item);
+  function requestDeleteItem(item: InventoryItem) {
+    if (canDeleteInventoryItem(item)) {
+      setDeleteTarget(item);
       return;
     }
-    navigateToAddChildren(item);
-  }
-
-  function openHierarchyView(item: InventoryItem, instanceId?: number) {
-    setHierarchyView({ item, instanceId });
-  }
-
-  function handleViewHierarchyClick(item: InventoryItem) {
-    if (needsSerialSelection(item)) {
-      setHierarchySerialSelectItem(item);
-      return;
-    }
-    const instances = getSelectableInstances(item);
-    const instanceId = instances.length === 1 ? instances[0].id : undefined;
-    openHierarchyView(item, instanceId);
-  }
-
-  function openDuplicateForm(item: InventoryItem, instanceId?: number) {
-    const instance =
-      instanceId != null
-        ? item.instances?.find((entry) => entry.id === instanceId)
-        : item.instances?.length === 1
-          ? item.instances[0]
-          : undefined;
-    const holderId =
-      instance?.holder_user_id ?? resolveInventoryHolderId(item) ?? undefined;
-    const locationSource = instance ?? item;
-    setDuplicateTarget({ item, instanceId });
-    setDuplicateForm({
-      serial_number: '',
-      holder_user_id: holderId != null ? String(holderId) : '',
-      location_room: locationSource.location_room?.trim() || '',
-      location_cabinet: locationSource.location_cabinet?.trim() || '',
-      location_rack: locationSource.location_rack?.trim() || '',
+    setDeleteBlockedTarget({
+      item,
+      instances: getBlockedDeleteInstances(item),
     });
   }
 
-  async function handleDuplicateConfirm() {
-    if (!duplicateTarget) return;
-
-    const serialNumber = duplicateForm.serial_number.trim();
-    const location = composeInventoryLocation(
-      duplicateForm.location_room,
-      duplicateForm.location_cabinet,
-      duplicateForm.location_rack
-    );
-    if (!serialNumber || !location) {
-      toast.error('Serial number and Room / Cabinet / Rack are required');
+  function requestDeleteInstance(item: InventoryItem, instance: InventoryInstance) {
+    if (isInstanceDeletable(instance)) {
+      setInstanceDeleteTarget({ item, instance });
       return;
     }
-    if (!duplicateForm.holder_user_id) {
-      toast.error('Inventory holder is required');
-      return;
-    }
-
-    const holderUserId = Number(duplicateForm.holder_user_id);
-    const { item, instanceId } = duplicateTarget;
-    setDuplicating(true);
-    try {
-      const result = await duplicateInventoryEntity(item, {
-        instanceId,
-        overrides: {
-          serialNumber,
-          holderUserId,
-          location,
-          locationRoom: duplicateForm.location_room,
-          locationCabinet: duplicateForm.location_cabinet,
-          locationRack: duplicateForm.location_rack,
-        },
-      });
-      toast.success(
-        result.serial
-          ? `Duplicated ${item.name} as ${result.serial}`
-          : `Duplicated ${item.name}`
-      );
-      setDuplicateTarget(null);
-      pagination.invalidate();
-    } catch (err) {
-      console.error('Failed to duplicate inventory item:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to duplicate inventory item');
-    } finally {
-      setDuplicating(false);
-    }
-  }
-
-  function handleDuplicateClick(item: InventoryItem) {
-    if (duplicating) return;
-    if (needsSerialSelection(item)) {
-      setDuplicateSerialSelectItem(item);
-      return;
-    }
-    const instances = getSelectableInstances(item);
-    const instanceId = instances.length === 1 ? instances[0].id : undefined;
-    openDuplicateForm(item, instanceId);
-  }
-
-  function openAddMore(item: InventoryItem) {
-    setAddMoreItem(item);
+    setDeleteBlockedTarget({ item, instances: [instance] });
   }
 
   async function handleAddMore(payload: {
@@ -1717,7 +1629,18 @@ export default function InventoryPage() {
                 <Button
                   variant="destructive"
                   size="sm"
-                  onClick={() => setBulkDeleteOpen(true)}
+                  onClick={() => {
+                    const knownSelected = inventory.filter((item) => selectedIds.has(item.id));
+                    const blocked = knownSelected.filter((item) => !isInventoryFullyDeletable(item));
+                    if (blocked.length > 0) {
+                      setDeleteBlockedTarget({
+                        item: blocked[0],
+                        instances: getBlockedDeleteInstances(blocked[0]),
+                      });
+                      return;
+                    }
+                    setBulkDeleteOpen(true);
+                  }}
                   disabled={bulkDeleting || selectingAll || selectedCount === 0}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
@@ -2095,7 +2018,22 @@ export default function InventoryPage() {
                             </TableCell>
                           )}
                           {isVisible('location') && (
-                            <TableCell className="max-w-0 truncate" title={item.displayLocation || '—'}>
+                            <TableCell
+                              className="max-w-0 truncate"
+                              title={
+                                item.location?.trim() ||
+                                [
+                                  item.location_room,
+                                  item.location_cabinet,
+                                  item.location_rack,
+                                ]
+                                  .map((part) => part?.trim())
+                                  .filter(Boolean)
+                                  .join(' / ') ||
+                                item.displayLocation ||
+                                '—'
+                              }
+                            >
                               {item.displayLocation || '—'}
                             </TableCell>
                           )}
@@ -2118,28 +2056,6 @@ export default function InventoryPage() {
                                   <Plus className={ACTION_ICON.add} />
                                 </Button>
                               ) : null}
-                              {canAddInventoryChildren(item.inventory_type) && canAddStock ? (
-                                <Button
-                                  size="icon-sm"
-                                  variant="ghost"
-                                  className={cn(ACTION_BTN, 'group/children')}
-                                  onClick={() => handleAddChildrenClick(item)}
-                                  title="Add Children"
-                                  aria-label="Add Children"
-                                >
-                                  <Layers className={ACTION_ICON.children} />
-                                </Button>
-                              ) : null}
-                              <Button
-                                size="icon-sm"
-                                variant="ghost"
-                                className={cn(ACTION_BTN, 'group/hierarchy')}
-                                onClick={() => handleViewHierarchyClick(item)}
-                                title="View Hierarchy"
-                                aria-label="View Hierarchy"
-                              >
-                                <Network className={ACTION_ICON.hierarchy} />
-                              </Button>
                               <Can permission={[P.inventory_label_generate, P.inventory_label_print]}>
                                 <Button
                                   size="icon-sm"
@@ -2151,37 +2067,6 @@ export default function InventoryPage() {
                                 >
                                   <Tag className="size-3.5 text-muted-foreground transition-colors group-hover/label:text-violet-600" />
                                 </Button>
-                              </Can>
-                              {canAddStock ? (
-                                <Button
-                                  size="icon-sm"
-                                  variant="ghost"
-                                  className={cn(ACTION_BTN, 'group/duplicate')}
-                                  onClick={() => handleDuplicateClick(item)}
-                                  disabled={duplicating}
-                                  title="Duplicate"
-                                  aria-label="Duplicate"
-                                >
-                                  <Copy className={ACTION_ICON.duplicate} />
-                                </Button>
-                              ) : null}
-                              <Can permission={[P.issue_inventory, P.inventory_issue_workflow]}>
-                                {canIssue ? (
-                                <Button
-                                  size="icon-sm"
-                                  variant="ghost"
-                                  className={cn(ACTION_BTN, 'group/issue')}
-                                  onClick={() => setIssueTarget({ item })}
-                                  title="Issue to developer"
-                                  aria-label="Issue to developer"
-                                  disabled={
-                                    (item.available_quantity ?? item.quantity) <= 0 &&
-                                    !(item.instances ?? []).some((i) => i.id && !i.is_reserved)
-                                  }
-                                >
-                                  <PackageMinus className={ACTION_ICON.issue} />
-                                </Button>
-                                ) : null}
                               </Can>
                               {!inventoryManager &&
                               ((item.instances ?? []).some(
@@ -2266,7 +2151,7 @@ export default function InventoryPage() {
                                   size="icon-sm"
                                   variant="ghost"
                                   className={cn(ACTION_BTN, 'group/delete')}
-                                  onClick={() => setDeleteTarget(item)}
+                                  onClick={() => requestDeleteItem(item)}
                                   title="Delete"
                                   aria-label="Delete"
                                 >
@@ -2311,7 +2196,18 @@ export default function InventoryPage() {
                                         instance.holder_user_id,
                                         instance.holder_name
                                       );
-                                      const locationLabel = instance.location?.trim() || '—';
+                                      const locationLabel = formatInventoryLocationAbbrev(instance);
+                                      const locationTitle =
+                                        instance.location?.trim() ||
+                                        [
+                                          instance.location_room,
+                                          instance.location_cabinet,
+                                          instance.location_rack,
+                                        ]
+                                          .map((part) => part?.trim())
+                                          .filter(Boolean)
+                                          .join(' / ') ||
+                                        locationLabel;
                                       return (
                                         <TableRow key={instance.id}>
                                           <TableCell
@@ -2350,7 +2246,7 @@ export default function InventoryPage() {
                                           </TableCell>
                                           <TableCell
                                             className={EXPANDED_CELL_TRUNCATE}
-                                            title={locationLabel}
+                                            title={locationTitle}
                                           >
                                             {locationLabel}
                                           </TableCell>
@@ -2390,22 +2286,6 @@ export default function InventoryPage() {
                                                   <Tag className="size-3.5 text-muted-foreground transition-colors group-hover/label:text-violet-600" />
                                                 </Button>
                                               </Can>
-                                              {!instance.is_reserved && canIssue ? (
-                                                <Can permission={[P.issue_inventory, P.inventory_issue_workflow]}>
-                                                  <Button
-                                                    size="icon-sm"
-                                                    variant="ghost"
-                                                    className={cn(ACTION_BTN, 'group/issue')}
-                                                    title="Issue this serial"
-                                                    aria-label="Issue this serial"
-                                                    onClick={() =>
-                                                      setIssueTarget({ item, instanceId: instance.id })
-                                                    }
-                                                  >
-                                                    <PackageMinus className={ACTION_ICON.issue} />
-                                                  </Button>
-                                                </Can>
-                                              ) : null}
                                               <Can permission={P.edit_inventory}>
                                                 {canEditInventory ? (
                                                   <Button
@@ -2429,7 +2309,7 @@ export default function InventoryPage() {
                                                     title="Delete this unit"
                                                     aria-label={`Delete ${serialLabel}`}
                                                     onClick={() =>
-                                                      setInstanceDeleteTarget({ item, instance })
+                                                      requestDeleteInstance(item, instance)
                                                     }
                                                   >
                                                     <Trash2 className={ACTION_ICON.delete} />
@@ -2515,166 +2395,6 @@ export default function InventoryPage() {
         </DialogContent>
       </Dialog>
 
-      <InventorySerialSelectDialog
-        item={addChildrenItem}
-        open={addChildrenItem != null}
-        onOpenChange={(open) => {
-          if (!open) setAddChildrenItem(null);
-        }}
-        confirmLabel="Continue"
-        description={
-          addChildrenItem
-            ? `${addChildrenItem.name} has ${addChildrenItem.quantity} units in stock. Choose which serial number to add children under.`
-            : undefined
-        }
-        onConfirm={(instanceId) => {
-          if (addChildrenItem) {
-            navigateToAddChildren(addChildrenItem, instanceId);
-            setAddChildrenItem(null);
-          }
-        }}
-      />
-
-      <InventorySerialSelectDialog
-        item={hierarchySerialSelectItem}
-        open={hierarchySerialSelectItem != null}
-        onOpenChange={(open) => {
-          if (!open) setHierarchySerialSelectItem(null);
-        }}
-        confirmLabel="View Hierarchy"
-        description={
-          hierarchySerialSelectItem
-            ? `${hierarchySerialSelectItem.name} has ${hierarchySerialSelectItem.quantity} units in stock. Choose which serial number to view in the hierarchy graph.`
-            : undefined
-        }
-        onConfirm={(instanceId) => {
-          if (hierarchySerialSelectItem) {
-            openHierarchyView(hierarchySerialSelectItem, instanceId);
-            setHierarchySerialSelectItem(null);
-          }
-        }}
-      />
-
-      <InventoryHierarchyDialog
-        item={hierarchyView?.item ?? null}
-        instanceId={hierarchyView?.instanceId}
-        open={hierarchyView != null}
-        onOpenChange={(open) => {
-          if (!open) setHierarchyView(null);
-        }}
-      />
-
-      <InventorySerialSelectDialog
-        item={duplicateSerialSelectItem}
-        open={duplicateSerialSelectItem != null}
-        onOpenChange={(open) => {
-          if (!open) setDuplicateSerialSelectItem(null);
-        }}
-        confirmLabel="Continue"
-        description={
-          duplicateSerialSelectItem
-            ? `${duplicateSerialSelectItem.name} has ${duplicateSerialSelectItem.quantity} units in stock. Choose which serial number to duplicate (including children).`
-            : undefined
-        }
-        onConfirm={(instanceId) => {
-          if (!duplicateSerialSelectItem) return;
-          const item = duplicateSerialSelectItem;
-          setDuplicateSerialSelectItem(null);
-          openDuplicateForm(item, instanceId);
-        }}
-      />
-
-      <Dialog
-        open={duplicateTarget != null}
-        onOpenChange={(open) => {
-          if (!open && !duplicating) setDuplicateTarget(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Duplicate Inventory Item</DialogTitle>
-            <DialogDescription>
-              {duplicateTarget
-                ? (() => {
-                    const sourceSerial = resolveInventoryInstanceSerial(
-                      duplicateTarget.item,
-                      duplicateTarget.instanceId ?? null
-                    );
-                    return `Create a copy of ${duplicateTarget.item.name}${
-                      sourceSerial ? ` (from ${sourceSerial})` : ''
-                    }, including any children. Enter the new serial number, holder, and location.`;
-                  })()
-                : 'Enter details for the duplicated inventory item.'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="duplicate-serial">Serial Number *</Label>
-              <Input
-                id="duplicate-serial"
-                value={duplicateForm.serial_number}
-                onChange={(e) =>
-                  setDuplicateForm((prev) => ({ ...prev, serial_number: e.target.value }))
-                }
-                placeholder="e.g., SN-2024-001"
-                disabled={duplicating}
-              />
-            </div>
-            <div>
-              <Label>Inventory Holder *</Label>
-              <Select
-                value={duplicateForm.holder_user_id || ''}
-                onValueChange={(value) =>
-                  setDuplicateForm((prev) => ({ ...prev, holder_user_id: value }))
-                }
-                disabled={duplicating}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select inventory holder" />
-                </SelectTrigger>
-                <SelectContent>
-                  {users.map((user) => (
-                    <SelectItem key={user.id} value={String(user.id)}>
-                      {user.full_name || user.username}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <CascadingLocationSelects
-              tree={definitions.inventory_location_tree}
-              required
-              disabled={duplicating}
-              value={{
-                location_room: duplicateForm.location_room,
-                location_cabinet: duplicateForm.location_cabinet,
-                location_rack: duplicateForm.location_rack,
-              }}
-              onChange={(next) =>
-                setDuplicateForm((prev) => ({
-                  ...prev,
-                  location_room: next.location_room,
-                  location_cabinet: next.location_cabinet,
-                  location_rack: next.location_rack,
-                }))
-              }
-            />
-            <div className="flex justify-end gap-2 pt-2">
-              <Button
-                variant="outline"
-                onClick={() => setDuplicateTarget(null)}
-                disabled={duplicating}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleDuplicateConfirm} disabled={duplicating}>
-                {duplicating ? 'Duplicating…' : 'Duplicate'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       <InventoryAddMoreDialog
         item={addMoreItem}
         open={addMoreItem != null}
@@ -2701,24 +2421,20 @@ export default function InventoryPage() {
         onDeleteOne={handleDeleteOneSerial}
       />
 
+      <InventoryDeleteBlockedDialog
+        item={deleteBlockedTarget?.item ?? null}
+        instances={deleteBlockedTarget?.instances ?? []}
+        open={deleteBlockedTarget != null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteBlockedTarget(null);
+        }}
+      />
+
       <InventoryReservationHoldDialog
         instance={reservationHoldInstance}
         open={reservationHoldInstance != null}
         onOpenChange={(open) => {
           if (!open) setReservationHoldInstance(null);
-        }}
-      />
-
-      <InventoryIssueDialog
-        open={issueTarget != null}
-        onOpenChange={(open) => {
-          if (!open) setIssueTarget(null);
-        }}
-        item={issueTarget?.item ?? null}
-        users={users}
-        presetInstanceId={issueTarget?.instanceId}
-        onIssued={() => {
-          void pagination.invalidate();
         }}
       />
 

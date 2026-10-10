@@ -65,6 +65,21 @@ export function composeInventoryLocation(
   return (fallback || '').trim();
 }
 
+/** Compact location for list columns: first letter of room, cabinet, rack (e.g. R-C-R). */
+export function formatInventoryLocationAbbrev(source?: {
+  location?: string | null;
+  location_room?: string | null;
+  location_cabinet?: string | null;
+  location_rack?: string | null;
+}): string {
+  const parts = parseInventoryLocationParts(source);
+  const letters = [parts.location_room, parts.location_cabinet, parts.location_rack]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase());
+  return letters.length > 0 ? letters.join('-') : '—';
+}
+
 export function parseInventoryLocationParts(source?: {
   location?: string | null;
   location_room?: string | null;

@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select';
 import type { Inventory, InventoryInstance } from '@/lib/models';
 import { inventoryUsesInstances, type HierarchyEntityType } from '@/lib/entity-hierarchy';
-import { getSelectableInstances } from '@/lib/inventory-install';
+import { getAvailableInstances } from '@/lib/inventory-install';
 
 type DeleteStep = 'choice' | 'confirm-all' | 'confirm-one';
 
@@ -51,7 +51,10 @@ export function InventoryDeleteDialog({
   onDeleteAll,
   onDeleteOne,
 }: InventoryDeleteDialogProps) {
-  const instances = useMemo(() => (item ? getSelectableInstances(item) : []), [item]);
+  const instances = useMemo(() => (item ? getAvailableInstances(item) : []), [item]);
+  const allInstanceCount = item?.instances?.filter((instance) => Boolean(instance.id)).length ?? 0;
+  /** Whole catalog row may be removed only when every unit is available (or there are no units). */
+  const canDeleteAll = allInstanceCount === 0 || instances.length === allInstanceCount;
   const canDeleteOne =
     !!item &&
     inventoryUsesInstances(item.inventory_type as HierarchyEntityType) &&
@@ -66,8 +69,10 @@ export function InventoryDeleteDialog({
   useEffect(() => {
     if (!open) return;
 
-    if (canDeleteOne) {
+    if (canDeleteOne && canDeleteAll) {
       setStep('choice');
+    } else if (canDeleteOne) {
+      setStep('confirm-one');
     } else {
       setStep('confirm-all');
     }
@@ -75,7 +80,7 @@ export function InventoryDeleteDialog({
     setConfirmationCode(generateDeleteCode());
     setUserInput('');
     setSubmitting(false);
-  }, [open, canDeleteOne, instances]);
+  }, [open, canDeleteOne, canDeleteAll, instances]);
 
   const codeMatches = userInput === confirmationCode;
   const selectedInstance = instances.find(
@@ -115,15 +120,16 @@ export function InventoryDeleteDialog({
 
   const description =
     step === 'choice'
-      ? `Choose how to delete "${item?.name ?? 'this item'}".`
+      ? `Choose how to delete available units of "${item?.name ?? 'this item'}". Reserved, issued, or installed units are excluded.`
       : step === 'confirm-all'
         ? `This will permanently delete "${item?.name ?? 'this item'}" and all of its serial numbers. This action cannot be undone.`
-        : `This will permanently delete the selected serial number from "${item?.name ?? 'this item'}". This action cannot be undone.`;
+        : `This will permanently delete the selected available serial number from "${item?.name ?? 'this item'}". This action cannot be undone.`;
 
   const canSubmit =
     codeMatches &&
     !submitting &&
-    (step === 'confirm-all' || (step === 'confirm-one' && Boolean(selectedInstanceId)));
+    ((step === 'confirm-all' && canDeleteAll) ||
+      (step === 'confirm-one' && Boolean(selectedInstanceId)));
 
   return (
     <AlertDialog
@@ -155,17 +161,19 @@ export function InventoryDeleteDialog({
             >
               Delete One
             </Button>
-            <Button
-              variant="destructive"
-              className="flex-1 bg-destructive text-emerald-50 hover:bg-destructive/90"
-              onClick={() => {
-                setStep('confirm-all');
-                setConfirmationCode(generateDeleteCode());
-                setUserInput('');
-              }}
-            >
-              Delete All
-            </Button>
+            {canDeleteAll ? (
+              <Button
+                variant="destructive"
+                className="flex-1 bg-destructive text-emerald-50 hover:bg-destructive/90"
+                onClick={() => {
+                  setStep('confirm-all');
+                  setConfirmationCode(generateDeleteCode());
+                  setUserInput('');
+                }}
+              >
+                Delete All
+              </Button>
+            ) : null}
           </div>
         )}
 
@@ -215,7 +223,7 @@ export function InventoryDeleteDialog({
         )}
 
         <AlertDialogFooter>
-          {step !== 'choice' && canDeleteOne && (
+          {step !== 'choice' && canDeleteOne && canDeleteAll && (
             <Button
               type="button"
               variant="ghost"
