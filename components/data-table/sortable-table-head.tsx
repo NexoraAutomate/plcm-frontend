@@ -35,8 +35,8 @@ export function SortableTableHead({
   return (
     <TableHead
       className={cn(
-        'cursor-pointer select-none hover:bg-background/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        isActive && 'text-foreground font-semibold',
+        'cursor-pointer select-none hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        isActive && 'bg-muted/90 text-foreground',
         className
       )}
       role="columnheader"

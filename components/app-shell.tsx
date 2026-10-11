@@ -42,7 +42,8 @@ function AppShellFrame({ children }: { children: ReactNode }) {
             "relative min-h-0 min-w-0 flex-1 bg-background",
             isExecutiveCommand
               ? "flex flex-col overflow-hidden p-0"
-              : "overflow-y-auto overflow-x-hidden p-6"
+              : // Padding lives on an inner wrapper so sticky table headers can sit flush under the navbar.
+                "overflow-y-auto overflow-x-hidden"
           )}
         >
           {hideNavbar ? (
@@ -63,7 +64,13 @@ function AppShellFrame({ children }: { children: ReactNode }) {
               </div>
             </div>
           ) : null}
-          <RoutePermissionGuard>{children}</RoutePermissionGuard>
+          {isExecutiveCommand ? (
+            <RoutePermissionGuard>{children}</RoutePermissionGuard>
+          ) : (
+            <div className="p-6">
+              <RoutePermissionGuard>{children}</RoutePermissionGuard>
+            </div>
+          )}
         </main>
       </div>
     </div>

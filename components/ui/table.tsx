@@ -4,12 +4,14 @@ import * as React from 'react'
 
 import { cn } from '@/lib/utils'
 
-/** Sticky under the main navbar with a blurred translucent background. */
+/** Sticky under the main navbar — solid muted surface so headers stay readable while scrolling. */
 const TABLE_HEADER_STICKY =
   '[&_th]:sticky [&_th]:top-0 [&_th]:z-20 ' +
-  '[&_th]:bg-background/80 [&_th]:backdrop-blur-md [&_th]:supports-backdrop-filter:bg-background/70 ' +
+  '[&_th]:bg-muted [&_th]:text-foreground [&_th]:font-semibold ' +
+  '[&_th]:border-b [&_th]:border-border ' +
+  '[&_th]:shadow-[0_2px_6px_-2px_rgba(0,0,0,0.12)] ' +
   '[&_tr]:border-b [&_tr]:bg-transparent [&_tr]:hover:bg-transparent ' +
-  'dark:[&_th]:bg-background/80 dark:[&_th]:supports-backdrop-filter:bg-background/70'
+  'dark:[&_th]:bg-muted dark:[&_th]:shadow-[0_2px_6px_-2px_rgba(0,0,0,0.45)]'
 
 function Table({
   className,

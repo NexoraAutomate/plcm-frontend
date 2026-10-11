@@ -3,7 +3,7 @@
 import { Fragment, useState, useMemo, useEffect, useRef, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -2024,9 +2024,6 @@ export default function InventoryPage() {
       <Card>
         <CardHeader>
           <CardTitle>Inventory Items</CardTitle>
-          <CardDescription>
-            Showing {inventory.length} on this page · {pagination.total} total in database
-          </CardDescription>
           <CardAction>
             <ColumnVisibilityMenu
               columns={COLUMN_DEFS}
@@ -2109,7 +2106,7 @@ export default function InventoryPage() {
                   {isVisible('location') && (
                     <SortableTableHead column="location" sort={sort} onSort={cycleSort}>Location</SortableTableHead>
                   )}
-                  <TableHead className="sticky right-0 top-0 z-30 w-[7.5rem] px-1 text-right">
+                  <TableHead className="sticky right-0 top-0 z-30 w-[7.5rem] bg-muted px-1 text-right">
                     Actions
                   </TableHead>
                 </TableRow>
