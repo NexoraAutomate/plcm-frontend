@@ -418,6 +418,12 @@ export default function MaintenancePage() {
         serialNumber={serialNumber}
         setSerialNumber={setSerialNumber}
         onLookup={handleLookup}
+        onClearLookup={() => {
+          setLookupResponse(null);
+          setLookupError(null);
+          setLookupCaseId(null);
+          setSerialNumber('');
+        }}
         onCreateCase={handleCreateCaseFromLookup}
         lookupResponse={lookupResponses}
         caseId={lookupCaseId}

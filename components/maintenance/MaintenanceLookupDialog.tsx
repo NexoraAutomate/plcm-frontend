@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronsUpDown, Loader2 } from 'lucide-react';
+import { Check, ChevronsUpDown, Eraser, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -38,6 +38,7 @@ interface MaintenanceLookupDialogProps {
   serialNumber: string;
   setSerialNumber: (value: string) => void;
   onLookup: (serialNumber: string) => Promise<void>;
+  onClearLookup: () => void;
   onCreateCase: () => Promise<void>;
   lookupResponse: lookUpResponse | null;
   caseId?: number | null;
@@ -55,7 +56,7 @@ interface SerialNumberFieldProps {
 function SerialNumberField({ value, onChange }: SerialNumberFieldProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [options, setOptions] = useState<string[]>([]);
+  const [allOptions, setAllOptions] = useState<string[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState(false);
   const requestIdRef = useRef(0);
@@ -66,50 +67,41 @@ function SerialNumberField({ value, onChange }: SerialNumberFieldProps) {
     onChange(next);
     setOpen(false);
     setSearchQuery('');
-    setOptions([]);
     setSearchError(false);
   };
 
   useEffect(() => {
     if (!open) return;
 
-    const q = searchQuery.trim();
-    if (q.length < 2) {
-      setOptions([]);
-      setSearching(false);
-      setSearchError(false);
-      return;
-    }
-
     const requestId = ++requestIdRef.current;
     setSearching(true);
     setSearchError(false);
-    const timeoutId = window.setTimeout(() => {
-      void searchProjectSerialNumbers(q, 25)
-        .then((results) => {
-          if (requestIdRef.current !== requestId) return;
-          setOptions(results);
-          setSearchError(false);
-        })
-        .catch(() => {
-          if (requestIdRef.current !== requestId) return;
-          setOptions([]);
-          setSearchError(true);
-        })
-        .finally(() => {
-          if (requestIdRef.current !== requestId) return;
-          setSearching(false);
-        });
-    }, 250);
 
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [open, searchQuery]);
+    void searchProjectSerialNumbers('', 500)
+      .then((results) => {
+        if (requestIdRef.current !== requestId) return;
+        setAllOptions(results);
+        setSearchError(false);
+      })
+      .catch(() => {
+        if (requestIdRef.current !== requestId) return;
+        setAllOptions([]);
+        setSearchError(true);
+      })
+      .finally(() => {
+        if (requestIdRef.current !== requestId) return;
+        setSearching(false);
+      });
+  }, [open]);
 
   const trimmedQuery = searchQuery.trim();
+  const options = trimmedQuery
+    ? allOptions.filter((serial) =>
+        serial.toLowerCase().includes(trimmedQuery.toLowerCase())
+      )
+    : allOptions;
   const showUseTyped =
-    trimmedQuery.length >= 2 &&
+    trimmedQuery.length > 0 &&
     !searching &&
     !options.some((option) => option.toLowerCase() === trimmedQuery.toLowerCase());
 
@@ -122,11 +114,10 @@ function SerialNumberField({ value, onChange }: SerialNumberFieldProps) {
           setOpen(nextOpen);
           if (!nextOpen) {
             setSearchQuery('');
-            setOptions([]);
             setSearching(false);
             setSearchError(false);
-          } else if (value) {
-            setSearchQuery(value);
+          } else {
+            setSearchQuery(value || '');
           }
         }}
       >
@@ -138,7 +129,7 @@ function SerialNumberField({ value, onChange }: SerialNumberFieldProps) {
             aria-expanded={open}
             className="h-10 w-full justify-between font-normal"
           >
-            <span className="truncate">{value || 'Search serial number'}</span>
+            <span className="truncate">{value || 'Select serial number'}</span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
@@ -151,14 +142,14 @@ function SerialNumberField({ value, onChange }: SerialNumberFieldProps) {
           <Command
             shouldFilter={false}
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && trimmedQuery.length >= 2) {
+              if (event.key === 'Enter' && trimmedQuery.length > 0) {
                 event.preventDefault();
                 selectSerial(trimmedQuery);
               }
             }}
           >
             <CommandInput
-              placeholder="Paste or type serial number..."
+              placeholder="Filter serial numbers..."
               value={searchQuery}
               onValueChange={setSearchQuery}
             />
@@ -166,21 +157,19 @@ function SerialNumberField({ value, onChange }: SerialNumberFieldProps) {
               {searching ? (
                 <div className="flex items-center gap-2 px-3 py-4 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Searching…
-                </div>
-              ) : trimmedQuery.length < 2 ? (
-                <div className="px-3 py-4 text-sm text-muted-foreground">
-                  Type or paste at least 2 characters to search verified serials on delivered projects.
+                  Loading serials…
                 </div>
               ) : (
                 <>
                   {searchError ? (
                     <div className="px-3 py-2 text-sm text-destructive">
-                      Serial search failed. You can still press Enter to use the typed value.
+                      Serial list failed to load. You can still press Enter to use a typed value.
                     </div>
                   ) : null}
                   {!searchError && options.length === 0 && !showUseTyped ? (
-                    <CommandEmpty>No matching verified serial on a delivered project.</CommandEmpty>
+                    <CommandEmpty>
+                      No verified serials found on completed projects.
+                    </CommandEmpty>
                   ) : null}
                   <CommandGroup className="max-h-72 overflow-auto">
                     {showUseTyped ? (
@@ -220,7 +209,7 @@ function SerialNumberField({ value, onChange }: SerialNumberFieldProps) {
         </PopoverContent>
       </Popover>
       <p className="text-xs text-muted-foreground">
-        Searches installed and verified serials on completed / ready-to-deliver projects. Paste a full SN and press Enter if needed.
+        Lists all installed and verified serials from completed (shipped) projects.
       </p>
     </div>
   );
@@ -232,6 +221,7 @@ export function MaintenanceLookupDialog({
   serialNumber,
   setSerialNumber,
   onLookup,
+  onClearLookup,
   onCreateCase,
   lookupResponse,
   caseId,
@@ -243,6 +233,11 @@ export function MaintenanceLookupDialog({
   const { can } = useAuth();
   const canSuspectChildren = can(P.suspect_children);
   const canCreateCase = can(P.create_maintenance_cases);
+  const canClear =
+    Boolean(serialNumber.trim()) ||
+    Boolean(lookupResponse) ||
+    Boolean(lookupError) ||
+    Boolean(caseId);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -280,6 +275,17 @@ export function MaintenanceLookupDialog({
                 Lookup
               </Button>
 
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full gap-2"
+                disabled={lookupLoading || !canClear}
+                onClick={onClearLookup}
+              >
+                <Eraser className="h-4 w-4" />
+                Clear lookup
+              </Button>
+
               {lookupResponse && !caseId && canCreateCase ? (
                 <Button onClick={onCreateCase} variant="secondary" className="w-full">
                   Create Maintenance Case
@@ -299,7 +305,7 @@ export function MaintenanceLookupDialog({
 
             {!lookupResponse ? (
               <p className="text-sm text-muted-foreground">
-                Type a serial or scan an inventory QR code to find verified hardware on delivered projects.
+                Type a serial or scan an inventory QR code to find verified hardware on completed projects.
               </p>
             ) : null}
           </aside>
@@ -321,6 +327,15 @@ export function MaintenanceLookupDialog({
         </div>
 
         <DialogFooter className="border-t px-6 py-4">
+          <Button
+            variant="outline"
+            disabled={lookupLoading || !canClear}
+            onClick={onClearLookup}
+            className="gap-2"
+          >
+            <Eraser className="h-4 w-4" />
+            Clear
+          </Button>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Close
           </Button>
