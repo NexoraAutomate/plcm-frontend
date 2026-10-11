@@ -1,8 +1,7 @@
 'use client';
 
-import { Package } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { KPICard } from '@/components/kpi-card';
+import { cn } from '@/lib/utils';
 import { MaintenanceCaseStatusBadge } from './badges';
 import type { MaintenanceCase, MaintenanceAction, FaultyEntity } from '@/lib/models';
 import { formatUserRef } from '@/lib/user-display';
@@ -27,10 +26,35 @@ interface MaintenanceCaseSummaryProps {
   counts: EntityWorkflowCounts;
 }
 
-function pct(value: number, total: number) {
-  if (!total) return 0;
-  return Math.round((100 * value) / total);
-}
+const STATUS_METRICS: Array<{
+  key: keyof EntityWorkflowCounts;
+  label: string;
+  tone: string;
+}> = [
+  { key: 'identified', label: 'Identified', tone: 'bg-sky-500/15 text-sky-700 dark:text-sky-300' },
+  {
+    key: 'under_inspection',
+    label: 'Under inspection',
+    tone: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+  },
+  {
+    key: 'confirmed_faulty',
+    label: 'Confirmed faulty',
+    tone: 'bg-red-500/15 text-red-700 dark:text-red-300',
+  },
+  {
+    key: 'under_repair',
+    label: 'Under repair',
+    tone: 'bg-violet-500/15 text-violet-700 dark:text-violet-300',
+  },
+  { key: 'repaired', label: 'Repaired', tone: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' },
+  { key: 'replaced', label: 'Replaced', tone: 'bg-slate-500/15 text-slate-700 dark:text-slate-300' },
+  {
+    key: 'no_fault_found',
+    label: 'No fault found',
+    tone: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300',
+  },
+];
 
 export function MaintenanceCaseSummary({
   maintenanceCase,
@@ -39,108 +63,77 @@ export function MaintenanceCaseSummary({
   projectName,
   counts,
 }: MaintenanceCaseSummaryProps) {
+  const activeStatuses = STATUS_METRICS.filter((metric) => counts[metric.key] > 0);
+  const projectLabel = projectName || maintenanceCase.project_name || '—';
+  const reporterLabel = formatUserRef(maintenanceCase.reported_by_user) || '—';
+  const resolvedLabel = maintenanceCase.resolved_at
+    ? new Date(maintenanceCase.resolved_at).toLocaleDateString()
+    : 'Pending';
+  const notesLabel = maintenanceCase.resolution_notes?.trim() || 'No notes yet';
+
   return (
-    <div className="space-y-6">
-      <Card className="p-4 sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-2">
-            <h1 className="text-2xl font-semibold tracking-tight">{maintenanceCase.case_number}</h1>
-            <p className="text-sm text-muted-foreground max-w-2xl">{maintenanceCase.description}</p>
+    <div className="space-y-3">
+      <Card className="p-3 sm:p-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-lg font-semibold tracking-tight">{maintenanceCase.case_number}</h1>
+              <MaintenanceCaseStatusBadge
+                maintenanceCase={maintenanceCase}
+                entities={entities}
+                actions={actions}
+                className="rounded-full px-2 py-0.5 text-[11px]"
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">{maintenanceCase.description}</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <MaintenanceCaseStatusBadge
-              maintenanceCase={maintenanceCase}
-              entities={entities}
-              actions={actions}
-              className="rounded-full px-3 py-1 text-xs"
-            />
-            <span className="text-sm text-muted-foreground">
-              Reported {new Date(maintenanceCase.reported_at).toLocaleDateString()}
-            </span>
-          </div>
+          <p className="text-xs text-muted-foreground whitespace-nowrap">
+            Reported {new Date(maintenanceCase.reported_at).toLocaleDateString()}
+          </p>
         </div>
 
-        <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
-          <div className="space-y-1 rounded-lg border border-border p-4">
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Project</p>
-            <p className="font-semibold">{projectName || maintenanceCase.project_name}</p>
-          </div>
-          <div className="space-y-1 rounded-lg border border-border p-4">
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Reported By</p>
-            <p className="font-semibold">{formatUserRef(maintenanceCase.reported_by_user)}</p>
-          </div>
-        </div>
-        <div className="flex justify-between">
-          <div className="space-y-1 rounded-lg pl-2 w-fit">
-            <p className="text-xs font-medium uppercase min-w-3/4 tracking-[0.2em] text-muted-foreground">
-              Resolution Notes
-            </p>
-            <p className="text-sm text-muted-foreground wrap-break-word">
-              {maintenanceCase.resolution_notes || 'No notes yet'}
-            </p>
-          </div>
-          <div className="space-y-1 rounded-lg">
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Resolved At</p>
-            <p className="text-sm text-muted-foreground">
-              {maintenanceCase.resolved_at
-                ? new Date(maintenanceCase.resolved_at).toLocaleDateString()
-                : 'Pending'}
-            </p>
-          </div>
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border/70 pt-2 text-xs text-muted-foreground">
+          <p>
+            <span className="font-medium text-foreground/80">Project</span>{' '}
+            <span className="text-foreground">{projectLabel}</span>
+          </p>
+          <p>
+            <span className="font-medium text-foreground/80">Reported by</span>{' '}
+            <span className="text-foreground">{reporterLabel}</span>
+          </p>
+          <p>
+            <span className="font-medium text-foreground/80">Resolved</span>{' '}
+            <span className="text-foreground">{resolvedLabel}</span>
+          </p>
+          <p className="min-w-0 flex-1 basis-full sm:basis-auto">
+            <span className="font-medium text-foreground/80">Notes</span>{' '}
+            <span className="text-foreground/90">{notesLabel}</span>
+          </p>
         </div>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-8">
-        <KPICard title="Total" value={counts.total} change={0} icon={Package} accentColor="blue" />
-        <KPICard
-          title="Identified"
-          value={counts.identified}
-          change={pct(counts.identified, counts.total)}
-          icon={Package}
-          accentColor="blue"
-        />
-        <KPICard
-          title="Under Inspection"
-          value={counts.under_inspection}
-          change={pct(counts.under_inspection, counts.total)}
-          icon={Package}
-          accentColor="orange"
-        />
-        <KPICard
-          title="Confirmed Faulty"
-          value={counts.confirmed_faulty}
-          change={pct(counts.confirmed_faulty, counts.total)}
-          icon={Package}
-          accentColor="red"
-        />
-        <KPICard
-          title="Under Repair"
-          value={counts.under_repair}
-          change={pct(counts.under_repair, counts.total)}
-          icon={Package}
-          accentColor="purple"
-        />
-        <KPICard
-          title="Repaired"
-          value={counts.repaired}
-          change={pct(counts.repaired, counts.total)}
-          icon={Package}
-          accentColor="green"
-        />
-        <KPICard
-          title="Replaced"
-          value={counts.replaced}
-          change={pct(counts.replaced, counts.total)}
-          icon={Package}
-          accentColor="indigo"
-        />
-        <KPICard
-          title="No Fault Found"
-          value={counts.no_fault_found}
-          change={pct(counts.no_fault_found, counts.total)}
-          icon={Package}
-          accentColor="slate"
-        />
+      <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border/80 bg-card px-2.5 py-2">
+        <div className="flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-1 text-primary">
+          <span className="text-[11px] font-medium uppercase tracking-wide">Entities</span>
+          <span className="text-sm font-semibold tabular-nums">{counts.total}</span>
+        </div>
+
+        {activeStatuses.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No workflow activity yet</p>
+        ) : (
+          activeStatuses.map((metric) => (
+            <div
+              key={metric.key}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-2 py-1',
+                metric.tone
+              )}
+            >
+              <span className="text-[11px] font-medium">{metric.label}</span>
+              <span className="text-sm font-semibold tabular-nums">{counts[metric.key]}</span>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

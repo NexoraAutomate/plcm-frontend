@@ -286,13 +286,13 @@ export default function MaintenancePage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="text-xl font-semibold tracking-tight">
             Maintenance Management
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Track maintenance cases, faulty entities, repairs, and deliveries
           </p>
         </div>
@@ -307,10 +307,11 @@ export default function MaintenancePage() {
       <MaintenanceMiniDashboard
         counts={statusCounts}
         onStatusFilter={handleStatusFilter}
+        activeStatus={statusFilter}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="space-y-2">
+      <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-4">
+        <div className="space-y-1.5">
           <Label htmlFor="search">Search</Label>
           <div className="relative">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -324,7 +325,7 @@ export default function MaintenancePage() {
           </div>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <Label htmlFor="status-filter">Status</Label>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger id="status-filter">
@@ -341,7 +342,7 @@ export default function MaintenancePage() {
           </Select>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <Label htmlFor="project-filter">Project</Label>
           <Select value={projectFilter} onValueChange={setProjectFilter}>
             <SelectTrigger id="project-filter">
@@ -358,19 +359,17 @@ export default function MaintenancePage() {
           </Select>
         </div>
 
-        <div className="space-y-2 flex items-end">
-          <Button
-            variant="outline"
-            onClick={() => void handleRefresh()}
-            disabled={isMutating || pagination.fetching}
-            className="w-full"
-          >
-            <RefreshCw
-              className={`h-4 w-4 mr-2 ${isMutating || pagination.fetching ? 'animate-spin' : ''}`}
-            />
-            Refresh
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          onClick={() => void handleRefresh()}
+          disabled={isMutating || pagination.fetching}
+          className="w-full"
+        >
+          <RefreshCw
+            className={`h-4 w-4 mr-2 ${isMutating || pagination.fetching ? 'animate-spin' : ''}`}
+          />
+          Refresh
+        </Button>
       </div>
 
       <div className="space-y-2">

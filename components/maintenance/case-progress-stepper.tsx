@@ -17,7 +17,12 @@ export function CaseProgressStepper({ displayStatus, className }: CaseProgressSt
   const currentIndex = CASE_WORKFLOW_ORDER.indexOf(displayStatus);
 
   return (
-    <ol className={cn('space-y-0', className)}>
+    <ol
+      className={cn(
+        'flex w-full items-start justify-between gap-1 overflow-x-auto pb-1',
+        className
+      )}
+    >
       {CASE_WORKFLOW_ORDER.map((step, index) => {
         const meta = CASE_STATUS_META[step];
         const isCompleted = index < currentIndex;
@@ -26,35 +31,44 @@ export function CaseProgressStepper({ displayStatus, className }: CaseProgressSt
         const Icon = meta.icon;
 
         return (
-          <li key={step} className="flex gap-3">
-            <div className="flex flex-col items-center">
+          <li
+            key={step}
+            className="relative flex min-w-0 flex-1 flex-col items-center text-center"
+          >
+            {index < CASE_WORKFLOW_ORDER.length - 1 ? (
               <div
                 className={cn(
-                  'flex h-8 w-8 items-center justify-center rounded-full border-2',
-                  isCompleted && 'border-emerald-500 bg-emerald-50 text-emerald-600 dark:bg-emerald-950',
-                  isCurrent && 'border-primary bg-primary/10 text-primary',
+                  'absolute left-[calc(50%+16px)] right-[calc(-50%+16px)] top-4 h-0.5',
+                  isCompleted ? 'bg-emerald-500' : 'bg-border'
+                )}
+                aria-hidden
+              />
+            ) : null}
+
+            <div className="relative z-10 flex h-8 w-8 items-center justify-center">
+              {isCurrent ? (
+                <span
+                  className="absolute inset-0 rounded-full bg-primary/35 animate-case-heartbeat-ring"
+                  aria-hidden
+                />
+              ) : null}
+              <div
+                className={cn(
+                  'relative flex h-8 w-8 items-center justify-center rounded-full border-2 bg-background',
+                  isCompleted &&
+                    'border-emerald-500 bg-emerald-50 text-emerald-600 dark:bg-emerald-950',
+                  isCurrent && 'border-primary bg-primary/15 text-primary animate-case-heartbeat',
                   isFuture && 'border-muted bg-muted/40 text-muted-foreground'
                 )}
               >
-                {isCompleted ? (
-                  <Check className="h-4 w-4" />
-                ) : (
-                  <Icon className="h-4 w-4" />
-                )}
+                {isCompleted ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
               </div>
-              {index < CASE_WORKFLOW_ORDER.length - 1 && (
-                <div
-                  className={cn(
-                    'my-1 h-6 w-0.5',
-                    isCompleted ? 'bg-emerald-500' : 'bg-border'
-                  )}
-                />
-              )}
             </div>
-            <div className={cn('pb-4 pt-1', isFuture && 'opacity-50')}>
+
+            <div className={cn('mt-2 px-1', isFuture && 'opacity-50')}>
               <p
                 className={cn(
-                  'text-sm font-medium',
+                  'text-[11px] font-medium leading-tight sm:text-xs',
                   isCurrent && 'text-foreground',
                   isCompleted && 'text-emerald-700 dark:text-emerald-400',
                   isFuture && 'text-muted-foreground'
@@ -62,9 +76,11 @@ export function CaseProgressStepper({ displayStatus, className }: CaseProgressSt
               >
                 {meta.label}
               </p>
-              {isCurrent && (
-                <p className="mt-0.5 text-xs text-muted-foreground">{meta.tooltip}</p>
-              )}
+              {isCurrent ? (
+                <p className="mt-0.5 hidden text-[10px] text-muted-foreground sm:block">
+                  {meta.tooltip}
+                </p>
+              ) : null}
             </div>
           </li>
         );

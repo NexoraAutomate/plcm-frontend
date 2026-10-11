@@ -490,40 +490,6 @@ export default function MaintenanceCaseInvestigationPage({
     setResolveDialogOpen(true);
   };
 
-  const handleCaseStatusChange = async (displayStatus: MaintenanceCaseWorkflowStatus) => {
-    const suggestion = getWorkflowSuggestion({
-      maintenanceCase,
-      entities,
-      actions: maintenanceActions,
-      trigger: displayStatus === MaintenanceCaseWorkflowStatus.CLOSED ? 'close_case' : 'verification_approved',
-    });
-
-    const applyStatus = async () => {
-      setCaseStatusLoading(true);
-      try {
-        await applyCaseStatus(displayStatus);
-        toast.success('Case status updated.');
-        await reloadCaseState();
-      } catch (error) {
-        console.error('Case status update failed', error);
-        toast.error('Unable to update case status.');
-      } finally {
-        setCaseStatusLoading(false);
-      }
-    };
-
-    if (suggestion && suggestion.suggestedCaseStatus === displayStatus) {
-      promptWorkflow({
-        message: suggestion.message,
-        suggestedCaseStatus: displayStatus,
-        execute: applyStatus,
-      });
-      return;
-    }
-
-    await applyStatus();
-  };
-
   const handleResolveFault = async (
     resolutionType: ResolutionType,
     replacement?: ReplacementSelection,
@@ -711,8 +677,6 @@ export default function MaintenanceCaseInvestigationPage({
             maintenanceCase={maintenanceCase}
             entities={entities}
             actions={maintenanceActions}
-            onCaseStatusChange={handleCaseStatusChange}
-            isUpdatingCase={caseStatusLoading}
           />
         </>
       ) : (
