@@ -10,7 +10,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsTrigger } from '@/components/ui/tabs';
+import {
+  AnimatedPillTabsList,
+  animatedPillTabsTriggerClassName,
+} from '@/components/ui/animated-pill-tabs';
 import {
   formatInventoryMoney,
   INVENTORY_CURRENCIES,
@@ -131,14 +135,22 @@ export function InventoryCostTab({
         onValueChange={(next) => setMode(next as CostEntryMode)}
         className="w-full"
       >
-        <TabsList className="grid h-auto w-full grid-cols-2">
-          <TabsTrigger value="batch" disabled={disabled}>
+        <AnimatedPillTabsList value={subTab}>
+          <TabsTrigger
+            value="batch"
+            disabled={disabled}
+            className={animatedPillTabsTriggerClassName}
+          >
             Supplier quote
           </TabsTrigger>
-          <TabsTrigger value="unit" disabled={disabled}>
+          <TabsTrigger
+            value="unit"
+            disabled={disabled}
+            className={animatedPillTabsTriggerClassName}
+          >
             Per-unit pricing
           </TabsTrigger>
-        </TabsList>
+        </AnimatedPillTabsList>
 
         <TabsContent value="batch" className="mt-4 space-y-3">
           <div className="space-y-2">

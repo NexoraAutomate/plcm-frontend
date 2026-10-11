@@ -1,6 +1,7 @@
 'use client';
 
 import { Fragment, useState, useMemo, useEffect, useRef, type ReactNode } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -321,6 +322,8 @@ function ExpandedInventoryUnitsTable({
             formatInventoryLocationAbbrev(row as unknown as InventoryInstance),
           status: (row) =>
             resolveInventoryInstanceStatus(row as unknown as InventoryInstance),
+          unit_cost: (row) =>
+            Number((row as unknown as InventoryInstance).unit_cost ?? Number.NaN),
         }
       ) as unknown as InventoryInstance[],
     [serialInstances, sort, users]
@@ -329,10 +332,11 @@ function ExpandedInventoryUnitsTable({
   return (
     <Table className="table-fixed" containerClassName={containerClassName}>
       <colgroup>
-        <col style={{ width: '28%' }} />
         <col style={{ width: '22%' }} />
+        <col style={{ width: '18%' }} />
         <col />
-        <col style={{ width: '7rem' }} />
+        <col style={{ width: '7.5rem' }} />
+        <col style={{ width: '6.5rem' }} />
         <col style={{ width: '7.5rem' }} />
       </colgroup>
       <TableHeader>
@@ -345,6 +349,9 @@ function ExpandedInventoryUnitsTable({
           </SortableTableHead>
           <SortableTableHead column="location" sort={sort} onSort={cycleSort}>
             Location
+          </SortableTableHead>
+          <SortableTableHead column="unit_cost" sort={sort} onSort={cycleSort} className="w-[7.5rem]">
+            Cost
           </SortableTableHead>
           <SortableTableHead column="status" sort={sort} onSort={cycleSort} className="w-28">
             Status
@@ -2120,14 +2127,18 @@ export default function InventoryPage() {
                     const isExpandable = serialInstances.length >= 1;
                     const isExpanded = expandedRows.has(item.id);
                     const isSelected = selectedIds.has(item.id);
+                    const exploringOther =
+                      expandedRows.size > 0 && !isExpanded;
 
                     return (
                       <Fragment key={item.id}>
                         <TableRow
                           className={cn(
-                            'group [&_td]:py-2.5',
-                            isExpanded && 'bg-muted/30',
-                            isSelected && 'bg-muted/50'
+                            'group [&_td]:py-2.5 transition-colors duration-200',
+                            isExpanded &&
+                              'relative z-[1] border-l-2 border-l-sky-500 bg-sky-100/70 shadow-[inset_0_0_0_1px_rgba(14,165,233,0.25)] hover:bg-sky-100/90 dark:border-l-sky-400 dark:bg-sky-950/55 dark:shadow-[inset_0_0_0_1px_rgba(56,189,248,0.2)] dark:hover:bg-sky-950/70',
+                            !isExpanded && isSelected && 'bg-muted/50',
+                            exploringOther && 'opacity-45'
                           )}
                           data-state={isSelected ? 'selected' : undefined}
                         >
@@ -2198,7 +2209,13 @@ export default function InventoryPage() {
                                     </div>
                                   )
                                 ) : null}
-                                <span className="truncate font-medium">
+                                <span
+                                  className={cn(
+                                    'truncate font-medium',
+                                    isExpanded &&
+                                      'font-semibold text-sky-950 dark:text-sky-50'
+                                  )}
+                                >
                                   {item.entityName || 'N/A'}
                                 </span>
                               </div>
@@ -2280,7 +2297,11 @@ export default function InventoryPage() {
                           <TableCell
                             className={cn(
                               'sticky right-0 z-10 w-[7.5rem] px-1 text-right group-hover:bg-muted/50',
-                              isSelected ? 'bg-muted/50' : isExpanded ? 'bg-muted/30' : 'bg-background'
+                              isExpanded
+                                ? 'bg-sky-100/70 group-hover:bg-sky-100/90 dark:bg-sky-950/55 dark:group-hover:bg-sky-950/70'
+                                : isSelected
+                                  ? 'bg-muted/50'
+                                  : 'bg-background'
                             )}
                           >
                             <div className="flex flex-nowrap justify-end gap-0">
@@ -2402,40 +2423,70 @@ export default function InventoryPage() {
                             </div>
                           </TableCell>
                         </TableRow>
-                        {isExpanded && isExpandable ? (
-                          <TableRow className="bg-muted/20 hover:bg-muted/20">
-                            <TableCell colSpan={inventoryTableColSpan} className="min-w-0 overflow-x-hidden p-0">
+                        {isExpandable ? (
+                          <TableRow
+                            className={cn(
+                              'border-0 bg-transparent hover:bg-transparent',
+                              exploringOther && 'opacity-45'
+                            )}
+                          >
+                            <TableCell
+                              colSpan={inventoryTableColSpan}
+                              className="min-w-0 overflow-hidden border-0 p-0"
+                            >
+                              <AnimatePresence initial={false}>
+                                {isExpanded ? (
+                              <motion.div
+                                key={`expand-${item.id}`}
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{
+                                  height: {
+                                    duration: 0.34,
+                                    ease: [0.22, 1, 0.36, 1],
+                                  },
+                                  opacity: { duration: 0.22, ease: 'easeOut' },
+                                }}
+                                className="overflow-hidden"
+                              >
                               {/*
-                                Mirror catalog columns: [checkbox?][expand][Category/photo][Type→ serial table].
-                                Unit Identity therefore starts under the Type column.
+                                Photo starts at catalog checkbox and spans through Category;
+                                serial table (Unit Identity) begins under Type.
                               */}
-                              <div className="min-w-0 overflow-x-hidden py-3 pr-3 pl-2">
-                                {/*
-                                  Photo column starts at the catalog checkbox and spans through Category;
-                                  serial table (Unit Identity) still begins under Type.
-                                */}
+                              <div className="min-w-0 overflow-x-hidden border-l-2 border-l-sky-500 bg-sky-50/80 py-3 pr-3 pl-2 dark:border-l-sky-400 dark:bg-sky-950/35">
                                 <div
                                   className={cn(
-                                    'mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5',
-                                    isVisible('name')
-                                      ? inventoryManager
-                                        ? 'pl-[min(18rem,calc(5rem+24%))]'
-                                        : 'pl-[min(15rem,calc(2.5rem+24%))]'
-                                      : 'pl-0'
+                                    'mb-2 flex w-full flex-wrap items-baseline gap-x-3 gap-y-0.5 rounded-md border px-3 py-2',
+                                    'border-sky-300/90 bg-sky-200/90 text-sky-950',
+                                    'dark:border-sky-700 dark:bg-sky-900 dark:text-sky-50'
                                   )}
                                 >
-                                  <h4 className="text-sm font-semibold">
+                                  <h4 className="text-sm font-semibold tracking-tight">
                                     Part Number{' '}
-                                    <span className="font-mono">
+                                    <span className="font-mono font-bold">
                                       {item.partNumber || '—'}
                                     </span>
                                   </h4>
-                                  <span className="text-xs text-muted-foreground">
+                                  <span className="text-xs font-medium text-sky-800 dark:text-sky-200">
                                     {serialInstances.length} unit
                                     {serialInstances.length === 1 ? '' : 's'}
                                   </span>
+                                  <span className="ml-auto text-[11px] font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+                                    Exploring
+                                  </span>
                                 </div>
-                                <div className="flex min-w-0 items-stretch gap-0">
+                                <motion.div
+                                  initial={{ y: -8, opacity: 0 }}
+                                  animate={{ y: 0, opacity: 1 }}
+                                  exit={{ y: -6, opacity: 0 }}
+                                  transition={{
+                                    duration: 0.28,
+                                    delay: 0.05,
+                                    ease: [0.22, 1, 0.36, 1],
+                                  }}
+                                  className="flex min-w-0 items-stretch gap-0"
+                                >
                                   {isVisible('name') ? (
                                     <div
                                       className={cn(
@@ -2539,6 +2590,22 @@ export default function InventoryPage() {
                                           >
                                             {locationLabel}
                                           </TableCell>
+                                          <TableCell
+                                            className="w-[7.5rem] tabular-nums text-sm"
+                                            title={
+                                              instance.unit_cost != null
+                                                ? formatInventoryMoney(
+                                                    instance.unit_cost,
+                                                    item.currency || 'PKR'
+                                                  )
+                                                : undefined
+                                            }
+                                          >
+                                            {formatInventoryMoney(
+                                              instance.unit_cost,
+                                              item.currency || 'PKR'
+                                            )}
+                                          </TableCell>
                                           <TableCell className="w-28 overflow-hidden">
                                             {isProjectReservedInstance(instance) &&
                                             !instance.is_reserved ? (
@@ -2640,8 +2707,11 @@ export default function InventoryPage() {
                                       }
                                     </ExpandedInventoryUnitsTable>
                                   </div>
-                                </div>
+                                </motion.div>
                               </div>
+                              </motion.div>
+                                ) : null}
+                              </AnimatePresence>
                             </TableCell>
                           </TableRow>
                         ) : null}
