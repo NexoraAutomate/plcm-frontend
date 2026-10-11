@@ -19,7 +19,7 @@ export function CaseProgressStepper({ displayStatus, className }: CaseProgressSt
   return (
     <ol
       className={cn(
-        'flex w-full items-start justify-between gap-1 overflow-x-auto pb-1',
+        'flex w-full items-start justify-between gap-1 overflow-visible px-2 py-3',
         className
       )}
     >
@@ -33,22 +33,23 @@ export function CaseProgressStepper({ displayStatus, className }: CaseProgressSt
         return (
           <li
             key={step}
-            className="relative flex min-w-0 flex-1 flex-col items-center text-center"
+            className="relative flex min-w-0 flex-1 flex-col items-center overflow-visible text-center"
           >
             {index < CASE_WORKFLOW_ORDER.length - 1 ? (
               <div
                 className={cn(
-                  'absolute left-[calc(50%+16px)] right-[calc(-50%+16px)] top-4 h-0.5',
+                  'absolute left-[calc(50%+18px)] right-[calc(-50%+18px)] top-[22px] h-0.5',
                   isCompleted ? 'bg-emerald-500' : 'bg-border'
                 )}
                 aria-hidden
               />
             ) : null}
 
-            <div className="relative z-10 flex h-8 w-8 items-center justify-center">
+            {/* Larger hit box so animate-ping (scale 2) is not clipped */}
+            <div className="relative z-10 flex h-11 w-11 items-center justify-center overflow-visible">
               {isCurrent ? (
                 <span
-                  className="absolute inset-0 rounded-full bg-primary/35 animate-case-heartbeat-ring"
+                  className="absolute h-8 w-8 animate-ping rounded-full bg-primary/45 [animation-duration:1.25s]"
                   aria-hidden
                 />
               ) : null}
@@ -57,7 +58,7 @@ export function CaseProgressStepper({ displayStatus, className }: CaseProgressSt
                   'relative flex h-8 w-8 items-center justify-center rounded-full border-2 bg-background',
                   isCompleted &&
                     'border-emerald-500 bg-emerald-50 text-emerald-600 dark:bg-emerald-950',
-                  isCurrent && 'border-primary bg-primary/15 text-primary animate-case-heartbeat',
+                  isCurrent && 'border-primary bg-primary/15 text-primary',
                   isFuture && 'border-muted bg-muted/40 text-muted-foreground'
                 )}
               >
@@ -65,7 +66,7 @@ export function CaseProgressStepper({ displayStatus, className }: CaseProgressSt
               </div>
             </div>
 
-            <div className={cn('mt-2 px-1', isFuture && 'opacity-50')}>
+            <div className={cn('mt-1.5 px-1', isFuture && 'opacity-50')}>
               <p
                 className={cn(
                   'text-[11px] font-medium leading-tight sm:text-xs',

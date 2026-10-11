@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { CaseProgressStepper } from '@/components/maintenance/case-progress-stepper';
 import {
   buildEntityDisplayContexts,
@@ -29,11 +28,5 @@ export function CaseDetailCards({
     [maintenanceCase, contexts, actions]
   );
 
-  return (
-    <Card>
-      <CardContent className="p-4 sm:p-5">
-        <CaseProgressStepper displayStatus={displayStatus} />
-      </CardContent>
-    </Card>
-  );
+  return <CaseProgressStepper displayStatus={displayStatus} />;
 }

@@ -124,7 +124,9 @@ export function buildCaseTimelineEvents(
       userLabel: resolveUserLabel(undefined, maintenanceCase.reported_by_user),
     });
 
-    if (maintenanceCase.resolved_at) {
+    const isCaseResolved =
+      maintenanceCase.status === 'resolved' || maintenanceCase.status === 'closed';
+    if (isCaseResolved && maintenanceCase.resolved_at) {
       events.push({
         id: `case-${maintenanceCase.id}-resolved`,
         kind: TimelineEventKind.CaseResolved,

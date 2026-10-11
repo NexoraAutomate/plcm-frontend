@@ -299,54 +299,6 @@
   }
 }
 
-@keyframes case-step-heartbeat {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  15% {
-    transform: scale(1.18);
-  }
-  30% {
-    transform: scale(1);
-  }
-  45% {
-    transform: scale(1.12);
-  }
-}
-
-@keyframes case-step-heartbeat-ring {
-  0% {
-    transform: scale(1);
-    opacity: 0.55;
-  }
-  70% {
-    transform: scale(1.85);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(1.85);
-    opacity: 0;
-  }
-}
-
-.animate-case-heartbeat {
-  animation: case-step-heartbeat 1.1s ease-in-out infinite;
-  will-change: transform;
-}
-
-.animate-case-heartbeat-ring {
-  animation: case-step-heartbeat-ring 1.1s ease-out infinite;
-  will-change: transform, opacity;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .animate-case-heartbeat,
-  .animate-case-heartbeat-ring {
-    animation: none;
-  }
-}
-
 @media print {
   aside,
   nav,

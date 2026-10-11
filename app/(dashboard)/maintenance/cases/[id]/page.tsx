@@ -2,14 +2,21 @@
 
 import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, InspectionPanel, RefreshCw } from 'lucide-react';
+import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+import { Tabs, TabsContent, TabsTrigger } from '@/components/ui/tabs';
+import {
+  AnimatedPillTabsList,
+  animatedPillTabsTriggerClassName,
+} from '@/components/ui/animated-pill-tabs';
 import { maintenanceService, formatMaintenanceApiError } from '@/services/maintenance';
-import { MaintenanceCaseSummary } from '@/components/maintenance/maintenance-case-summary';
+import {
+  EntityWorkflowMetrics,
+  MaintenanceCaseSummary,
+} from '@/components/maintenance/maintenance-case-summary';
 import { InvestigationTree } from '@/components/maintenance/investigation-tree';
 import { MaintenanceFaultyEntitiesTable } from '@/components/maintenance/maintenance-faulty-entities-table';
 import { ResolveFaultDialog, type ReplacementSelection } from '@/components/maintenance/resolve-fault-dialog';
@@ -75,7 +82,6 @@ export default function MaintenanceCaseInvestigationPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const router = useRouter();
   const { user } = useAuth();
   const resolvedParams = use(params);
   const caseId = Number(resolvedParams.id);
@@ -95,6 +101,7 @@ export default function MaintenanceCaseInvestigationPage({
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [workflowDialogOpen, setWorkflowDialogOpen] = useState(false);
   const [pendingWorkflow, setPendingWorkflow] = useState<PendingWorkflowAction | null>(null);
+  const [detailTab, setDetailTab] = useState('tree');
 
   const treeNodes = useMemo(() => buildInvestigationTree(entities), [entities]);
 
@@ -634,35 +641,18 @@ export default function MaintenanceCaseInvestigationPage({
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-1">
-          <Link
-            href="/maintenance"
-            className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
-          >
-            <ArrowLeft className="h-4 w-4" /> Back to maintenance cases
-          </Link>
-          <div className="pt-4 flex flex-col w-4xl">
-            <div className="flex px-1 items-center w-2xl h-10">
-              <InspectionPanel className="w-1/12 h-full" />
-              <h1 className="text-2xl font-bold tracking-tight w-11/12 h-full">
-                Maintenance Case Investigation
-              </h1>
-            </div>
-            <p className="pl-16 text-sm text-muted-foreground">
-              Inspect potentially affected or confirmed faulty entities and manage the
-              investigation lifecycle for this case.
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={() => router.back()}>
-            Back
-          </Button>
-          <Button onClick={refresh} disabled={isLoading}>
-            <RefreshCw className="mr-2 h-4 w-4" /> Refresh
-          </Button>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link
+          href="/maintenance"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Maintenance cases
+        </Link>
+        <Button variant="outline" size="sm" onClick={refresh} disabled={isLoading}>
+          <RefreshCw className={cn('mr-2 h-3.5 w-3.5', isLoading && 'animate-spin')} />
+          Refresh
+        </Button>
       </div>
 
       {maintenanceCase ? (
@@ -671,7 +661,6 @@ export default function MaintenanceCaseInvestigationPage({
             maintenanceCase={maintenanceCase}
             entities={entities}
             actions={maintenanceActions}
-            counts={counts}
           />
           <CaseDetailCards
             maintenanceCase={maintenanceCase}
@@ -685,18 +674,25 @@ export default function MaintenanceCaseInvestigationPage({
         </div>
       )}
 
-      <Separator />
-
-      <div className="space-y-6">
-        <Tabs defaultValue="tree">
-          <TabsList>
-            <TabsTrigger value="tree">Investigation Tree</TabsTrigger>
-            <TabsTrigger value="entities">Faulty Entities</TabsTrigger>
-            <TabsTrigger value="actions">Maintenance Actions</TabsTrigger>
-            <TabsTrigger value="timeline">Timeline</TabsTrigger>
-          </TabsList>
-          <TabsContent value="tree">
-            <div className="space-y-4">
+      <Card>
+        <CardContent className="space-y-4 p-4 sm:p-5">
+          <EntityWorkflowMetrics counts={counts} />
+          <Tabs value={detailTab} onValueChange={setDetailTab} className="space-y-4">
+            <AnimatedPillTabsList value={detailTab}>
+              <TabsTrigger value="tree" className={animatedPillTabsTriggerClassName}>
+                Investigation Tree
+              </TabsTrigger>
+              <TabsTrigger value="entities" className={animatedPillTabsTriggerClassName}>
+                Faulty Entities
+              </TabsTrigger>
+              <TabsTrigger value="actions" className={animatedPillTabsTriggerClassName}>
+                Maintenance Actions
+              </TabsTrigger>
+              <TabsTrigger value="timeline" className={animatedPillTabsTriggerClassName}>
+                Timeline
+              </TabsTrigger>
+            </AnimatedPillTabsList>
+            <TabsContent value="tree" className="mt-0 space-y-4">
               <p className="text-sm text-muted-foreground">
                 Use the hierarchy tree to inspect entity relationships and confirm whether a
                 specific part is faulty.
@@ -720,10 +716,8 @@ export default function MaintenanceCaseInvestigationPage({
                 }}
                 onFaultTypeChange={handleFaultTypeChange}
               />
-            </div>
-          </TabsContent>
-          <TabsContent value="entities">
-            <div className="space-y-4">
+            </TabsContent>
+            <TabsContent value="entities" className="mt-0 space-y-4">
               <MaintenanceFaultyEntitiesTable
                 entities={entities}
                 actions={maintenanceActions}
@@ -764,10 +758,8 @@ export default function MaintenanceCaseInvestigationPage({
                   )
                 }
               />
-            </div>
-          </TabsContent>
-          <TabsContent value="actions">
-            <div className="space-y-4">
+            </TabsContent>
+            <TabsContent value="actions" className="mt-0 space-y-4">
               <p className="text-sm text-muted-foreground">
                 Structured audit log of all engineer actions recorded for this case.
               </p>
@@ -776,10 +768,8 @@ export default function MaintenanceCaseInvestigationPage({
                 entities={entities}
                 isLoading={timelineLoading}
               />
-            </div>
-          </TabsContent>
-          <TabsContent value="timeline">
-            <div className="space-y-4">
+            </TabsContent>
+            <TabsContent value="timeline" className="mt-0 space-y-4">
               <p className="text-sm text-muted-foreground">
                 Review investigation actions grouped by parent and child entities.
               </p>
@@ -788,10 +778,10 @@ export default function MaintenanceCaseInvestigationPage({
                 events={timelineEventsView}
                 isLoading={timelineLoading}
               />
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
 
       <EntityDetailSheet
         entity={activeEntity}
