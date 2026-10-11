@@ -1,8 +1,8 @@
 import * as api from '@/lib/api';
 
 /**
- * Typeahead search for project-installed serial numbers only.
- * Never loads inventory or the full serial population (capped server-side).
+ * Typeahead search for installed/verified serials on delivered projects.
+ * Never loads inventory stock or the full serial population (capped server-side).
  */
 export async function searchProjectSerialNumbers(
   query: string,

@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Search, RefreshCw } from 'lucide-react';
+import { Search, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import * as maintenanceApi from '@/lib/api';
 import * as MaintenanceTypes from '@/lib/models';
@@ -43,7 +43,6 @@ export default function MaintenancePage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { can } = useAuth();
-  const canCreateCase = can(P.create_maintenance_cases);
   const canEditCase = can(P.edit_maintenance_cases);
   const canDeleteCase = can(P.delete_maintenance_cases);
   const { sort, cycleSort, listFilterPatch } = useTableSorting();
@@ -61,7 +60,6 @@ export default function MaintenancePage() {
   const debouncedSearch = useDebouncedValue(search);
   const [statusFilter, setStatusFilter] = useState<string>(searchParams.get('status') || 'all');
   const [projectFilter, setProjectFilter] = useState<string>('all');
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isLookupOpen, setIsLookupOpen] = useState(false);
   const [editingCase, setEditingCase] = useState<MaintenanceTypes.MaintenanceCase | null>(null);
@@ -122,18 +120,6 @@ export default function MaintenancePage() {
 
   const filtered = paginatedCases;
 
-  const handleCreate = async (data: MaintenanceTypes.CreateMaintenanceCasePayload) => {
-    try {
-      setIsMutating(true);
-      await createMaintenanceCase(data);
-      invalidateCaseQueries();
-    } catch {
-      // Error handled by data store
-    } finally {
-      setIsMutating(false);
-    }
-  };
-
   const handleUpdate = async (data: MaintenanceTypes.UpdateMaintenanceCasePayload) => {
     if (!editingCase) return;
     try {
@@ -151,11 +137,7 @@ export default function MaintenancePage() {
   const handleSubmit = async (
     data: MaintenanceTypes.CreateMaintenanceCasePayload | MaintenanceTypes.UpdateMaintenanceCasePayload
   ) => {
-    if (editingCase) {
-      await handleUpdate(data as MaintenanceTypes.UpdateMaintenanceCasePayload);
-    } else {
-      await handleCreate(data as MaintenanceTypes.CreateMaintenanceCasePayload);
-    }
+    await handleUpdate(data as MaintenanceTypes.UpdateMaintenanceCasePayload);
   };
 
   const handleLookup = async (serialNumberValue: string) => {
@@ -319,12 +301,6 @@ export default function MaintenancePage() {
             <Search className="h-4 w-4" />
             Lookup by Serial Number
           </Button>
-          {canCreateCase ? (
-            <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add New Case
-            </Button>
-          ) : null}
         </div>
       </div>
 
@@ -452,9 +428,8 @@ export default function MaintenancePage() {
       />
 
       <MaintenanceCaseDialog
-        isOpen={isCreateOpen || isEditOpen}
+        isOpen={isEditOpen}
         onClose={() => {
-          setIsCreateOpen(false);
           setIsEditOpen(false);
           setEditingCase(null);
         }}

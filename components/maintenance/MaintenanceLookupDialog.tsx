@@ -169,7 +169,7 @@ function SerialNumberField({ value, onChange }: SerialNumberFieldProps) {
                 </div>
               ) : trimmedQuery.length < 2 ? (
                 <div className="px-3 py-4 text-sm text-muted-foreground">
-                  Type or paste at least 2 characters to search project-installed serials.
+                  Type or paste at least 2 characters to search verified serials on delivered projects.
                 </div>
               ) : (
                 <>
@@ -179,7 +179,7 @@ function SerialNumberField({ value, onChange }: SerialNumberFieldProps) {
                     </div>
                   ) : null}
                   {!searchError && options.length === 0 && !showUseTyped ? (
-                    <CommandEmpty>No matching project-installed serial.</CommandEmpty>
+                    <CommandEmpty>No matching verified serial on a delivered project.</CommandEmpty>
                   ) : null}
                   <CommandGroup className="max-h-72 overflow-auto">
                     {showUseTyped ? (
@@ -219,7 +219,7 @@ function SerialNumberField({ value, onChange }: SerialNumberFieldProps) {
         </PopoverContent>
       </Popover>
       <p className="text-xs text-muted-foreground">
-        Searches only serials installed under a project (not inventory stock). Paste a full SN and press Enter if needed.
+        Searches installed and verified serials on completed / ready-to-deliver projects. Paste a full SN and press Enter if needed.
       </p>
     </div>
   );
@@ -290,7 +290,7 @@ export function MaintenanceLookupDialog({
 
             {!lookupResponse ? (
               <p className="text-sm text-muted-foreground">
-                Type a serial to search project-installed hardware, then run lookup.
+                Type a serial to search verified hardware on delivered projects, then run lookup.
               </p>
             ) : null}
           </aside>
