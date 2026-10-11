@@ -27,6 +27,7 @@ import {
 import { cn } from '@/lib/utils';
 import { searchProjectSerialNumbers } from '@/lib/serial-numbers';
 import { EntityLookupTree } from './EntityLookupTree';
+import { MaintenanceQrScanPlaceholder } from './maintenance-qr-scan-placeholder';
 import type { EntityLookupNode, lookUpResponse } from '@/lib/models';
 import { useAuth } from '@/lib/auth-context';
 import { P } from '@/lib/permission-codes';
@@ -259,6 +260,14 @@ export function MaintenanceLookupDialog({
           <aside className="space-y-4 border-b bg-muted/20 p-4 sm:p-6 lg:border-b-0 lg:border-r">
             <SerialNumberField value={serialNumber} onChange={setSerialNumber} />
 
+            <MaintenanceQrScanPlaceholder
+              disabled={lookupLoading}
+              onSerialDetected={async (scannedSerial) => {
+                setSerialNumber(scannedSerial);
+                await onLookup(scannedSerial);
+              }}
+            />
+
             <div className="flex flex-col gap-2">
               <Button
                 onClick={() => onLookup(serialNumber)}
@@ -290,7 +299,7 @@ export function MaintenanceLookupDialog({
 
             {!lookupResponse ? (
               <p className="text-sm text-muted-foreground">
-                Type a serial to search verified hardware on delivered projects, then run lookup.
+                Type a serial or scan an inventory QR code to find verified hardware on delivered projects.
               </p>
             ) : null}
           </aside>
