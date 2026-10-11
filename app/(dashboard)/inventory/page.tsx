@@ -2125,7 +2125,7 @@ export default function InventoryPage() {
                       <Fragment key={item.id}>
                         <TableRow
                           className={cn(
-                            'group',
+                            'group [&_td]:py-2.5',
                             isExpanded && 'bg-muted/30',
                             isSelected && 'bg-muted/50'
                           )}
@@ -2175,10 +2175,10 @@ export default function InventoryPage() {
                           </TableCell>
                           {isVisible('name') && (
                             <TableCell
-                              className="max-w-0"
+                              className="max-w-0 py-2.5"
                               title={item.entityName || 'N/A'}
                             >
-                              <div className="flex min-w-0 items-center gap-2">
+                              <div className="flex min-w-0 items-center gap-2.5">
                                 {/* Hide catalog thumb (and placeholder) while serials are expanded. */}
                                 {!isExpanded ? (
                                   item.picture_url ? (
@@ -2187,14 +2187,14 @@ export default function InventoryPage() {
                                       ownerType="inventory"
                                       ownerId={item.id}
                                       alt={item.entityName || item.name || 'Inventory'}
-                                      className="h-7 w-7 shrink-0 rounded-none border object-cover"
+                                      className="h-10 w-10 shrink-0 rounded-none border object-cover"
                                     />
                                   ) : (
                                     <div
-                                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-none border bg-muted/40 text-muted-foreground"
+                                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-none border bg-muted/40 text-muted-foreground"
                                       aria-hidden
                                     >
-                                      <ImageIcon className="h-3.5 w-3.5" />
+                                      <ImageIcon className="h-5 w-5" />
                                     </div>
                                   )
                                 ) : null}
@@ -2409,17 +2409,19 @@ export default function InventoryPage() {
                                 Mirror catalog columns: [checkbox?][expand][Category/photo][Type→ serial table].
                                 Unit Identity therefore starts under the Type column.
                               */}
-                              <div className="min-w-0 overflow-x-hidden py-3 pr-3">
+                              <div className="min-w-0 overflow-x-hidden py-3 pr-3 pl-2">
+                                {/*
+                                  Photo column starts at the catalog checkbox and spans through Category;
+                                  serial table (Unit Identity) still begins under Type.
+                                */}
                                 <div
                                   className={cn(
                                     'mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5',
-                                    inventoryManager && isVisible('name')
-                                      ? 'pl-[calc(5rem+min(11rem,22%))]'
-                                      : !inventoryManager && isVisible('name')
-                                        ? 'pl-[calc(2.5rem+min(11rem,22%))]'
-                                        : inventoryManager
-                                          ? 'pl-20'
-                                          : 'pl-10'
+                                    isVisible('name')
+                                      ? inventoryManager
+                                        ? 'pl-[min(18rem,calc(5rem+24%))]'
+                                        : 'pl-[min(15rem,calc(2.5rem+24%))]'
+                                      : 'pl-0'
                                   )}
                                 >
                                   <h4 className="text-sm font-semibold">
@@ -2433,17 +2435,16 @@ export default function InventoryPage() {
                                     {serialInstances.length === 1 ? '' : 's'}
                                   </span>
                                 </div>
-                                {/* Photo column stretches to the same height as the serials table border. */}
                                 <div className="flex min-w-0 items-stretch gap-0">
-                                  <div
-                                    className={cn(
-                                      'shrink-0',
-                                      inventoryManager ? 'w-20' : 'w-10'
-                                    )}
-                                    aria-hidden
-                                  />
                                   {isVisible('name') ? (
-                                    <div className="flex w-[min(11rem,22%)] shrink-0 items-center justify-center self-stretch rounded-none border border-r-0 bg-background px-2">
+                                    <div
+                                      className={cn(
+                                        'flex min-h-0 shrink-0 self-stretch items-center justify-center rounded-none border border-r-0 bg-background p-1.5',
+                                        inventoryManager
+                                          ? 'w-[min(18rem,calc(5rem+24%))]'
+                                          : 'w-[min(15rem,calc(2.5rem+24%))]'
+                                      )}
+                                    >
                                       {item.picture_url ? (
                                         <EntityPicture
                                           src={item.picture_url}
@@ -2452,11 +2453,11 @@ export default function InventoryPage() {
                                           alt={
                                             item.entityName || item.name || 'Inventory'
                                           }
-                                          className="h-24 w-24 rounded-none object-cover"
+                                          className="h-auto max-h-full w-full rounded-none object-contain"
                                         />
                                       ) : (
                                         <div
-                                          className="flex h-24 w-24 items-center justify-center rounded-none bg-muted/40 text-muted-foreground"
+                                          className="flex h-full w-full min-h-0 items-center justify-center rounded-none bg-muted/40 text-muted-foreground"
                                           aria-hidden
                                         >
                                           <ImageIcon className="h-8 w-8" />
