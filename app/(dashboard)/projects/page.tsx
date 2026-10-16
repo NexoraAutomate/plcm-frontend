@@ -170,7 +170,8 @@ export default function ProjectsPage(){
   
   const statusFilterParam = searchParams.get('status');
   const orderFilterParam = searchParams.get('order_id');
-  const orderFilterId = orderFilterParam ? Number(orderFilterParam) : null;
+  const parsedOrderFilterId = orderFilterParam ? Number(orderFilterParam) : NaN;
+  const orderFilterId = Number.isFinite(parsedOrderFilterId) ? parsedOrderFilterId : null;
   const [statusFilter, setStatusFilter] = useState<string>(statusFilterParam || 'Total');
   const [groupByProjectName, setGroupByProjectName] = useState(false);
   const [expandedProjectGroups, setExpandedProjectGroups] = useState<Set<string>>(
@@ -280,17 +281,31 @@ export default function ProjectsPage(){
     fetchPage: fetchProjectsPage,
     filters: listFilters,
   });
-  const projects =
+  // Only fall back to the unfiltered DataStore when no list filters are active.
+  // Otherwise empty/placeholder paginated results incorrectly show every project
+  // while the "Filtered by order" chip still reflects the URL.
+  const listFiltersActive =
+    statusFilter !== 'Total' || orderFilterId != null || !!debouncedSearch.trim();
+  const rawProjects =
     pagination.items.length > 0
       ? pagination.items
-      : storeProjects.length > 0 && !pagination.loading
+      : storeProjects.length > 0 && !pagination.loading && !listFiltersActive
         ? storeProjects
         : pagination.items;
+  // Client-scope by order so keep-previous placeholder data cannot leak other
+  // orders' rows while the filtered page is refetching.
+  const projects = useMemo(
+    () =>
+      orderFilterId != null
+        ? rawProjects.filter((project) => project.order_id === orderFilterId)
+        : rawProjects,
+    [rawProjects, orderFilterId]
+  );
   const showLoader = useListPageLoader(pagination, {
     pageLoading,
     debouncedSearch,
-    filtersActive: statusFilter !== 'Total' || orderFilterId != null,
-    hasData: projects.length > 0 || storeProjects.length > 0,
+    filtersActive: listFiltersActive,
+    hasData: projects.length > 0 || (!listFiltersActive && storeProjects.length > 0),
   });
 
   const orderScopedProjects = projects;

@@ -576,7 +576,7 @@ export default function CustomerDetailPage(){
                     <TableBody>
                         {filtered.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                            <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                             No orders found
                             </TableCell>
                         </TableRow>
