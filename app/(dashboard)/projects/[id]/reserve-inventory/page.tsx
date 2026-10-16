@@ -29,6 +29,7 @@ import { Can } from '@/components/auth';
 import { PageLoader } from '@/components/page-loader';
 import { ReserveSerialCombobox } from '@/components/reserve-serial-combobox';
 import { StatusBadge } from '@/components/status-badge';
+import { EntityInventorySourceIcon } from '@/components/entity-inventory-source-icon';
 import { P } from '@/lib/permission-codes';
 import * as api from '@/lib/api';
 import type {
@@ -983,10 +984,22 @@ export default function ReserveInventoryPage() {
                       : `Collapse ${row.entity_name} children`
                   }
                 >
-                  {row.entity_name}
+                  <span className="inline-flex min-w-0 items-center gap-1.5">
+                    <EntityInventorySourceIcon
+                      source={row.inventory_source}
+                      iconClassName="h-3 w-3"
+                    />
+                    <span className="truncate">{row.entity_name}</span>
+                  </span>
                 </button>
               ) : (
-                <span className="text-foreground">{row.entity_name}</span>
+                <span className="inline-flex min-w-0 items-center gap-1.5 text-foreground">
+                  <EntityInventorySourceIcon
+                    source={row.inventory_source}
+                    iconClassName="h-3 w-3"
+                  />
+                  <span className="truncate">{row.entity_name}</span>
+                </span>
               )}
               {statusBadge(row)}
               <button

@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { ArrowLeft, FolderOpen, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { EntityInventorySourceIcon } from '@/components/entity-inventory-source-icon';
 import { useDataStore } from '@/lib/data-store';
 
 type Props = {
@@ -16,6 +17,8 @@ type Props = {
   projectName?: string | null;
   systemName?: string | null;
   sdlsNumber?: number | null;
+  /** turnkey | build_from_children | group */
+  inventorySource?: string | null;
   /** Optional page-specific reload after hierarchy refresh. */
   onRefresh?: () => void | Promise<unknown>;
 };
@@ -28,6 +31,7 @@ export function HierarchyEntityHeader({
   projectName,
   systemName,
   sdlsNumber,
+  inventorySource,
   onRefresh,
 }: Props) {
   const router = useRouter();
@@ -63,7 +67,13 @@ export function HierarchyEntityHeader({
           </Button>
         </Link>
         <div className="min-w-0">
-          <h1 className="text-3xl font-bold tracking-tight">{name}</h1>
+          <h1 className="flex min-w-0 items-center gap-2.5 text-3xl font-bold tracking-tight">
+            <EntityInventorySourceIcon
+              source={inventorySource}
+              iconClassName="h-6 w-6"
+            />
+            <span className="truncate">{name}</span>
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Project: {projectName || '—'}
             {systemName ? ` · System: ${systemName}` : ''}

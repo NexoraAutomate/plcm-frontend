@@ -127,6 +127,7 @@ export default function ComponentDetailPage() {
             ? systems.find((item) => item.id === systemId)?.sdls_number
             : undefined
         }
+        inventorySource={component.inventory_source}
       />
 
       <EntityInstallMetadataCard

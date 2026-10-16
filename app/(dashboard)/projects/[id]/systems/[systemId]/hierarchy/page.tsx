@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { EntityInventorySourceIcon } from '@/components/entity-inventory-source-icon';
 import { useDataStore } from '@/lib/data-store';
 import { useEntityHierarchyGate } from '@/hooks/use-ensure-hierarchy';
 import { PageLoader } from '@/components/page-loader';
@@ -100,20 +101,22 @@ export default function SystemHierarchyPage() {
       ? system?.id
       : rootEntityId;
 
-  const rootEntityName = (() => {
+  const rootEntity = (() => {
     if (!system || resolvedRootId == null) return null;
-    if (rootType === 'system') return system.name;
+    if (rootType === 'system') return system;
     if (rootType === 'subsystem') {
-      return resolveCurrentInstallEntity(resolvedRootId, subsystems)?.name ?? null;
+      return resolveCurrentInstallEntity(resolvedRootId, subsystems);
     }
     if (rootType === 'module') {
-      return resolveCurrentInstallEntity(resolvedRootId, modules)?.name ?? null;
+      return resolveCurrentInstallEntity(resolvedRootId, modules);
     }
     if (rootType === 'unit') {
-      return resolveCurrentInstallEntity(resolvedRootId, units)?.name ?? null;
+      return resolveCurrentInstallEntity(resolvedRootId, units);
     }
-    return resolveCurrentInstallEntity(resolvedRootId, components)?.name ?? null;
+    return resolveCurrentInstallEntity(resolvedRootId, components);
   })();
+  const rootEntityName = rootEntity?.name ?? null;
+  const rootInventorySource = rootEntity?.inventory_source ?? system?.inventory_source;
 
   if (pageLoading || scopedLoading) {
     return <PageLoader />;
@@ -153,8 +156,12 @@ export default function SystemHierarchyPage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {rootEntityName ?? system.name}
+          <h1 className="flex min-w-0 items-center gap-2 text-2xl font-bold tracking-tight">
+            <EntityInventorySourceIcon
+              source={rootInventorySource}
+              iconClassName="h-5 w-5"
+            />
+            <span className="truncate">{rootEntityName ?? system.name}</span>
           </h1>
           <p className="text-sm text-muted-foreground">
             {isSubtreeRoot

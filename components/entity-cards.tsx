@@ -39,6 +39,7 @@ import {
   resolveEntityLifecycleTone,
 } from '@/lib/entity-lifecycle-style';
 import { EntityInventoryHoldDetails } from '@/components/entity-inventory-hold-details';
+import { EntityInventorySourceIcon } from '@/components/entity-inventory-source-icon';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
 import type { EntityProgressSnapshot } from '@/lib/project-progress';
@@ -61,6 +62,7 @@ interface EntityCardsProps {
     is_current_install?: boolean;
     installed_by_id?: number | null;
     assigned_developer_id?: number | null;
+    inventory_source?: string | null;
   }>;
   statuses?: Status[];
   onAdd?: () => void;
@@ -328,7 +330,12 @@ export function EntityCards({
                       <div className="space-y-3 p-1">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold text-sm truncate">{entity.name}</h3>
+                            <h3 className="flex min-w-0 items-center gap-1.5 font-semibold text-sm">
+                              <EntityInventorySourceIcon
+                                source={entity.inventory_source}
+                              />
+                              <span className="truncate">{entity.name}</span>
+                            </h3>
                             {showOwnInstallChrome ? (
                               <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400 mt-0.5">
                                 Installed by you

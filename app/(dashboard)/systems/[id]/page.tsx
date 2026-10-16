@@ -231,6 +231,7 @@ export default function SystemDetailPage() {
         projectId={project?.id}
         projectName={project?.name}
         sdlsNumber={system.sdls_number}
+        inventorySource={system.inventory_source}
       />
 
       <EntityInstallMetadataCard

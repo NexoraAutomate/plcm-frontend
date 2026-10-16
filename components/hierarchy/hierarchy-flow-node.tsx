@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { HierarchyNodeFieldLines } from '@/components/hierarchy-node-legend';
 import { StatusBadge } from '@/components/status-badge';
+import { EntityInventorySourceIcon } from '@/components/entity-inventory-source-icon';
 import { CHILD_ENTITY_TYPE } from '@/lib/hierarchy-dashboard-entity-config';
 import { useAppDefinitions } from '@/lib/app-definitions-context';
 import type { HierarchyEntityActionHandlers } from '@/components/hierarchy-dashboard/use-hierarchy-entity-actions';
@@ -244,11 +245,15 @@ function HierarchyFlowNode({ data }: NodeProps<Node<HierarchyNodeData>>) {
         </div>
         <p
           className={cn(
-            'truncate text-sm font-semibold',
+            'flex min-w-0 items-center gap-1.5 text-sm font-semibold',
             canNavigate && highlightState !== 'selected' && 'hover:text-primary'
           )}
         >
-          {data.label}
+          <EntityInventorySourceIcon
+            source={data.inventorySource}
+            iconClassName="h-3 w-3"
+          />
+          <span className="truncate">{data.label}</span>
         </p>
         {data.assigned || data.reserved || data.shortage || data.issued || displayedItemStatus ? (
           <div className="mt-1.5 flex flex-wrap gap-1">

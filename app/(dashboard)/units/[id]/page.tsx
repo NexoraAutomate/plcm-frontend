@@ -276,6 +276,7 @@ export default function UnitDetailPage() {
             ? systems.find((item) => item.id === systemId)?.sdls_number
             : undefined
         }
+        inventorySource={unit.inventory_source}
       />
 
       <EntityInstallMetadataCard

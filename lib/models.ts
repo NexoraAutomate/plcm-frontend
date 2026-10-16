@@ -871,6 +871,8 @@ export interface HierarchyInstallFields {
   replacement_sequence?: number
   replaced_at?: string | null
   assigned_developer_id?: number | null
+  /** Snapshot from config: turnkey | build_from_children | group */
+  inventory_source?: string | null
 }
 
 export interface EntityAttachment {

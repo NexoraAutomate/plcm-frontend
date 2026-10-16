@@ -38,6 +38,7 @@ export interface HierarchyTreeNode {
   shortage?: boolean;
   issued?: boolean;
   itemStatus?: string;
+  inventorySource?: string | null;
 }
 
 export interface HierarchyNodeFieldVisibility {
@@ -82,6 +83,7 @@ export interface HierarchyNodeData extends Record<string, unknown> {
   shortage?: boolean;
   issued?: boolean;
   itemStatus?: string;
+  inventorySource?: string | null;
 }
 
 const DETAIL_PATH: Record<HierarchyEntityType, (id: number) => string> = {
@@ -119,6 +121,7 @@ export function mapEntityFields(
     replaced_at?: string | null;
     installation_date?: string;
     assigned_developer_id?: number | null;
+    inventory_source?: string | null;
   },
   statuses: Status[] = [],
   options?: { preferOriginalBuild?: boolean }
@@ -148,6 +151,7 @@ export function mapEntityFields(
     replacementDate: getReplacementDateForDisplay(entity),
     isCurrentInstall: entity.is_current_install !== false,
     assigned: Boolean(entity.assigned_developer_id),
+    inventorySource: entity.inventory_source ?? null,
   };
 }
 
@@ -326,6 +330,7 @@ export function hierarchyTreeToFlow(
           shortage: node.shortage,
           issued: node.issued,
           itemStatus: node.itemStatus,
+          inventorySource: node.inventorySource,
         },
       });
 
