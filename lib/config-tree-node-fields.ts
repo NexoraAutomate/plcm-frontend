@@ -21,7 +21,7 @@ export const CONFIG_TREE_NODE_FIELD_OPTIONS: Array<{
 }> = [
   { key: 'abbreviation', label: 'Abbreviation' },
   { key: 'level', label: 'Level' },
-  { key: 'inventorySource', label: 'Turnkey / Build' },
+  { key: 'inventorySource', label: 'Turnkey / Build / Group' },
   { key: 'description', label: 'Description' },
 ];
 

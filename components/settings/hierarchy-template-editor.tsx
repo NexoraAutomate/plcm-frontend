@@ -33,6 +33,7 @@ import {
   INVENTORY_SOURCE_OPTIONS,
   PARENT_TEMPLATE_LEVEL,
   TEMPLATE_NODE_LEVELS,
+  inventorySourceLabel,
   newClientKey,
   normalizeInventorySource,
   type InventorySource,
@@ -236,15 +237,13 @@ export function HierarchyTemplateEditor({
       toast.error('Name cannot be empty');
       return;
     }
-    const hasChildren = nodes.some(
-      (n) => n.parent_client_key === editTarget.client_key
-    );
-    const inventory_source =
+    const hasChildren =
       editTarget.level !== 'component' &&
-      hasChildren &&
-      editInventorySource === INVENTORY_SOURCE.BUILD_FROM_CHILDREN
-        ? INVENTORY_SOURCE.BUILD_FROM_CHILDREN
-        : INVENTORY_SOURCE.TURNKEY;
+      nodes.some((n) => n.parent_client_key === editTarget.client_key);
+    const requested = normalizeInventorySource(editInventorySource);
+    const inventory_source = hasChildren
+      ? requested
+      : INVENTORY_SOURCE.TURNKEY;
     onChange(
       nodes.map((n) =>
         n.client_key === editTarget.client_key
@@ -318,11 +317,7 @@ export function HierarchyTemplateEditor({
       ? grouped[childLevel].filter((c) => c.parent_client_key === node.client_key)
       : [];
     const abbr = node.abbreviation ? ` [${node.abbreviation}]` : '';
-    const sourceLabel =
-      normalizeInventorySource(node.inventory_source) ===
-      INVENTORY_SOURCE.BUILD_FROM_CHILDREN
-        ? 'Build'
-        : 'Turnkey';
+    const sourceLabel = inventorySourceLabel(node.inventory_source);
 
     if (node.level === 'component') {
       return (
@@ -528,9 +523,7 @@ export function HierarchyTemplateEditor({
                       >
                         <RadioGroupItem
                           value={option.value}
-                          disabled={
-                            option.value === INVENTORY_SOURCE.BUILD_FROM_CHILDREN
-                          }
+                          disabled={option.requiresChildren}
                           className="mt-0.5"
                         />
                         <span>
@@ -544,7 +537,7 @@ export function HierarchyTemplateEditor({
                   </RadioGroup>
                   <p className="text-xs text-muted-foreground">
                     New nodes start as Turnkey. After you add children, edit the node
-                    to switch it to Build from Children.
+                    to switch it to Build or Group.
                   </p>
                 </div>
 
@@ -635,11 +628,10 @@ export function HierarchyTemplateEditor({
                 {INVENTORY_SOURCE_OPTIONS.map((option) => {
                   const hasChildren = Boolean(
                     editTarget &&
+                      editTarget.level !== 'component' &&
                       nodes.some((n) => n.parent_client_key === editTarget.client_key)
                   );
-                  const disabled =
-                    option.value === INVENTORY_SOURCE.BUILD_FROM_CHILDREN &&
-                    (editTarget?.level === 'component' || !hasChildren);
+                  const disabled = option.requiresChildren && !hasChildren;
                   return (
                     <label
                       key={option.value}

@@ -506,13 +506,27 @@ function ConfigTreeCanvasInner({
         addParentPeer(key);
       },
       onToggleChildren: toggleNodeChildren,
+      onSetInventorySource: (key, source) => {
+        const node = nodesByKey.get(key);
+        if (!node) return;
+        if (normalizeInventorySource(node.inventory_source) === source) return;
+        onChange(
+          syncInventorySources(
+            draftNodes.map((n) =>
+              n.client_key === key ? { ...n, inventory_source: source } : n
+            )
+          )
+        );
+      },
     }),
     [
       addChild,
       addParentPeer,
       addSibling,
+      draftNodes,
       ensureExpanded,
       nodesByKey,
+      onChange,
       openNodeForm,
       requestDeleteNode,
       toggleNodeChildren,
@@ -1372,11 +1386,13 @@ export function HierarchyConfigTreeEditor({
       selected?.abbreviation ||
       suggestAbbreviation(name)
     ).toUpperCase();
-    const hasChildren = nodes.some((n) => n.parent_client_key === form.clientKey);
-    const inventory_source =
-      form.level !== 'component' && hasChildren
-        ? INVENTORY_SOURCE.BUILD_FROM_CHILDREN
-        : INVENTORY_SOURCE.TURNKEY;
+    const hasChildren =
+      form.level !== 'component' &&
+      nodes.some((n) => n.parent_client_key === form.clientKey);
+    const requested = normalizeInventorySource(form.inventory_source);
+    const inventory_source = hasChildren
+      ? requested
+      : INVENTORY_SOURCE.TURNKEY;
     onChange(
       syncInventorySources(
         nodes.map((n) =>
@@ -1770,18 +1786,19 @@ export function HierarchyConfigTreeEditor({
                   <Label>Inventory source</Label>
                   <InventorySourceToggle
                     size="dialog"
-                    value={
-                      formCanBuild
-                        ? INVENTORY_SOURCE.BUILD_FROM_CHILDREN
-                        : INVENTORY_SOURCE.TURNKEY
-                    }
+                    value={form.inventory_source}
                     canBuild={formCanBuild}
+                    onChange={(source) => {
+                      setForm((prev) =>
+                        prev ? { ...prev, inventory_source: source } : prev
+                      );
+                    }}
                     onDenied={(_, reason) => toast.error(reason)}
                   />
                   <p className="text-xs text-muted-foreground">
                     {formCanBuild
-                      ? 'This node has children, so it is locked to Build. Remove all children to use Turnkey.'
-                      : 'No children — locked to Turnkey. Adding a child switches this node to Build automatically.'}
+                      ? 'Turnkey reserves from stock. Build creates inventory when children are verified. Group is logical only and becomes install verified when all children are verified.'
+                      : 'No children — Turnkey only. Add children to enable Build or Group.'}
                   </p>
                 </div>
               </div>

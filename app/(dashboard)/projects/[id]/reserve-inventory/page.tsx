@@ -342,10 +342,10 @@ function statusBadge(row: ReservationPlanItem) {
       </Badge>
     );
   }
-  if (status === 'assemble') {
+  if (status === 'assemble' || status === 'group') {
     return (
       <Badge variant="outline" className="gap-1">
-        Waiting for children
+        {status === 'group' ? 'Group — waiting for children' : 'Waiting for children'}
       </Badge>
     );
   }
@@ -1032,7 +1032,7 @@ export default function ReserveInventoryPage() {
                       'No matching available inventory for this entity'}
                   </p>
                 ) : null}
-                {row.status === 'assemble' ? (
+                {row.status === 'assemble' || row.status === 'group' ? (
                   <p className="text-xs text-muted-foreground">
                     {typeof row.children_complete === 'number' &&
                     typeof row.children_total === 'number' &&
@@ -1040,7 +1040,9 @@ export default function ReserveInventoryPage() {
                       ? `${row.children_complete}/${row.children_total} children installed and verified. `
                       : ''}
                     {row.reason ||
-                      'Automatically created when required child items are installed and verified'}
+                      (row.status === 'group'
+                        ? 'Logical group — becomes install verified when all children are install verified'
+                        : 'Automatically created when required child items are installed and verified')}
                   </p>
                 ) : null}
                 {row.can_assign_developer ? (

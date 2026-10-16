@@ -24,6 +24,7 @@ import {
 } from '@/lib/config-tree-layout';
 import { InventorySourceToggle } from '@/components/settings/config-tree/inventory-source-toggle';
 import { LEVEL_NODE_STYLE } from '@/lib/config-tree-level-styles';
+import type { InventorySource } from '@/lib/hierarchy-config';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -35,6 +36,7 @@ export type ConfigTreeNodeActions = {
   onAddSiblingBelow: (clientKey: string) => void;
   onAddParentPeer: (clientKey: string) => void;
   onToggleChildren: (clientKey: string) => void;
+  onSetInventorySource: (clientKey: string, source: InventorySource) => void;
 };
 
 type Props = NodeProps<Node<ConfigTreeNodeData>> & {
@@ -208,6 +210,11 @@ export const ConfigTreeFlowNode = memo(function ConfigTreeFlowNode({
               value={draft.inventory_source}
               canBuild={data.canBuildFromChildren}
               disabled={!interactive}
+              onChange={(source) => {
+                if (interactive) {
+                  actions.onSetInventorySource(draft.client_key, source);
+                }
+              }}
               onDenied={(_, reason) => {
                 if (interactive) toast.error(reason);
               }}

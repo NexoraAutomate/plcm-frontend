@@ -2,20 +2,44 @@
 
 import {
   INVENTORY_SOURCE,
+  normalizeInventorySource,
   type InventorySource,
 } from '@/lib/hierarchy-config';
 import { cn } from '@/lib/utils';
 
 type Props = {
   value: InventorySource | string | null | undefined;
-  /** True when this node currently has children (must be Build). */
+  /** True when this node currently has children (Build / Group allowed). */
   canBuild: boolean;
   disabled?: boolean;
   size?: 'node' | 'dialog';
   className?: string;
+  onChange?: (source: InventorySource) => void;
   /** Called when the user tries to pick a mode that children don't allow. */
   onDenied?: (source: InventorySource, reason: string) => void;
 };
+
+const OPTIONS: Array<{
+  value: InventorySource;
+  label: string;
+  requiresChildren: boolean;
+}> = [
+  {
+    value: INVENTORY_SOURCE.TURNKEY,
+    label: 'Turnkey',
+    requiresChildren: false,
+  },
+  {
+    value: INVENTORY_SOURCE.BUILD_FROM_CHILDREN,
+    label: 'Build',
+    requiresChildren: true,
+  },
+  {
+    value: INVENTORY_SOURCE.GROUP,
+    label: 'Group',
+    requiresChildren: true,
+  },
+];
 
 export function InventorySourceToggle({
   value,
@@ -23,21 +47,34 @@ export function InventorySourceToggle({
   disabled,
   size = 'dialog',
   className,
+  onChange,
   onDenied,
 }: Props) {
   const compact = size === 'node';
-  const isBuild = canBuild;
+  const current = normalizeInventorySource(value);
 
-  const turnkeyHint = canBuild
-    ? 'Has children — locked to Build. Remove all children to use Turnkey.'
-    : 'Turnkey / Procured';
-  const buildHint = canBuild
-    ? 'Build from children'
-    : 'Add child nodes to switch this node to Build.';
+  const hintFor = (source: InventorySource, requiresChildren: boolean) => {
+    if (requiresChildren && !canBuild) {
+      return 'Add child nodes before selecting Build or Group.';
+    }
+    if (source === INVENTORY_SOURCE.TURNKEY) {
+      return canBuild
+        ? 'Turnkey / Procured — reserved from inventory even with children'
+        : 'Turnkey / Procured';
+    }
+    if (source === INVENTORY_SOURCE.GROUP) {
+      return 'Group — logical only; install verified when all children are verified';
+    }
+    return 'Build from children — inventory created when children are verified';
+  };
 
-  const deny = (source: InventorySource, reason: string) => {
+  const select = (source: InventorySource, requiresChildren: boolean) => {
     if (disabled) return;
-    onDenied?.(source, reason);
+    if (requiresChildren && !canBuild) {
+      onDenied?.(source, hintFor(source, requiresChildren));
+      return;
+    }
+    onChange?.(source);
   };
 
   return (
@@ -49,48 +86,36 @@ export function InventorySourceToggle({
         className
       )}
       role="group"
-      aria-label="Inventory source (set automatically from children)"
+      aria-label="Inventory source"
     >
-      <button
-        type="button"
-        title={turnkeyHint}
-        className={cn(
-          'nodrag nopan flex-1 rounded-full font-semibold leading-none tracking-tight',
-          compact ? 'text-[8px]' : 'text-xs',
-          !isBuild
-            ? 'bg-background text-foreground shadow-sm'
-            : 'cursor-not-allowed text-current opacity-40'
-        )}
-        aria-pressed={!isBuild}
-        aria-disabled={canBuild}
-        onClick={() => {
-          if (canBuild) {
-            deny(INVENTORY_SOURCE.TURNKEY, turnkeyHint);
-          }
-        }}
-      >
-        Turnkey
-      </button>
-      <button
-        type="button"
-        title={buildHint}
-        className={cn(
-          'nodrag nopan flex-1 rounded-full font-semibold leading-none tracking-tight',
-          compact ? 'text-[8px]' : 'text-xs',
-          isBuild
-            ? 'bg-background text-foreground shadow-sm'
-            : 'cursor-not-allowed text-current opacity-40'
-        )}
-        aria-pressed={isBuild}
-        aria-disabled={!canBuild}
-        onClick={() => {
-          if (!canBuild) {
-            deny(INVENTORY_SOURCE.BUILD_FROM_CHILDREN, buildHint);
-          }
-        }}
-      >
-        Build
-      </button>
+      {OPTIONS.map((option) => {
+        const allowed = !option.requiresChildren || canBuild;
+        const active = current === option.value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            title={hintFor(option.value, option.requiresChildren)}
+            className={cn(
+              'nodrag nopan flex-1 rounded-full font-semibold leading-none tracking-tight',
+              compact ? 'text-[8px]' : 'text-xs',
+              active
+                ? 'bg-background text-foreground shadow-sm'
+                : allowed
+                  ? 'text-current opacity-70 hover:opacity-100'
+                  : 'cursor-not-allowed text-current opacity-40'
+            )}
+            aria-pressed={active}
+            aria-disabled={!allowed || disabled}
+            onClick={(e) => {
+              e.stopPropagation();
+              select(option.value, option.requiresChildren);
+            }}
+          >
+            {option.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -42,6 +42,7 @@ export const CHILD_TEMPLATE_LEVEL: Record<TemplateNodeLevel, TemplateNodeLevel |
 export const INVENTORY_SOURCE = {
   TURNKEY: 'turnkey',
   BUILD_FROM_CHILDREN: 'build_from_children',
+  GROUP: 'group',
 } as const;
 
 export type InventorySource =
@@ -51,18 +52,29 @@ export const INVENTORY_SOURCE_OPTIONS: Array<{
   value: InventorySource;
   label: string;
   description: string;
+  /** When true, only valid on nodes that currently have children. */
+  requiresChildren: boolean;
 }> = [
   {
     value: INVENTORY_SOURCE.TURNKEY,
     label: 'Turnkey / Procured',
     description:
       'This item is directly received from a vendor and can be added to inventory by the Inventory Manager.',
+    requiresChildren: false,
   },
   {
     value: INVENTORY_SOURCE.BUILD_FROM_CHILDREN,
     label: 'Build from Children',
     description:
       'This item is automatically created in inventory when its required child items are installed and verified.',
+    requiresChildren: true,
+  },
+  {
+    value: INVENTORY_SOURCE.GROUP,
+    label: 'Group',
+    description:
+      'Logical grouping only — no inventory item. Becomes install verified when all children are install verified.',
+    requiresChildren: true,
   },
 ];
 
@@ -76,7 +88,25 @@ export function normalizeInventorySource(
   if (raw === 'build_from_children' || raw === 'build') {
     return INVENTORY_SOURCE.BUILD_FROM_CHILDREN;
   }
+  if (raw === 'group' || raw === 'logical_group') {
+    return INVENTORY_SOURCE.GROUP;
+  }
   return INVENTORY_SOURCE.TURNKEY;
+}
+
+export function inventorySourceLabel(value?: string | null): string {
+  const source = normalizeInventorySource(value);
+  if (source === INVENTORY_SOURCE.BUILD_FROM_CHILDREN) return 'Build';
+  if (source === INVENTORY_SOURCE.GROUP) return 'Group';
+  return 'Turnkey';
+}
+
+export function requiresChildrenSource(value?: string | null): boolean {
+  const source = normalizeInventorySource(value);
+  return (
+    source === INVENTORY_SOURCE.BUILD_FROM_CHILDREN ||
+    source === INVENTORY_SOURCE.GROUP
+  );
 }
 
 export type TemplateDraftNode = {
@@ -104,7 +134,7 @@ export function newClientKey(prefix = 'n'): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-/** True when this node may use Build from Children (non-component with at least one child). */
+/** True when this node may use Build or Group (non-component with at least one child). */
 export function canBuildFromChildren(
   nodes: TemplateDraftNode[],
   clientKey: string
@@ -123,21 +153,30 @@ export function parentKeysWithChildren(nodes: TemplateDraftNode[]): Set<string> 
 }
 
 /**
- * Align inventory source with child presence:
- * parents (non-component with children) → Build from Children;
- * everyone else → Turnkey.
+ * Coerce invalid inventory sources only:
+ * - leaves / components → Turnkey
+ * - parents keep Turnkey, Build, or Group as chosen
  */
 export function syncInventorySources(
   nodes: TemplateDraftNode[]
 ): TemplateDraftNode[] {
   const parents = parentKeysWithChildren(nodes);
   return nodes.map((n) => {
-    const canBuild = n.level !== 'component' && parents.has(n.client_key);
-    const desired = canBuild
-      ? INVENTORY_SOURCE.BUILD_FROM_CHILDREN
-      : INVENTORY_SOURCE.TURNKEY;
-    if (normalizeInventorySource(n.inventory_source) === desired) return n;
-    return { ...n, inventory_source: desired };
+    const canParent = n.level !== 'component' && parents.has(n.client_key);
+    const current = normalizeInventorySource(n.inventory_source);
+    if (!canParent) {
+      if (current === INVENTORY_SOURCE.TURNKEY) return n;
+      return { ...n, inventory_source: INVENTORY_SOURCE.TURNKEY };
+    }
+    if (
+      current === INVENTORY_SOURCE.TURNKEY ||
+      current === INVENTORY_SOURCE.BUILD_FROM_CHILDREN ||
+      current === INVENTORY_SOURCE.GROUP
+    ) {
+      if (n.inventory_source === current) return n;
+      return { ...n, inventory_source: current };
+    }
+    return { ...n, inventory_source: INVENTORY_SOURCE.BUILD_FROM_CHILDREN };
   });
 }
 

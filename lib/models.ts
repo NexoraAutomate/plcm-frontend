@@ -712,7 +712,7 @@ export interface ReservationPlanItem {
   entity_serial_number?: string | null
   path: string
   depth: number
-  status: 'available' | 'short' | 'reserved' | 'assemble' | 'issued' | 'installing' | 'testing' | 'verified' | string
+  status: 'available' | 'short' | 'reserved' | 'assemble' | 'group' | 'issued' | 'installing' | 'testing' | 'verified' | string
   available: boolean
   reason?: string | null
   free_quantity?: number | null
@@ -745,6 +745,7 @@ export interface ReservationPlan {
   short_count: number
   reserved_count: number
   assemble_count?: number
+  group_count?: number
   items: ReservationPlanItem[]
 }
 
