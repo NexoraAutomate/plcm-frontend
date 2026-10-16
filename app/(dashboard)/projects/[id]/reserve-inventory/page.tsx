@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/select';
 import { Can } from '@/components/auth';
 import { PageLoader } from '@/components/page-loader';
+import { ReserveSerialCombobox } from '@/components/reserve-serial-combobox';
 import { StatusBadge } from '@/components/status-badge';
 import { P } from '@/lib/permission-codes';
 import * as api from '@/lib/api';
@@ -365,12 +366,42 @@ function committedActionLabel(row: ReservationPlanItem): string {
   return lifecycleLabel(row);
 }
 
+function compareSerialsAscending(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+/** Ascending natural order (SR-001 before SR-002 before SR-010). */
+function sortedSerials(serials: string[]): string[] {
+  return [...serials].sort(compareSerialsAscending);
+}
+
 function defaultSerial(row: ReservationPlanItem): string {
-  const serials = row.serial_numbers?.filter(Boolean) ?? [];
+  const serials = sortedSerials(row.serial_numbers?.filter(Boolean) ?? []);
   if (row.suggested_serial && serials.includes(row.suggested_serial)) {
     return row.suggested_serial;
   }
   return serials[0] ?? '';
+}
+
+/** Rows that share the same physical stock must not pick the same serial. */
+function stockPoolKey(row: ReservationPlanItem): string {
+  return row.inventory_id != null
+    ? `id:${row.inventory_id}`
+    : `name:${row.inventory_name ?? ''}:${row.part_number ?? ''}`;
+}
+
+/** Prefer the next unused serial after `previous`, then any unused serial. */
+function pickReplacementSerial(
+  serials: string[],
+  used: Set<string>,
+  previous: string
+): string {
+  const prevIdx = previous ? serials.indexOf(previous) : -1;
+  if (prevIdx >= 0) {
+    const after = serials.slice(prevIdx + 1).find((sn) => !used.has(sn));
+    if (after) return after;
+  }
+  return serials.find((sn) => !used.has(sn)) ?? '';
 }
 
 /** Assign unique default serials across available rows that share the same stock. */
@@ -383,11 +414,8 @@ function assignDistinctDefaultSerials(
   for (const row of items) {
     if (row.status !== 'available') continue;
     const key = rowKey(row);
-    const serials = row.serial_numbers?.filter(Boolean) ?? [];
-    const poolKey =
-      row.inventory_id != null
-        ? `id:${row.inventory_id}`
-        : `name:${row.inventory_name ?? ''}:${row.part_number ?? ''}`;
+    const serials = sortedSerials(row.serial_numbers?.filter(Boolean) ?? []);
+    const poolKey = stockPoolKey(row);
     let used = usedByPool.get(poolKey);
     if (!used) {
       used = new Set();
@@ -407,6 +435,68 @@ function assignDistinctDefaultSerials(
     next[key] = pick;
   }
   return next;
+}
+
+/**
+ * Apply a user serial pick and reassign conflicting rows in the same stock pool
+ * so each available row keeps a distinct serial.
+ */
+function applySerialSelection(
+  items: ReservationPlanItem[],
+  prev: Record<string, string>,
+  changedKey: string,
+  selected: string
+): Record<string, string> {
+  const next: Record<string, string> = { ...prev, [changedKey]: selected };
+  const changedRow = items.find((row) => rowKey(row) === changedKey);
+  if (!changedRow || changedRow.status !== 'available') return next;
+
+  const pool = stockPoolKey(changedRow);
+  const poolRows = items.filter(
+    (row) => row.status === 'available' && stockPoolKey(row) === pool
+  );
+  const used = new Set<string>();
+  if (selected) used.add(selected);
+
+  for (const row of poolRows) {
+    const key = rowKey(row);
+    if (key === changedKey) continue;
+    const serials = sortedSerials(row.serial_numbers?.filter(Boolean) ?? []);
+    const current = next[key] ?? '';
+    if (current && !used.has(current) && serials.includes(current)) {
+      used.add(current);
+      continue;
+    }
+    const pick = pickReplacementSerial(serials, used, current);
+    next[key] = pick;
+    if (pick) used.add(pick);
+  }
+
+  return next;
+}
+
+/** Serials still choosable for a row (own selection + unused by siblings in pool). */
+function availableSerialOptions(
+  row: ReservationPlanItem,
+  items: ReservationPlanItem[],
+  selections: Record<string, string>
+): string[] {
+  const serials = sortedSerials(row.serial_numbers?.filter(Boolean) ?? []);
+  const key = rowKey(row);
+  const pool = stockPoolKey(row);
+  const current = selections[key] ?? '';
+  const usedByOthers = new Set<string>();
+
+  for (const other of items) {
+    if (other.status !== 'available') continue;
+    if (stockPoolKey(other) !== pool) continue;
+    const otherKey = rowKey(other);
+    if (otherKey === key) continue;
+    const sn = selections[otherKey];
+    if (sn) usedByOthers.add(sn);
+  }
+
+  return serials.filter((sn) => sn === current || !usedByOthers.has(sn));
 }
 
 export default function ReserveInventoryPage() {
@@ -457,14 +547,27 @@ export default function ReserveInventoryPage() {
       setExtraUsers(usersRes.data ?? []);
 
       const nextSerials = assignDistinctDefaultSerials(planRes.data.items ?? []);
-      const nextDevelopers: Record<string, string> = {};
-      for (const row of planRes.data.items ?? []) {
-        if (row.can_assign_developer && row.assigned_developer_id) {
-          nextDevelopers[rowKey(row)] = String(row.assigned_developer_id);
-        }
-      }
+      const items = planRes.data.items ?? [];
       setSerialByKey(nextSerials);
-      setDeveloperByKey(nextDevelopers);
+      // Keep pending local developer picks across reserve/reload; server assignment wins.
+      setDeveloperByKey((prev) => {
+        const next: Record<string, string> = {};
+        for (const row of items) {
+          const key = rowKey(row);
+          const canKeepLocal =
+            row.status === 'available' || row.can_assign_developer;
+          if (canKeepLocal) {
+            const local = prev[key];
+            if (local && local !== NONE_DEVELOPER) {
+              next[key] = local;
+            }
+          }
+          if (row.can_assign_developer && row.assigned_developer_id) {
+            next[key] = String(row.assigned_developer_id);
+          }
+        }
+        return next;
+      });
     } catch (error: unknown) {
       toast.error(apiError(error, 'Failed to load reservation plan'));
       setPlan(null);
@@ -829,10 +932,13 @@ export default function ReserveInventoryPage() {
     const key = rowKey(row);
     const isShort = row.status === 'short';
     const isBusy = busyKey === key || reservingAll;
-    const serials = (row.serial_numbers ?? []).filter(Boolean);
+    const serials = sortedSerials((row.serial_numbers ?? []).filter(Boolean));
     const showSerialSelect = row.status === 'available' && serials.length > 1;
     const currentSerial =
       serialByKey[key] !== undefined ? serialByKey[key] : defaultSerial(row);
+    const selectableSerials = showSerialSelect
+      ? availableSerialOptions(row, plan?.items ?? [], serialByKey)
+      : serials;
     const currentDeveloper = developerByKey[key] || NONE_DEVELOPER;
     const isParent = node.children.length > 0;
     const isCollapsed = collapsedKeys.has(key);
@@ -971,24 +1077,16 @@ export default function ReserveInventoryPage() {
               {row.status === 'available' ? (
                 <>
                   {showSerialSelect ? (
-                    <Select
+                    <ReserveSerialCombobox
                       value={currentSerial || undefined}
+                      options={selectableSerials}
                       onValueChange={(value) =>
-                        setSerialByKey((prev) => ({ ...prev, [key]: value }))
+                        setSerialByKey((prev) =>
+                          applySerialSelection(plan?.items ?? [], prev, key, value)
+                        )
                       }
                       disabled={isBusy || !canReserve}
-                    >
-                      <SelectTrigger size="sm" className="w-38" aria-label="Serial number">
-                        <SelectValue placeholder="Serial #" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {serials.map((sn) => (
-                          <SelectItem key={sn} value={sn}>
-                            SN {sn}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    />
                   ) : null}
                   <Can permission={P.hierarchy_assign_developer}>
                     <Select
