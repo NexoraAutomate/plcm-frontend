@@ -26,6 +26,7 @@ export function buildListFilters(input: {
   unitId?: number | null;
   inventoryType?: string;
   stock?: string;
+  inventorySource?: string;
   installedById?: number | null;
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
@@ -48,6 +49,7 @@ export function buildListFilters(input: {
     unit_id: input.unitId ?? undefined,
     inventory_type: input.inventoryType,
     stock: input.stock,
+    inventory_source: input.inventorySource,
     installed_by_id: input.installedById ?? undefined,
     sort_by: input.sort_by,
     sort_order: input.sort_order,

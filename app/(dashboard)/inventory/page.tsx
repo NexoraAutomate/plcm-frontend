@@ -131,6 +131,7 @@ const ACTION_ICON = {
 
 type EntityType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
 type StockFilter = 'all' | 'available' | 'reserved' | 'out_of_stock';
+type SourceFilter = 'all' | 'turnkey' | 'build';
 
 const STOCK_FILTERS: { value: StockFilter; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -139,8 +140,42 @@ const STOCK_FILTERS: { value: StockFilter; label: string }[] = [
   { value: 'out_of_stock', label: 'Out of Stock' },
 ];
 
+const SOURCE_FILTERS: {
+  value: SourceFilter;
+  label: string;
+  activeClass: string;
+  inactiveClass: string;
+}[] = [
+  {
+    value: 'all',
+    label: 'All Sources',
+    activeClass: 'border-primary bg-primary text-primary-foreground',
+    inactiveClass: 'border-transparent bg-muted/50 text-muted-foreground hover:bg-muted',
+  },
+  {
+    value: 'turnkey',
+    label: 'Turnkey',
+    activeClass:
+      'border-teal-200 bg-teal-50 text-teal-800 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-300',
+    inactiveClass:
+      'border-teal-100/80 bg-teal-50/40 text-teal-700/70 hover:bg-teal-50/70 dark:border-teal-900/50 dark:bg-teal-950/40 dark:text-teal-400/70 dark:hover:bg-teal-950/60',
+  },
+  {
+    value: 'build',
+    label: 'Build',
+    activeClass:
+      'border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-300',
+    inactiveClass:
+      'border-violet-100/80 bg-violet-50/40 text-violet-700/70 hover:bg-violet-50/70 dark:border-violet-900/50 dark:bg-violet-950/40 dark:text-violet-400/70 dark:hover:bg-violet-950/60',
+  },
+];
+
 function isStockFilter(value: string | null): value is StockFilter {
   return STOCK_FILTERS.some((filter) => filter.value === value);
+}
+
+function isSourceFilter(value: string | null): value is SourceFilter {
+  return SOURCE_FILTERS.some((filter) => filter.value === value);
 }
 
 const ENTITY_TYPE_FILTER_STYLES: {
@@ -449,11 +484,14 @@ export default function InventoryPage() {
   const debouncedSearch = useDebouncedValue(search);
   const [entityTypeFilter, setEntityTypeFilter] = useState<EntityType | 'all'>('all');
   const [stockFilter, setStockFilter] = useState<StockFilter>('all');
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
   const { sort, cycleSort, listFilterPatch } = useTableSorting();
 
   useEffect(() => {
     const stock = searchParams.get('stock');
     if (isStockFilter(stock)) setStockFilter(stock);
+    const source = searchParams.get('source');
+    if (isSourceFilter(source)) setSourceFilter(source);
     const q = searchParams.get('q');
     if (q) setSearch(q);
   }, [searchParams]);
@@ -466,6 +504,16 @@ export default function InventoryPage() {
     const qs = params.toString();
     router.replace(qs ? `/inventory?${qs}` : '/inventory', { scroll: false });
   }
+
+  function applySourceFilter(value: SourceFilter) {
+    setSourceFilter(value);
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === 'all') params.delete('source');
+    else params.set('source', value);
+    const qs = params.toString();
+    router.replace(qs ? `/inventory?${qs}` : '/inventory', { scroll: false });
+  }
+
   const inventoryTypeParam = entityTypeFilter !== 'all' ? entityTypeFilter : undefined;
   const listFilters = useMemo(
     () =>
@@ -473,9 +521,10 @@ export default function InventoryPage() {
         search: debouncedSearch,
         inventoryType: inventoryTypeParam,
         stock: stockFilter !== 'all' ? stockFilter : undefined,
+        inventorySource: sourceFilter !== 'all' ? sourceFilter : undefined,
         ...listFilterPatch,
       }),
-    [debouncedSearch, inventoryTypeParam, stockFilter, listFilterPatch]
+    [debouncedSearch, inventoryTypeParam, stockFilter, sourceFilter, listFilterPatch]
   );
   const pagination = usePaginatedList({
     queryKey: queryKeys.inventoryPage(inventoryTypeParam, listFilters),
@@ -1927,6 +1976,22 @@ export default function InventoryPage() {
                   stockFilter === value
                     ? 'border-primary bg-primary text-primary-foreground'
                     : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {SOURCE_FILTERS.map(({ value, label, activeClass, inactiveClass }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => applySourceFilter(value)}
+                className={cn(
+                  'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                  sourceFilter === value ? activeClass : inactiveClass
                 )}
               >
                 {label}
