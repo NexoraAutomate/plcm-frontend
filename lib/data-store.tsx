@@ -877,6 +877,14 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
 
   const updateProject = async (id: number, data: Partial<Models.Project>) => {
     try {
+      const toUtcIsoDate = (value: string) => {
+        if (value.includes('T')) {
+          return value.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(value)
+            ? value
+            : `${value}Z`;
+        }
+        return `${value}T00:00:00Z`;
+      };
       const payload: Partial<Models.Project> = {};
       if (data.name !== undefined) payload.name = data.name;
       if (data.description !== undefined) payload.description = data.description;
@@ -884,14 +892,10 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       if (data.order_id !== undefined && data.order_id > 0) payload.order_id = data.order_id;
       if (data.status_id !== undefined && data.status_id > 0) payload.status_id = data.status_id;
       if (data.start_date) {
-        payload.start_date = data.start_date.includes('T')
-          ? data.start_date
-          : `${data.start_date}T00:00:00`;
+        payload.start_date = toUtcIsoDate(data.start_date);
       }
       if (data.end_date) {
-        payload.end_date = data.end_date.includes('T')
-          ? data.end_date
-          : `${data.end_date}T00:00:00`;
+        payload.end_date = toUtcIsoDate(data.end_date);
       }
 
       const res = await api.projects.update(id, payload);

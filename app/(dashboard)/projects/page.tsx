@@ -380,12 +380,16 @@ export default function ProjectsPage(){
           )}
           {isVisible('start_date') && (
             <TableCell className="text-sm text-muted-foreground">
-              {new Date(project.start_date).toLocaleDateString()}
+              {project.start_date
+                ? new Date(project.start_date).toLocaleDateString()
+                : '—'}
             </TableCell>
           )}
           {isVisible('end_date') && (
             <TableCell className="text-sm text-muted-foreground">
-              {new Date(project.end_date).toLocaleDateString()}
+              {project.end_date
+                ? new Date(project.end_date).toLocaleDateString()
+                : '—'}
             </TableCell>
           )}
           {isVisible('systems') && (
@@ -501,9 +505,9 @@ export default function ProjectsPage(){
         name: formData.name.trim(),
         description: formData.description || null,
         start_date: formData.start_date
-          ? `${formData.start_date}T00:00:00`
+          ? `${formData.start_date}T00:00:00Z`
           : undefined,
-        end_date: formData.end_date ? `${formData.end_date}T00:00:00` : undefined,
+        end_date: formData.end_date ? `${formData.end_date}T00:00:00Z` : undefined,
         owner_id: formData.owner_id || undefined,
         order_id: formData.order_id,
         hierarchy_config_id: formData.hierarchy_config_id,
