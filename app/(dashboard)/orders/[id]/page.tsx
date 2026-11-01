@@ -155,6 +155,10 @@ export default function OrderDetailPage() {
               <p className="mt-1 font-medium">{formatDate(order.delivery_date)}</p>
             </div>
             <div>
+              <p className="text-sm text-muted-foreground">Production Support</p>
+              <p className="mt-1 font-medium">{formatDate(order.production_support_date)}</p>
+            </div>
+            <div>
               <p className="text-sm text-muted-foreground">Created</p>
               <p className="mt-1 font-medium">{formatDate(order.created_at)}</p>
             </div>

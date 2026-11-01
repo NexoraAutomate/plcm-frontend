@@ -6,26 +6,27 @@ import { useDataStore } from '@/lib/data-store';
 import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { CircleArrowLeft } from 'lucide-react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Copy } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import * as Models from '@/lib/models';
 import { Badge } from '@/components/ui/badge';
 import { CustomerMiniDashboard } from '@/components/lazy/list-dashboards';
-import { ProjectManagerSelect } from '@/components/orders/project-manager-select';
+import {
+  OrderFormDialog,
+  emptyOrderForm,
+  type OrderFormData,
+} from '@/components/orders/order-form-dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
-import { RequiredMark } from '@/components/ui/required-mark';
 import { validateOrderForm } from '@/lib/form-validation';
 import {
   ListStatsVisibilityControls,
@@ -33,39 +34,6 @@ import {
 } from '@/components/list-stats-visibility';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { useClientTableSort } from '@/hooks/use-table-sorting';
-
-type OrderForm = {
-  order_number?: string
-  title: string
-  description?: string | null
-  contract_number?: string | null
-  po_number?: string | null
-  order_date: string
-  delivery_date?: string | null
-  total_value?: number | null
-  currency: string
-  project_manager?: string | null
-  remarks?: string | null
-
-  customer_id?: number;
-  status_id?: number;
-  };
-const emptyOrderForm: OrderForm = {
-  order_number: '',
-  title: '',
-  description: '',
-  contract_number: '',
-  po_number: '',
-  order_date: '',
-  delivery_date: '',
-  total_value: null,
-  currency: 'PKR',
-  project_manager: '',
-  remarks: '',
-  customer_id: undefined,
-  status_id: undefined
- 
-};
 
 export default function CustomerDetailPage(){
     const params = useParams();
@@ -83,7 +51,7 @@ export default function CustomerDetailPage(){
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
-    const [formData, setFormData] = useState<OrderForm>(emptyOrderForm);
+    const [formData, setFormData] = useState<OrderFormData>(emptyOrderForm);
     
     const [statuses, setStatuses] = useState<Models.Status[]>([]);
     const [loadingStatuses, setLoadingStatuses] = useState(true);
@@ -115,21 +83,49 @@ export default function CustomerDetailPage(){
 
   const { sort, cycleSort, sortedRows } = useClientTableSort(filtered);
 
-  async function handleCreate() {
-    const validationError = validateOrderForm({
+
+  function todayIsoDate() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function orderValidationError() {
+    return validateOrderForm({
       title: formData.title,
       orderDate: formData.order_date,
       currency: formData.currency,
       statusId: formData.status_id,
       customerId: formData.customer_id,
+      deliveryDate: formData.delivery_date,
+      productionSupportDate: formData.production_support_date,
     });
+  }
+
+  function sanitizeOrderPayload(data: OrderFormData): OrderFormData {
+    const blankToNull = (value?: string | null) => {
+      const trimmed = (value ?? '').trim();
+      return trimmed ? trimmed : null;
+    };
+    return {
+      ...data,
+      description: blankToNull(data.description),
+      contract_number: blankToNull(data.contract_number),
+      po_number: blankToNull(data.po_number),
+      delivery_date: blankToNull(data.delivery_date),
+      production_support_date: blankToNull(data.production_support_date),
+      project_manager: blankToNull(data.project_manager),
+      remarks: blankToNull(data.remarks),
+    };
+  }
+
+  async function handleCreate() {
+    const validationError = orderValidationError();
     if (validationError) {
       toast.error(validationError);
       return;
     }
 
     try {
-      await createOrder(formData);
+      await createOrder(sanitizeOrderPayload(formData));
 
       setFormData(emptyOrderForm);
       setIsCreateOpen(false);
@@ -143,20 +139,14 @@ export default function CustomerDetailPage(){
   async function handleUpdate() {
     if (!editingId) return;
 
-    const validationError = validateOrderForm({
-      title: formData.title,
-      orderDate: formData.order_date,
-      currency: formData.currency,
-      statusId: formData.status_id,
-      customerId: formData.customer_id,
-    });
+    const validationError = orderValidationError();
     if (validationError) {
       toast.error(validationError);
       return;
     }
 
     try {
-      await updateOrder(editingId, formData);
+      await updateOrder(editingId, sanitizeOrderPayload(formData));
 
       setFormData(emptyOrderForm);
       setEditingId(null);
@@ -192,15 +182,43 @@ export default function CustomerDetailPage(){
       po_number: order.po_number ?? '',
       order_date: order.order_date ?? '',
       delivery_date: order.delivery_date ?? '',
+      production_support_date: order.production_support_date ?? '',
       total_value: order.total_value ?? null,
-      currency: order.currency ?? '',
+      currency: order.currency ?? 'PKR',
       project_manager: order.project_manager ?? '',
       remarks: order.remarks ?? '',
-      customer_id: order.customer_id ?? undefined, // <-- Missing
+      customer_id: order.customer_id ?? undefined,
       status_id: order.status_id ?? undefined,
     });
 
     setIsEditOpen(true);
+  }
+
+  function openRepeat(order: typeof orders[number]) {
+    const baseTitle = (order.title ?? '').trim();
+    setEditingId(null);
+    setIsEditOpen(false);
+    setFormData({
+      order_number: '',
+      title: baseTitle
+        ? baseTitle.toLowerCase().endsWith('(repeat)')
+          ? baseTitle
+          : `${baseTitle} (Repeat)`
+        : 'Repeat Order',
+      description: order.description ?? '',
+      contract_number: order.contract_number ?? '',
+      po_number: order.po_number ?? '',
+      order_date: todayIsoDate(),
+      delivery_date: order.delivery_date ?? '',
+      production_support_date: order.production_support_date ?? '',
+      total_value: order.total_value ?? null,
+      currency: order.currency ?? 'PKR',
+      project_manager: order.project_manager ?? '',
+      remarks: order.remarks ?? '',
+      customer_id: order.customer_id ?? customer?.id,
+      status_id: defaultStatusId,
+    });
+    setIsCreateOpen(true);
   }
     
     useEffect(() => {
@@ -313,227 +331,43 @@ export default function CustomerDetailPage(){
                 </SelectContent>
                 </Select>
 
-                <Dialog open={isCreateOpen} onOpenChange={(open) => {
-                  setIsCreateOpen(open);
-                  if (open && customer) {
-                    setFormData((prev) => ({ ...prev, customer_id: customer.id }));
-                  }
-                }}>
                 <Can permission={P.create_orders}>
-                  <DialogTrigger asChild>
-                      <Button className="gap-2">
-                      <Plus className="h-4 w-4" />
-                      Add Order
-                      </Button>
-                  </DialogTrigger>
+                  <Button
+                    className="gap-2"
+                    onClick={() => {
+                      setFormData({
+                        ...emptyOrderForm,
+                        customer_id: customer.id,
+                        status_id: defaultStatusId,
+                        order_date: todayIsoDate(),
+                      });
+                      setIsCreateOpen(true);
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Order
+                  </Button>
                 </Can>
-
-                <DialogContent className="sm:max-w-190 p-0">
-                    <DialogHeader className="border-b px-6 py-4">
-                    <DialogTitle className="text-lg font-semibold">Create Order</DialogTitle>
-                    <DialogDescription>Enter order details below.</DialogDescription>
-                    </DialogHeader>
-
-                    <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
-                    <div className="grid gap-5 md:grid-cols-2">
-                        {/* <div className="space-y-2">
-                        <Label htmlFor="order_number">Order Number</Label>
-                        <Input
-                            id="order_number"
-                            value={formData.order_number}
-                            onChange={(e) =>
-                            setFormData({ ...formData, order_number: e.target.value })
-                            }
-                            placeholder="ORD-001"
-                            className="h-10"
-                        />
-                        </div> */}
-
-                        <div className="space-y-2">
-                        <Label htmlFor="customer">Customer<RequiredMark /></Label>
-                        <Select
-                            value={formData.customer_id?.toString() ?? ""}
-                            onValueChange={(v) =>
-                            setFormData({
-                                ...formData,
-                                customer_id: Number(v),
-                            })
-                            }
-                        >
-                            <SelectTrigger id="customer" className="h-10">
-                            <SelectValue placeholder="Select customer" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {customers.map((c) => (
-                                <SelectItem
-                                    key={c.id}
-                                    value={c.id.toString()}
-                                >
-                                    {c.name}
-                                </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                        <Label htmlFor="status">Status<RequiredMark /></Label>
-                        <Select
-                            value={formData.status_id?.toString()}
-                            onValueChange={(v) =>
-                            setFormData({ ...formData, status_id: parseInt(v, 10) })
-                            }
-                        >
-                            <SelectTrigger id="status" className="h-10">
-                            <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                            {statuses.map((s) => (
-                                <SelectItem key={s.id} value={s.id.toString()}>
-                                {s.status_name}
-                                </SelectItem>
-                            ))}
-                            </SelectContent>
-                        </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                        <Label htmlFor="title">Title<RequiredMark /></Label>
-                        <Input
-                            id="title"
-                            value={formData.title}
-                            onChange={(e) =>
-                            setFormData({ ...formData, title: e.target.value })
-                            }
-                            placeholder="Order title"
-                            className="h-10"
-                        />
-                        </div>
-
-                        <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="description">Description</Label>
-                        <textarea
-                            id="description"
-                            className="min-h-22.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            value={formData.description ?? ""}
-                            onChange={(e) =>
-                            setFormData({ ...formData, description: e.target.value })
-                            }
-                        />
-                        </div>
-
-                        <div className="space-y-2">
-                        <Label htmlFor="contract_number">Contract Number</Label>
-                        <Input
-                            id="contract_number"
-                            value={formData.contract_number ?? ""}
-                            onChange={(e) =>
-                            setFormData({ ...formData, contract_number: e.target.value })
-                            }
-                            className="h-10"
-                        />
-                        </div>
-
-                        <div className="space-y-2">
-                        <Label htmlFor="po_number">PO Number</Label>
-                        <Input
-                            id="po_number"
-                            value={formData.po_number ?? ""}
-                            onChange={(e) =>
-                            setFormData({ ...formData, po_number: e.target.value })
-                            }
-                            className="h-10"
-                        />
-                        </div>
-
-                        <div className="space-y-2">
-                        <Label htmlFor="order_date">Order Date<RequiredMark /></Label>
-                        <Input
-                            id="order_date"
-                            type="date"
-                            value={formData.order_date}
-                            onChange={(e) =>
-                            setFormData({ ...formData, order_date: e.target.value })
-                            }
-                            className="h-10"
-                        />
-                        </div>
-
-                        <div className="space-y-2">
-                        <Label htmlFor="delivery_date">Delivery Date</Label>
-                        <Input
-                            id="delivery_date"
-                            type="date"
-                            value={formData.delivery_date ?? ""}
-                            onChange={(e) =>
-                            setFormData({ ...formData, delivery_date: e.target.value })
-                            }
-                            className="h-10"
-                        />
-                        </div>
-
-                        <div className="space-y-2">
-                        <Label htmlFor="total_value">Total Value</Label>
-                        <Input
-                            id="total_value"
-                            type="number"
-                            value={formData.total_value ?? ""}
-                            onChange={(e) =>
-                            setFormData({
-                                ...formData,
-                                total_value: e.target.value === "" ? null : Number(e.target.value),
-                            })
-                            }
-                            className="h-10"
-                        />
-                        </div>
-
-                        <div className="space-y-2">
-                        <Label htmlFor="currency">Currency<RequiredMark /></Label>
-                        <Input
-                            id="currency"
-                            value={formData.currency}
-                            onChange={(e) =>
-                            setFormData({ ...formData, currency: e.target.value })
-                            }
-                            placeholder="USD / PKR / EUR"
-                            className="h-10"
-                        />
-                        </div>
-
-                        <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="project_manager">Project Manager</Label>
-                        <ProjectManagerSelect
-                            id="project_manager"
-                            value={formData.project_manager}
-                            onChange={(project_manager) =>
-                            setFormData({ ...formData, project_manager })
-                            }
-                        />
-                        </div>
-
-                        <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="remarks">Remarks</Label>
-                        <textarea
-                            id="remarks"
-                            className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            value={formData.remarks ?? ""}
-                            onChange={(e) =>
-                            setFormData({ ...formData, remarks: e.target.value })
-                            }
-                        />
-                        </div>
-                    </div>
-                    </div>
-
-                    <div className="flex items-center justify-end gap-2 border-t px-6 py-4">
-                    <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-                        Cancel
-                    </Button>
-                    <Button onClick={handleCreate}>Create</Button>
-                    </div>
-                </DialogContent>
-                </Dialog>
+                <OrderFormDialog
+                  mode="create"
+                  open={isCreateOpen}
+                  onOpenChange={(open) => {
+                    setIsCreateOpen(open);
+                    if (!open) {
+                      setFormData({
+                        ...emptyOrderForm,
+                        customer_id: customer.id,
+                        status_id: defaultStatusId,
+                      });
+                    }
+                  }}
+                  formData={formData}
+                  onFormChange={setFormData}
+                  customers={customers}
+                  statuses={statuses}
+                  onSubmit={handleCreate}
+                  lockCustomer
+                />
             </div>
 
             <Card>
@@ -660,6 +494,19 @@ export default function CustomerDetailPage(){
                             </TableCell>
                             <TableCell className="text-right">
                                 <div className="flex justify-end gap-2 text-accent">
+                                    <Can permission={P.create_orders}>
+                                      <button
+                                        type="button"
+                                        title="Repeat order"
+                                        className="inline-flex"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          openRepeat(order);
+                                        }}
+                                      >
+                                        <Copy className="w-4.5 text-accent-foreground hover:text-emerald-600" />
+                                      </button>
+                                    </Can>
                                     <Can permission={P.edit_orders}>
                                       <Pencil  className='w-4.5 text-accent-foreground hover:text-blue-600'
                                       onClick={(e) => { e.stopPropagation(); openEdit(order); }}
@@ -685,254 +532,27 @@ export default function CustomerDetailPage(){
                 </CardContent>
             </Card>
             
-            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                <DialogContent className="sm:max-w-190 p-0">
-                <DialogHeader className="border-b px-6 py-4">
-                    <DialogTitle className="text-lg font-semibold">
-                    Edit Order
-                    </DialogTitle>
-                    <DialogDescription>
-                    Update the order details below.
-                    </DialogDescription>
-                </DialogHeader>
-
-                <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
-                    <div className="grid gap-5 md:grid-cols-2">
-
-                    {/* Customer */}
-                    <div className="space-y-2">
-                        <Label htmlFor="edit_customer">Customer<RequiredMark /></Label>
-
-                        <Select
-                        value={formData.customer_id?.toString() ?? ""}
-                        onValueChange={(v) =>
-                            setFormData({
-                            ...formData,
-                            customer_id: Number(v),
-                            })
-                        }
-                        >
-                        <SelectTrigger className="h-10">
-                            <SelectValue placeholder="Select customer" />
-                        </SelectTrigger>
-
-                        <SelectContent>
-                            {customers.map((c) => (
-                            <SelectItem
-                                key={c.id}
-                                value={c.id.toString()}
-                            >
-                                {c.name}
-                            </SelectItem>
-                            ))}
-                        </SelectContent>
-                        </Select>
-                    </div>
-
-                    {/* Status */}
-                    <div className="space-y-2">
-                        <Label>Status<RequiredMark /></Label>
-
-                        <Select
-                        value={formData.status_id?.toString() ?? ""}
-                        onValueChange={(v) =>
-                            setFormData({
-                            ...formData,
-                            status_id: Number(v),
-                            })
-                        }
-                        >
-                        <SelectTrigger className="h-10">
-                            <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-
-                        <SelectContent>
-                            {statuses.map((s) => (
-                            <SelectItem
-                                key={s.id}
-                                value={s.id.toString()}
-                            >
-                                {s.status_name}
-                            </SelectItem>
-                            ))}
-                        </SelectContent>
-                        </Select>
-                    </div>
-
-                    {/* Title */}
-                    <div className="space-y-2">
-                        <Label>Title<RequiredMark /></Label>
-
-                        <Input
-                        value={formData.title}
-                        onChange={(e) =>
-                            setFormData({
-                            ...formData,
-                            title: e.target.value,
-                            })
-                        }
-                        />
-                    </div>
-
-                    {/* Description */}
-                    <div className="space-y-2 md:col-span-2">
-                        <Label>Description</Label>
-
-                        <textarea
-                        className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        value={formData.description ?? ""}
-                        onChange={(e) =>
-                            setFormData({
-                            ...formData,
-                            description: e.target.value,
-                            })
-                        }
-                        />
-                    </div>
-
-                    {/* Contract */}
-                    <div className="space-y-2">
-                        <Label>Contract Number</Label>
-
-                        <Input
-                        value={formData.contract_number ?? ""}
-                        onChange={(e) =>
-                            setFormData({
-                            ...formData,
-                            contract_number: e.target.value,
-                            })
-                        }
-                        />
-                    </div>
-
-                    {/* PO */}
-                    <div className="space-y-2">
-                        <Label>PO Number</Label>
-
-                        <Input
-                        value={formData.po_number ?? ""}
-                        onChange={(e) =>
-                            setFormData({
-                            ...formData,
-                            po_number: e.target.value,
-                            })
-                        }
-                        />
-                    </div>
-
-                    {/* Order Date */}
-                    <div className="space-y-2">
-                        <Label>Order Date<RequiredMark /></Label>
-
-                        <Input
-                        type="date"
-                        value={formData.order_date}
-                        onChange={(e) =>
-                            setFormData({
-                            ...formData,
-                            order_date: e.target.value,
-                            })
-                        }
-                        />
-                    </div>
-
-                    {/* Delivery Date */}
-                    <div className="space-y-2">
-                        <Label>Delivery Date</Label>
-
-                        <Input
-                        type="date"
-                        value={formData.delivery_date ?? ""}
-                        onChange={(e) =>
-                            setFormData({
-                            ...formData,
-                            delivery_date: e.target.value,
-                            })
-                        }
-                        />
-                    </div>
-
-                    {/* Total Value */}
-                    <div className="space-y-2">
-                        <Label>Total Value</Label>
-
-                        <Input
-                        type="number"
-                        value={formData.total_value ?? ""}
-                        onChange={(e) =>
-                            setFormData({
-                            ...formData,
-                            total_value:
-                                e.target.value === ""
-                                ? null
-                                : Number(e.target.value),
-                            })
-                        }
-                        />
-                    </div>
-
-                    {/* Currency */}
-                    <div className="space-y-2">
-                        <Label>Currency<RequiredMark /></Label>
-
-                        <Input
-                        value={formData.currency}
-                        onChange={(e) =>
-                            setFormData({
-                            ...formData,
-                            currency: e.target.value,
-                            })
-                        }
-                        />
-                    </div>
-
-                    {/* Project Manager */}
-                    <div className="space-y-2 md:col-span-2">
-                        <Label>Project Manager</Label>
-                        <ProjectManagerSelect
-                        value={formData.project_manager}
-                        onChange={(project_manager) =>
-                            setFormData({
-                            ...formData,
-                            project_manager,
-                            })
-                        }
-                        />
-                    </div>
-
-                    {/* Remarks */}
-                    <div className="space-y-2 md:col-span-2">
-                        <Label>Remarks</Label>
-
-                        <textarea
-                        className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        value={formData.remarks ?? ""}
-                        onChange={(e) =>
-                            setFormData({
-                            ...formData,
-                            remarks: e.target.value,
-                            })
-                        }
-                        />
-                    </div>
-
-                    </div>
-                </div>
-
-                <div className="flex justify-end gap-2 border-t px-6 py-4">
-                    <Button
-                    variant="outline"
-                    onClick={() => setIsEditOpen(false)}
-                    >
-                    Cancel
-                    </Button>
-
-                    <Button onClick={handleUpdate}>
-                    Update Order
-                    </Button>
-                </div>
-                </DialogContent>
-            </Dialog>
+            <OrderFormDialog
+              mode="edit"
+              open={isEditOpen}
+              onOpenChange={(open) => {
+                setIsEditOpen(open);
+                if (!open) {
+                  setEditingId(null);
+                  setFormData({
+                    ...emptyOrderForm,
+                    customer_id: customer?.id,
+                    status_id: defaultStatusId,
+                  });
+                }
+              }}
+              formData={formData}
+              onFormChange={setFormData}
+              customers={customers}
+              statuses={statuses}
+              onSubmit={handleUpdate}
+              lockCustomer
+            />
 
             <ConfirmDialog
               open={deleteConfirm.open}

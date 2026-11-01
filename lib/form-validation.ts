@@ -130,12 +130,22 @@ export function validateOrderForm(input: {
   currency: string;
   statusId?: number | null;
   customerId?: number | null;
+  deliveryDate?: string | null;
+  productionSupportDate?: string | null;
 }): string | null {
   if (isBlank(input.title)) return requiredMessage('Title');
   if (isBlank(input.orderDate)) return requiredMessage('Order date');
   if (isBlank(input.currency)) return requiredMessage('Currency');
   if (isMissingId(input.statusId)) return requiredMessage('Status');
   if (isMissingId(input.customerId)) return requiredMessage('Customer');
+  const delivery = (input.deliveryDate ?? '').trim();
+  const support = (input.productionSupportDate ?? '').trim();
+  if (support && !delivery) {
+    return 'Set a delivery date before production support';
+  }
+  if (support && delivery && support < delivery) {
+    return 'Production support must be on or after the delivery date';
+  }
   return null;
 }
 

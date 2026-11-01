@@ -215,6 +215,7 @@ export interface Order {
   po_number?: string | null
   order_date: string
   delivery_date?: string | null
+  production_support_date?: string | null
   total_value?: number | null
   currency: string
   project_manager?: string | null
@@ -235,6 +236,7 @@ export interface OrderCreate {
   po_number?: string
   order_date: string
   delivery_date?: string
+  production_support_date?: string
   total_value?: number
   currency?: string
   project_manager?: string
@@ -251,6 +253,7 @@ export interface OrderUpdate {
   po_number?: string
   order_date?: string
   delivery_date?: string
+  production_support_date?: string
   total_value?: number
   currency?: string
   project_manager?: string
