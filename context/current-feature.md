@@ -1,4 +1,4 @@
-# Current Feature: Inventory Reports Cleanup & Selectable Columns
+# Current Feature: Sibling Node Groups
 
 ## Status
 
@@ -6,23 +6,23 @@ In Progress
 
 ## Goals
 
-- [x] Trim inventory report modes to significant ones only (drop stubs/duplicates)
-- [x] Remove redundant Part Number / Serial Number filters and report columns (and Part/Serial Lookup mode)
-- [x] Location filter/entry uses saved location tree dropdown (Room→Cabinet→Rack), linked to inventory records
-- [x] Report table columns adapt by report type
-- [x] Selectable column visibility works across application tables (shared control + persistence)
+- [x] Persist sibling groups (`sibling_group_id` + `sibling_group_name`) on hierarchy config nodes (backend + frontend)
+- [x] Allow multi-select of two or more sibling nodes on the config tree canvas
+- [x] User can create a group with a custom name, rename, and ungroup
+- [x] Visual group frame on the canvas around grouped siblings
 
 ## Notes
 
-- Keep inventory master fields for part/serial in create/edit if still used for unit identity; remove from reports UI as redundant with search/SKU
-- Redundant modes today: by_project/by_system/by_location/lookup ≡ current; issued ≡ reserved; valuation is stub
-- Keep: current, low, out, available, one open-issuance mode, movements
-- Location master: `inventory_location_tree` + `CascadingLocationSelects`
-- No shared DataTable today — add reusable column-visibility hook/UI and wire into EntityTable, ReportTable, and major list pages
+- Groups are visual/organizational among siblings only — they do not change hierarchy parent/child levels
+- Multi-select limited to nodes that share the same `parent_client_key`
+- Ctrl/Cmd+click to add/remove siblings from selection
 
 ## History
 
 <!-- Completed features (append only) -->
+
+### Inventory Reports Cleanup & Selectable Columns
+Trim report modes; location tree filter; adaptive columns; shared column visibility.
 
 ### Frontend OOM — Safety Caps (Phase 4)
 Lower absolute paginated-fetch safety valve; status list cap; poll intervals; toast/gcTime; hierarchy merge cap.

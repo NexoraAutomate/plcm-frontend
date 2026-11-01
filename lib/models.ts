@@ -1026,6 +1026,8 @@ export interface HierarchyConfigNode {
   abbreviation?: string | null
   sort_order?: number
   inventory_source?: string
+  sibling_group_id?: string | null
+  sibling_group_name?: string | null
 }
 
 export interface HierarchyConfiguration {

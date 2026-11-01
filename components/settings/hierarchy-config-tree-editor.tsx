@@ -28,6 +28,7 @@ import {
   Panel,
   ReactFlow,
   ReactFlowProvider,
+  SelectionMode,
   useEdgesState,
   useNodesState,
   useReactFlow,
@@ -36,19 +37,14 @@ import {
   type Node,
   type OnConnectEnd,
   type OnNodeDrag,
+  type OnSelectionChangeFunc,
   type NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
-  Columns2,
   Copy,
-  GitBranch,
-  Lock,
-  LockOpen,
   Maximize2,
   Minimize2,
-  Plus,
-  Rows2,
   Save,
   X,
 } from 'lucide-react';
@@ -87,33 +83,41 @@ import {
   CONFIG_TREE_FIELD_VISIBILITY_KEYS,
   DEFAULT_CONFIG_TREE_NODE_FIELD_VISIBILITY,
   DEFAULT_NODE_HEIGHT,
+  absoluteFlowPosition,
+  areSiblingKeys,
   DEFAULT_NODE_WIDTH,
   descendantsOf,
   filterVisibleHierarchyNodes,
+  groupSiblingNodes,
   hasSystemNode,
   isDraftNode,
   isEntityAssigned,
   isHierarchyFullyExpanded,
   layoutHandleIds,
   parentKeysWithChildren,
+  pruneUndersizedSiblingGroups,
   siblingsOf,
+  ungroupSiblingNodes,
   type ConfigTreeEdgeData,
   type ConfigTreeNodeData,
   type ConfigTreeNodeFieldVisibility,
   type LayoutDirection,
+  type SiblingGroupNodeData,
 } from '@/lib/config-tree-layout';
 import { LEVEL_LEGEND_DOT, LEVEL_NODE_STYLE } from '@/lib/config-tree-level-styles';
 import {
   ConfigTreeFlowNode,
   type ConfigTreeNodeActions,
 } from '@/components/settings/config-tree/config-tree-flow-node';
+import { ConfigTreeSiblingGroupNode } from '@/components/settings/config-tree/config-tree-sibling-group-node';
+import { ConfigTreeSelectionToolbar } from '@/components/settings/config-tree/config-tree-selection-toolbar';
 import { ConfigAnimatedEdge } from '@/components/settings/config-tree/config-animated-edge';
 import { ConfigTreeEraser } from '@/components/settings/config-tree/config-tree-eraser';
 import { ConfigTreeEntitySidebar, ENTITY_DND_MIME, type EntityDragPayload } from '@/components/settings/config-tree/config-tree-entity-sidebar';
 import { ConfigEntityTypeTree } from '@/components/settings/config-tree/config-entity-type-tree';
-import { ConfigTreeNodeLegend } from '@/components/settings/config-tree/config-tree-node-legend';
+import { ConfigTreeToolbar } from '@/components/settings/config-tree/config-tree-toolbar';
 import {
-  ConfigTreeDownloadButton,
+  useConfigTreePdfDownload,
   type ConfigTreePdfMeta,
 } from '@/components/settings/config-tree/config-tree-download-button';
 import { InventorySourceToggle } from '@/components/settings/config-tree/inventory-source-toggle';
@@ -138,6 +142,20 @@ function NodeWithActions(props: NodeProps<Node<ConfigTreeNodeData>>) {
   const actions = useContext(ActionsContext);
   if (!actions) return null;
   return <ConfigTreeFlowNode {...props} actions={actions} />;
+}
+
+const GroupToggleContext = createContext<((groupId: string) => void) | null>(
+  null
+);
+
+function SiblingGroupWithToggle(props: NodeProps<Node<SiblingGroupNodeData>>) {
+  const onToggleCollapsed = useContext(GroupToggleContext);
+  return (
+    <ConfigTreeSiblingGroupNode
+      {...props}
+      onToggleCollapsed={onToggleCollapsed ?? undefined}
+    />
+  );
 }
 
 function EdgeWithDelete(
@@ -181,6 +199,17 @@ type CanvasProps = {
   layoutNonce: number;
   pendingPositions: MutableRefObject<Map<string, { x: number; y: number }>>;
   pdfMeta?: ConfigTreePdfMeta;
+  onSaveClick?: () => void;
+  onDuplicateClick?: () => void;
+  saving?: boolean;
+  saveDisabled?: boolean;
+  saveTitle?: string;
+  showDuplicate?: boolean;
+  duplicateDisabled?: boolean;
+  selectedKeys: string[];
+  onSelectedKeysChange: (keys: string[]) => void;
+  onGroupSiblings: (memberIds?: string[]) => void;
+  onUngroupSiblings: (groupId?: string) => void;
 };
 
 function ConfigTreeCanvasInner({
@@ -202,19 +231,33 @@ function ConfigTreeCanvasInner({
   addParentPeer,
   requestDeleteNode,
   layoutNonce,
+  onSaveClick,
+  onDuplicateClick,
+  saving = false,
+  saveDisabled = false,
+  saveTitle,
+  showDuplicate = false,
+  duplicateDisabled = false,
+  selectedKeys,
+  onSelectedKeysChange,
+  onGroupSiblings,
+  onUngroupSiblings,
   pendingPositions,
   pdfMeta,
 }: CanvasProps) {
   const { screenToFlowPosition, getInternalNode, fitView, getNodes } =
     useReactFlow();
+  const { busy: downloadBusy, download } = useConfigTreePdfDownload(pdfMeta);
   const connectingNodeId = useRef<string | null>(null);
+  const selectedParentKey =
+    selectedKeys.length > 0 ? selectedKeys[selectedKeys.length - 1] : null;
   const skipNextSync = useRef(false);
   const structureKey = useMemo(
     () =>
       draftNodes
         .map(
           (n) =>
-            `${n.client_key}:${n.parent_client_key ?? ''}:${n.level}:${n.sort_order}`
+            `${n.client_key}:${n.parent_client_key ?? ''}:${n.level}:${n.sort_order}:${n.sibling_group_id ?? ''}`
         )
         .join('|'),
     [draftNodes]
@@ -224,17 +267,27 @@ function ConfigTreeCanvasInner({
       draftNodes
         .map(
           (n) =>
-            `${n.client_key}:${n.name}:${n.abbreviation ?? ''}:${n.description ?? ''}:${normalizeInventorySource(n.inventory_source)}`
+            `${n.client_key}:${n.name}:${n.abbreviation ?? ''}:${n.description ?? ''}:${normalizeInventorySource(n.inventory_source)}:${n.sibling_group_name ?? ''}`
         )
         .join('|'),
     [draftNodes]
   );
   const lastLayoutNonce = useRef(layoutNonce);
   const lastStructureKey = useRef(structureKey);
+  const lastContentKey = useRef(contentKey);
   const lastDirection = useRef(direction);
   /** Empty = system/roots only; keys = parents whose immediate children are shown. */
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set());
   const lastExpandedKey = useRef('');
+  /** Sibling groups shown as a single card (one parent edge). */
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(
+    () => new Set()
+  );
+  const collapsedGroupSig = useMemo(
+    () => [...collapsedGroupIds].sort().join('|'),
+    [collapsedGroupIds]
+  );
+  const lastCollapsedGroupSig = useRef(collapsedGroupSig);
   const [fieldVisibility, setFieldVisibility] =
     useState<ConfigTreeNodeFieldVisibility>(
       () => ({ ...DEFAULT_CONFIG_TREE_NODE_FIELD_VISIBILITY })
@@ -284,7 +337,6 @@ function ConfigTreeCanvasInner({
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initial.flowNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges);
-  const [selectedParentKey, setSelectedParentKey] = useState<string | null>(null);
 
   const nodesByKey = useMemo(() => {
     const map = new Map<string, TemplateDraftNode>();
@@ -370,41 +422,85 @@ function ConfigTreeCanvasInner({
     }
 
     const structureChanged = lastStructureKey.current !== structureKey;
+    const contentChanged = lastContentKey.current !== contentKey;
     const directionChanged = lastDirection.current !== direction;
     const layoutChanged = lastLayoutNonce.current !== layoutNonce;
     const expandChanged = lastExpandedKey.current !== expandedKeySig;
+    const groupCollapseChanged =
+      lastCollapsedGroupSig.current !== collapsedGroupSig;
     const visibilityChanged = lastFieldVisibilitySig.current !== fieldVisibilitySig;
     lastStructureKey.current = structureKey;
+    lastContentKey.current = contentKey;
     lastDirection.current = direction;
     lastLayoutNonce.current = layoutNonce;
     lastExpandedKey.current = expandedKeySig;
+    lastCollapsedGroupSig.current = collapsedGroupSig;
     lastFieldVisibilitySig.current = fieldVisibilitySig;
 
     // Drop freehand pending spots — new nodes always snap into the active layout
     pendingPositions.current.clear();
 
-    const positionById = new Map(
-      getNodes().map((n) => [n.id, { x: n.position.x, y: n.position.y }])
-    );
+    const current = getNodes();
+    // Only measure tree cards — never feed inflated group boxes back into dagre.
     const sizeById = new Map(
-      getNodes().map((n) => [
-        n.id,
-        {
-          width: typeof n.style?.width === 'number' ? n.style.width : DEFAULT_NODE_WIDTH,
-          height: typeof n.style?.height === 'number' ? n.style.height : DEFAULT_NODE_HEIGHT,
-        },
-      ])
+      current
+        .filter((n) => n.type === 'configTree')
+        .map((n) => [
+          n.id,
+          {
+            width:
+              typeof n.style?.width === 'number' ? n.style.width : DEFAULT_NODE_WIDTH,
+            height:
+              typeof n.style?.height === 'number'
+                ? n.style.height
+                : DEFAULT_NODE_HEIGHT,
+          },
+        ])
     );
 
-    // Re-run Dagre whenever hierarchy, orientation, or expand/collapse changes so
-    // siblings/children land on the correct parallel rank. Field-visibility toggles
-    // only refresh node data and keep the current layout.
-    const applyAutoLayout =
-      structureChanged ||
-      directionChanged ||
-      layoutChanged ||
-      expandChanged ||
-      positionById.size === 0;
+    // Auto-layout on any structural / content / direction / group change (H and V).
+    // Skip only for pure field-visibility toggles so the canvas does not jump.
+    // @see https://reactflow.dev/examples/layout/auto-layout
+    const visibilityOnly =
+      visibilityChanged &&
+      !structureChanged &&
+      !contentChanged &&
+      !directionChanged &&
+      !layoutChanged &&
+      !expandChanged &&
+      !groupCollapseChanged;
+    const applyAutoLayout = !visibilityOnly || current.length === 0;
+
+    if (!applyAutoLayout) {
+      const lookup = new Map(
+        current.map((n) => [
+          n.id,
+          { position: n.position, parentId: n.parentId ?? null },
+        ])
+      );
+      const positionById = new Map(
+        current
+          .filter((n) => n.type === 'configTree')
+          .map((n) => [n.id, absoluteFlowPosition(n, lookup)])
+      );
+      const kept = buildGraphFromDraft({
+        nodes: visibleDraftNodes,
+        levelLabel,
+        locked,
+        readOnly,
+        direction,
+        sizeById,
+        positionById,
+        applyAutoLayout: false,
+        parentsWithChildren: parentsWithKids,
+        expandedKeys,
+        fieldVisibility,
+        collapsedGroupIds,
+      });
+      setNodes(kept.flowNodes);
+      setEdges(kept.edges);
+      return;
+    }
 
     const next = buildGraphFromDraft({
       nodes: visibleDraftNodes,
@@ -413,15 +509,14 @@ function ConfigTreeCanvasInner({
       readOnly,
       direction,
       sizeById,
-      positionById: applyAutoLayout ? undefined : positionById,
-      applyAutoLayout,
+      applyAutoLayout: true,
       parentsWithChildren: parentsWithKids,
       expandedKeys,
       fieldVisibility,
+      collapsedGroupIds,
     });
     setNodes(next.flowNodes);
     setEdges(next.edges);
-    if (visibilityChanged && !applyAutoLayout) return;
     const t = window.setTimeout(() => void fitView({ padding: 0.2, duration: 200 }), 40);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- rebuild on structure/content/layout/expand/visibility signatures
@@ -433,6 +528,7 @@ function ConfigTreeCanvasInner({
     direction,
     layoutNonce,
     expandedKeySig,
+    collapsedGroupSig,
     fieldVisibilitySig,
   ]);
 
@@ -454,12 +550,40 @@ function ConfigTreeCanvasInner({
     [draftNodes, edges, locked, onChange, readOnly, setEdges]
   );
 
+  const toggleGroupCollapsed = useCallback((groupId: string) => {
+    setCollapsedGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }, []);
+
   const nodeTypes = useMemo(
     () => ({
       configTree: NodeWithActions,
+      siblingGroup: SiblingGroupWithToggle,
     }),
     []
   );
+
+  // Drop collapse state for groups that no longer exist
+  useEffect(() => {
+    const live = new Set(
+      draftNodes
+        .map((n) => n.sibling_group_id?.trim())
+        .filter((id): id is string => Boolean(id))
+    );
+    setCollapsedGroupIds((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (live.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [draftNodes]);
 
   const edgeTypes = useMemo(
     () => ({
@@ -479,18 +603,18 @@ function ConfigTreeCanvasInner({
       onEdit: openNodeForm,
       onDelete: requestDeleteNode,
       onAddChild: (key) => {
-        setSelectedParentKey(key);
+        onSelectedKeysChange([key]);
         ensureExpanded(key);
         addChild(key);
       },
       onAddSiblingAbove: (key) => {
         const node = nodesByKey.get(key);
-        if (node?.parent_client_key) setSelectedParentKey(node.parent_client_key);
+        if (node?.parent_client_key) onSelectedKeysChange([node.parent_client_key]);
         addSibling(key, 'above');
       },
       onAddSiblingBelow: (key) => {
         const node = nodesByKey.get(key);
-        if (node?.parent_client_key) setSelectedParentKey(node.parent_client_key);
+        if (node?.parent_client_key) onSelectedKeysChange([node.parent_client_key]);
         addSibling(key, 'below');
       },
       onAddParentPeer: (key) => {
@@ -499,9 +623,9 @@ function ConfigTreeCanvasInner({
           ? nodesByKey.get(node.parent_client_key)
           : null;
         if (parent?.parent_client_key) {
-          setSelectedParentKey(parent.parent_client_key);
+          onSelectedKeysChange([parent.parent_client_key]);
         } else if (parent) {
-          setSelectedParentKey(null);
+          onSelectedKeysChange([]);
         }
         addParentPeer(key);
       },
@@ -527,6 +651,7 @@ function ConfigTreeCanvasInner({
       ensureExpanded,
       nodesByKey,
       onChange,
+      onSelectedKeysChange,
       openNodeForm,
       requestDeleteNode,
       toggleNodeChildren,
@@ -600,7 +725,7 @@ function ConfigTreeCanvasInner({
           ? (event as TouchEvent).changedTouches[0]
           : (event as MouseEvent);
       const position = screenToFlowPosition({ x: clientX, y: clientY });
-      setSelectedParentKey(fromId);
+      onSelectedKeysChange([fromId]);
       ensureExpanded(fromId);
       placeNode({
         level: childLevel,
@@ -612,6 +737,7 @@ function ConfigTreeCanvasInner({
       ensureExpanded,
       locked,
       mode,
+      onSelectedKeysChange,
       nodesByKey,
       placeNode,
       readOnly,
@@ -772,7 +898,7 @@ function ConfigTreeCanvasInner({
             y: event.clientY,
           }),
         });
-        if (key) setSelectedParentKey(key);
+        if (key) onSelectedKeysChange([key]);
         return;
       }
 
@@ -830,6 +956,7 @@ function ConfigTreeCanvasInner({
       locked,
       mode,
       nodesByKey,
+      onSelectedKeysChange,
       placeNode,
       readOnly,
       screenToFlowPosition,
@@ -840,13 +967,14 @@ function ConfigTreeCanvasInner({
   const onEraseNodes = useCallback(
     (ids: string[]) => {
       if (locked || readOnly || !ids.length) return;
+      const erasable = ids.filter((id) => !id.startsWith('sibling-group-'));
+      if (!erasable.length) return;
       let remove = new Set<string>();
-      for (const id of ids) {
+      for (const id of erasable) {
         for (const k of descendantsOf(draftNodes, id)) remove.add(k);
       }
-      onChange(
-        syncInventorySources(draftNodes.filter((n) => !remove.has(n.client_key)))
-      );
+      const remaining = draftNodes.filter((n) => !remove.has(n.client_key));
+      onChange(syncInventorySources(pruneUndersizedSiblingGroups(remaining)));
       toast.success(`Erased ${remove.size} node(s)`);
     },
     [draftNodes, locked, onChange, readOnly]
@@ -873,12 +1001,31 @@ function ConfigTreeCanvasInner({
 
   const interactive = !locked && !readOnly && mode === 'selection';
 
-  // Clear selection if the node was deleted
+  // Drop deleted keys from multi-selection
   useEffect(() => {
-    if (selectedParentKey && !nodesByKey.has(selectedParentKey)) {
-      setSelectedParentKey(null);
-    }
-  }, [nodesByKey, selectedParentKey]);
+    if (!selectedKeys.some((key) => !nodesByKey.has(key))) return;
+    onSelectedKeysChange(selectedKeys.filter((key) => nodesByKey.has(key)));
+  }, [nodesByKey, onSelectedKeysChange, selectedKeys]);
+
+  const canGroupSelection =
+    !readOnly &&
+    !locked &&
+    selectedKeys.length >= 2 &&
+    areSiblingKeys(draftNodes, selectedKeys);
+  const canUngroupSelection =
+    !readOnly &&
+    !locked &&
+    selectedKeys.some((key) => Boolean(nodesByKey.get(key)?.sibling_group_id));
+
+  const onSelectionChange = useCallback<OnSelectionChangeFunc>(
+    ({ nodes: selected }) => {
+      if (!interactive) return;
+      onSelectedKeysChange(
+        selected.filter((n) => n.type === 'configTree').map((n) => n.id)
+      );
+    },
+    [interactive, onSelectedKeysChange]
+  );
 
   return (
     <div className="flex h-full min-h-0 w-full">
@@ -898,11 +1045,9 @@ function ConfigTreeCanvasInner({
       />
       <div className="relative min-h-0 min-w-0 flex-1">
         <ActionsContext.Provider value={actions}>
+          <GroupToggleContext.Provider value={toggleGroupCollapsed}>
           <ReactFlow
-            nodes={nodes.map((n) => ({
-              ...n,
-              selected: n.id === selectedParentKey,
-            }))}
+            nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
@@ -915,27 +1060,23 @@ function ConfigTreeCanvasInner({
             onNodeDragStop={onNodeDragStop}
             onDragOver={onDragOver}
             onDrop={onDrop}
-            onNodeClick={(_, node) => {
-              if (!interactive) return;
-              setSelectedParentKey(node.id);
-            }}
+            onSelectionChange={interactive ? onSelectionChange : undefined}
             onNodeDoubleClick={(_, node) => {
               if (!interactive) return;
-              setSelectedParentKey(node.id);
+              if (node.type === 'siblingGroup') return;
               openNodeForm(node.id);
-            }}
-            onPaneClick={() => {
-              if (!interactive) return;
-              setSelectedParentKey(null);
             }}
             nodesDraggable={interactive}
             nodesConnectable={interactive}
             elementsSelectable={mode === 'selection'}
+            selectionMode={SelectionMode.Partial}
+            multiSelectionKeyCode="Shift"
             edgesFocusable={interactive}
             deleteKeyCode={interactive ? ['Backspace', 'Delete'] : null}
             onBeforeDelete={async ({ nodes: ns, edges: es }) => {
-              if (ns.length > 0) {
-                requestDeleteNode(ns[0].id);
+              const target = ns.find((n) => n.type === 'configTree');
+              if (target) {
+                requestDeleteNode(target.id);
                 return false;
               }
               if (es.length > 0) {
@@ -975,105 +1116,55 @@ function ConfigTreeCanvasInner({
                 return LEVEL_NODE_STYLE[level].minimap;
               }}
             />
-            <ConfigTreeDownloadButton meta={pdfMeta} />
-            <ConfigTreeNodeLegend
-              visibility={fieldVisibility}
-              onChange={setFieldVisibility}
-            />
-
-            <Panel position="top-left" className="z-50 flex flex-wrap gap-1.5">
-              <Button
-                type="button"
-                size="sm"
-                variant={showFullHierarchy ? 'default' : 'secondary'}
-                className="h-8"
-                disabled={!parentsWithKids.size}
-                onClick={toggleFullHierarchy}
-                title={
-                  showFullHierarchy
-                    ? 'Show system nodes only'
-                    : 'Show full hierarchy'
-                }
-              >
-                <GitBranch className="mr-1 h-3.5 w-3.5" />
-                {showFullHierarchy ? 'System only' : 'Show full hierarchy'}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={locked ? 'default' : 'secondary'}
-                className="h-8"
-                disabled={readOnly}
-                onClick={() => setLocked(!locked)}
-                title={locked ? 'Unlock layout' : 'Lock layout'}
-              >
-                {locked ? (
-                  <Lock className="mr-1 h-3.5 w-3.5" />
-                ) : (
-                  <LockOpen className="mr-1 h-3.5 w-3.5" />
-                )}
-                {locked ? 'Locked' : 'Lock'}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={mode === 'selection' ? 'default' : 'secondary'}
-                className="h-8"
-                disabled={locked || readOnly}
-                onClick={() => setMode('selection')}
-              >
-                Selection
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={mode === 'eraser' ? 'default' : 'secondary'}
-                className="h-8"
-                disabled={locked || readOnly}
-                onClick={() => setMode('eraser')}
-              >
-                Eraser
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={direction === 'TB' ? 'default' : 'secondary'}
-                className="h-8"
-                disabled={locked}
-                onClick={() => setDirection('TB')}
-                title="Vertical layout"
-              >
-                <Rows2 className="mr-1 h-3.5 w-3.5" />
-                Vertical
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={direction === 'LR' ? 'default' : 'secondary'}
-                className="h-8"
-                disabled={locked}
-                onClick={() => setDirection('LR')}
-                title="Horizontal layout"
-              >
-                <Columns2 className="mr-1 h-3.5 w-3.5" />
-                Horizontal
-              </Button>
-              {!readOnly && !locked && !systemExists ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  className="h-8"
-                  onClick={() => {
-                    setSelectedParentKey(null);
-                    addChild(null);
-                  }}
-                >
-                  <Plus className="mr-1 h-3.5 w-3.5" />
-                  {levelLabel('system')}
-                </Button>
-              ) : null}
+            <Panel position="top-left" className="z-50 m-2">
+              <ConfigTreeToolbar
+                showFullHierarchy={showFullHierarchy}
+                canToggleHierarchy={parentsWithKids.size > 0}
+                onToggleHierarchy={toggleFullHierarchy}
+                locked={locked}
+                readOnly={readOnly}
+                onToggleLock={() => setLocked(!locked)}
+                mode={mode}
+                onModeChange={setMode}
+                direction={direction}
+                onDirectionChange={setDirection}
+                showAddSystem={!readOnly && !locked && !systemExists}
+                addSystemLabel={levelLabel('system')}
+                onAddSystem={() => {
+                  onSelectedKeysChange([]);
+                  addChild(null);
+                }}
+                fieldVisibility={fieldVisibility}
+                onFieldVisibilityChange={setFieldVisibility}
+                fileActions={{
+                  onDownload: () => void download(),
+                  downloadBusy,
+                  onSave: onSaveClick,
+                  saveDisabled,
+                  saveTitle,
+                  saving,
+                  onDuplicate: showDuplicate ? onDuplicateClick : undefined,
+                  duplicateDisabled,
+                }}
+                groupActions={{
+                  canGroup: canGroupSelection,
+                  canUngroup: canUngroupSelection,
+                  onGroup: () => onGroupSiblings(),
+                  onUngroup: () => onUngroupSiblings(),
+                  selectionCount: selectedKeys.length,
+                }}
+              />
             </Panel>
+
+            {!readOnly && !locked && mode === 'selection' ? (
+              <ConfigTreeSelectionToolbar
+                draftNodes={draftNodes}
+                locked={locked}
+                readOnly={readOnly}
+                onGroup={(memberIds) => onGroupSiblings(memberIds)}
+                onUngroup={(groupId) => onUngroupSiblings(groupId)}
+              />
+            ) : null}
 
             {mode === 'eraser' && !locked && !readOnly ? (
               <ConfigTreeEraser
@@ -1082,6 +1173,7 @@ function ConfigTreeCanvasInner({
               />
             ) : null}
           </ReactFlow>
+          </GroupToggleContext.Provider>
         </ActionsContext.Provider>
       </div>
     </div>
@@ -1165,6 +1257,10 @@ export function HierarchyConfigTreeEditor({
   );
   const [saveName, setSaveName] = useState('');
   const [saveDescription, setSaveDescription] = useState('');
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  const [groupDialogOpen, setGroupDialogOpen] = useState(false);
+  const [groupName, setGroupName] = useState('');
+  const [pendingGroupKeys, setPendingGroupKeys] = useState<string[]>([]);
   const pendingPositions = useRef(new Map<string, { x: number; y: number }>());
 
   const unassignedCount = useMemo(
@@ -1201,13 +1297,20 @@ export function HierarchyConfigTreeEditor({
     if (!overlayOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      if (form || deleteKey || saveDialogOpen) return;
+      if (form || deleteKey || saveDialogOpen || groupDialogOpen) return;
       event.preventDefault();
       closeFullscreen();
     };
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
-  }, [closeFullscreen, deleteKey, form, overlayOpen, saveDialogOpen]);
+  }, [
+    closeFullscreen,
+    deleteKey,
+    form,
+    groupDialogOpen,
+    overlayOpen,
+    saveDialogOpen,
+  ]);
 
   useEffect(() => {
     if (!overlayOpen) return;
@@ -1274,7 +1377,8 @@ export function HierarchyConfigTreeEditor({
       const base = nodes.filter((n) => (n.parent_client_key ?? null) !== input.parentKey);
       const reindexed = nextSiblings.map((s, index) => ({ ...s, sort_order: index }));
       onChange(syncInventorySources([...base, ...reindexed]));
-      // Positions come from Dagre on the next structure sync (active H/V layout).
+      // Force H/V auto-layout after every insert (avoids TB group stretch from stale coords).
+      setLayoutNonce((n) => n + 1);
       if (!input.name) {
         setForm({
           mode: 'create',
@@ -1360,13 +1464,77 @@ export function HierarchyConfigTreeEditor({
   const confirmDelete = useCallback(() => {
     if (!deleteKey) return;
     const removeKeys = descendantsOf(nodes, deleteKey);
-    onChange(
-      syncInventorySources(nodes.filter((n) => !removeKeys.has(n.client_key)))
-    );
+    const remaining = nodes.filter((n) => !removeKeys.has(n.client_key));
+    onChange(syncInventorySources(pruneUndersizedSiblingGroups(remaining)));
     setForm((f) => (f && removeKeys.has(f.clientKey) ? null : f));
+    setSelectedKeys((keys) => keys.filter((k) => !removeKeys.has(k)));
     setDeleteKey(null);
     toast.success('Node and children removed');
   }, [deleteKey, nodes, onChange]);
+
+  const openGroupDialog = useCallback(
+    (memberIds?: string[]) => {
+      const keys = memberIds?.length ? memberIds : selectedKeys;
+      if (keys.length < 2 || !areSiblingKeys(nodes, keys)) {
+        toast.error('Select two or more sibling nodes (Shift+click)');
+        return;
+      }
+      const existingName = keys
+        .map((key) => nodesByKey.get(key)?.sibling_group_name?.trim())
+        .find(Boolean);
+      setPendingGroupKeys(keys);
+      setGroupName(existingName || '');
+      setGroupDialogOpen(true);
+    },
+    [nodes, nodesByKey, selectedKeys]
+  );
+
+  const confirmGroupDialog = useCallback(() => {
+    const name = groupName.trim();
+    if (!name) {
+      toast.error('Enter a group name');
+      return;
+    }
+    const keys = pendingGroupKeys.length ? pendingGroupKeys : selectedKeys;
+    if (keys.length < 2 || !areSiblingKeys(nodes, keys)) {
+      toast.error('Select two or more sibling nodes');
+      setGroupDialogOpen(false);
+      return;
+    }
+    onChange(groupSiblingNodes(nodes, keys, name));
+    setGroupDialogOpen(false);
+    setPendingGroupKeys([]);
+    setLayoutNonce((n) => n + 1);
+    toast.success(`Grouped as “${name}”`);
+  }, [groupName, nodes, onChange, pendingGroupKeys, selectedKeys]);
+
+  const handleUngroupSiblings = useCallback(
+    (groupId?: string) => {
+      if (groupId) {
+        onChange(ungroupSiblingNodes(nodes, { groupId }));
+        setLayoutNonce((n) => n + 1);
+        toast.success('Ungrouped');
+        return;
+      }
+      const groupIds = new Set(
+        selectedKeys
+          .map((key) => nodesByKey.get(key)?.sibling_group_id?.trim())
+          .filter((id): id is string => Boolean(id))
+      );
+      if (!groupIds.size) {
+        toast.error('Selected nodes are not in a group');
+        return;
+      }
+      let next = nodes;
+      for (const id of groupIds) {
+        next = ungroupSiblingNodes(next, { groupId: id });
+      }
+      onChange(next);
+      setLayoutNonce((n) => n + 1);
+      toast.success('Ungrouped');
+    },
+    [nodes, nodesByKey, onChange, selectedKeys]
+  );
 
   const entityOptions = useMemo(() => {
     if (!form) return [];
@@ -1509,6 +1677,19 @@ export function HierarchyConfigTreeEditor({
 
   const deleteTarget = deleteKey ? nodesByKey.get(deleteKey) : null;
 
+  const saveTitle =
+    unassignedCount > 0
+      ? `Assign entities to all nodes first (${unassignedCount} left)`
+      : nodes.length === 0
+        ? 'Add nodes first'
+        : configId
+          ? 'Save changes to this configuration'
+          : 'Save configuration';
+
+  const configurationTitle = configId
+    ? (draftName.trim() || pdfMeta?.name?.trim() || 'Configuration')
+    : 'New Configuration';
+
   const canvasProps: CanvasProps = {
     draftNodes: nodes,
     onChange,
@@ -1530,6 +1711,18 @@ export function HierarchyConfigTreeEditor({
     layoutNonce,
     pendingPositions,
     pdfMeta,
+    onSaveClick: onSave && !readOnly ? handleSaveClick : undefined,
+    onDuplicateClick:
+      onDuplicate && configId && !readOnly ? openDuplicateDialog : undefined,
+    saving,
+    saveDisabled: !entitiesReady || saving,
+    saveTitle,
+    showDuplicate: Boolean(onDuplicate && configId && !readOnly),
+    duplicateDisabled: !entitiesReady || saving,
+    selectedKeys,
+    onSelectedKeysChange: setSelectedKeys,
+    onGroupSiblings: openGroupDialog,
+    onUngroupSiblings: handleUngroupSiblings,
   };
 
   const actionButtons =
@@ -1541,15 +1734,7 @@ export function HierarchyConfigTreeEditor({
             size="sm"
             className="h-8"
             disabled={!entitiesReady || saving}
-            title={
-              unassignedCount > 0
-                ? `Assign entities to all nodes first (${unassignedCount} left)`
-                : nodes.length === 0
-                  ? 'Add nodes first'
-                  : configId
-                    ? 'Save changes to this configuration'
-                    : 'Save configuration'
-            }
+            title={saveTitle}
             onClick={handleSaveClick}
           >
             <Save className="mr-1 h-3.5 w-3.5" />
@@ -1582,26 +1767,11 @@ export function HierarchyConfigTreeEditor({
             aria-modal="true"
             aria-label="Configuration hierarchy tree"
           >
-            <div className="flex items-start justify-between gap-3 border-b px-3 py-2">
-              <div className="max-w-2xl space-y-1">
-                <div className="text-xs text-muted-foreground">
-                  Click a node to add children (same entity can be added more than once) ·
-                  Double-click (or pencil) to edit · Turnkey/Build toggle on the node · Lock
-                  freezes edits · Esc exits
-                </div>
-                {unassignedCount > 0 ? (
-                  <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
-                    {unassignedCount} node{unassignedCount === 1 ? '' : 's'} still need an
-                    Entity List assignment
-                  </p>
-                ) : nodes.length > 0 ? (
-                  <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
-                    All nodes assigned — ready to save
-                  </p>
-                ) : null}
-              </div>
-              <div className="flex items-center gap-1.5">
-                {actionButtons}
+            <div className="flex items-center justify-between gap-3 border-b border-teal-500/15 bg-gradient-to-r from-slate-100 via-teal-50/80 to-slate-100 px-4 py-2.5 dark:from-slate-900 dark:via-teal-950/50 dark:to-slate-900">
+              <h2 className="truncate text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-50">
+                {configurationTitle}
+              </h2>
+              <div className="flex shrink-0 items-center gap-1.5">
                 <Button
                   type="button"
                   size="icon"
@@ -1686,6 +1856,52 @@ export function HierarchyConfigTreeEditor({
       </div>
 
       {overlay}
+
+      <Dialog open={groupDialogOpen} onOpenChange={setGroupDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Group siblings</DialogTitle>
+            <DialogDescription>
+              Name this group of{' '}
+              {(pendingGroupKeys.length || selectedKeys.length) || 0} sibling
+              nodes. Groups move together on the canvas and do not change
+              hierarchy levels.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="cfg-tree-group-name">Group name</Label>
+            <Input
+              id="cfg-tree-group-name"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              placeholder="e.g. Power rails"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  confirmGroupDialog();
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setGroupDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={confirmGroupDialog}
+              disabled={!groupName.trim()}
+            >
+              Group
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
         <DialogContent className="max-w-md">

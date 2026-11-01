@@ -1,5 +1,6 @@
 import {
   CHILD_TEMPLATE_LEVEL,
+  newClientKey,
   type TemplateDraftNode,
   type TemplateNodeLevel,
 } from '@/lib/hierarchy-config';
@@ -109,4 +110,96 @@ export function canLinkLevels(
   childLevel: TemplateNodeLevel
 ): boolean {
   return CHILD_TEMPLATE_LEVEL[parentLevel] === childLevel;
+}
+
+/** True when every key refers to a draft node under the same parent. */
+export function areSiblingKeys(
+  nodes: TemplateDraftNode[],
+  keys: readonly string[]
+): boolean {
+  if (keys.length < 2) return false;
+  const byKey = new Map(nodes.map((n) => [n.client_key, n]));
+  const first = byKey.get(keys[0]);
+  if (!first) return false;
+  const parent = first.parent_client_key ?? null;
+  return keys.every((key) => {
+    const node = byKey.get(key);
+    return !!node && (node.parent_client_key ?? null) === parent;
+  });
+}
+
+/** Assign selected siblings into a named group (creates a new group id). */
+export function groupSiblingNodes(
+  nodes: TemplateDraftNode[],
+  keys: readonly string[],
+  groupName: string,
+  groupId = newClientKey('sg')
+): TemplateDraftNode[] {
+  const name = groupName.trim();
+  if (!name || keys.length < 2 || !areSiblingKeys(nodes, keys)) return nodes;
+  const keySet = new Set(keys);
+  return nodes.map((node) =>
+    keySet.has(node.client_key)
+      ? {
+          ...node,
+          sibling_group_id: groupId,
+          sibling_group_name: name,
+        }
+      : node
+  );
+}
+
+/** Clear sibling group fields for the given keys (or whole group id). */
+export function ungroupSiblingNodes(
+  nodes: TemplateDraftNode[],
+  opts: { keys?: readonly string[]; groupId?: string | null }
+): TemplateDraftNode[] {
+  const keySet = opts.keys ? new Set(opts.keys) : null;
+  const groupId = opts.groupId?.trim() || null;
+  return nodes.map((node) => {
+    const matchKey = keySet?.has(node.client_key);
+    const matchGroup = groupId && node.sibling_group_id === groupId;
+    if (!matchKey && !matchGroup) return node;
+    return {
+      ...node,
+      sibling_group_id: null,
+      sibling_group_name: null,
+    };
+  });
+}
+
+/** Drop group membership when fewer than two members remain. */
+export function pruneUndersizedSiblingGroups(
+  nodes: TemplateDraftNode[]
+): TemplateDraftNode[] {
+  const counts = new Map<string, number>();
+  for (const node of nodes) {
+    const gid = node.sibling_group_id?.trim();
+    if (!gid) continue;
+    counts.set(gid, (counts.get(gid) ?? 0) + 1);
+  }
+  const drop = new Set(
+    [...counts.entries()].filter(([, count]) => count < 2).map(([id]) => id)
+  );
+  if (!drop.size) return nodes;
+  return nodes.map((node) =>
+    node.sibling_group_id && drop.has(node.sibling_group_id)
+      ? { ...node, sibling_group_id: null, sibling_group_name: null }
+      : node
+  );
+}
+
+export function renameSiblingGroup(
+  nodes: TemplateDraftNode[],
+  groupId: string,
+  groupName: string
+): TemplateDraftNode[] {
+  const name = groupName.trim();
+  const gid = groupId.trim();
+  if (!name || !gid) return nodes;
+  return nodes.map((node) =>
+    node.sibling_group_id === gid
+      ? { ...node, sibling_group_name: name }
+      : node
+  );
 }

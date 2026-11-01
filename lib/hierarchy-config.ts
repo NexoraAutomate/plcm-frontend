@@ -118,6 +118,9 @@ export type TemplateDraftNode = {
   abbreviation?: string | null;
   sort_order?: number;
   inventory_source?: InventorySource;
+  /** Shared id for a visual/org group of sibling nodes (same parent). */
+  sibling_group_id?: string | null;
+  sibling_group_name?: string | null;
 };
 
 export const DEFAULT_PRODUCT_TYPES = [

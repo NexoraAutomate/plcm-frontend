@@ -14,7 +14,10 @@ interface ConfigTreeNodeLegendProps {
   className?: string;
 }
 
-/** Floating panel to choose which detail fields appear on config tree nodes. */
+/**
+ * Floating panel to choose which detail fields appear on config tree nodes.
+ * Prefer ConfigTreeToolbar on the config-tree canvas (collapsible top-left).
+ */
 export function ConfigTreeNodeLegend({
   visibility,
   onChange,

@@ -61,10 +61,6 @@ export function ConfigAnimatedEdge({
         }}
         className={cn(data?.toBeDeleted && 'opacity-50')}
       />
-      {/* Animated pulse along the path */}
-      <circle r="4" fill="#2563eb">
-        <animateMotion dur="2.4s" repeatCount="indefinite" path={edgePath} />
-      </circle>
       {!locked && onDeleteEdge ? (
         <EdgeLabelRenderer>
           <button

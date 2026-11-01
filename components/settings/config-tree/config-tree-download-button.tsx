@@ -35,14 +35,14 @@ export type ConfigTreePdfMeta = {
 };
 
 /**
- * Download flow as a print-quality PDF
- * (capture based on https://reactflow.dev/examples/misc/download-image).
+ * PDF export for the config tree (must run under ReactFlowProvider).
+ * Capture based on https://reactflow.dev/examples/misc/download-image.
  */
-export function ConfigTreeDownloadButton({ meta }: { meta?: ConfigTreePdfMeta }) {
+export function useConfigTreePdfDownload(meta?: ConfigTreePdfMeta) {
   const { getNodes } = useReactFlow();
   const [busy, setBusy] = useState(false);
 
-  const onClick = useCallback(async () => {
+  const download = useCallback(async () => {
     setBusy(true);
     try {
       const nodes = getNodes();
@@ -121,6 +121,13 @@ export function ConfigTreeDownloadButton({ meta }: { meta?: ConfigTreePdfMeta })
     }
   }, [getNodes, meta]);
 
+  return { busy, download };
+}
+
+/** @deprecated Prefer wiring download via ConfigTreeToolbar. */
+export function ConfigTreeDownloadButton({ meta }: { meta?: ConfigTreePdfMeta }) {
+  const { busy, download } = useConfigTreePdfDownload(meta);
+
   return (
     <Panel position="bottom-right">
       <Button
@@ -129,7 +136,7 @@ export function ConfigTreeDownloadButton({ meta }: { meta?: ConfigTreePdfMeta })
         variant="secondary"
         className="h-8 shadow"
         disabled={busy}
-        onClick={() => void onClick()}
+        onClick={() => void download()}
       >
         <Download className="mr-1.5 h-3.5 w-3.5" />
         {busy ? 'Exporting…' : 'Download'}

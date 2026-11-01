@@ -156,6 +156,8 @@ function draftFingerprint(draft: Draft): string {
       abbreviation: n.abbreviation ?? null,
       sort_order: n.sort_order ?? 0,
       inventory_source: normalizeInventorySource(n.inventory_source),
+      sibling_group_id: n.sibling_group_id ?? null,
+      sibling_group_name: n.sibling_group_name ?? null,
     })),
   });
 }
@@ -204,6 +206,8 @@ function toDraft(config: HierarchyConfiguration): Draft {
       abbreviation: n.abbreviation,
       sort_order: n.sort_order ?? index,
       inventory_source: normalizeInventorySource(n.inventory_source),
+      sibling_group_id: n.sibling_group_id ?? null,
+      sibling_group_name: n.sibling_group_name ?? null,
     })),
   };
 }
@@ -243,6 +247,8 @@ function draftToExportPayload(draft: Draft): HierarchyConfigurationWrite {
       abbreviation: n.abbreviation ?? null,
       sort_order: index,
       inventory_source: normalizeInventorySource(n.inventory_source),
+      sibling_group_id: n.sibling_group_id?.trim() || null,
+      sibling_group_name: n.sibling_group_name?.trim() || null,
     })),
   };
 }
@@ -293,6 +299,14 @@ function parseConfigJson(parsed: unknown): HierarchyConfigurationWrite {
       typeof node.client_key === 'string' && node.client_key.trim()
         ? node.client_key.trim()
         : newClientKey(level.slice(0, 3));
+    const siblingGroupId =
+      typeof node.sibling_group_id === 'string' && node.sibling_group_id.trim()
+        ? node.sibling_group_id.trim()
+        : null;
+    const siblingGroupName =
+      typeof node.sibling_group_name === 'string' && node.sibling_group_name.trim()
+        ? node.sibling_group_name.trim()
+        : null;
     return {
       client_key: clientKey,
       parent_client_key:
@@ -307,6 +321,8 @@ function parseConfigJson(parsed: unknown): HierarchyConfigurationWrite {
       inventory_source: normalizeInventorySource(
         typeof node.inventory_source === 'string' ? node.inventory_source : null
       ),
+      sibling_group_id: siblingGroupId,
+      sibling_group_name: siblingGroupId ? siblingGroupName : null,
     };
   });
 
@@ -699,6 +715,8 @@ export function HierarchyConfigPanel({
     abbreviation: n.abbreviation,
     sort_order: n.sort_order ?? index,
     inventory_source: normalizeInventorySource(n.inventory_source),
+    sibling_group_id: n.sibling_group_id ?? null,
+    sibling_group_name: n.sibling_group_name ?? null,
   }));
 
   const isDirty = draftFingerprint(draft) !== baselineFingerprint;
@@ -965,11 +983,7 @@ export function HierarchyConfigPanel({
   }
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Flight → SDLS → System → Subsystem → Module → Unit → Component
-      </p>
-
+    <div className="space-y-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative min-w-0 flex-1">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -981,18 +995,6 @@ export function HierarchyConfigPanel({
           />
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => void load({ quiet: true })}
-            disabled={loading || listRefreshing}
-          >
-            <RefreshCw
-              className={`mr-1.5 h-4 w-4 ${listRefreshing ? 'animate-spin' : ''}`}
-            />
-            Refresh
-          </Button>
           {canManage ? (
             <Can permission={P.hierarchy_config_manage}>
               <>
@@ -1022,7 +1024,7 @@ export function HierarchyConfigPanel({
         </div>
       </div>
 
-      <div className="relative space-y-3">
+      <div className="relative space-y-2.5">
         {listRefreshing ? (
           <div className="pointer-events-none absolute inset-0 z-10 rounded-lg bg-background/40" />
         ) : null}
@@ -1044,95 +1046,36 @@ export function HierarchyConfigPanel({
         ) : (
           <>
             {pagedConfigs.map((config) => (
-              <SettingsCard
+              <div
                 key={config.id}
-                title={config.name}
-                description={`v${config.version}`}
-                headerAction={
-                  <div className="flex items-center gap-0.5">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground"
-                          onClick={() => handleExportJson(config)}
-                          aria-label="Export"
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Export</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground"
-                          onClick={() => openEdit(config)}
-                          aria-label={canManage ? 'Edit' : 'View'}
-                        >
-                          {canManage ? (
-                            <Pencil className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>{canManage ? 'Edit' : 'View'}</TooltipContent>
-                    </Tooltip>
-                    {canManage ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground"
-                            onClick={() => handleDuplicateFromList(config)}
-                            aria-label="Duplicate"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Duplicate</TooltipContent>
-                      </Tooltip>
-                    ) : null}
-                    {canManage ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground shadow-none hover:bg-transparent hover:text-destructive"
-                            onClick={() => setDeleteTarget(config)}
-                            aria-label="Delete"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Delete</TooltipContent>
-                      </Tooltip>
-                    ) : null}
-                  </div>
-                }
+                className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-xl border bg-card px-4 py-3.5 shadow-sm"
               >
-                <div className="flex flex-wrap items-center gap-2">
-                  {config.is_available ? (
-                    <Badge className="border-emerald-800 bg-emerald-700 text-white">
-                      <CheckCircle2 className="mr-1 h-3 w-3" />
-                      Available
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className="truncate text-sm font-semibold tracking-tight">
+                      {config.name}
+                    </span>
+                    <span className="shrink-0 rounded-md bg-muted px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
+                      v{config.version}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {config.is_available ? (
+                      <Badge className="border-emerald-800 bg-emerald-700 text-white">
+                        <CheckCircle2 className="mr-1 h-3 w-3" />
+                        Available
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline">Unavailable</Badge>
+                    )}
+                    <Badge variant="outline">
+                      <GitBranch className="mr-1 h-3 w-3" />
+                      {config.nodes.length} template nodes
                     </Badge>
-                  ) : (
-                    <Badge variant="outline">Unavailable</Badge>
-                  )}
-                  <Badge variant="outline">
-                    <GitBranch className="mr-1 h-3 w-3" />
-                    {config.nodes.length} template nodes
-                  </Badge>
+                  </div>
                 </div>
                 {canManage ? (
-                  <div className="mt-3 flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     <Switch
                       checked={config.is_available}
                       onCheckedChange={(checked) => void toggleAvailable(config, checked)}
@@ -1142,7 +1085,73 @@ export function HierarchyConfigPanel({
                     </span>
                   </div>
                 ) : null}
-              </SettingsCard>
+                <div className="flex items-center gap-0.5">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground shadow-none hover:bg-muted hover:text-foreground"
+                        onClick={() => handleExportJson(config)}
+                        aria-label="Export"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Export</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground shadow-none hover:bg-muted hover:text-foreground"
+                        onClick={() => openEdit(config)}
+                        aria-label={canManage ? 'Edit' : 'View'}
+                      >
+                        {canManage ? (
+                          <Pencil className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{canManage ? 'Edit' : 'View'}</TooltipContent>
+                  </Tooltip>
+                  {canManage ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground shadow-none hover:bg-muted hover:text-foreground"
+                          onClick={() => handleDuplicateFromList(config)}
+                          aria-label="Duplicate"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Duplicate</TooltipContent>
+                    </Tooltip>
+                  ) : null}
+                  {canManage ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground shadow-none hover:bg-muted hover:text-destructive"
+                          onClick={() => setDeleteTarget(config)}
+                          aria-label="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Delete</TooltipContent>
+                    </Tooltip>
+                  ) : null}
+                </div>
+              </div>
             ))}
             <EntityListPagination
               page={safePage}
