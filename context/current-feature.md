@@ -1,25 +1,31 @@
-# Current Feature: Sibling Node Groups
+# Current Feature: Inventory OEM Refs, Warranty & Shelf-Life Expiry
 
 ## Status
 
-In Progress
+Complete
 
 ## Goals
 
-- [x] Persist sibling groups (`sibling_group_id` + `sibling_group_name`) on hierarchy config nodes (backend + frontend)
-- [x] Allow multi-select of two or more sibling nodes on the config tree canvas
-- [x] User can create a group with a custom name, rename, and ungroup
-- [x] Visual group frame on the canvas around grouped siblings
+- [x] On Add Stock / Add Inventory, capture OEM Part Number and OEM Serial Number for reference (`original_part_number` / `original_serial_number`)
+- [x] Add a supplier-warranty toggle; when on, capture warranty end date and persist it on stock units
+- [x] Ensure shelf-life expiry date is captured on Add Stock and stored on units
+- [x] Highlight and/or filter inventory rows whose shelf life or warranty is expired or nearing expiry
+- [x] Persist warranty fields in backend (model, schema, migration, create/update paths)
 
 ## Notes
 
-- Groups are visual/organizational among siblings only — they do not change hierarchy parent/child levels
-- Multi-select limited to nodes that share the same `parent_client_key`
-- Ctrl/Cmd+click to add/remove siblings from selection
+- OEM PN/SN map to existing `original_part_number` / `original_serial_number` (reference only; PLCM identities stay auto-generated)
+- Warranty: toggle + `warranty_expires_at` date (null when toggle off / not provided)
+- Shelf life already has `shelf_life_expires_at`; surface clearly on Add Stock and keep on instances
+- Expiry UX: row highlighting + filter control on `/inventory` table (expired + within ~30 days)
+- Add Stock currently uses the full Add Inventory dialog via `restockInventoryId`
 
 ## History
 
 <!-- Completed features (append only) -->
+
+### Sibling Node Groups
+Persist sibling groups on hierarchy config; multi-select; create/rename/ungroup; visual frame.
 
 ### Inventory Reports Cleanup & Selectable Columns
 Trim report modes; location tree filter; adaptive columns; shared column visibility.

@@ -1115,7 +1115,9 @@ export interface InventoryInstance extends HierarchyInstallFields {
   location_cabinet?: string | null
   location_rack?: string | null
   added_date?: string
-  shelf_life_expires_at?: string
+  shelf_life_expires_at?: string | null
+  /** Supplier warranty end date when provided. */
+  warranty_expires_at?: string | null
   updated_at?: string
   is_reserved?: boolean
   is_project_reserved?: boolean
@@ -1219,7 +1221,9 @@ export interface Inventory extends HierarchyInstallFields {
   holder_user_id?: number
   holder_name?: string | null
   added_date?: string
-  shelf_life_expires_at?: string
+  shelf_life_expires_at?: string | null
+  /** Supplier warranty end date when provided. */
+  warranty_expires_at?: string | null
   created_at?: string
   updated_at?: string
   instances?: InventoryInstance[]

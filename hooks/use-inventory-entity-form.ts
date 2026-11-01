@@ -203,7 +203,7 @@ export function useInventoryEntityForm(options: {
   );
 
   const validateCreate = useCallback((): string | null => {
-    return validateInventoryForm({
+    const baseError = validateInventoryForm({
       name: formData.name,
       partNumber: formData.part_number,
       location: formData.location,
@@ -215,6 +215,11 @@ export function useInventoryEntityForm(options: {
       isComponent: selectedEntityType === 'component',
       entityCategoryLabel: entityLabel(selectedEntityType),
     });
+    if (baseError) return baseError;
+    if (formData.warranty_provided && !formData.warranty_expires_at.trim()) {
+      return 'Enter the warranty end date, or turn off supplier warranty';
+    }
+    return null;
   }, [context, entityLabel, formData, selectedEntityType]);
 
   return {

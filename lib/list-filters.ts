@@ -19,6 +19,8 @@ export interface ListFilterParams {
   stock?: string;
   /** Inventory origin: turnkey | build / build_from_children */
   inventory_source?: string;
+  /** Shelf-life / warranty attention: attention | expiring | expired */
+  expiry?: string;
   /** Filter hierarchy entities by installer (installed_by_id) */
   installed_by_id?: number;
   /** Server-side sort column (model field name) */

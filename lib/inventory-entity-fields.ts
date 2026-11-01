@@ -45,6 +45,9 @@ export const emptyInventoryEntityForm = {
   holder_user_id: '',
   added_date: '',
   shelf_life_expires_at: '',
+  /** UI-only: when false, warranty_expires_at is cleared on submit. */
+  warranty_provided: false,
+  warranty_expires_at: '',
   picture_url: '',
   installation_date: '',
   installed_by_id: '',
@@ -179,7 +182,11 @@ export function inventoryGroupFieldsFromForm(
             : undefined,
           shelf_life_expires_at: formData.shelf_life_expires_at
             ? new Date(formData.shelf_life_expires_at).toISOString()
-            : undefined,
+            : null,
+          warranty_expires_at:
+            formData.warranty_provided && formData.warranty_expires_at
+              ? new Date(formData.warranty_expires_at).toISOString()
+              : null,
           picture_url: removePicture ? undefined : formData.picture_url || undefined,
         }
       : {}),
@@ -272,7 +279,11 @@ export function inventoryInstanceFieldsFromForm(
     added_date: formData.added_date ? new Date(formData.added_date).toISOString() : undefined,
     shelf_life_expires_at: formData.shelf_life_expires_at
       ? new Date(formData.shelf_life_expires_at).toISOString()
-      : undefined,
+      : null,
+    warranty_expires_at:
+      formData.warranty_provided && formData.warranty_expires_at
+        ? new Date(formData.warranty_expires_at).toISOString()
+        : null,
     picture_url: removePicture ? undefined : formData.picture_url || undefined,
     installation_date: formData.installation_date
       ? new Date(formData.installation_date).toISOString()
@@ -305,6 +316,10 @@ export function inventoryFormFromItem(item: Inventory) {
     added_date: item.added_date ? item.added_date.slice(0, 10) : '',
     shelf_life_expires_at: item.shelf_life_expires_at
       ? item.shelf_life_expires_at.slice(0, 10)
+      : '',
+    warranty_provided: Boolean(item.warranty_expires_at),
+    warranty_expires_at: item.warranty_expires_at
+      ? item.warranty_expires_at.slice(0, 10)
       : '',
     picture_url: item.picture_url || '',
     installation_date: item.installation_date ? item.installation_date.slice(0, 10) : '',
@@ -340,6 +355,12 @@ export function inventoryFormFromInstance(instance: InventoryInstance, group: In
     shelf_life_expires_at: instance.shelf_life_expires_at
       ? instance.shelf_life_expires_at.slice(0, 10)
       : '',
+    warranty_provided: Boolean(instance.warranty_expires_at || group.warranty_expires_at),
+    warranty_expires_at: instance.warranty_expires_at
+      ? instance.warranty_expires_at.slice(0, 10)
+      : group.warranty_expires_at
+        ? group.warranty_expires_at.slice(0, 10)
+        : '',
     // Catalog photo identifies the inventory look; prefer group over unit.
     picture_url: group.picture_url || instance.picture_url || '',
     installation_date: instance.installation_date

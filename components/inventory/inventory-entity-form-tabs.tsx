@@ -17,6 +17,7 @@ import type { emptyInventoryEntityForm } from '@/lib/inventory-entity-fields';
 import { workflowStatusLabel } from '@/lib/workflow-status';
 import { CascadingLocationSelects } from '@/components/inventory/cascading-location-selects';
 import { FileDropZone } from '@/components/ui/file-drop-zone';
+import { Switch } from '@/components/ui/switch';
 import { useAppDefinitions } from '@/lib/app-definitions-context';
 
 export type InventoryEntityFormData = typeof emptyInventoryEntityForm;
@@ -473,6 +474,34 @@ export function InventoryEntityFormTabs({
             />
           </div>
 
+          {mode === 'create' || editingInstanceId != null ? (
+            <>
+              <div>
+                <Label>OEM Part Number</Label>
+                <Input
+                  value={formData.original_part_number}
+                  onChange={(e) =>
+                    onFormDataChange({ ...formData, original_part_number: e.target.value })
+                  }
+                  placeholder="Manufacturer / OEM part number (reference)"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Stored for reference only. PLCM part numbers stay system-generated.
+                </p>
+              </div>
+              <div>
+                <Label>OEM Serial Number</Label>
+                <Input
+                  value={formData.original_serial_number}
+                  onChange={(e) =>
+                    onFormDataChange({ ...formData, original_serial_number: e.target.value })
+                  }
+                  placeholder="Manufacturer / OEM serial (reference)"
+                />
+              </div>
+            </>
+          ) : null}
+
           <div>
             <Label>Shelf Life Expires</Label>
             <Input
@@ -482,6 +511,43 @@ export function InventoryEntityFormTabs({
                 onFormDataChange({ ...formData, shelf_life_expires_at: e.target.value })
               }
             />
+            <p className="text-xs text-muted-foreground">
+              Optional. Used to highlight stock nearing or past shelf-life expiry.
+            </p>
+          </div>
+
+          <div className="sm:col-span-2 space-y-3 rounded-md border p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Label htmlFor="entity-inventory-warranty-toggle">Supplier warranty</Label>
+                <p className="text-xs text-muted-foreground">
+                  Turn on when the supplier provides a warranty period for this stock.
+                </p>
+              </div>
+              <Switch
+                id="entity-inventory-warranty-toggle"
+                checked={formData.warranty_provided}
+                onCheckedChange={(checked) =>
+                  onFormDataChange({
+                    ...formData,
+                    warranty_provided: checked,
+                    warranty_expires_at: checked ? formData.warranty_expires_at : '',
+                  })
+                }
+              />
+            </div>
+            {formData.warranty_provided ? (
+              <div>
+                <Label>Warranty expires *</Label>
+                <Input
+                  type="date"
+                  value={formData.warranty_expires_at}
+                  onChange={(e) =>
+                    onFormDataChange({ ...formData, warranty_expires_at: e.target.value })
+                  }
+                />
+              </div>
+            ) : null}
           </div>
         </TabsContent>
       ) : null}
