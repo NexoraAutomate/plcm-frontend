@@ -28,6 +28,7 @@ export function buildListFilters(input: {
   stock?: string;
   inventorySource?: string;
   expiry?: string;
+  warranty?: string;
   installedById?: number | null;
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
@@ -52,6 +53,7 @@ export function buildListFilters(input: {
     stock: input.stock,
     inventory_source: input.inventorySource,
     expiry: input.expiry,
+    warranty: input.warranty,
     installed_by_id: input.installedById ?? undefined,
     sort_by: input.sort_by,
     sort_order: input.sort_order,

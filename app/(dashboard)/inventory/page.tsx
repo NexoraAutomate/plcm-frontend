@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Plus, Edit, Trash2, Search, ChevronDown, ListOrdered, Undo2, RefreshCw, Download, Upload, FileText, AlertCircle, CheckCircle2, Tag, ScanLine, QrCode, Lock, LockOpen, Info, ImageIcon } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, ChevronDown, ListOrdered, Undo2, RefreshCw, Download, Upload, FileText, AlertCircle, CheckCircle2, Tag, ScanLine, QrCode, Lock, LockOpen, Info, ImageIcon, X } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
@@ -114,7 +114,10 @@ import {
 import { formatInventoryMoney } from '@/lib/inventory-currencies';
 import {
   formatExpiryDate,
+  getInstanceExpiryAttention,
   getInventoryExpiryAttention,
+  getInventoryShelfLifeSummary,
+  getInventoryWarrantySummary,
   type InventoryExpiryLevel,
 } from '@/lib/inventory-expiry';
 import { Switch } from '@/components/ui/switch';
@@ -147,6 +150,9 @@ const STOCK_FILTERS: { value: StockFilter; label: string }[] = [
   { value: 'out_of_stock', label: 'Out of Stock' },
 ];
 
+const FILTER_CHIP_INACTIVE =
+  'border-border/80 bg-background text-muted-foreground hover:bg-muted hover:text-foreground';
+
 const EXPIRY_FILTERS: {
   value: ExpiryFilter;
   label: string;
@@ -155,33 +161,30 @@ const EXPIRY_FILTERS: {
 }[] = [
   {
     value: 'all',
-    label: 'All Dates',
-    activeClass: 'border-primary bg-primary text-primary-foreground',
-    inactiveClass: 'border-transparent bg-muted/50 text-muted-foreground hover:bg-muted',
+    label: 'All',
+    activeClass: 'border-primary bg-primary text-primary-foreground shadow-sm',
+    inactiveClass: FILTER_CHIP_INACTIVE,
   },
   {
     value: 'attention',
-    label: 'Expiry Attention',
+    label: 'Needs Attention',
     activeClass:
-      'border-amber-300 bg-amber-100 text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100',
-    inactiveClass:
-      'border-amber-100/80 bg-amber-50/40 text-amber-800/80 hover:bg-amber-50/70 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300/80 dark:hover:bg-amber-950/60',
+      'border-amber-600 bg-amber-600 text-white shadow-sm dark:border-amber-500 dark:bg-amber-500 dark:text-amber-950',
+    inactiveClass: FILTER_CHIP_INACTIVE,
   },
   {
     value: 'expiring',
     label: 'Expiring Soon',
     activeClass:
-      'border-amber-300 bg-amber-100 text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100',
-    inactiveClass:
-      'border-amber-100/80 bg-amber-50/40 text-amber-800/80 hover:bg-amber-50/70 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300/80 dark:hover:bg-amber-950/60',
+      'border-amber-600 bg-amber-600 text-white shadow-sm dark:border-amber-500 dark:bg-amber-500 dark:text-amber-950',
+    inactiveClass: FILTER_CHIP_INACTIVE,
   },
   {
     value: 'expired',
     label: 'Expired',
     activeClass:
-      'border-rose-300 bg-rose-100 text-rose-950 dark:border-rose-700 dark:bg-rose-950 dark:text-rose-100',
-    inactiveClass:
-      'border-rose-100/80 bg-rose-50/40 text-rose-800/80 hover:bg-rose-50/70 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300/80 dark:hover:bg-rose-950/60',
+      'border-rose-600 bg-rose-600 text-white shadow-sm dark:border-rose-500 dark:bg-rose-500 dark:text-rose-950',
+    inactiveClass: FILTER_CHIP_INACTIVE,
   },
 ];
 
@@ -193,25 +196,23 @@ const SOURCE_FILTERS: {
 }[] = [
   {
     value: 'all',
-    label: 'All Sources',
-    activeClass: 'border-primary bg-primary text-primary-foreground',
-    inactiveClass: 'border-transparent bg-muted/50 text-muted-foreground hover:bg-muted',
+    label: 'All',
+    activeClass: 'border-primary bg-primary text-primary-foreground shadow-sm',
+    inactiveClass: FILTER_CHIP_INACTIVE,
   },
   {
     value: 'turnkey',
     label: 'Turnkey',
     activeClass:
-      'border-teal-200 bg-teal-50 text-teal-800 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-300',
-    inactiveClass:
-      'border-teal-100/80 bg-teal-50/40 text-teal-700/70 hover:bg-teal-50/70 dark:border-teal-900/50 dark:bg-teal-950/40 dark:text-teal-400/70 dark:hover:bg-teal-950/60',
+      'border-teal-700 bg-teal-700 text-white shadow-sm dark:border-teal-500 dark:bg-teal-500 dark:text-teal-950',
+    inactiveClass: FILTER_CHIP_INACTIVE,
   },
   {
     value: 'build',
     label: 'Build',
     activeClass:
-      'border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-300',
-    inactiveClass:
-      'border-violet-100/80 bg-violet-50/40 text-violet-700/70 hover:bg-violet-50/70 dark:border-violet-900/50 dark:bg-violet-950/40 dark:text-violet-400/70 dark:hover:bg-violet-950/60',
+      'border-violet-700 bg-violet-700 text-white shadow-sm dark:border-violet-500 dark:bg-violet-500 dark:text-violet-950',
+    inactiveClass: FILTER_CHIP_INACTIVE,
   },
 ];
 
@@ -244,43 +245,38 @@ const ENTITY_TYPE_FILTER_STYLES: {
 }[] = [
   {
     value: 'all',
-    activeClass: 'border-primary bg-primary text-primary-foreground',
-    inactiveClass: 'border-transparent bg-muted/50 text-muted-foreground hover:bg-muted',
+    activeClass: 'border-primary bg-primary text-primary-foreground shadow-sm',
+    inactiveClass: FILTER_CHIP_INACTIVE,
   },
   {
     value: 'system',
     activeClass:
-      'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300',
-    inactiveClass:
-      'border-blue-100/80 bg-blue-50/40 text-blue-600/70 hover:bg-blue-50/70 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-400/70 dark:hover:bg-blue-950/60',
+      'border-blue-700 bg-blue-700 text-white shadow-sm dark:border-blue-500 dark:bg-blue-500 dark:text-blue-950',
+    inactiveClass: FILTER_CHIP_INACTIVE,
   },
   {
     value: 'subsystem',
     activeClass:
-      'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-300',
-    inactiveClass:
-      'border-sky-100/80 bg-sky-50/40 text-sky-600/70 hover:bg-sky-50/70 dark:border-sky-900/50 dark:bg-sky-950/40 dark:text-sky-400/70 dark:hover:bg-sky-950/60',
+      'border-sky-700 bg-sky-700 text-white shadow-sm dark:border-sky-500 dark:bg-sky-500 dark:text-sky-950',
+    inactiveClass: FILTER_CHIP_INACTIVE,
   },
   {
     value: 'module',
     activeClass:
-      'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-300',
-    inactiveClass:
-      'border-indigo-100/80 bg-indigo-50/40 text-indigo-600/70 hover:bg-indigo-50/70 dark:border-indigo-900/50 dark:bg-indigo-950/40 dark:text-indigo-400/70 dark:hover:bg-indigo-950/60',
+      'border-indigo-700 bg-indigo-700 text-white shadow-sm dark:border-indigo-500 dark:bg-indigo-500 dark:text-indigo-950',
+    inactiveClass: FILTER_CHIP_INACTIVE,
   },
   {
     value: 'unit',
     activeClass:
-      'border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-800 dark:bg-cyan-950 dark:text-cyan-300',
-    inactiveClass:
-      'border-cyan-100/80 bg-cyan-50/40 text-cyan-600/70 hover:bg-cyan-50/70 dark:border-cyan-900/50 dark:bg-cyan-950/40 dark:text-cyan-400/70 dark:hover:bg-cyan-950/60',
+      'border-cyan-700 bg-cyan-700 text-white shadow-sm dark:border-cyan-500 dark:bg-cyan-500 dark:text-cyan-950',
+    inactiveClass: FILTER_CHIP_INACTIVE,
   },
   {
     value: 'component',
     activeClass:
-      'border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-300',
-    inactiveClass:
-      'border-teal-100/80 bg-teal-50/40 text-teal-600/70 hover:bg-teal-50/70 dark:border-teal-900/50 dark:bg-teal-950/40 dark:text-teal-400/70 dark:hover:bg-teal-950/60',
+      'border-teal-700 bg-teal-700 text-white shadow-sm dark:border-teal-500 dark:bg-teal-500 dark:text-teal-950',
+    inactiveClass: FILTER_CHIP_INACTIVE,
   },
 ];
 
@@ -532,7 +528,7 @@ export default function InventoryPage() {
         ...filter,
         label:
           filter.value === 'all'
-            ? 'All Types'
+            ? 'All'
             : entityLabel(filter.value),
       })),
     [entityLabel]
@@ -545,6 +541,7 @@ export default function InventoryPage() {
   const [stockFilter, setStockFilter] = useState<StockFilter>('all');
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
   const [expiryFilter, setExpiryFilter] = useState<ExpiryFilter>('all');
+  const [warrantyFilter, setWarrantyFilter] = useState<ExpiryFilter>('all');
   const { sort, cycleSort, listFilterPatch } = useTableSorting();
 
   useEffect(() => {
@@ -554,6 +551,8 @@ export default function InventoryPage() {
     if (isSourceFilter(source)) setSourceFilter(source);
     const expiry = searchParams.get('expiry');
     if (isExpiryFilter(expiry)) setExpiryFilter(expiry);
+    const warranty = searchParams.get('warranty');
+    if (isExpiryFilter(warranty)) setWarrantyFilter(warranty);
     const q = searchParams.get('q');
     if (q) setSearch(q);
   }, [searchParams]);
@@ -585,6 +584,33 @@ export default function InventoryPage() {
     router.replace(qs ? `/inventory?${qs}` : '/inventory', { scroll: false });
   }
 
+  function applyWarrantyFilter(value: ExpiryFilter) {
+    setWarrantyFilter(value);
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === 'all') params.delete('warranty');
+    else params.set('warranty', value);
+    const qs = params.toString();
+    router.replace(qs ? `/inventory?${qs}` : '/inventory', { scroll: false });
+  }
+
+  const filtersActive =
+    Boolean(search.trim()) ||
+    entityTypeFilter !== 'all' ||
+    stockFilter !== 'all' ||
+    sourceFilter !== 'all' ||
+    expiryFilter !== 'all' ||
+    warrantyFilter !== 'all';
+
+  function clearAllFilters() {
+    setSearch('');
+    setEntityTypeFilter('all');
+    setStockFilter('all');
+    setSourceFilter('all');
+    setExpiryFilter('all');
+    setWarrantyFilter('all');
+    router.replace('/inventory', { scroll: false });
+  }
+
   const inventoryTypeParam = entityTypeFilter !== 'all' ? entityTypeFilter : undefined;
   const listFilters = useMemo(
     () =>
@@ -594,6 +620,7 @@ export default function InventoryPage() {
         stock: stockFilter !== 'all' ? stockFilter : undefined,
         inventorySource: sourceFilter !== 'all' ? sourceFilter : undefined,
         expiry: expiryFilter !== 'all' ? expiryFilter : undefined,
+        warranty: warrantyFilter !== 'all' ? warrantyFilter : undefined,
         ...listFilterPatch,
       }),
     [
@@ -602,6 +629,7 @@ export default function InventoryPage() {
       stockFilter,
       sourceFilter,
       expiryFilter,
+      warrantyFilter,
       listFilterPatch,
     ]
   );
@@ -1379,6 +1407,9 @@ export default function InventoryPage() {
   const editingInstance = instances.find((instance) => instance.id === editingInstanceId) ?? null;
   const editStatusLabel = resolveInventoryInstanceStatus(editingInstance);
   const editStatusAvailable = isInventoryInstanceAvailable(editingInstance);
+  const editInstanceExpiry = editingInstance
+    ? getInstanceExpiryAttention(editingInstance)
+    : { level: 'ok' as const, hits: [] };
 
   const installerLabel = (() => {
     if (!formData.installed_by_id) return '—';
@@ -1711,7 +1742,21 @@ export default function InventoryPage() {
           ) : null}
 
           <div>
-            <Label>Shelf Life Expires</Label>
+            <div className="flex items-center gap-2">
+              <Label>Shelf Life Expires</Label>
+              {mode === 'edit' &&
+              editingSerialOnly &&
+              editInstanceExpiry.hits.some(
+                (hit) => hit.kind === 'shelf_life' && hit.level === 'expired'
+              ) ? (
+                <Badge
+                  variant="outline"
+                  className="h-5 border-rose-300 bg-rose-100/80 px-1.5 text-[10px] font-medium text-rose-900 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-100"
+                >
+                  Expired
+                </Badge>
+              ) : null}
+            </div>
             <Input
               type="date"
               value={formData.shelf_life_expires_at}
@@ -1720,7 +1765,8 @@ export default function InventoryPage() {
               }
             />
             <p className="text-xs text-muted-foreground">
-              Optional. Used to highlight stock nearing or past shelf-life expiry.
+              Optional. Highlighted for warehouse stock only — issued and installed-verified
+              units are excluded.
             </p>
           </div>
 
@@ -2117,8 +2163,8 @@ export default function InventoryPage() {
       ) : null}
 
       <div className="space-y-3">
-        <div className="flex flex-wrap gap-4 items-center">
-          <div className="flex-1 min-w-50 relative">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative min-w-50 flex-1">
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search by name, serial number, or part number..."
@@ -2128,55 +2174,17 @@ export default function InventoryPage() {
             />
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {STOCK_FILTERS.map(({ value, label }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => applyStockFilter(value)}
-                className={cn(
-                  'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                  stockFilter === value
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {SOURCE_FILTERS.map(({ value, label, activeClass, inactiveClass }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => applySourceFilter(value)}
-                className={cn(
-                  'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                  sourceFilter === value ? activeClass : inactiveClass
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {EXPIRY_FILTERS.map(({ value, label, activeClass, inactiveClass }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => applyExpiryFilter(value)}
-                className={cn(
-                  'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                  expiryFilter === value ? activeClass : inactiveClass
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          {filtersActive ? (
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground"
+              title="Clear all filters"
+              aria-label="Clear all filters"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
 
           <Dialog
             open={isCreateOpen}
@@ -2248,20 +2256,113 @@ export default function InventoryPage() {
           </Dialog>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {ENTITY_TYPE_FILTERS.map(({ value, label, activeClass, inactiveClass }) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setEntityTypeFilter(value)}
-              className={cn(
-                'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                entityTypeFilter === value ? activeClass : inactiveClass
-              )}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="flex flex-col gap-2.5 rounded-lg border bg-muted/20 p-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="w-[5.5rem] shrink-0 whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Type
+            </span>
+            <div className="flex min-w-0 flex-1 flex-wrap gap-2">
+              {ENTITY_TYPE_FILTERS.map(({ value, label, activeClass, inactiveClass }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setEntityTypeFilter(value)}
+                  className={cn(
+                    'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                    entityTypeFilter === value ? activeClass : inactiveClass
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="w-[5.5rem] shrink-0 whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Stock
+            </span>
+            <div className="flex min-w-0 flex-1 flex-wrap gap-2">
+              {STOCK_FILTERS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => applyStockFilter(value)}
+                  className={cn(
+                    'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                    stockFilter === value
+                      ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+                      : FILTER_CHIP_INACTIVE
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="w-[5.5rem] shrink-0 whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Source
+            </span>
+            <div className="flex min-w-0 flex-1 flex-wrap gap-2">
+              {SOURCE_FILTERS.map(({ value, label, activeClass, inactiveClass }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => applySourceFilter(value)}
+                  className={cn(
+                    'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                    sourceFilter === value ? activeClass : inactiveClass
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="w-[5.5rem] shrink-0 whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Shelf life
+            </span>
+            <div className="flex min-w-0 flex-1 flex-wrap gap-2">
+              {EXPIRY_FILTERS.map(({ value, label, activeClass, inactiveClass }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => applyExpiryFilter(value)}
+                  className={cn(
+                    'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                    expiryFilter === value ? activeClass : inactiveClass
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="w-[5.5rem] shrink-0 whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Warranty
+            </span>
+            <div className="flex min-w-0 flex-1 flex-wrap gap-2">
+              {EXPIRY_FILTERS.map(({ value, label, activeClass, inactiveClass }) => (
+                <button
+                  key={`warranty-${value}`}
+                  type="button"
+                  onClick={() => applyWarrantyFilter(value)}
+                  className={cn(
+                    'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                    warrantyFilter === value ? activeClass : inactiveClass
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2371,9 +2472,16 @@ export default function InventoryPage() {
                     const exploringOther =
                       expandedRows.size > 0 && !isExpanded;
                     const expiryAttention = getInventoryExpiryAttention(item);
-                    const expiryLabels = Array.from(
-                      new Set(expiryAttention.hits.map((hit) => hit.label))
-                    );
+                    const shelfLifeSummary = getInventoryShelfLifeSummary(item);
+                    const warrantySummary = getInventoryWarrantySummary(item);
+                    const showShelfLifeSummary =
+                      shelfLifeSummary.countable > 0 &&
+                      (shelfLifeSummary.expired > 0 ||
+                        shelfLifeSummary.expiringThisWeek > 0);
+                    const showWarrantySummary =
+                      warrantySummary.countable > 0 &&
+                      (warrantySummary.expired > 0 ||
+                        warrantySummary.expiringThisWeek > 0);
 
                     return (
                       <Fragment key={item.id}>
@@ -2465,28 +2573,55 @@ export default function InventoryPage() {
                                   >
                                     {item.entityName || 'N/A'}
                                   </span>
-                                  {!isExpanded && expiryAttention.level !== 'ok' ? (
+                                  {!isExpanded &&
+                                  (showShelfLifeSummary || showWarrantySummary) ? (
                                     <div className="flex flex-wrap gap-1">
-                                      {expiryLabels.map((label) => (
+                                      {showShelfLifeSummary &&
+                                      shelfLifeSummary.expired > 0 ? (
                                         <Badge
-                                          key={label}
                                           variant="outline"
-                                          className={cn(
-                                            'h-5 px-1.5 text-[10px] font-medium',
-                                            expiryAttention.level === 'expired'
-                                              ? 'border-rose-300 bg-rose-100/80 text-rose-900 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-100'
-                                              : 'border-amber-300 bg-amber-100/80 text-amber-950 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-100'
-                                          )}
-                                          title={expiryAttention.hits
-                                            .map(
-                                              (hit) =>
-                                                `${hit.label}: ${formatExpiryDate(hit.expiresAt)}`
-                                            )
-                                            .join(' · ')}
+                                          className="h-5 border-rose-300 bg-rose-100/80 px-1.5 text-[10px] font-medium text-rose-900 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-100"
                                         >
-                                          {label}
+                                          {shelfLifeSummary.expired} shelf life expired
                                         </Badge>
-                                      ))}
+                                      ) : null}
+                                      {showShelfLifeSummary &&
+                                      shelfLifeSummary.expiringThisWeek > 0 ? (
+                                        <Badge
+                                          variant="outline"
+                                          className="h-5 border-amber-300 bg-amber-100/80 px-1.5 text-[10px] font-medium text-amber-950 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-100"
+                                        >
+                                          {shelfLifeSummary.expiringThisWeek} shelf life
+                                          this week
+                                        </Badge>
+                                      ) : null}
+                                      {showWarrantySummary &&
+                                      warrantySummary.expired > 0 ? (
+                                        <Badge
+                                          variant="outline"
+                                          className="h-5 border-fuchsia-300 bg-fuchsia-100/80 px-1.5 text-[10px] font-medium text-fuchsia-950 dark:border-fuchsia-800 dark:bg-fuchsia-950/60 dark:text-fuchsia-100"
+                                        >
+                                          {warrantySummary.expired} warranty expired
+                                        </Badge>
+                                      ) : null}
+                                      {showWarrantySummary &&
+                                      warrantySummary.expiringThisWeek > 0 ? (
+                                        <Badge
+                                          variant="outline"
+                                          className="h-5 border-purple-300 bg-purple-100/80 px-1.5 text-[10px] font-medium text-purple-950 dark:border-purple-800 dark:bg-purple-950/60 dark:text-purple-100"
+                                        >
+                                          {warrantySummary.expiringThisWeek} warranty
+                                          this week
+                                        </Badge>
+                                      ) : null}
+                                      {showShelfLifeSummary ? (
+                                        <Badge
+                                          variant="outline"
+                                          className="h-5 border-emerald-300 bg-emerald-50/80 px-1.5 text-[10px] font-medium text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-100"
+                                        >
+                                          {shelfLifeSummary.reliable} reliable
+                                        </Badge>
+                                      ) : null}
                                     </div>
                                   ) : null}
                                 </div>
@@ -2824,35 +2959,66 @@ export default function InventoryPage() {
                                           .filter(Boolean)
                                           .join(' / ') ||
                                         locationLabel;
+                                      const instanceExpiry = getInstanceExpiryAttention(instance);
+                                      const shelfExpiredHit = instanceExpiry.hits.find(
+                                        (hit) =>
+                                          hit.kind === 'shelf_life' && hit.level === 'expired'
+                                      );
+                                      const warrantyExpiredHit = instanceExpiry.hits.find(
+                                        (hit) =>
+                                          hit.kind === 'warranty' && hit.level === 'expired'
+                                      );
                                       return (
                                         <TableRow key={instance.id}>
                                           <TableCell
                                             className={cn(EXPANDED_CELL_TRUNCATE, 'font-mono text-sm')}
                                             title={serialLabel}
                                           >
-                                            {canEditInventory ? (
-                                              <button
-                                                type="button"
-                                                className="block w-full truncate text-left cursor-pointer"
-                                                onClick={() => void openEdit(item, instance.id)}
-                                                title={`Edit ${serialLabel}`}
-                                              >
-                                                {serialLabel}
-                                              </button>
-                                            ) : isProjectReservedInstance(instance) ? (
-                                              <button
-                                                type="button"
-                                                className="block w-full truncate text-left cursor-pointer"
-                                                onClick={() =>
-                                                  setReservationHoldInstance(instance)
-                                                }
-                                                title="View reservation details"
-                                              >
-                                                {serialLabel}
-                                              </button>
-                                            ) : (
-                                              serialLabel
-                                            )}
+                                            <div className="flex min-w-0 items-center gap-1.5">
+                                              {canEditInventory ? (
+                                                <button
+                                                  type="button"
+                                                  className="min-w-0 flex-1 truncate text-left cursor-pointer"
+                                                  onClick={() => void openEdit(item, instance.id)}
+                                                  title={`Edit ${serialLabel}`}
+                                                >
+                                                  {serialLabel}
+                                                </button>
+                                              ) : isProjectReservedInstance(instance) ? (
+                                                <button
+                                                  type="button"
+                                                  className="min-w-0 flex-1 truncate text-left cursor-pointer"
+                                                  onClick={() =>
+                                                    setReservationHoldInstance(instance)
+                                                  }
+                                                  title="View reservation details"
+                                                >
+                                                  {serialLabel}
+                                                </button>
+                                              ) : (
+                                                <span className="min-w-0 flex-1 truncate">
+                                                  {serialLabel}
+                                                </span>
+                                              )}
+                                              {shelfExpiredHit ? (
+                                                <Badge
+                                                  variant="outline"
+                                                  className="h-5 shrink-0 border-rose-300 bg-rose-100/80 px-1.5 text-[10px] font-medium text-rose-900 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-100"
+                                                  title={`Shelf life expired: ${formatExpiryDate(shelfExpiredHit.expiresAt)}`}
+                                                >
+                                                  Shelf expired
+                                                </Badge>
+                                              ) : null}
+                                              {warrantyExpiredHit ? (
+                                                <Badge
+                                                  variant="outline"
+                                                  className="h-5 shrink-0 border-fuchsia-300 bg-fuchsia-100/80 px-1.5 text-[10px] font-medium text-fuchsia-950 dark:border-fuchsia-800 dark:bg-fuchsia-950/60 dark:text-fuchsia-100"
+                                                  title={`Warranty expired: ${formatExpiryDate(warrantyExpiredHit.expiresAt)}`}
+                                                >
+                                                  Warranty expired
+                                                </Badge>
+                                              ) : null}
+                                            </div>
                                           </TableCell>
                                           <TableCell
                                             className={EXPANDED_CELL_TRUNCATE}
@@ -3056,6 +3222,44 @@ export default function InventoryPage() {
                           )}
                           {editStatusLabel}
                         </span>
+                      ) : null}
+                      {editingSerialOnly &&
+                      editInstanceExpiry.hits.some(
+                        (hit) => hit.kind === 'shelf_life' && hit.level === 'expired'
+                      ) ? (
+                        <Badge
+                          variant="outline"
+                          className="h-6 border-rose-300 bg-rose-100/80 px-2 text-[11px] font-medium text-rose-900 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-100"
+                        >
+                          Shelf life expired
+                        </Badge>
+                      ) : null}
+                      {editingSerialOnly &&
+                      editInstanceExpiry.hits.some(
+                        (hit) => hit.kind === 'warranty' && hit.level === 'expired'
+                      ) ? (
+                        <Badge
+                          variant="outline"
+                          className="h-6 border-fuchsia-300 bg-fuchsia-100/80 px-2 text-[11px] font-medium text-fuchsia-950 dark:border-fuchsia-800 dark:bg-fuchsia-950/60 dark:text-fuchsia-100"
+                        >
+                          Warranty expired
+                        </Badge>
+                      ) : null}
+                      {editingSerialOnly &&
+                      editInstanceExpiry.level === 'expiring' &&
+                      !editInstanceExpiry.hits.some((hit) => hit.level === 'expired') ? (
+                        <Badge
+                          variant="outline"
+                          className="h-6 border-amber-300 bg-amber-100/80 px-2 text-[11px] font-medium text-amber-950 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-100"
+                          title={editInstanceExpiry.hits
+                            .map(
+                              (hit) =>
+                                `${hit.label}: ${formatExpiryDate(hit.expiresAt)}`
+                            )
+                            .join(' · ')}
+                        >
+                          Expiring soon
+                        </Badge>
                       ) : null}
                       {editingSerialOnly ? (
                         <TooltipProvider>
