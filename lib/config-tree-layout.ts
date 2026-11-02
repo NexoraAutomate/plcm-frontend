@@ -39,6 +39,7 @@ export {
   isDraftNode,
   isEntityAssigned,
   isHierarchyFullyExpanded,
+  defaultSiblingGroupName,
   nestSiblingGroup,
   parentKeysWithChildren,
   pluralizeEntityName,

@@ -153,11 +153,47 @@ export function groupSiblingNodes(
   );
 }
 
-/** Simple English plural for default subgroup names (e.g. Box → Boxes, Relay → Relays). */
+/** True when the word already looks plural (units, boxes, batteries, …). */
+function isLikelyAlreadyPlural(lower: string): boolean {
+  if (lower.length < 2) return false;
+  // batteries, categories
+  if (lower.endsWith('ies') && lower.length > 3) return true;
+  // boxes, buses, watches, dishes, quizzes
+  if (/(?:ses|xes|zes|ches|shes)$/.test(lower)) return true;
+  // units, modules, relays — ends with a single "s" (not "ss" / "us" short words)
+  if (
+    lower.endsWith('s') &&
+    !lower.endsWith('ss') &&
+    !lower.endsWith('us') &&
+    lower.length > 3
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * English plural for default group / subgroup names.
+ * Already-plural names are left unchanged (units → units, not unitss / unitses).
+ * Examples: Box → Boxes, Relay → Relays, Unit → Units, Units → Units.
+ */
 export function pluralizeEntityName(name: string): string {
   const trimmed = name.trim();
   if (!trimmed) return trimmed;
   const lower = trimmed.toLowerCase();
+
+  if (isLikelyAlreadyPlural(lower)) return trimmed;
+
+  // consonant + y → ies (battery → batteries)
+  if (
+    lower.endsWith('y') &&
+    trimmed.length > 1 &&
+    !/[aeiou]/i.test(trimmed.charAt(trimmed.length - 2))
+  ) {
+    return `${trimmed.slice(0, -1)}ies`;
+  }
+
+  // s / x / z / ch / sh → es (box → boxes, bus → buses)
   if (
     lower.endsWith('s') ||
     lower.endsWith('x') ||
@@ -167,14 +203,16 @@ export function pluralizeEntityName(name: string): string {
   ) {
     return `${trimmed}es`;
   }
-  if (
-    lower.endsWith('y') &&
-    trimmed.length > 1 &&
-    !/[aeiou]/i.test(trimmed.charAt(trimmed.length - 2))
-  ) {
-    return `${trimmed.slice(0, -1)}ies`;
-  }
+
   return `${trimmed}s`;
+}
+
+/** Default sibling-group label: plural when quantity > 1, otherwise the entity name. */
+export function defaultSiblingGroupName(name: string, quantity = 2): string {
+  const trimmed = name.trim();
+  if (!trimmed) return 'Group';
+  if (quantity <= 1) return trimmed;
+  return pluralizeEntityName(trimmed);
 }
 
 /**
@@ -303,7 +341,8 @@ export function applyPendingSiblingAdds(
     if (item.quantity < 2) continue;
     const memberKeys = keysByItem.get(item.itemIndex) ?? [];
     if (memberKeys.length < 2) continue;
-    const subName = item.subgroupName || pluralizeEntityName(item.name);
+    const subName =
+      item.subgroupName || defaultSiblingGroupName(item.name, item.quantity);
     const subId = newClientKey('sg');
     next = next.map((node) =>
       memberKeys.includes(node.client_key)

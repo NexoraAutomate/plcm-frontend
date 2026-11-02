@@ -98,6 +98,7 @@ import {
   isEntityAssigned,
   isHierarchyFullyExpanded,
   layoutHandleIds,
+  defaultSiblingGroupName,
   nestSiblingGroup,
   parseSiblingGroupFlowId,
   parentKeysWithChildren,
@@ -1753,8 +1754,21 @@ export function HierarchyConfigTreeEditor({
       const existingName = keys
         .map((key) => nodesByKey.get(key)?.sibling_group_name?.trim())
         .find(Boolean);
+      const memberNames = keys
+        .map((key) => nodesByKey.get(key)?.name?.trim() || '')
+        .filter(Boolean);
+      const allSame =
+        memberNames.length > 0 &&
+        memberNames.every(
+          (n) => n.toLowerCase() === memberNames[0].toLowerCase()
+        );
+      const suggested = allSame
+        ? defaultSiblingGroupName(memberNames[0], memberNames.length)
+        : memberNames.length >= 2
+          ? `${memberNames[0]} & ${memberNames[1]}`
+          : memberNames[0] || 'Group';
       setPendingGroupKeys(keys);
-      setGroupName(existingName || '');
+      setGroupName(existingName || suggested);
       setGroupDialogOpen(true);
     },
     [nodes, nodesByKey, selectedKeys]
@@ -1902,7 +1916,10 @@ export function HierarchyConfigTreeEditor({
       const sameName =
         dragged.name.trim().toLowerCase() === target.name.trim().toLowerCase();
       const groupName = sameName
-        ? pluralizeEntityName(dragged.name.trim() || target.name.trim())
+        ? defaultSiblingGroupName(
+            dragged.name.trim() || target.name.trim(),
+            2
+          )
         : `${dragged.name.trim() || 'Node'} & ${target.name.trim() || 'Node'}`;
       onChange(
         syncInventorySources(
@@ -2057,8 +2074,12 @@ export function HierarchyConfigTreeEditor({
         (sum, item) => sum + Math.max(1, Math.floor(item.quantity) || 1),
         0
       );
+      const firstItem = form.pendingItems[0];
       const groupLabel =
-        form.groupName.trim() || form.pendingItems[0]?.name.trim() || 'Group';
+        form.groupName.trim() ||
+        (firstItem
+          ? defaultSiblingGroupName(firstItem.name, total)
+          : 'Group');
       if (total > 1 && !groupLabel) {
         toast.error('Enter a group name');
         return;
@@ -2073,7 +2094,8 @@ export function HierarchyConfigTreeEditor({
             item.abbreviation.trim() || suggestAbbreviation(item.name),
           quantity: item.quantity,
           subgroupName:
-            item.subgroupName.trim() || pluralizeEntityName(item.name),
+            item.subgroupName.trim() ||
+            defaultSiblingGroupName(item.name, item.quantity),
         })),
         inventory_source,
         groupLabel
@@ -2135,7 +2157,8 @@ export function HierarchyConfigTreeEditor({
                     ...p,
                     quantity: Math.min(MAX_NODE_QUANTITY, p.quantity + qty),
                     subgroupName:
-                      p.subgroupName.trim() || pluralizeEntityName(p.name),
+                      p.subgroupName.trim() ||
+                      defaultSiblingGroupName(p.name, p.quantity + qty),
                   }
                 : p
             )
@@ -2149,15 +2172,25 @@ export function HierarchyConfigTreeEditor({
                   item.abbreviation || suggestAbbreviation(item.name)
                 ).toUpperCase(),
                 quantity: qty,
-                subgroupName: pluralizeEntityName(item.name),
+                subgroupName: defaultSiblingGroupName(item.name, qty),
               },
             ];
+        const totalAfter = nextItems.reduce(
+          (sum, p) => sum + Math.max(1, Math.floor(p.quantity) || 1),
+          0
+        );
+        const autoNames = new Set([
+          ...prev.pendingItems.map((p) => p.name.trim()),
+          ...prev.pendingItems.map((p) => pluralizeEntityName(p.name.trim())),
+          item.name.trim(),
+          pluralizeEntityName(item.name.trim()),
+        ]);
         const defaultGroupName =
-          !prev.groupName.trim() ||
-          prev.pendingItems.some((p) => p.name === prev.groupName.trim())
-            ? prev.pendingItems.length === 0
-              ? item.name
-              : prev.groupName.trim() || item.name
+          !prev.groupName.trim() || autoNames.has(prev.groupName.trim())
+            ? defaultSiblingGroupName(
+                nextItems[0]?.name || item.name,
+                totalAfter
+              )
             : prev.groupName;
         return {
           ...prev,
@@ -2787,29 +2820,61 @@ export function HierarchyConfigTreeEditor({
                                           : Number.isNaN(Number(raw))
                                             ? 0
                                             : Number(raw);
-                                      setForm((prev) =>
-                                        prev
-                                          ? {
-                                              ...prev,
-                                              pendingItems: prev.pendingItems.map(
-                                                (p) =>
-                                                  p.key === item.key
-                                                    ? {
-                                                        ...p,
-                                                        quantity: next,
-                                                        subgroupName:
-                                                          next > 1 &&
-                                                          !p.subgroupName.trim()
-                                                            ? pluralizeEntityName(
-                                                                p.name
-                                                              )
-                                                            : p.subgroupName,
-                                                      }
-                                                    : p
-                                              ),
-                                            }
-                                          : prev
-                                      );
+                                      setForm((prev) => {
+                                        if (!prev) return prev;
+                                        const pendingItems = prev.pendingItems.map(
+                                          (p) =>
+                                            p.key === item.key
+                                              ? {
+                                                  ...p,
+                                                  quantity: next,
+                                                  subgroupName:
+                                                    next > 1 &&
+                                                    (!p.subgroupName.trim() ||
+                                                      p.subgroupName.trim() ===
+                                                        pluralizeEntityName(
+                                                          p.name
+                                                        ) ||
+                                                      p.subgroupName.trim() ===
+                                                        p.name.trim())
+                                                      ? defaultSiblingGroupName(
+                                                          p.name,
+                                                          next
+                                                        )
+                                                      : p.subgroupName,
+                                                }
+                                              : p
+                                        );
+                                        const total = pendingItems.reduce(
+                                          (sum, p) =>
+                                            sum +
+                                            Math.max(
+                                              0,
+                                              Math.floor(Number(p.quantity) || 0)
+                                            ),
+                                          0
+                                        );
+                                        const autoNames = new Set(
+                                          pendingItems.flatMap((p) => [
+                                            p.name.trim(),
+                                            pluralizeEntityName(p.name.trim()),
+                                          ])
+                                        );
+                                        const groupName =
+                                          !prev.groupName.trim() ||
+                                          autoNames.has(prev.groupName.trim())
+                                            ? defaultSiblingGroupName(
+                                                pendingItems[0]?.name ||
+                                                  item.name,
+                                                Math.max(total, 1)
+                                              )
+                                            : prev.groupName;
+                                        return {
+                                          ...prev,
+                                          pendingItems,
+                                          groupName,
+                                        };
+                                      });
                                     }}
                                   />
                                   <Button
@@ -2867,7 +2932,10 @@ export function HierarchyConfigTreeEditor({
                                             : prev
                                         )
                                       }
-                                      placeholder={pluralizeEntityName(item.name)}
+                                      placeholder={defaultSiblingGroupName(
+                                        item.name,
+                                        item.quantity
+                                      )}
                                     />
                                   </div>
                                 ) : null}
@@ -2889,7 +2957,12 @@ export function HierarchyConfigTreeEditor({
                             )
                           }
                           placeholder={
-                            form.pendingItems[0]?.name.trim() || 'Group name'
+                            form.pendingItems[0]
+                              ? defaultSiblingGroupName(
+                                  form.pendingItems[0].name,
+                                  pendingNodeCount
+                                )
+                              : 'Group name'
                           }
                         />
                         {form.pendingItems.length > 1 ? (
