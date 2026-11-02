@@ -147,6 +147,7 @@ export function groupSiblingNodes(
           sibling_group_id: groupId,
           sibling_group_name: name,
           sibling_group_parent_id: null,
+          sibling_group_parent_name: null,
         }
       : node
   );
@@ -311,6 +312,7 @@ export function applyPendingSiblingAdds(
             sibling_group_id: subId,
             sibling_group_name: subName,
             sibling_group_parent_id: outerGroupId,
+            sibling_group_parent_name: label,
           }
         : node
     );
@@ -382,6 +384,7 @@ export function ungroupSiblingNodes(
       sibling_group_id: null,
       sibling_group_name: null,
       sibling_group_parent_id: null,
+      sibling_group_parent_name: null,
     };
   });
 }
@@ -442,10 +445,15 @@ export function pruneUndersizedSiblingGroups(
         sibling_group_id: null,
         sibling_group_name: null,
         sibling_group_parent_id: null,
+        sibling_group_parent_name: null,
       };
     }
     if (parentGid && drop.has(parentGid)) {
-      return { ...node, sibling_group_parent_id: null };
+      return {
+        ...node,
+        sibling_group_parent_id: null,
+        sibling_group_parent_name: null,
+      };
     }
     return node;
   });
@@ -509,9 +517,21 @@ export function nestSiblingGroup(
     if (childParent !== nestParent) return nodes;
   }
 
+  const parentName = parentId
+    ? siblingGroupMembers(nodes, parentId).find((m) =>
+        m.sibling_group_name?.trim()
+      )?.sibling_group_name?.trim() ||
+      siblingGroupMembers(nodes, parentId)[0]?.name?.trim() ||
+      'Group'
+    : null;
+
   return nodes.map((node) =>
     node.sibling_group_id?.trim() === childId
-      ? { ...node, sibling_group_parent_id: parentId }
+      ? {
+          ...node,
+          sibling_group_parent_id: parentId,
+          sibling_group_parent_name: parentId ? parentName : null,
+        }
       : node
   );
 }
@@ -578,6 +598,7 @@ export function addNodesToSiblingGroup(
           sibling_group_id: gid,
           sibling_group_name: groupName,
           sibling_group_parent_id: nestParent,
+          sibling_group_parent_name: members[0].sibling_group_parent_name ?? null,
         }
       : node
   );

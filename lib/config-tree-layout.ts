@@ -293,15 +293,35 @@ function collectGroupPacks(
   }
 
   const parentByGroup = new Map<string, string | null>();
+  const virtualParentName = new Map<string, string>();
   for (const [gid, members] of byGroup) {
     const parent = groupNestParentId(members);
-    parentByGroup.set(gid, parent && byGroup.has(parent) ? parent : null);
+    parentByGroup.set(gid, parent);
+    if (parent && !byGroup.has(parent)) {
+      const pname =
+        members.find((m) => m.sibling_group_parent_name?.trim())
+          ?.sibling_group_parent_name?.trim() || 'Group';
+      virtualParentName.set(parent, pname);
+    }
+  }
+
+  // Include virtual outer groups (parent id with no direct leaf members).
+  for (const [parentId, name] of virtualParentName) {
+    if (!parentByGroup.has(parentId)) {
+      parentByGroup.set(parentId, null);
+      byGroup.set(parentId, []); // no direct leaves
+      // Stash name via a synthetic marker on an empty pack later
+      void name;
+    }
   }
 
   // Keep groups that have >= 2 slots (direct leaves + nested child groups).
   const childrenTmp = new Map<string, string[]>();
   for (const [gid, parent] of parentByGroup) {
-    if (!parent) continue;
+    if (!parent || !parentByGroup.has(parent)) {
+      if (parent && !parentByGroup.has(parent)) parentByGroup.set(gid, null);
+      continue;
+    }
     const list = childrenTmp.get(parent) ?? [];
     list.push(gid);
     childrenTmp.set(parent, list);
@@ -309,14 +329,14 @@ function collectGroupPacks(
   for (const gid of [...parentByGroup.keys()]) {
     const direct = byGroup.get(gid)?.length ?? 0;
     const nested = childrenTmp.get(gid)?.length ?? 0;
-    if (direct + nested < 2) {
+    if (direct + nested < 2 && !virtualParentName.has(gid)) {
       parentByGroup.delete(gid);
     }
   }
 
   const childrenByParent = new Map<string, string[]>();
   for (const [gid, parent] of parentByGroup) {
-    if (!parent) continue;
+    if (!parent || !parentByGroup.has(parent)) continue;
     const list = childrenByParent.get(parent) ?? [];
     list.push(gid);
     childrenByParent.set(parent, list);
@@ -326,7 +346,7 @@ function collectGroupPacks(
     let d = 0;
     let cur = parentByGroup.get(gid) ?? null;
     const seen = new Set<string>();
-    while (cur) {
+    while (cur && parentByGroup.has(cur)) {
       if (seen.has(cur)) break;
       seen.add(cur);
       d += 1;
@@ -356,10 +376,25 @@ function collectGroupPacks(
       }
       return child;
     });
-    packs.set(
+    const pack = packSiblingGroupUnits(
       gid,
-      packSiblingGroupUnits(gid, members, childPacks, direction, sizeById)
+      members,
+      childPacks,
+      direction,
+      sizeById
     );
+    if (virtualParentName.has(gid) && !members.length) {
+      packs.set(gid, {
+        ...pack,
+        name: virtualParentName.get(gid) || pack.name,
+        parentGroupId: null,
+      });
+    } else {
+      packs.set(gid, {
+        ...pack,
+        parentGroupId: parentByGroup.get(gid) ?? null,
+      });
+    }
   }
   return packs;
 }

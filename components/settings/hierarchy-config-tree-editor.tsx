@@ -251,6 +251,8 @@ type CanvasProps = {
     childGroupId: string;
     parentGroupId: string | null;
   }) => void;
+  /** Drag one sibling node onto another → create/join a group. */
+  onPairSiblingNodes: (draggedKey: string, targetKey: string) => void;
 };
 
 function ConfigTreeCanvasInner({
@@ -286,6 +288,7 @@ function ConfigTreeCanvasInner({
   onEditGroup,
   onApplyGroupMembership,
   onApplyGroupNesting,
+  onPairSiblingNodes,
   pendingPositions,
   pdfMeta,
 }: CanvasProps) {
@@ -614,11 +617,13 @@ function ConfigTreeCanvasInner({
   // Drop dead collapse state; newly created groups start collapsed by default.
   const knownGroupIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    const live = new Set(
-      draftNodes
-        .map((n) => n.sibling_group_id?.trim())
-        .filter((id): id is string => Boolean(id))
-    );
+    const live = new Set<string>();
+    for (const n of draftNodes) {
+      const gid = n.sibling_group_id?.trim();
+      if (gid) live.add(gid);
+      const parentGid = n.sibling_group_parent_id?.trim();
+      if (parentGid) live.add(parentGid);
+    }
     setCollapsedGroupIds((prev) => {
       let changed = false;
       const next = new Set<string>();
@@ -954,6 +959,74 @@ function ConfigTreeCanvasInner({
     [getNodes]
   );
 
+  /** Closest overlapping sibling tree node under the drag center (same parent). */
+  const hitTestSiblingNode = useCallback(
+    (node: Node): string | null => {
+      const dragged = nodesByKey.get(node.id);
+      if (!dragged || dragged.level === 'system') return null;
+
+      const all = getNodes();
+      const byId = new Map(
+        all.map((n) => [
+          n.id,
+          { position: n.position, parentId: n.parentId ?? null },
+        ])
+      );
+      const abs = absoluteFlowPosition(node, byId);
+      const nw =
+        typeof node.width === 'number'
+          ? node.width
+          : typeof node.style?.width === 'number'
+            ? node.style.width
+            : DEFAULT_NODE_WIDTH;
+      const nh =
+        typeof node.height === 'number'
+          ? node.height
+          : typeof node.style?.height === 'number'
+            ? node.style.height
+            : DEFAULT_NODE_HEIGHT;
+      const center = { x: abs.x + nw / 2, y: abs.y + nh / 2 };
+
+      let best: { id: string; area: number } | null = null;
+      for (const candidate of all) {
+        if (candidate.type !== 'configTree' || candidate.id === node.id) continue;
+        const target = nodesByKey.get(candidate.id);
+        if (!target || target.level === 'system') continue;
+        if (
+          (target.parent_client_key ?? null) !==
+          (dragged.parent_client_key ?? null)
+        ) {
+          continue;
+        }
+        const tAbs = absoluteFlowPosition(candidate, byId);
+        const tw =
+          typeof candidate.width === 'number'
+            ? candidate.width
+            : typeof candidate.style?.width === 'number'
+              ? candidate.style.width
+              : DEFAULT_NODE_WIDTH;
+        const th =
+          typeof candidate.height === 'number'
+            ? candidate.height
+            : typeof candidate.style?.height === 'number'
+              ? candidate.style.height
+              : DEFAULT_NODE_HEIGHT;
+        if (
+          center.x < tAbs.x ||
+          center.x > tAbs.x + tw ||
+          center.y < tAbs.y ||
+          center.y > tAbs.y + th
+        ) {
+          continue;
+        }
+        const area = tw * th;
+        if (!best || area < best.area) best = { id: candidate.id, area };
+      }
+      return best?.id ?? null;
+    },
+    [getNodes, nodesByKey]
+  );
+
   const onNodeDragStop: OnNodeDrag = useCallback(
     (_: ReactMouseEvent, node: Node) => {
       if (locked || readOnly) return;
@@ -989,9 +1062,17 @@ function ConfigTreeCanvasInner({
         return;
       }
 
-      // Sibling-group membership: drop onto a group to join; drag out to leave
-      // (node stays in the configuration either way).
+      // Sibling nodes / groups: pair nodes first, then join/leave groups.
       if (node.type === 'configTree') {
+        // Drop onto another sibling node → create (or join) a group.
+        const hitSiblingKey = hitTestSiblingNode(node);
+        if (hitSiblingKey) {
+          onPairSiblingNodes(node.id, hitSiblingKey);
+          return;
+        }
+
+        // Drop onto a group frame to join; drag clear of a group to leave
+        // (node stays in the configuration either way).
         const hitGroupId = hitTestSiblingGroup(node);
         const currentGroupId =
           nodesByKey.get(node.id)?.sibling_group_id?.trim() || null;
@@ -1011,10 +1092,12 @@ function ConfigTreeCanvasInner({
       draftNodes,
       getClosestEdge,
       hitTestSiblingGroup,
+      hitTestSiblingNode,
       locked,
       nodesByKey,
       onApplyGroupMembership,
       onApplyGroupNesting,
+      onPairSiblingNodes,
       readOnly,
       setEdges,
       setNodes,
@@ -1764,6 +1847,74 @@ export function HierarchyConfigTreeEditor({
     }
   }, [editGroupId, editGroupName, editGroupQuantity, nodes, onChange]);
 
+  const handlePairSiblingNodes = useCallback(
+    (draggedKey: string, targetKey: string) => {
+      if (draggedKey === targetKey) return;
+      const dragged = nodesByKey.get(draggedKey);
+      const target = nodesByKey.get(targetKey);
+      if (!dragged || !target) return;
+      if (
+        (dragged.parent_client_key ?? null) !== (target.parent_client_key ?? null)
+      ) {
+        toast.error('Only siblings under the same parent can be grouped');
+        return;
+      }
+      if (dragged.level === 'system' || target.level === 'system') {
+        toast.error('System nodes cannot be grouped');
+        return;
+      }
+
+      const draggedGroup = dragged.sibling_group_id?.trim() || null;
+      const targetGroup = target.sibling_group_id?.trim() || null;
+
+      // Already together in the same group — nothing to do.
+      if (draggedGroup && targetGroup && draggedGroup === targetGroup) return;
+
+      // Target already grouped → add dragged into that group.
+      if (targetGroup) {
+        onChange(
+          syncInventorySources(
+            pruneUndersizedSiblingGroups(
+              addNodesToSiblingGroup(nodes, targetGroup, [draggedKey])
+            )
+          )
+        );
+        setLayoutNonce((n) => n + 1);
+        toast.success('Added to group');
+        return;
+      }
+
+      // Dragged already grouped → add target into that group.
+      if (draggedGroup) {
+        onChange(
+          syncInventorySources(
+            pruneUndersizedSiblingGroups(
+              addNodesToSiblingGroup(nodes, draggedGroup, [targetKey])
+            )
+          )
+        );
+        setLayoutNonce((n) => n + 1);
+        toast.success('Added to group');
+        return;
+      }
+
+      // Both ungrouped → create a new sibling group.
+      const sameName =
+        dragged.name.trim().toLowerCase() === target.name.trim().toLowerCase();
+      const groupName = sameName
+        ? pluralizeEntityName(dragged.name.trim() || target.name.trim())
+        : `${dragged.name.trim() || 'Node'} & ${target.name.trim() || 'Node'}`;
+      onChange(
+        syncInventorySources(
+          groupSiblingNodes(nodes, [draggedKey, targetKey], groupName)
+        )
+      );
+      setLayoutNonce((n) => n + 1);
+      toast.success(`Grouped as “${groupName}”`);
+    },
+    [nodes, nodesByKey, onChange]
+  );
+
   const handleApplyGroupMembership = useCallback(
     (input: { nodeKey: string; targetGroupId: string | null }) => {
       const node = nodesByKey.get(input.nodeKey);
@@ -2174,6 +2325,7 @@ export function HierarchyConfigTreeEditor({
     onEditGroup: openEditGroupDialog,
     onApplyGroupMembership: handleApplyGroupMembership,
     onApplyGroupNesting: handleApplyGroupNesting,
+    onPairSiblingNodes: handlePairSiblingNodes,
   };
 
   const actionButtons =
