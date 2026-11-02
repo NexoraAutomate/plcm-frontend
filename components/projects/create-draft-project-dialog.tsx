@@ -82,6 +82,12 @@ interface CreateDraftProjectDialogProps {
   onSubmit: () => void;
   projectLabel: string;
   projectLabelPlural: string;
+  mode?: 'create' | 'edit';
+  showTrigger?: boolean;
+  titleOverride?: string;
+  descriptionOverride?: string;
+  /** When true, structural fields stay editable (Admin override after approval). */
+  allowStructuralEdit?: boolean;
 }
 
 function SectionHeading({
@@ -122,7 +128,13 @@ export function CreateDraftProjectDialog({
   onSubmit,
   projectLabel,
   projectLabelPlural,
+  mode = 'create',
+  showTrigger = true,
+  titleOverride,
+  descriptionOverride,
+  allowStructuralEdit = true,
 }: CreateDraftProjectDialogProps) {
+  const isEdit = mode === 'edit';
   const totalSdls = useMemo(
     () =>
       formData.sdls_counts_by_flight
@@ -137,6 +149,15 @@ export function CreateDraftProjectDialog({
 
   const creationMode = formData.is_existing_project ? 'existing' : 'draft';
   const projectWord = formData.flight_count === 1 ? projectLabel : projectLabelPlural;
+  const structuralDisabled = isCreating || !allowStructuralEdit;
+  const dialogTitle =
+    titleOverride ??
+    (isEdit ? `Edit ${projectLabel}` : `Create Draft ${projectLabel}`);
+  const dialogDescription =
+    descriptionOverride ??
+    (isEdit
+      ? `Update ${projectLabel.toLowerCase()} order, schedule, and structure.`
+      : `Name the ${projectLabel.toLowerCase()}, choose its order and structure, then save. Drafts wait for Project Director or Admin approval before hierarchy generation.`);
 
   return (
     <Dialog
@@ -146,23 +167,22 @@ export function CreateDraftProjectDialog({
         onOpenChange(nextOpen);
       }}
     >
-      <Can permission={[P.project_create_draft, P.create_projects]}>
-        <DialogTrigger asChild>
-          <Button className="gap-2">
-            <Plus className="h-4 w-4" />
-            New Draft {projectLabel}
-          </Button>
-        </DialogTrigger>
-      </Can>
+      {showTrigger ? (
+        <Can permission={[P.project_create_draft, P.create_projects]}>
+          <DialogTrigger asChild>
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" />
+              New Draft {projectLabel}
+            </Button>
+          </DialogTrigger>
+        </Can>
+      ) : null}
 
       <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-5xl">
         <DialogHeader className="border-b px-6 py-3.5 pr-12 text-left">
-          <DialogTitle className="text-lg font-semibold">
-            Create Draft {projectLabel}
-          </DialogTitle>
+          <DialogTitle className="text-lg font-semibold">{dialogTitle}</DialogTitle>
           <DialogDescription className="text-sm leading-relaxed">
-            Name the {projectLabel.toLowerCase()}, choose its order and structure, then save.
-            Drafts wait for Project Director or Admin approval before hierarchy generation.
+            {dialogDescription}
           </DialogDescription>
         </DialogHeader>
 
@@ -283,6 +303,7 @@ export function CreateDraftProjectDialog({
                 </div>
               </div>
 
+              {!isEdit ? (
               <div className="mt-4">
                 <SectionHeading
                   title="Creation path"
@@ -334,6 +355,7 @@ export function CreateDraftProjectDialog({
                   </label>
                 </RadioGroup>
               </div>
+              ) : null}
             </section>
 
             <section className="lg:col-span-2">
@@ -374,7 +396,7 @@ export function CreateDraftProjectDialog({
                         };
                       });
                     }}
-                    disabled={isCreating}
+                    disabled={structuralDisabled}
                   >
                     <SelectTrigger id="create-project-config" className="h-9 w-full">
                       <SelectValue placeholder="Select project configuration" />
@@ -425,7 +447,7 @@ export function CreateDraftProjectDialog({
                         };
                       });
                     }}
-                    disabled={isCreating}
+                    disabled={structuralDisabled}
                     className="h-9"
                   />
                   <p className="text-[11px] leading-snug text-muted-foreground">
@@ -494,7 +516,7 @@ export function CreateDraftProjectDialog({
                                 };
                               });
                             }}
-                            disabled={isCreating}
+                            disabled={structuralDisabled}
                             className="h-9 w-24"
                           />
                           <span className="text-[11px] text-muted-foreground">
@@ -539,7 +561,9 @@ export function CreateDraftProjectDialog({
                                       };
                                     });
                                   }}
-                                  disabled={isCreating || !formData.hierarchy_config_id}
+                                  disabled={
+                                    structuralDisabled || !formData.hierarchy_config_id
+                                  }
                                 >
                                   <SelectTrigger
                                     id={`create-flight-${flightIndex}-sdls-config-${sdlsIndex}`}
@@ -581,10 +605,14 @@ export function CreateDraftProjectDialog({
           </Button>
           <Button type="button" onClick={() => void onSubmit()} disabled={isCreating}>
             {isCreating
-              ? 'Creating…'
-              : formData.is_existing_project
-                ? `Create existing ${projectLabel.toLowerCase()}`
-                : 'Create draft'}
+              ? isEdit
+                ? 'Updating…'
+                : 'Creating…'
+              : isEdit
+                ? `Update ${projectLabel.toLowerCase()}`
+                : formData.is_existing_project
+                  ? `Create existing ${projectLabel.toLowerCase()}`
+                  : 'Create draft'}
           </Button>
         </div>
       </DialogContent>

@@ -7,9 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useAuth } from '@/lib/auth-context';
+import { WorkflowRole } from '@/lib/workflow-roles';
 import { Edit, Trash2, Search, GitBranch, ChevronDown, Eye } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
@@ -41,7 +41,7 @@ import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-
 import { useColumnVisibility, type ColumnVisibilityDef } from '@/hooks/use-column-visibility';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { toDateInputValue } from '@/lib/hierarchy-install-fields';
-import { workflowStatusLabel } from '@/lib/workflow-status';
+import { isProjectStructurallyFrozen, workflowStatusLabel } from '@/lib/workflow-status';
 import { getSystemCountByProjectId, getCount } from '@/lib/entity-counts';
 import { EntityCountCell } from '@/components/entity-count-cell';
 import { Progress } from '@/components/ui/progress';
@@ -59,10 +59,9 @@ import {
 import * as api from '@/lib/api';
 import type { HierarchyConfigurationSummary } from '@/lib/models';
 import { useAppDefinitions } from '@/lib/app-definitions-context';
-import { RequiredMark } from '@/components/ui/required-mark';
 import { ExistingProjectBadge } from '@/components/projects/existing-project-badge';
 import { isExistingProject } from '@/lib/project-existing';
-import { validateProjectCreateForm, validateProjectEditForm } from '@/lib/form-validation';
+import { validateProjectCreateForm } from '@/lib/form-validation';
 
 const COLUMN_DEFS: ColumnVisibilityDef[] = [
   { id: 'serial', label: '#' },
@@ -145,6 +144,8 @@ function ProjectSystemProgressRows({
 export default function ProjectsPage(){
   const router = useRouter();
   const { entityLabel } = useAppDefinitions();
+  const { hasWorkflowRole } = useAuth();
+  const isAdminUser = hasWorkflowRole(WorkflowRole.ADMIN);
   const { showStats, setShowStats } = useListStatsVisibility();
   const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility('projects-list', COLUMN_DEFS);
   const projectTableColSpan = visibleIds.length + 1;
@@ -159,7 +160,6 @@ export default function ProjectsPage(){
     orders,
     systems,
     projects: storeProjects,
-    createProject,
     updateProject,
     deleteProject,
   } = useDataStore();
@@ -238,12 +238,12 @@ export default function ProjectsPage(){
   }
 
   useEffect(() => {
-    if (!isCreateOpen) return;
+    if (!isCreateOpen && !isEditOpen) return;
     void api.hierarchyConfigurations
       .listAvailable()
       .then((res) => setAvailableConfigs(res.data ?? []))
       .catch(() => setAvailableConfigs([]));
-  }, [isCreateOpen]);
+  }, [isCreateOpen, isEditOpen]);
 
   useEffect(() => {
     if (isCreateOpen && formData.status_id === 0 && statuses[0]?.id) {
@@ -471,11 +471,22 @@ export default function ProjectsPage(){
               <Can permission={P.edit_projects}>
                 <button
                   type="button"
-                  className="rounded p-1 hover:bg-muted"
+                  className="rounded p-1 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
                   onClick={(e) => {
                     e.stopPropagation();
-                    openEdit(project);
+                    void openEdit(project);
                   }}
+                  disabled={!canEditProject(project)}
+                  title={
+                    canEditProject(project)
+                      ? 'Edit'
+                      : 'Only Admin can edit an approved project'
+                  }
+                  aria-label={
+                    canEditProject(project)
+                      ? `Edit ${project.name}`
+                      : 'Only Admin can edit an approved project'
+                  }
                 >
                   <Edit className="h-4 w-4 text-accent-foreground hover:text-blue-600" />
                 </button>
@@ -569,13 +580,98 @@ export default function ProjectsPage(){
     }
   }
 
+  function projectStatusName(project: (typeof projects)[0]): string | undefined {
+    return (
+      project.status?.status_name ??
+      statuses.find((status) => status.id === project.status_id)?.status_name
+    );
+  }
+
+  function canEditProject(project: (typeof projects)[0]): boolean {
+    if (!isProjectStructurallyFrozen(projectStatusName(project))) return true;
+    return isAdminUser;
+  }
+
+  function formDataFromProject(project: Models.Project): CreateDraftProjectFormData {
+    const flightCount = Math.max(1, Number(project.flight_count) || 1);
+    const sdlsPerFlight = Math.max(1, Number(project.sdls_per_flight) || 1);
+    const sdlsCounts =
+      Array.isArray(project.sdls_counts_by_flight) &&
+      project.sdls_counts_by_flight.length > 0
+        ? project.sdls_counts_by_flight.map((count) => Math.max(1, Number(count) || 1))
+        : Array.from({ length: flightCount }, () => sdlsPerFlight);
+    const configId = project.hierarchy_config_id ?? 0;
+    const configMatrix =
+      Array.isArray(project.hierarchy_config_ids_by_flight) &&
+      project.hierarchy_config_ids_by_flight.length > 0
+        ? sdlsCounts.map((count, flightIndex) => {
+            const row = project.hierarchy_config_ids_by_flight?.[flightIndex] ?? [];
+            return Array.from({ length: count }, (_, sdlsIndex) => {
+              const id = Number(row?.[sdlsIndex] || configId);
+              return id > 0 ? id : configId;
+            });
+          })
+        : sdlsCounts.map((count) =>
+            Array.from({ length: count }, () => configId)
+          );
+
+    return {
+      name: project.name ?? '',
+      description: project.description ?? '',
+      start_date: toDateInputValue(project.start_date),
+      end_date: toDateInputValue(project.end_date),
+      owner_id: project.owner_id ?? 0,
+      order_id: project.order_id ?? 0,
+      status_id: project.status_id ?? 0,
+      hierarchy_config_id: configId,
+      product_type: project.product_type ?? '',
+      flight_count: sdlsCounts.length,
+      sdls_per_flight: Math.max(...sdlsCounts),
+      sdls_counts_by_flight: sdlsCounts,
+      hierarchy_config_ids_by_flight: configMatrix,
+      is_existing_project: project.is_existing_project ?? false,
+    };
+  }
+
+  function handleEditDialogOpenChange(open: boolean) {
+    if (isCreating) return;
+    setIsEditOpen(open);
+    if (!open) {
+      setEditingId(null);
+      resetCreateForm(orderFilterId);
+    }
+  }
+
   async function handleUpdate() {
     if (!editingId) return;
-    const validationError = validateProjectEditForm({
+    const editingProject =
+      projects.find((project) => project.id === editingId) ??
+      storeProjects.find((project) => project.id === editingId);
+    if (editingProject && !canEditProject(editingProject)) {
+      toast.error('Only Admin can edit an approved project');
+      return;
+    }
+
+    const sdlsCounts = formData.sdls_counts_by_flight
+      .slice(0, Number(formData.flight_count))
+      .map((count) => Number(count));
+    const configMatrix = (formData.hierarchy_config_ids_by_flight || [])
+      .slice(0, Number(formData.flight_count))
+      .map((row, flightIndex) => {
+        const expected = sdlsCounts[flightIndex] ?? 1;
+        return Array.from({ length: expected }, (_, sdlsIndex) => {
+          const id = Number(row?.[sdlsIndex] || formData.hierarchy_config_id);
+          return id > 0 ? id : formData.hierarchy_config_id;
+        });
+      });
+    const validationError = validateProjectCreateForm({
       name: formData.name,
-      ownerId: formData.owner_id,
-      statusId: formData.status_id,
+      hierarchyConfigId: formData.hierarchy_config_id,
       orderId: formData.order_id,
+      productType: formData.product_type,
+      flightCount: Number(formData.flight_count),
+      sdlsCountsByFlight: sdlsCounts,
+      hierarchyConfigIdsByFlight: configMatrix,
       startDate: formData.start_date,
       endDate: formData.end_date,
     });
@@ -583,48 +679,53 @@ export default function ProjectsPage(){
       toast.error(validationError);
       return;
     }
+
+    setIsCreating(true);
     try {
-      await updateProject(editingId, formData);
+      await updateProject(editingId, {
+        name: formData.name.trim(),
+        description: formData.description || null,
+        start_date: formData.start_date || undefined,
+        end_date: formData.end_date || undefined,
+        owner_id: formData.owner_id || undefined,
+        order_id: formData.order_id,
+        status_id: formData.status_id || undefined,
+        hierarchy_config_id: formData.hierarchy_config_id,
+        product_type: formData.product_type,
+        flight_count: Number(formData.flight_count),
+        sdls_per_flight: Math.max(...sdlsCounts),
+        sdls_counts_by_flight: sdlsCounts,
+        hierarchy_config_ids_by_flight: configMatrix,
+      });
       pagination.invalidate();
-      resetCreateForm();
+      resetCreateForm(orderFilterId);
       setEditingId(null);
       setIsEditOpen(false);
     } catch {
       // Error handled by DataStore
+    } finally {
+      setIsCreating(false);
     }
   }
 
-  function openEdit(project: typeof projects[0]) {
+  async function openEdit(project: (typeof projects)[0]) {
+    if (!canEditProject(project)) {
+      toast.error('Only Admin can edit an approved project');
+      return;
+    }
+
     setEditingId(project.id);
-    setFormData({
-      name: project.name ?? '',
-      description: project.description ?? '',
-      start_date: toDateInputValue(project.start_date),
-      end_date: toDateInputValue(project.end_date),
-      owner_id: project.owner_id,
-      order_id: project.order_id,
-      status_id: project.status_id,
-      hierarchy_config_id: project.hierarchy_config_id ?? 0,
-      product_type: project.product_type ?? '',
-      flight_count: project.flight_count ?? 1,
-      sdls_per_flight: project.sdls_per_flight ?? 1,
-      sdls_counts_by_flight:
-        project.sdls_counts_by_flight ??
-        Array(project.flight_count ?? 1).fill(project.sdls_per_flight ?? 1),
-      hierarchy_config_ids_by_flight:
-        project.hierarchy_config_ids_by_flight ??
-        (
-          project.sdls_counts_by_flight ??
-          Array(project.flight_count ?? 1).fill(project.sdls_per_flight ?? 1)
-        ).map((count) =>
-          Array.from(
-            { length: Number(count) || 1 },
-            () => project.hierarchy_config_id ?? 0
-          )
-        ),
-      is_existing_project: project.is_existing_project ?? false,
-    });
+    setFormData(formDataFromProject(project));
     setIsEditOpen(true);
+
+    try {
+      const res = await api.projects.get(project.id);
+      if (res.data) {
+        setFormData(formDataFromProject(res.data));
+      }
+    } catch {
+      // Keep list-row values if detail fetch fails.
+    }
   }
 
 
@@ -859,103 +960,21 @@ export default function ProjectsPage(){
         </CardContent>
       </Card>
 
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit {entityLabel('project')}</DialogTitle>
-            <DialogDescription>Update {entityLabel('project').toLowerCase()} details</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>{entityLabel('project')} Name<RequiredMark /></Label>
-              <Input
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder={`${entityLabel('project')} name`}
-              />
-            </div>
-            <div>
-              <Label>Description</Label>
-              <Input
-                value={formData.description ?? ''}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Project details"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Start Date<RequiredMark /></Label>
-                <Input
-                  type="date"
-                  value={formData.start_date}
-                  onChange={(e) => {
-                    const start_date = e.target.value;
-                    setFormData((prev) => ({
-                      ...prev,
-                      start_date,
-                      end_date:
-                        prev.end_date && start_date && prev.end_date < start_date
-                          ? ''
-                          : prev.end_date,
-                    }));
-                  }}
-                />
-              </div>
-              <div>
-                <Label>End Date<RequiredMark /></Label>
-                <Input
-                  type="date"
-                  value={formData.end_date}
-                  min={formData.start_date || undefined}
-                  onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                />
-              </div>
-            </div>
-            <div>
-              <Label>Owner<RequiredMark /></Label>
-              <Select
-                value={formData.owner_id.toString()}
-                onValueChange={(v) => setFormData({ ...formData, owner_id: parseInt(v) })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {users.map((u) => (
-                    <SelectItem key={u.id} value={u.id.toString()}>
-                      {u.full_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Status<RequiredMark /></Label>
-              <Select
-                value={formData.status_id.toString()}
-                onValueChange={(v) => setFormData({ ...formData, status_id: parseInt(v) })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {statuses.map((s) => (
-                    <SelectItem key={s.id} value={s.id.toString()}>
-                      {workflowStatusLabel(s.status_name)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex gap-2 justify-end pt-4">
-              <Button variant="outline" onClick={() => setIsEditOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleUpdate}>Update</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <CreateDraftProjectDialog
+        open={isEditOpen}
+        onOpenChange={handleEditDialogOpenChange}
+        formData={formData}
+        onFormChange={setFormData}
+        orders={orders}
+        availableConfigs={availableConfigs}
+        isCreating={isCreating}
+        onSubmit={() => void handleUpdate()}
+        projectLabel={entityLabel('project')}
+        projectLabelPlural={entityLabel('project', true)}
+        mode="edit"
+        showTrigger={false}
+        allowStructuralEdit
+      />
 
       <ProjectDeleteDialog
         open={deleteConfirm.open}

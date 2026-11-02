@@ -898,13 +898,41 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       if (data.end_date) {
         payload.end_date = toUtcIsoDate(data.end_date);
       }
+      if (data.hierarchy_config_id !== undefined && data.hierarchy_config_id > 0) {
+        payload.hierarchy_config_id = data.hierarchy_config_id;
+      }
+      if (data.product_type !== undefined) payload.product_type = data.product_type;
+      if (data.flight_count !== undefined && data.flight_count > 0) {
+        payload.flight_count = data.flight_count;
+      }
+      if (data.sdls_per_flight !== undefined && data.sdls_per_flight > 0) {
+        payload.sdls_per_flight = data.sdls_per_flight;
+      }
+      if (data.sdls_counts_by_flight !== undefined) {
+        payload.sdls_counts_by_flight = data.sdls_counts_by_flight;
+      }
+      if (data.hierarchy_config_ids_by_flight !== undefined) {
+        payload.hierarchy_config_ids_by_flight = data.hierarchy_config_ids_by_flight;
+      }
+      if (data.is_existing_project !== undefined) {
+        payload.is_existing_project = data.is_existing_project;
+      }
 
       const res = await api.projects.update(id, payload);
       setProjects(projects.map((p) => (p.id === id ? res.data : p)));
       toast.success('Project updated successfully');
       return res.data;
     } catch (err) {
-      toast.error('Failed to update project');
+      const detail =
+        err &&
+        typeof err === 'object' &&
+        'response' in err &&
+        (err as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+      toast.error(
+        typeof detail === 'string' && detail.trim()
+          ? detail
+          : 'Failed to update project'
+      );
       throw err;
     }
   };

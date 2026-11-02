@@ -46,6 +46,20 @@ export function isProjectReadOnly(statusName?: string | null): boolean {
   return isProjectCancelled(statusName) || isProjectSuperseded(statusName);
 }
 
+/** After approval (and later workflow states), structural fields are frozen for non-admins. */
+export function isProjectStructurallyFrozen(statusName?: string | null): boolean {
+  const status = (statusName ?? '').trim().toUpperCase();
+  return (
+    status === ProjectWorkflowStatus.APPROVED ||
+    status === ProjectWorkflowStatus.HIERARCHY_GENERATED ||
+    status === ProjectWorkflowStatus.READY_FOR_INVENTORY ||
+    status === ProjectWorkflowStatus.COMPLETED ||
+    status === ProjectWorkflowStatus.READY_TO_DELIVER ||
+    status === ProjectWorkflowStatus.CANCELLED ||
+    status === ProjectWorkflowStatus.SUPERSEDED
+  );
+}
+
 export function isProjectCompleted(statusName?: string | null): boolean {
   return statusName === ProjectWorkflowStatus.COMPLETED;
 }
