@@ -6,18 +6,19 @@ In Progress
 
 ## Goals
 
-- [x] Clicking a faulty/matched hardware entity in Maintenance Entity Lookup opens a detail dialog
+- [x] Clicking a faulty/matched hardware entity in Maintenance Entity Lookup opens a detail view
 - [x] Detail shows stocking-equivalent fields: OEM, PN/SN, OEM PN/SN, warranty, installer, install dates
 - [x] Detail shows test reports / attachments and BoM for that inventory when available
-- [x] Nested dialog does not close the parent lookup dialog unexpectedly
+- [x] Nested view does not close the parent lookup dialog unexpectedly
+- [x] Restyle as sliding side sheet with AnimatedPillTabs
+- [x] Add Fault History tab: same/different OEM counts, list, last fault, clickable detail
 
 ## Notes
 
 - Entry point: Maintenance Entity Lookup Dialog (`/maintenance` → Lookup)
-- Reuse APIs: hierarchy entity get, inventory listByEntity/get/getChildren, attachments.list, replacement chain
-- Prefer a sibling Dialog/Sheet over nesting inside lookup DialogContent
-- Hardware roles in flow: matched, hardware, descendant (not customer/order/project)
-- New component: `components/maintenance/maintenance-entity-stock-detail-dialog.tsx`
+- UI: right Sheet (`sm:max-w-xl`) + AnimatedPillTabs (ID / Install / Files / BoM / Faults)
+- Backend: `GET /faulty-entities/product-fault-history/?part_number=&oem_name=`
+- Component: `components/maintenance/maintenance-entity-stock-detail-dialog.tsx`
 
 ## History
 

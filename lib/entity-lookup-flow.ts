@@ -27,14 +27,12 @@ export type EntityFlowFieldKey =
   | 'entity_type'
   | 'part_number'
   | 'serial_number'
-  | 'entity_id'
-  | 'role_label';
+  | 'entity_id';
 
 export const ENTITY_FLOW_FIELD_OPTIONS: Array<{
   key: EntityFlowFieldKey;
   label: string;
 }> = [
-  { key: 'role_label', label: 'Role' },
   { key: 'entity_name', label: 'Name' },
   { key: 'entity_type', label: 'Entity Type' },
   { key: 'part_number', label: 'Part Number' },
@@ -43,12 +41,22 @@ export const ENTITY_FLOW_FIELD_OPTIONS: Array<{
 ];
 
 export const DEFAULT_VISIBLE_FIELDS: EntityFlowFieldKey[] = [
-  'role_label',
   'entity_name',
   'entity_type',
   'part_number',
   'serial_number',
 ];
+
+export interface EntityLookupWorkflowNode {
+  entity_type: string;
+  entity_id: number;
+  entity_name: string;
+  entity_PartNumber?: string;
+  entity_SerialNumber?: string;
+  label?: string;
+  role: EntityNodeRole;
+  children: EntityLookupWorkflowNode[];
+}
 
 export interface EntityFlowNodeData extends Record<string, unknown> {
   entity_type: string;
@@ -370,32 +378,112 @@ export function toEntityLookupNode(data: EntityFlowNodeData): EntityLookupNode {
   };
 }
 
-export function getRoleLabel(role: EntityNodeRole) {
-  switch (role) {
-    case 'business':
-      return 'Business Layer';
-    case 'hardware':
-      return 'Hardware Ancestor';
-    case 'matched':
-      return 'Matched Entity';
-    case 'descendant':
-      return 'Descendant';
-    default:
-      return role;
+/** Nested hierarchy used by the collapsible workflow sheet. */
+export function buildEntityLookupWorkflowTree(
+  response: lookUpResponse
+): EntityLookupWorkflowNode | null {
+  const spine = buildSpineEntries(response);
+  if (!spine.length) return null;
+
+  const root: EntityLookupWorkflowNode = {
+    ...spine[0],
+    children: [],
+  };
+
+  let cursor = root;
+  for (let index = 1; index < spine.length; index += 1) {
+    const next: EntityLookupWorkflowNode = {
+      ...spine[index],
+      children: [],
+    };
+    cursor.children.push(next);
+    cursor = next;
   }
+
+  const descendantRoots = buildTree(response.descendants || []);
+  for (const child of descendantRoots) {
+    cursor.children.push(mapLookupNodeToWorkflow(child, 'descendant'));
+  }
+
+  return root;
 }
 
-export function getMiniMapNodeColor(role?: EntityNodeRole) {
-  switch (role) {
-    case 'matched':
-      return '#d97706';
-    case 'business':
-      return '#0284c7';
-    case 'hardware':
-      return '#6366f1';
-    case 'descendant':
-      return '#64748b';
-    default:
-      return '#94a3b8';
+function mapLookupNodeToWorkflow(
+  node: EntityLookupNode,
+  role: EntityNodeRole
+): EntityLookupWorkflowNode {
+  return {
+    entity_type: node.entity_type,
+    entity_id: node.entity_id,
+    entity_name: node.entity_name || node.label,
+    entity_PartNumber: node.entity_PartNumber,
+    entity_SerialNumber: node.entity_SerialNumber,
+    label: node.label,
+    role,
+    children: (node.children || []).map((child) =>
+      mapLookupNodeToWorkflow(child, 'descendant')
+    ),
+  };
+}
+
+/** Collect ancestor keys (inclusive) from root to the focus node. */
+export function collectWorkflowPathKeys(
+  root: EntityLookupWorkflowNode | null,
+  focusType: string,
+  focusId: number
+): Set<string> {
+  const path = new Set<string>();
+  if (!root) return path;
+
+  const target = entityNodeId(focusType, focusId);
+
+  const walk = (node: EntityLookupWorkflowNode, trail: string[]): boolean => {
+    const key = entityNodeId(node.entity_type, node.entity_id);
+    const nextTrail = [...trail, key];
+    if (key === target) {
+      nextTrail.forEach((item) => path.add(item));
+      return true;
+    }
+    for (const child of node.children) {
+      if (walk(child, nextTrail)) return true;
+    }
+    return false;
+  };
+
+  if (!walk(root, [])) {
+    return collectMatchedWorkflowPathKeys(root);
   }
+
+  return path;
+}
+
+/** Expand only the spine down to the matched (suspected) entity. */
+export function collectMatchedWorkflowPathKeys(
+  root: EntityLookupWorkflowNode | null
+): Set<string> {
+  const path = new Set<string>();
+  if (!root) return path;
+
+  const walk = (node: EntityLookupWorkflowNode, trail: string[]): boolean => {
+    const key = entityNodeId(node.entity_type, node.entity_id);
+    const nextTrail = [...trail, key];
+    if (node.role === 'matched') {
+      nextTrail.forEach((item) => path.add(item));
+      return true;
+    }
+    for (const child of node.children) {
+      if (walk(child, nextTrail)) return true;
+    }
+    return false;
+  };
+
+  if (!walk(root, [])) {
+    let cursor: EntityLookupWorkflowNode | undefined = root;
+    while (cursor) {
+      path.add(entityNodeId(cursor.entity_type, cursor.entity_id));
+      cursor = cursor.children.length === 1 ? cursor.children[0] : undefined;
+    }
+  }
+
+  return path;
 }

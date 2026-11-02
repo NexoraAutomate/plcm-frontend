@@ -1115,6 +1115,14 @@ export const faultyEntities = {
   getMaintenanceHistory: (entityId: number) => api.get<Models.MaintenanceAction[]>(`/faulty-entities/${entityId}/history/`),
   getEntityMaintenanceHistory: (entityType: string, entityId: number) =>
     api.get<Models.FaultyEntity[]>(`/entities/${entityType}/${entityId}/maintenance-history/`),
+  getProductFaultHistory: (partNumber: string, oemName?: string | null, limit = 200) =>
+    api.get<Models.ProductFaultHistory>('/faulty-entities/product-fault-history/', {
+      params: buildQueryParams({
+        part_number: partNumber,
+        oem_name: oemName?.trim() || undefined,
+        limit,
+      }),
+    }),
 };
 
 // Maintenance Actions

@@ -1,20 +1,29 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Network } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { ChevronLeft, Loader2, Network } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import { Tabs, TabsContent, TabsTrigger } from '@/components/ui/tabs';
+import {
+  AnimatedPillTabsList,
+  animatedPillTabsTriggerClassName,
+} from '@/components/ui/animated-pill-tabs';
 import { EntityPicture } from '@/components/entity-picture';
 import { InventoryHierarchyDialog } from '@/components/inventory-hierarchy-dialog';
 import { StatusBadge } from '@/components/status-badge';
+import {
+  FaultyEntityStatusBadge,
+  ResolutionTypeBadge,
+} from '@/components/maintenance/badges';
 import {
   attachmentDisplayTitle,
   attachmentTypeLabel,
@@ -31,6 +40,9 @@ import type {
   Inventory,
   InventoryChildLink,
   InventoryInstance,
+  MaintenanceAction,
+  ProductFaultHistory,
+  ProductFaultHistoryItem,
 } from '@/lib/models';
 
 type HardwareOwnerType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
@@ -61,7 +73,7 @@ interface MaintenanceEntityStockDetailDialogProps {
   selection: MaintenanceEntityStockSelection | null;
 }
 
-function DetailField({
+function DetailCard({
   label,
   value,
   className,
@@ -71,11 +83,31 @@ function DetailField({
   className?: string;
 }) {
   return (
-    <div className={cn('space-y-1', className)}>
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+    <div className={cn('rounded-lg border border-border bg-background/60 p-3', className)}>
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p className="text-sm font-medium wrap-break-word">{value?.trim() || '—'}</p>
+      <p className="mt-1 text-sm font-medium wrap-break-word">{value?.trim() || '—'}</p>
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string | number;
+  hint?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-muted/30 p-3">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">{value}</p>
+      {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }
@@ -131,10 +163,7 @@ function findMatchingInstance(
 
   return (
     instances.find((instance) => {
-      const candidates = [
-        instance.serial_number,
-        instance.original_serial_number,
-      ]
+      const candidates = [instance.serial_number, instance.original_serial_number]
         .filter(Boolean)
         .map((value) => value!.trim().toLowerCase());
       return candidates.includes(normalized);
@@ -165,6 +194,13 @@ function mergeAttachments(
   );
 }
 
+function oemMatchLabel(item: ProductFaultHistoryItem, currentOem?: string | null) {
+  if (item.same_oem === true) return 'Same OEM';
+  if (item.same_oem === false) return 'Different OEM';
+  if (!currentOem?.trim()) return item.oem_name?.trim() || 'OEM unknown';
+  return item.oem_name?.trim() ? 'OEM unknown match' : 'OEM unknown';
+}
+
 export function MaintenanceEntityStockDetailDialog({
   open,
   onOpenChange,
@@ -180,10 +216,14 @@ export function MaintenanceEntityStockDetailDialog({
   const [bomLinks, setBomLinks] = useState<InventoryChildLink[]>([]);
   const [bomOpen, setBomOpen] = useState(false);
   const [tab, setTab] = useState('identification');
+  const [faultHistory, setFaultHistory] = useState<ProductFaultHistory | null>(null);
+  const [faultHistoryLoading, setFaultHistoryLoading] = useState(false);
+  const [faultHistoryError, setFaultHistoryError] = useState<string | null>(null);
+  const [selectedFault, setSelectedFault] = useState<ProductFaultHistoryItem | null>(null);
+  const [faultActions, setFaultActions] = useState<MaintenanceAction[]>([]);
+  const [faultActionsLoading, setFaultActionsLoading] = useState(false);
 
-  const ownerType = selection
-    ? normalizeEntityType(selection.entityType)
-    : '';
+  const ownerType = selection ? normalizeEntityType(selection.entityType) : '';
   const hardwareOwnerType = isHardwareOwnerType(ownerType) ? ownerType : null;
 
   useEffect(() => {
@@ -195,6 +235,9 @@ export function MaintenanceEntityStockDetailDialog({
       setInstance(null);
       setAttachments([]);
       setBomLinks([]);
+      setFaultHistory(null);
+      setSelectedFault(null);
+      setFaultActions([]);
       return;
     }
 
@@ -202,6 +245,9 @@ export function MaintenanceEntityStockDetailDialog({
     setLoading(true);
     setError(null);
     setTab('identification');
+    setSelectedFault(null);
+    setFaultActions([]);
+    setFaultHistory(null);
 
     void (async () => {
       try {
@@ -236,10 +282,7 @@ export function MaintenanceEntityStockDetailDialog({
               if (!serialHint) return true;
               const instanceMatch = findMatchingInstance(item, serialHint);
               if (instanceMatch) return true;
-              const itemSerials = [
-                item.serial_number,
-                item.original_serial_number,
-              ]
+              const itemSerials = [item.serial_number, item.original_serial_number]
                 .filter(Boolean)
                 .map((value) => value!.trim().toLowerCase());
               return itemSerials.includes(serialHint.toLowerCase());
@@ -310,6 +353,73 @@ export function MaintenanceEntityStockDetailDialog({
     };
   }, [open, selection, hardwareOwnerType]);
 
+  const oemName =
+    entity?.oem_name?.trim() || inventory?.oem_name?.trim() || undefined;
+
+  const partNumber =
+    entity?.part_number?.trim() ||
+    selection?.partNumber?.trim() ||
+    (inventory ? inventoryPartNumber(inventory) : undefined) ||
+    undefined;
+
+  useEffect(() => {
+    if (!open || !partNumber?.trim()) {
+      setFaultHistory(null);
+      setFaultHistoryError(null);
+      setFaultHistoryLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setFaultHistoryLoading(true);
+    setFaultHistoryError(null);
+
+    void api.faultyEntities
+      .getProductFaultHistory(partNumber, oemName)
+      .then((res) => {
+        if (cancelled) return;
+        setFaultHistory(res.data ?? null);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setFaultHistory(null);
+        setFaultHistoryError('Failed to load product fault history.');
+      })
+      .finally(() => {
+        if (!cancelled) setFaultHistoryLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, partNumber, oemName]);
+
+  useEffect(() => {
+    if (!selectedFault) {
+      setFaultActions([]);
+      setFaultActionsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setFaultActionsLoading(true);
+    void api.maintenanceActions
+      .listByFaultyEntityId(selectedFault.id)
+      .then((res) => {
+        if (!cancelled) setFaultActions(res.data ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setFaultActions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setFaultActionsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedFault]);
+
   const installerLabel = useMemo(() => {
     const installerId =
       entity?.installed_by_id ??
@@ -324,17 +434,6 @@ export function MaintenanceEntityStockDetailDialog({
     inventory?.installed_by_id,
     users,
   ]);
-
-  const oemName =
-    entity?.oem_name?.trim() ||
-    inventory?.oem_name?.trim() ||
-    undefined;
-
-  const partNumber =
-    entity?.part_number?.trim() ||
-    selection?.partNumber?.trim() ||
-    (inventory ? inventoryPartNumber(inventory) : undefined) ||
-    undefined;
 
   const serialNumber =
     entity?.serial_number?.trim() ||
@@ -374,23 +473,22 @@ export function MaintenanceEntityStockDetailDialog({
   );
 
   const title =
-    entity?.name?.trim() ||
-    selection?.label?.trim() ||
-    'Entity stocking detail';
+    entity?.name?.trim() || selection?.label?.trim() || 'Entity stocking detail';
+
+  const lastFault = faultHistory?.history?.[0] ?? null;
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent
-          className="flex max-h-[90vh] w-[calc(100vw-1.5rem)] max-w-3xl flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl"
-          onPointerDownOutside={(event) => event.preventDefault()}
-          onInteractOutside={(event) => event.preventDefault()}
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent
+          side="right"
+          className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-xl"
         >
-          <DialogHeader className="border-b px-6 py-4">
-            <DialogTitle className="pr-8">{title}</DialogTitle>
-            <DialogDescription>
-              Complete stocking and installation detail for the selected entity.
-            </DialogDescription>
+          <SheetHeader className="border-b px-4 py-4 pr-12 text-left">
+            <SheetTitle className="text-lg">{title}</SheetTitle>
+            <SheetDescription>
+              Stocking, installation, attachments, BoM, and product fault history.
+            </SheetDescription>
             {hardwareOwnerType ? (
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <Badge variant="secondary" className="text-[10px] uppercase">
@@ -401,264 +499,541 @@ export function MaintenanceEntityStockDetailDialog({
                     ID {selection.entityId}
                   </Badge>
                 ) : null}
-                {inventory ? (
+                {partNumber ? (
                   <Badge variant="outline" className="text-[10px]">
-                    Inventory #{inventory.id}
+                    PN {partNumber}
+                  </Badge>
+                ) : null}
+                {oemName ? (
+                  <Badge variant="outline" className="text-[10px]">
+                    OEM {oemName}
                   </Badge>
                 ) : null}
               </div>
             ) : null}
-          </DialogHeader>
+          </SheetHeader>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+          <div className="min-h-0 flex-1 overflow-hidden">
             {loading ? (
-              <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
+              <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Loading stocking details…
               </div>
             ) : error ? (
-              <p className="py-10 text-center text-sm text-destructive">{error}</p>
+              <p className="p-6 text-center text-sm text-destructive">{error}</p>
             ) : !entity ? (
-              <p className="py-10 text-center text-sm text-muted-foreground">
+              <p className="p-6 text-center text-sm text-muted-foreground">
                 No entity selected.
               </p>
             ) : (
-              <Tabs value={tab} onValueChange={setTab} className="w-full">
-                <TabsList className="mb-4 flex h-auto w-full flex-wrap justify-start gap-1">
-                  <TabsTrigger value="identification">Identification</TabsTrigger>
-                  <TabsTrigger value="installation">Installation</TabsTrigger>
-                  <TabsTrigger value="attachments">
-                    Attachments
-                    {attachments.length ? ` (${attachments.length})` : ''}
-                  </TabsTrigger>
-                  <TabsTrigger value="bom">
-                    BoM
-                    {bomLinks.length ? ` (${bomLinks.length})` : ''}
-                  </TabsTrigger>
-                </TabsList>
+              <Tabs
+                value={tab}
+                onValueChange={(next) => {
+                  setTab(next);
+                  if (next !== 'fault-history') setSelectedFault(null);
+                }}
+                className="flex h-full min-h-0 flex-col"
+              >
+                <div className="border-b px-4 py-3">
+                  <AnimatedPillTabsList value={tab} className="gap-0.5">
+                    <TabsTrigger
+                      value="identification"
+                      className={animatedPillTabsTriggerClassName}
+                    >
+                      ID
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="installation"
+                      className={animatedPillTabsTriggerClassName}
+                    >
+                      Install
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="attachments"
+                      className={animatedPillTabsTriggerClassName}
+                    >
+                      Files
+                    </TabsTrigger>
+                    <TabsTrigger value="bom" className={animatedPillTabsTriggerClassName}>
+                      BoM
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="fault-history"
+                      className={animatedPillTabsTriggerClassName}
+                    >
+                      Faults
+                    </TabsTrigger>
+                  </AnimatedPillTabsList>
+                </div>
 
-                <TabsContent value="identification" className="mt-0 space-y-4">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <DetailField label="Name" value={entity.name} />
-                    <DetailField label="Description" value={entity.description} />
-                    <DetailField label="OEM Name" value={oemName} />
-                    <DetailField
-                      label="SKU"
-                      value={inventory?.sku || entity.sku}
-                    />
-                    <DetailField label="Part Number" value={partNumber} />
-                    <DetailField label="Serial Number" value={serialNumber} />
-                    <DetailField label="OEM Part Number" value={oemPartNumber} />
-                    <DetailField label="OEM Serial Number" value={oemSerialNumber} />
-                    <DetailField
-                      label="Configuration Item"
-                      value={
-                        entity.configuration_item ||
-                        instance?.configuration_item ||
-                        inventory?.configuration_item
-                      }
-                    />
-                    <DetailField
-                      label="Warranty Status"
-                      value={warrantyStatusLabel(warrantyExpiresAt)}
-                    />
-                    <DetailField
-                      label="Shelf Life Expires"
-                      value={formatDate(shelfLifeExpiresAt)}
-                    />
-                    <DetailField
-                      label="Added Date"
-                      value={formatDate(
-                        instance?.added_date || inventory?.added_date
-                      )}
-                    />
-                  </div>
-
-                  {hardwareOwnerType ? (
-                    <div className="rounded-lg border bg-muted/30 p-4">
-                      <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Picture
-                      </p>
-                      <EntityPicture
-                        src={
-                          entity.picture_url ||
-                          instance?.picture_url ||
-                          inventory?.picture_url
-                        }
-                        ownerType={hardwareOwnerType}
-                        ownerId={entity.id}
-                        alt={entity.name}
-                        className="max-h-48 w-full rounded-md object-contain"
-                      />
-                    </div>
-                  ) : null}
-                </TabsContent>
-
-                <TabsContent value="installation" className="mt-0 space-y-4">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <DetailField
-                      label="Installation Date"
-                      value={formatDate(installationDate)}
-                    />
-                    <DetailField label="Installer" value={installerLabel} />
-                    <DetailField
-                      label="Installed Part Number"
-                      value={partNumber}
-                    />
-                    <DetailField label="Installed OEM" value={oemName} />
-                    <DetailField
-                      label="Installed Serial Number"
-                      value={serialNumber}
-                    />
-                    <DetailField
-                      label="Replaced At"
-                      value={formatDateTime(entity.replaced_at)}
-                    />
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="attachments" className="mt-0 space-y-5">
-                  <section className="space-y-2">
-                    <h3 className="text-sm font-semibold">Test Reports</h3>
-                    {testReports.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        No test reports attached.
-                      </p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {testReports.map((attachment) => (
-                          <li
-                            key={attachment.id}
-                            className="flex items-center justify-between gap-2 rounded-md border bg-background px-3 py-2 text-sm"
-                          >
-                            <div className="min-w-0">
-                              <button
-                                type="button"
-                                className="truncate text-left font-medium text-primary hover:underline"
-                                onClick={() =>
-                                  void api.attachments.download(
-                                    attachment.id,
-                                    attachment.file_name
-                                  )
-                                }
-                              >
-                                {attachmentDisplayTitle(attachment)}
-                              </button>
-                              <p className="truncate text-xs text-muted-foreground">
-                                {attachment.file_name}
-                                {attachment.uploaded_at
-                                  ? ` · ${formatDateTime(attachment.uploaded_at)}`
-                                  : ''}
-                              </p>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </section>
-
-                  <section className="space-y-2">
-                    <h3 className="text-sm font-semibold">Other Attachments</h3>
-                    {otherAttachments.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        No other attachments for this inventory/entity.
-                      </p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {otherAttachments.map((attachment) => (
-                          <li
-                            key={attachment.id}
-                            className="flex items-center justify-between gap-2 rounded-md border bg-background px-3 py-2 text-sm"
-                          >
-                            <div className="min-w-0">
-                              <button
-                                type="button"
-                                className="truncate text-left font-medium text-primary hover:underline"
-                                onClick={() =>
-                                  void api.attachments.download(
-                                    attachment.id,
-                                    attachment.file_name
-                                  )
-                                }
-                              >
-                                {attachmentDisplayTitle(attachment)}
-                              </button>
-                              <p className="truncate text-xs text-muted-foreground">
-                                {attachmentTypeLabel(attachment.attachment_type)} ·{' '}
-                                {attachment.file_name}
-                              </p>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </section>
-                </TabsContent>
-
-                <TabsContent value="bom" className="mt-0 space-y-4">
-                  {!inventory ? (
-                    <p className="text-sm text-muted-foreground">
-                      No linked inventory record was found for this entity, so BoM
-                      cannot be loaded.
-                    </p>
-                  ) : (
-                    <>
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-sm text-muted-foreground">
-                          Child links configured for this inventory item.
-                        </p>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="gap-2"
-                          onClick={() => setBomOpen(true)}
-                        >
-                          <Network className="h-4 w-4" />
-                          Open BoM map
-                        </Button>
+                <ScrollArea className="min-h-0 flex-1">
+                  <div className="space-y-4 p-4 pb-8">
+                    <TabsContent value="identification" className="mt-0 space-y-3">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <DetailCard label="Name" value={entity.name} />
+                        <DetailCard label="Description" value={entity.description} />
+                        <DetailCard label="OEM Name" value={oemName} />
+                        <DetailCard label="SKU" value={inventory?.sku || entity.sku} />
+                        <DetailCard label="Part Number" value={partNumber} />
+                        <DetailCard label="Serial Number" value={serialNumber} />
+                        <DetailCard label="OEM Part Number" value={oemPartNumber} />
+                        <DetailCard label="OEM Serial Number" value={oemSerialNumber} />
+                        <DetailCard
+                          label="Configuration Item"
+                          value={
+                            entity.configuration_item ||
+                            instance?.configuration_item ||
+                            inventory?.configuration_item
+                          }
+                        />
+                        <DetailCard
+                          label="Warranty Status"
+                          value={warrantyStatusLabel(warrantyExpiresAt)}
+                        />
+                        <DetailCard
+                          label="Shelf Life Expires"
+                          value={formatDate(shelfLifeExpiresAt)}
+                        />
+                        <DetailCard
+                          label="Added Date"
+                          value={formatDate(
+                            instance?.added_date || inventory?.added_date
+                          )}
+                        />
                       </div>
 
-                      {bomLinks.length === 0 ? (
+                      {hardwareOwnerType ? (
+                        <div className="rounded-xl border border-border bg-muted/20 p-3">
+                          <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                            Picture
+                          </p>
+                          <EntityPicture
+                            src={
+                              entity.picture_url ||
+                              instance?.picture_url ||
+                              inventory?.picture_url
+                            }
+                            ownerType={hardwareOwnerType}
+                            ownerId={entity.id}
+                            alt={entity.name}
+                            className="max-h-44 w-full rounded-md object-contain"
+                          />
+                        </div>
+                      ) : null}
+                    </TabsContent>
+
+                    <TabsContent value="installation" className="mt-0">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <DetailCard
+                          label="Installation Date"
+                          value={formatDate(installationDate)}
+                        />
+                        <DetailCard label="Installer" value={installerLabel} />
+                        <DetailCard label="Installed Part Number" value={partNumber} />
+                        <DetailCard label="Installed OEM" value={oemName} />
+                        <DetailCard
+                          label="Installed Serial Number"
+                          value={serialNumber}
+                        />
+                        <DetailCard
+                          label="Replaced At"
+                          value={formatDateTime(entity.replaced_at)}
+                        />
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="attachments" className="mt-0 space-y-5">
+                      <section className="space-y-2">
+                        <h3 className="text-sm font-semibold">Test Reports</h3>
+                        {testReports.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">
+                            No test reports attached.
+                          </p>
+                        ) : (
+                          <ul className="space-y-2">
+                            {testReports.map((attachment) => (
+                              <li
+                                key={attachment.id}
+                                className="rounded-lg border border-border bg-background/60 px-3 py-2 text-sm"
+                              >
+                                <button
+                                  type="button"
+                                  className="truncate text-left font-medium text-primary hover:underline"
+                                  onClick={() =>
+                                    void api.attachments.download(
+                                      attachment.id,
+                                      attachment.file_name
+                                    )
+                                  }
+                                >
+                                  {attachmentDisplayTitle(attachment)}
+                                </button>
+                                <p className="truncate text-xs text-muted-foreground">
+                                  {attachment.file_name}
+                                  {attachment.uploaded_at
+                                    ? ` · ${formatDateTime(attachment.uploaded_at)}`
+                                    : ''}
+                                </p>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </section>
+
+                      <section className="space-y-2">
+                        <h3 className="text-sm font-semibold">Other Attachments</h3>
+                        {otherAttachments.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">
+                            No other attachments for this inventory/entity.
+                          </p>
+                        ) : (
+                          <ul className="space-y-2">
+                            {otherAttachments.map((attachment) => (
+                              <li
+                                key={attachment.id}
+                                className="rounded-lg border border-border bg-background/60 px-3 py-2 text-sm"
+                              >
+                                <button
+                                  type="button"
+                                  className="truncate text-left font-medium text-primary hover:underline"
+                                  onClick={() =>
+                                    void api.attachments.download(
+                                      attachment.id,
+                                      attachment.file_name
+                                    )
+                                  }
+                                >
+                                  {attachmentDisplayTitle(attachment)}
+                                </button>
+                                <p className="truncate text-xs text-muted-foreground">
+                                  {attachmentTypeLabel(attachment.attachment_type)} ·{' '}
+                                  {attachment.file_name}
+                                </p>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </section>
+                    </TabsContent>
+
+                    <TabsContent value="bom" className="mt-0 space-y-4">
+                      {!inventory ? (
                         <p className="text-sm text-muted-foreground">
-                          No BoM children configured.
+                          No linked inventory record was found for this entity, so BoM
+                          cannot be loaded.
                         </p>
                       ) : (
-                        <ul className="space-y-2">
-                          {bomLinks.map((link) => (
-                            <li
-                              key={link.id}
-                              className="rounded-md border bg-background px-3 py-2 text-sm"
+                        <>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm text-muted-foreground">
+                              Child links configured for this inventory item.
+                            </p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="gap-2"
+                              onClick={() => setBomOpen(true)}
                             >
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-medium">
-                                  {link.child_category_name ||
-                                    `Inventory #${link.child_inventory_id}`}
-                                </span>
-                                {link.stock_consumed ? (
-                                  <StatusBadge status="Consumed" />
-                                ) : null}
-                              </div>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                Child inventory #{link.child_inventory_id}
-                                {link.child_instance_serial
-                                  ? ` · SN ${link.child_instance_serial}`
-                                  : link.child_instance_id
-                                    ? ` · Instance #${link.child_instance_id}`
-                                    : ''}
-                              </p>
-                            </li>
-                          ))}
-                        </ul>
+                              <Network className="h-4 w-4" />
+                              Open BoM map
+                            </Button>
+                          </div>
+
+                          {bomLinks.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                              No BoM children configured.
+                            </p>
+                          ) : (
+                            <ul className="space-y-2">
+                              {bomLinks.map((link) => (
+                                <li
+                                  key={link.id}
+                                  className="rounded-lg border border-border bg-background/60 px-3 py-2 text-sm"
+                                >
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="font-medium">
+                                      {link.child_category_name ||
+                                        `Inventory #${link.child_inventory_id}`}
+                                    </span>
+                                    {link.stock_consumed ? (
+                                      <StatusBadge status="Consumed" />
+                                    ) : null}
+                                  </div>
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    Child inventory #{link.child_inventory_id}
+                                    {link.child_instance_serial
+                                      ? ` · SN ${link.child_instance_serial}`
+                                      : link.child_instance_id
+                                        ? ` · Instance #${link.child_instance_id}`
+                                        : ''}
+                                  </p>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </>
                       )}
-                    </>
-                  )}
-                </TabsContent>
+                    </TabsContent>
+
+                    <TabsContent value="fault-history" className="mt-0 space-y-4">
+                      {!partNumber ? (
+                        <p className="text-sm text-muted-foreground">
+                          No part number available, so product fault history cannot be
+                          loaded.
+                        </p>
+                      ) : faultHistoryLoading ? (
+                        <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Loading fault history…
+                        </div>
+                      ) : faultHistoryError ? (
+                        <p className="text-sm text-destructive">{faultHistoryError}</p>
+                      ) : selectedFault ? (
+                        <div className="space-y-4">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="gap-1 px-0"
+                            onClick={() => setSelectedFault(null)}
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                            Back to fault list
+                          </Button>
+
+                          <div className="rounded-xl border border-border bg-muted/20 p-4">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div>
+                                <p className="text-xs text-muted-foreground">
+                                  Case #{selectedFault.case_id}
+                                </p>
+                                <h3 className="text-base font-semibold">
+                                  {selectedFault.entity_name ||
+                                    selectedFault.serial_number ||
+                                    `Fault #${selectedFault.id}`}
+                                </h3>
+                              </div>
+                              <FaultyEntityStatusBadge entity={selectedFault} />
+                            </div>
+                            <div className="mt-3">
+                              <ResolutionTypeBadge
+                                resolutionType={selectedFault.resolution_type}
+                              />
+                            </div>
+                            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                              <DetailCard
+                                label="Fault Type"
+                                value={selectedFault.fault_type}
+                              />
+                              <DetailCard
+                                label="OEM"
+                                value={
+                                  selectedFault.oem_name ||
+                                  oemMatchLabel(selectedFault, oemName)
+                                }
+                              />
+                              <DetailCard
+                                label="Part Number"
+                                value={selectedFault.part_number}
+                              />
+                              <DetailCard
+                                label="Serial Number"
+                                value={selectedFault.serial_number}
+                              />
+                              <DetailCard
+                                label="Identified At"
+                                value={formatDateTime(selectedFault.identified_at)}
+                              />
+                              <DetailCard
+                                label="Resolved At"
+                                value={formatDateTime(selectedFault.resolved_at)}
+                              />
+                              <DetailCard
+                                label="Description"
+                                value={selectedFault.fault_description}
+                                className="sm:col-span-2"
+                              />
+                              <DetailCard
+                                label="Investigation Notes"
+                                value={selectedFault.investigation_notes}
+                                className="sm:col-span-2"
+                              />
+                            </div>
+                          </div>
+
+                          <section className="space-y-2">
+                            <h3 className="text-sm font-semibold">Actions</h3>
+                            {faultActionsLoading ? (
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Loading actions…
+                              </div>
+                            ) : faultActions.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">
+                                No maintenance actions recorded for this fault.
+                              </p>
+                            ) : (
+                              <ul className="space-y-2">
+                                {faultActions.map((action) => (
+                                  <li
+                                    key={action.id}
+                                    className="rounded-lg border border-border bg-background/60 px-3 py-2 text-sm"
+                                  >
+                                    <p className="font-medium capitalize">
+                                      {action.action_type?.replaceAll('_', ' ') ||
+                                        `Action #${action.id}`}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {action.outcome
+                                        ? `${action.outcome.replaceAll('_', ' ')} · `
+                                        : ''}
+                                      {formatDateTime(action.performed_at) || '—'}
+                                    </p>
+                                    {action.notes ? (
+                                      <p className="mt-1 text-xs text-muted-foreground">
+                                        {action.notes}
+                                      </p>
+                                    ) : null}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </section>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <StatCard
+                              label="Same OEM faults"
+                              value={faultHistory?.same_oem_fault_count ?? 0}
+                              hint={
+                                oemName
+                                  ? `Product ${partNumber} · OEM ${oemName}`
+                                  : `Product ${partNumber}`
+                              }
+                            />
+                            <StatCard
+                              label="Different OEM faults"
+                              value={faultHistory?.different_oem_fault_count ?? 0}
+                              hint={
+                                oemName
+                                  ? 'Same part number, other OEMs'
+                                  : 'Set OEM on this entity to compare'
+                              }
+                            />
+                            <StatCard
+                              label="Total product faults"
+                              value={faultHistory?.total_fault_count ?? 0}
+                            />
+                            <StatCard
+                              label="Last fault"
+                              value={
+                                formatDateTime(faultHistory?.last_fault_at) || 'None'
+                              }
+                              hint={
+                                lastFault
+                                  ? lastFault.entity_name ||
+                                    lastFault.serial_number ||
+                                    `Fault #${lastFault.id}`
+                                  : undefined
+                              }
+                            />
+                          </div>
+
+                          {(faultHistory?.unknown_oem_fault_count ?? 0) > 0 ? (
+                            <p className="text-xs text-muted-foreground">
+                              {faultHistory?.unknown_oem_fault_count} fault
+                              {(faultHistory?.unknown_oem_fault_count ?? 0) === 1
+                                ? ''
+                                : 's'}{' '}
+                              could not be classified by OEM.
+                            </p>
+                          ) : null}
+
+                          <section className="space-y-2">
+                            <h3 className="text-sm font-semibold">Fault history</h3>
+                            {!faultHistory?.history?.length ? (
+                              <p className="text-sm text-muted-foreground">
+                                No prior faults found for this part number.
+                              </p>
+                            ) : (
+                              <ul className="space-y-2">
+                                {faultHistory.history.map((item) => {
+                                  const isThisUnit =
+                                    selection != null &&
+                                    normalizeEntityType(item.entity_type) ===
+                                      hardwareOwnerType &&
+                                    item.entity_id === selection.entityId;
+                                  return (
+                                    <li key={item.id}>
+                                      <button
+                                        type="button"
+                                        className="w-full rounded-lg border border-border bg-background/60 px-3 py-3 text-left transition-colors hover:bg-muted/40"
+                                        onClick={() => setSelectedFault(item)}
+                                      >
+                                        <div className="flex flex-wrap items-start justify-between gap-2">
+                                          <div className="min-w-0">
+                                            <p className="truncate text-sm font-semibold">
+                                              {item.entity_name ||
+                                                item.serial_number ||
+                                                `Fault #${item.id}`}
+                                            </p>
+                                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                              Case #{item.case_id}
+                                              {item.serial_number
+                                                ? ` · SN ${item.serial_number}`
+                                                : ''}
+                                              {' · '}
+                                              {formatDateTime(item.identified_at) ||
+                                                'Unknown date'}
+                                            </p>
+                                          </div>
+                                          <div className="flex flex-wrap items-center gap-1.5">
+                                            {isThisUnit ? (
+                                              <Badge
+                                                variant="secondary"
+                                                className="text-[10px]"
+                                              >
+                                                This unit
+                                              </Badge>
+                                            ) : null}
+                                            <Badge
+                                              variant="outline"
+                                              className="text-[10px]"
+                                            >
+                                              {oemMatchLabel(item, oemName)}
+                                            </Badge>
+                                          </div>
+                                        </div>
+                                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                                          <FaultyEntityStatusBadge
+                                            entity={item}
+                                            showPotentiallyAffected={false}
+                                          />
+                                          {item.fault_type ? (
+                                            <span className="text-xs capitalize text-muted-foreground">
+                                              {item.fault_type.replaceAll('_', ' ')}
+                                            </span>
+                                          ) : null}
+                                        </div>
+                                      </button>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            )}
+                          </section>
+                        </div>
+                      )}
+                    </TabsContent>
+                  </div>
+                </ScrollArea>
               </Tabs>
             )}
           </div>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       <InventoryHierarchyDialog
         item={inventory}

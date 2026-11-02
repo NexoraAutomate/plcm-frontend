@@ -1852,6 +1852,25 @@ export interface FaultyEntity {
   case?: MaintenanceCase;
 }
 
+/** Faulty-entity row with OEM enrichment from product fault history. */
+export interface ProductFaultHistoryItem extends FaultyEntity {
+  oem_name?: string | null;
+  same_oem?: boolean | null;
+}
+
+/** Aggregate fault history for a product (part number), split by OEM. */
+export interface ProductFaultHistory {
+  part_number: string;
+  current_oem?: string | null;
+  same_oem_fault_count: number;
+  different_oem_fault_count: number;
+  unknown_oem_fault_count: number;
+  total_fault_count: number;
+  last_fault_at?: string | null;
+  last_fault_id?: number | null;
+  history: ProductFaultHistoryItem[];
+}
+
 // Maintenance Action
 export interface MaintenanceAction {
   id: number;
