@@ -91,10 +91,20 @@ function SectionHeading({
   description?: string;
 }) {
   return (
-    <div className="space-y-1">
-      <h3 className="text-sm font-semibold tracking-tight text-foreground">{title}</h3>
+    <div className="mb-3 border-b border-border/80 pb-2">
+      <div className="flex items-center gap-2.5">
+        <span
+          aria-hidden
+          className="h-4 w-1 shrink-0 rounded-full bg-primary"
+        />
+        <h3 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-foreground">
+          {title}
+        </h3>
+      </div>
       {description ? (
-        <p className="text-xs leading-relaxed text-muted-foreground">{description}</p>
+        <p className="mt-1 pl-[18px] text-xs leading-snug text-muted-foreground">
+          {description}
+        </p>
       ) : null}
     </div>
   );
@@ -152,300 +162,311 @@ export function OrderFormDialog({
         </Can>
       ) : null}
 
-      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-2xl">
-        <DialogHeader className="border-b px-6 py-4 pr-12 text-left">
+      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-5xl">
+        <DialogHeader className="border-b px-6 py-3.5 pr-12 text-left">
           <DialogTitle className="text-lg font-semibold">{dialogTitle}</DialogTitle>
           <DialogDescription className="text-sm leading-relaxed">
             {dialogDescription}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[min(70vh,640px)] space-y-6 overflow-y-auto px-6 py-5">
-          <section className="space-y-4">
-            <SectionHeading
-              title="Parties & status"
-              description="Who the order belongs to and where it sits in the workflow."
-            />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor={`order-${mode}-customer`}>
-                  Customer
-                  <RequiredMark />
-                </Label>
-                <Select
-                  value={formData.customer_id?.toString() ?? ''}
-                  onValueChange={(value) =>
-                    applyFormChange(onFormChange, formData, {
-                      customer_id: Number(value),
-                    })
-                  }
-                  disabled={submitting || lockCustomer}
-                >
-                  <SelectTrigger id={`order-${mode}-customer`} className="h-10 w-full">
-                    <SelectValue placeholder="Select customer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers.map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id.toString()}>
-                        {customer.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+        <div className="px-6 py-4">
+          <div className="grid gap-5 lg:grid-cols-2 lg:gap-x-8 lg:gap-y-5">
+            <section>
+              <SectionHeading
+                title="Parties & status"
+                description="Who the order belongs to and where it sits in the workflow."
+              />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor={`order-${mode}-customer`}>
+                    Customer
+                    <RequiredMark />
+                  </Label>
+                  <Select
+                    value={formData.customer_id?.toString() ?? ''}
+                    onValueChange={(value) =>
+                      applyFormChange(onFormChange, formData, {
+                        customer_id: Number(value),
+                      })
+                    }
+                    disabled={submitting || lockCustomer}
+                  >
+                    <SelectTrigger id={`order-${mode}-customer`} className="h-9 w-full">
+                      <SelectValue placeholder="Select customer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {customers.map((customer) => (
+                        <SelectItem key={customer.id} value={customer.id.toString()}>
+                          {customer.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor={`order-${mode}-status`}>
-                  Status
-                  <RequiredMark />
-                </Label>
-                <Select
-                  value={formData.status_id?.toString() ?? ''}
-                  onValueChange={(value) =>
-                    applyFormChange(onFormChange, formData, {
-                      status_id: Number(value),
-                    })
-                  }
-                  disabled={submitting}
-                >
-                  <SelectTrigger id={`order-${mode}-status`} className="h-10 w-full">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {statuses.map((status) => (
-                      <SelectItem key={status.id} value={status.id.toString()}>
-                        {status.status_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="space-y-1.5">
+                  <Label htmlFor={`order-${mode}-status`}>
+                    Status
+                    <RequiredMark />
+                  </Label>
+                  <Select
+                    value={formData.status_id?.toString() ?? ''}
+                    onValueChange={(value) =>
+                      applyFormChange(onFormChange, formData, {
+                        status_id: Number(value),
+                      })
+                    }
+                    disabled={submitting}
+                  >
+                    <SelectTrigger id={`order-${mode}-status`} className="h-9 w-full">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statuses.map((status) => (
+                        <SelectItem key={status.id} value={status.id.toString()}>
+                          {status.status_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
 
-          <section className="space-y-4">
-            <SectionHeading
-              title="Order identity"
-              description="Title and description used across projects and reporting."
-            />
-            <div className="grid gap-4">
-              <div className="space-y-2">
-                <Label htmlFor={`order-${mode}-title`}>
-                  Title
-                  <RequiredMark />
-                </Label>
-                <Input
-                  id={`order-${mode}-title`}
-                  value={formData.title}
-                  onChange={(e) =>
-                    applyFormChange(onFormChange, formData, { title: e.target.value })
-                  }
-                  placeholder="Order title"
-                  disabled={submitting}
-                  className="h-10"
-                  autoFocus={isCreate}
-                />
+            <section>
+              <SectionHeading
+                title="Commercial references"
+                description="Contract and purchase-order identifiers for this engagement."
+              />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor={`order-${mode}-contract`}>Contract Number</Label>
+                  <Input
+                    id={`order-${mode}-contract`}
+                    value={formData.contract_number ?? ''}
+                    onChange={(e) =>
+                      applyFormChange(onFormChange, formData, {
+                        contract_number: e.target.value,
+                      })
+                    }
+                    disabled={submitting}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor={`order-${mode}-po`}>PO Number</Label>
+                  <Input
+                    id={`order-${mode}-po`}
+                    value={formData.po_number ?? ''}
+                    onChange={(e) =>
+                      applyFormChange(onFormChange, formData, {
+                        po_number: e.target.value,
+                      })
+                    }
+                    disabled={submitting}
+                    className="h-9"
+                  />
+                </div>
               </div>
+            </section>
 
-              <div className="space-y-2">
-                <Label htmlFor={`order-${mode}-description`}>Description</Label>
-                <Textarea
-                  id={`order-${mode}-description`}
-                  value={formData.description ?? ''}
-                  onChange={(e) =>
-                    applyFormChange(onFormChange, formData, {
-                      description: e.target.value,
-                    })
-                  }
-                  placeholder="Specifications and scope notes"
-                  disabled={submitting}
-                  className="min-h-20 resize-none"
-                />
-              </div>
-            </div>
-          </section>
+            <section className="lg:col-span-2">
+              <SectionHeading
+                title="Order identity"
+                description="Title and description used across projects and reporting."
+              />
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+                <div className="space-y-1.5">
+                  <Label htmlFor={`order-${mode}-title`}>
+                    Title
+                    <RequiredMark />
+                  </Label>
+                  <Input
+                    id={`order-${mode}-title`}
+                    value={formData.title}
+                    onChange={(e) =>
+                      applyFormChange(onFormChange, formData, { title: e.target.value })
+                    }
+                    placeholder="Order title"
+                    disabled={submitting}
+                    className="h-9"
+                    autoFocus={isCreate}
+                  />
+                </div>
 
-          <section className="space-y-4">
-            <SectionHeading
-              title="Commercial references"
-              description="Contract and purchase-order identifiers for this engagement."
-            />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor={`order-${mode}-contract`}>Contract Number</Label>
-                <Input
-                  id={`order-${mode}-contract`}
-                  value={formData.contract_number ?? ''}
-                  onChange={(e) =>
-                    applyFormChange(onFormChange, formData, {
-                      contract_number: e.target.value,
-                    })
-                  }
-                  disabled={submitting}
-                  className="h-10"
-                />
+                <div className="space-y-1.5">
+                  <Label htmlFor={`order-${mode}-description`}>Description</Label>
+                  <Textarea
+                    id={`order-${mode}-description`}
+                    value={formData.description ?? ''}
+                    onChange={(e) =>
+                      applyFormChange(onFormChange, formData, {
+                        description: e.target.value,
+                      })
+                    }
+                    placeholder="Specifications and scope notes"
+                    disabled={submitting}
+                    className="min-h-9 h-9 resize-none py-2"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor={`order-${mode}-po`}>PO Number</Label>
-                <Input
-                  id={`order-${mode}-po`}
-                  value={formData.po_number ?? ''}
-                  onChange={(e) =>
-                    applyFormChange(onFormChange, formData, {
-                      po_number: e.target.value,
-                    })
-                  }
-                  disabled={submitting}
-                  className="h-10"
-                />
-              </div>
-            </div>
-          </section>
+            </section>
 
-          <section className="space-y-4">
-            <SectionHeading
-              title="Schedule"
-              description="Order date, delivery, and post-delivery production support."
-            />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor={`order-${mode}-order-date`}>
-                  Order Date
-                  <RequiredMark />
-                </Label>
-                <Input
-                  id={`order-${mode}-order-date`}
-                  type="date"
-                  value={formData.order_date}
-                  onChange={(e) =>
-                    applyFormChange(onFormChange, formData, {
-                      order_date: e.target.value,
-                    })
-                  }
-                  disabled={submitting}
-                  className="h-10"
-                />
-              </div>
+            <section>
+              <SectionHeading
+                title="Schedule"
+                description="Order date, delivery, and post-delivery production support."
+              />
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor={`order-${mode}-order-date`}>
+                    Order Date
+                    <RequiredMark />
+                  </Label>
+                  <Input
+                    id={`order-${mode}-order-date`}
+                    type="date"
+                    value={formData.order_date}
+                    onChange={(e) =>
+                      applyFormChange(onFormChange, formData, {
+                        order_date: e.target.value,
+                      })
+                    }
+                    disabled={submitting}
+                    className="h-9"
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor={`order-${mode}-delivery`}>Delivery Date</Label>
-                <Input
-                  id={`order-${mode}-delivery`}
-                  type="date"
-                  value={formData.delivery_date ?? ''}
-                  onChange={(e) => {
-                    const delivery_date = e.target.value;
-                    const currentSupport = (formData.production_support_date ?? '').trim();
-                    applyFormChange(onFormChange, formData, {
-                      delivery_date,
-                      production_support_date: !delivery_date
-                        ? ''
-                        : currentSupport && currentSupport < delivery_date
+                <div className="space-y-1.5">
+                  <Label htmlFor={`order-${mode}-delivery`}>Delivery Date</Label>
+                  <Input
+                    id={`order-${mode}-delivery`}
+                    type="date"
+                    value={formData.delivery_date ?? ''}
+                    onChange={(e) => {
+                      const delivery_date = e.target.value;
+                      const currentSupport = (formData.production_support_date ?? '').trim();
+                      applyFormChange(onFormChange, formData, {
+                        delivery_date,
+                        production_support_date: !delivery_date
                           ? ''
-                          : formData.production_support_date,
-                    });
-                  }}
-                  disabled={submitting}
-                  className="h-10"
-                />
-              </div>
+                          : currentSupport && currentSupport < delivery_date
+                            ? ''
+                            : formData.production_support_date,
+                      });
+                    }}
+                    disabled={submitting}
+                    className="h-9"
+                  />
+                </div>
 
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor={`order-${mode}-production-support`}>
-                  Production Support
-                </Label>
-                <Input
-                  id={`order-${mode}-production-support`}
-                  type="date"
-                  value={formData.production_support_date ?? ''}
-                  min={formData.delivery_date || undefined}
-                  onChange={(e) =>
-                    applyFormChange(onFormChange, formData, {
-                      production_support_date: e.target.value,
-                    })
-                  }
-                  disabled={submitting || !deliverySet}
-                  className="h-10"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {deliverySet
-                    ? 'Must be on or after the delivery date.'
-                    : 'Set a delivery date to enable production support.'}
-                </p>
+                <div className="space-y-1.5">
+                  <Label htmlFor={`order-${mode}-production-support`}>
+                    Production Support
+                  </Label>
+                  <Input
+                    id={`order-${mode}-production-support`}
+                    type="date"
+                    value={formData.production_support_date ?? ''}
+                    min={formData.delivery_date || undefined}
+                    onChange={(e) =>
+                      applyFormChange(onFormChange, formData, {
+                        production_support_date: e.target.value,
+                      })
+                    }
+                    disabled={submitting || !deliverySet}
+                    className="h-9"
+                  />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    {deliverySet
+                      ? 'On or after delivery date.'
+                      : 'Requires a delivery date.'}
+                  </p>
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
 
-          <section className="space-y-4">
-            <SectionHeading
-              title="Value & ownership"
-              description="Commercial value and the project manager responsible for delivery."
-            />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor={`order-${mode}-value`}>Total Value</Label>
-                <Input
-                  id={`order-${mode}-value`}
-                  type="number"
-                  value={formData.total_value ?? ''}
-                  onChange={(e) =>
-                    applyFormChange(onFormChange, formData, {
-                      total_value:
-                        e.target.value === '' ? null : Number(e.target.value),
-                    })
-                  }
-                  disabled={submitting}
-                  className="h-10"
-                />
+            <section>
+              <SectionHeading
+                title="Value & ownership"
+                description="Commercial value and the project manager responsible for delivery."
+              />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor={`order-${mode}-value`}>Total Value</Label>
+                  <Input
+                    id={`order-${mode}-value`}
+                    type="number"
+                    min={0.01}
+                    step="any"
+                    inputMode="decimal"
+                    value={formData.total_value ?? ''}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === '') {
+                        applyFormChange(onFormChange, formData, { total_value: null });
+                        return;
+                      }
+                      const next = Number(raw);
+                      applyFormChange(onFormChange, formData, {
+                        total_value: Number.isFinite(next) ? next : null,
+                      });
+                    }}
+                    disabled={submitting}
+                    className="h-9"
+                    placeholder="e.g. 150000"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor={`order-${mode}-currency`}>
+                    Currency
+                    <RequiredMark />
+                  </Label>
+                  <Input
+                    id={`order-${mode}-currency`}
+                    value={formData.currency}
+                    onChange={(e) =>
+                      applyFormChange(onFormChange, formData, {
+                        currency: e.target.value,
+                      })
+                    }
+                    placeholder="USD / PKR / EUR"
+                    disabled={submitting}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor={`order-${mode}-pm`}>Project Manager</Label>
+                  <ProjectManagerSelect
+                    id={`order-${mode}-pm`}
+                    value={formData.project_manager}
+                    onChange={(project_manager) =>
+                      applyFormChange(onFormChange, formData, { project_manager })
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor={`order-${mode}-remarks`}>Remarks</Label>
+                  <Textarea
+                    id={`order-${mode}-remarks`}
+                    value={formData.remarks ?? ''}
+                    onChange={(e) =>
+                      applyFormChange(onFormChange, formData, {
+                        remarks: e.target.value,
+                      })
+                    }
+                    placeholder="Internal notes"
+                    disabled={submitting}
+                    className="min-h-9 h-9 resize-none py-2"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor={`order-${mode}-currency`}>
-                  Currency
-                  <RequiredMark />
-                </Label>
-                <Input
-                  id={`order-${mode}-currency`}
-                  value={formData.currency}
-                  onChange={(e) =>
-                    applyFormChange(onFormChange, formData, {
-                      currency: e.target.value,
-                    })
-                  }
-                  placeholder="USD / PKR / EUR"
-                  disabled={submitting}
-                  className="h-10"
-                />
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor={`order-${mode}-pm`}>Project Manager</Label>
-                <ProjectManagerSelect
-                  id={`order-${mode}-pm`}
-                  value={formData.project_manager}
-                  onChange={(project_manager) =>
-                    applyFormChange(onFormChange, formData, { project_manager })
-                  }
-                />
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor={`order-${mode}-remarks`}>Remarks</Label>
-                <Textarea
-                  id={`order-${mode}-remarks`}
-                  value={formData.remarks ?? ''}
-                  onChange={(e) =>
-                    applyFormChange(onFormChange, formData, {
-                      remarks: e.target.value,
-                    })
-                  }
-                  placeholder="Internal notes"
-                  disabled={submitting}
-                  className="min-h-20 resize-none"
-                />
-              </div>
-            </div>
-          </section>
+            </section>
+          </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t px-6 py-4">
+        <div className="flex items-center justify-end gap-2 border-t px-6 py-3.5">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}

@@ -248,6 +248,8 @@ export const orders = {
   list: (skip = 0, limit = 100, filters?: ListFilterParams) =>
     api.get<Models.Order[]>("/orders/", { params: listParams(skip, limit, undefined, filters) }),
   get: (id: number) => api.get<Models.Order>(`/orders/${id}/`),
+  listProjects: (id: number) =>
+    api.get<Models.Project[]>(`/orders/${id}/projects/`),
   create: (data: Partial<Models.Order>) => api.post<Models.Order>("/orders/", data),
   update: (id: number, data: Partial<Models.Order>) => api.put<Models.Order>(`/orders/${id}/`, data),
   delete: (id: number) => api.delete(`/orders/${id}/`),

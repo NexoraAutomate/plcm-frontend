@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -53,6 +53,8 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const [confirmationCode, setConfirmationCode] = useState("");
   const [userInput, setUserInput] = useState("");
+  const confirmationInputRef = useRef<HTMLInputElement>(null);
+  const confirmLockRef = useRef(false);
 
   const expectedValues = (acceptedValues?.length
     ? acceptedValues
@@ -72,6 +74,7 @@ export function ConfirmDialog({
       }
       setUserInput("");
     }
+    if (open) confirmLockRef.current = false;
   }, [open, destructive, usesValueConfirm]);
 
   const codeMatches = userInput === confirmationCode;
@@ -81,13 +84,40 @@ export function ConfirmDialog({
   const canConfirm = usesValueConfirm ? valueMatches : codeMatches;
 
   const handleConfirm = () => {
+    if (confirmLockRef.current) return;
     if (destructive && !canConfirm) return;
-    onConfirm();
+    confirmLockRef.current = true;
+    try {
+      onConfirm();
+    } finally {
+      queueMicrotask(() => {
+        confirmLockRef.current = false;
+      });
+    }
+  };
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    handleConfirm();
+  };
+
+  const handleConfirmationKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    if (event.repeat) return;
+    handleConfirm();
   };
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+      <AlertDialogContent
+        onOpenAutoFocus={(event) => {
+          if (!destructive) return;
+          event.preventDefault();
+          confirmationInputRef.current?.focus();
+        }}
+      >
+        <form className="grid gap-4" onSubmit={handleSubmit}>
         <AlertDialogHeader>
           <AlertDialogTitle className="text-foreground">{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
@@ -119,11 +149,13 @@ export function ConfirmDialog({
                     {confirmInputLabel ?? "Serial number"}
                   </Label>
                   <Input
+                    ref={confirmationInputRef}
                     id="delete-confirmation-value"
                     value={userInput}
                     onChange={(e) => setUserInput(e.target.value)}
                     placeholder={confirmPlaceholder ?? "Enter serial number"}
                     autoComplete="off"
+                    onKeyDown={handleConfirmationKeyDown}
                   />
                 </div>
               </>
@@ -138,6 +170,7 @@ export function ConfirmDialog({
                 <div className="space-y-1">
                   <Label htmlFor="delete-confirmation-code">Confirmation code</Label>
                   <Input
+                    ref={confirmationInputRef}
                     id="delete-confirmation-code"
                     value={userInput}
                     onChange={(e) =>
@@ -146,6 +179,7 @@ export function ConfirmDialog({
                     placeholder="Enter the 4-digit code"
                     inputMode="numeric"
                     autoComplete="off"
+                    onKeyDown={handleConfirmationKeyDown}
                   />
                 </div>
               </>
@@ -153,11 +187,11 @@ export function ConfirmDialog({
           </div>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
           <Button
+            type="submit"
             variant={destructive ? "destructive" : "default"}
             disabled={destructive && !canConfirm}
-            onClick={handleConfirm}
             className={
               destructive ? "bg-destructive text-emerald-50 hover:bg-destructive/90" : ""
             }
@@ -165,6 +199,7 @@ export function ConfirmDialog({
             {destructive ? "Delete" : "Confirm"}
           </Button>
         </AlertDialogFooter>
+        </form>
       </AlertDialogContent>
     </AlertDialog>
   );

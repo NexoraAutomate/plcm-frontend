@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -65,6 +65,8 @@ export function InventoryDeleteDialog({
   const [confirmationCode, setConfirmationCode] = useState('');
   const [userInput, setUserInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const codeInputRef = useRef<HTMLInputElement>(null);
+  const submitLockRef = useRef(false);
 
   useEffect(() => {
     if (!open) return;
@@ -80,7 +82,13 @@ export function InventoryDeleteDialog({
     setConfirmationCode(generateDeleteCode());
     setUserInput('');
     setSubmitting(false);
+    submitLockRef.current = false;
   }, [open, canDeleteOne, canDeleteAll, instances]);
+
+  useEffect(() => {
+    if (!open || step === 'choice') return;
+    codeInputRef.current?.focus();
+  }, [open, step, confirmationCode]);
 
   const codeMatches = userInput === confirmationCode;
   const selectedInstance = instances.find(
@@ -93,20 +101,23 @@ export function InventoryDeleteDialog({
   }
 
   async function handleConfirm() {
-    if (!item || !codeMatches || submitting) return;
+    if (!item || !codeMatches || submitting || submitLockRef.current) return;
+    if (step === 'confirm-one' && !selectedInstance?.id) return;
+    if (step === 'confirm-all' && !canDeleteAll) return;
 
+    submitLockRef.current = true;
     setSubmitting(true);
     try {
       if (step === 'confirm-all') {
         await onDeleteAll(item.id);
-      } else if (step === 'confirm-one') {
-        if (!selectedInstance?.id) return;
+      } else if (step === 'confirm-one' && selectedInstance?.id) {
         await onDeleteOne(selectedInstance.id);
       }
       onOpenChange(false);
     } catch {
       // Parent handlers already toast; keep dialog open for retry.
     } finally {
+      submitLockRef.current = false;
       setSubmitting(false);
     }
   }
@@ -139,7 +150,20 @@ export function InventoryDeleteDialog({
         else onOpenChange(true);
       }}
     >
-      <AlertDialogContent>
+      <AlertDialogContent
+        onOpenAutoFocus={(event) => {
+          if (step === 'choice') return;
+          event.preventDefault();
+          codeInputRef.current?.focus();
+        }}
+      >
+        <form
+          className="grid gap-4"
+          onSubmit={(event: FormEvent<HTMLFormElement>) => {
+            event.preventDefault();
+            void handleConfirm();
+          }}
+        >
         <AlertDialogHeader>
           <AlertDialogTitle className="text-foreground">{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
@@ -148,6 +172,7 @@ export function InventoryDeleteDialog({
         {step === 'choice' && (
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button
+              type="button"
               variant="outline"
               className="flex-1"
               onClick={() => {
@@ -163,6 +188,7 @@ export function InventoryDeleteDialog({
             </Button>
             {canDeleteAll ? (
               <Button
+                type="button"
                 variant="destructive"
                 className="flex-1 bg-destructive text-emerald-50 hover:bg-destructive/90"
                 onClick={() => {
@@ -207,6 +233,7 @@ export function InventoryDeleteDialog({
               <div className="space-y-1">
                 <Label htmlFor="inventory-delete-code">Confirmation code</Label>
                 <Input
+                  ref={codeInputRef}
                   id="inventory-delete-code"
                   value={userInput}
                   onChange={(e) =>
@@ -216,6 +243,12 @@ export function InventoryDeleteDialog({
                   inputMode="numeric"
                   autoComplete="off"
                   disabled={submitting}
+                  onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
+                    if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+                    event.preventDefault();
+                    if (event.repeat || !canSubmit) return;
+                    void handleConfirm();
+                  }}
                 />
               </div>
             </div>
@@ -236,18 +269,19 @@ export function InventoryDeleteDialog({
               Back
             </Button>
           )}
-          <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel type="button" disabled={submitting}>Cancel</AlertDialogCancel>
           {step !== 'choice' && (
             <Button
+              type="submit"
               variant="destructive"
               disabled={!canSubmit}
-              onClick={() => void handleConfirm()}
               className="bg-destructive text-emerald-50 hover:bg-destructive/90"
             >
               {submitting ? 'Deleting…' : 'Delete'}
             </Button>
           )}
         </AlertDialogFooter>
+        </form>
       </AlertDialogContent>
     </AlertDialog>
   );

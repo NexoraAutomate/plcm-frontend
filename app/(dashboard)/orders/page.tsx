@@ -40,6 +40,8 @@ import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
 import { validateOrderForm } from '@/lib/form-validation';
+import { cloneOrderProjectsAsDrafts } from '@/lib/clone-order-projects';
+import { useAuth } from '@/lib/auth-context';
 import {
   ListStatsVisibilityControls,
   useListStatsVisibility,
@@ -63,7 +65,9 @@ export default function OrdersPage() {
   const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility('orders-list', COLUMN_DEFS);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { customers, projects, createOrder, updateOrder, deleteOrder } = useDataStore();
+  const { customers, projects, createOrder, updateOrder, deleteOrder, mergeProjectLocal } =
+    useDataStore();
+  const { can } = useAuth();
   const faultMap = useEntityFaultMap();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
@@ -73,6 +77,7 @@ export default function OrdersPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [repeatSourceOrderId, setRepeatSourceOrderId] = useState<number | null>(null);
   
   const [formData, setFormData] = useState<OrderFormData>(emptyOrderForm);
   const { data: statuses = [] } = useStatusesByTypeQuery('orders');
@@ -86,6 +91,7 @@ export default function OrdersPage() {
 
   useEffect(() => {
     if (searchParams.get('action') === 'create') {
+      setRepeatSourceOrderId(null);
       setFormData((previous) => ({
         ...emptyOrderForm,
         status_id: previous.status_id ?? defaultStatusId,
@@ -118,6 +124,7 @@ export default function OrdersPage() {
       customerId: formData.customer_id,
       deliveryDate: formData.delivery_date,
       productionSupportDate: formData.production_support_date,
+      totalValue: formData.total_value,
     });
   }
 
@@ -178,10 +185,43 @@ export default function OrdersPage() {
       return;
     }
 
+    const sourceOrderId = repeatSourceOrderId;
+
     try {
-      await createOrder(sanitizeOrderPayload(formData));
+      const newOrder = await createOrder(sanitizeOrderPayload(formData));
       pagination.invalidate();
 
+      if (sourceOrderId != null && newOrder?.id) {
+        if (!can(P.project_create_draft)) {
+          toast.warning(
+            'Order repeated, but draft projects were not cloned (missing create-draft permission).'
+          );
+        } else {
+          try {
+            const cloneResult = await cloneOrderProjectsAsDrafts(sourceOrderId, newOrder.id);
+            cloneResult.created.forEach((project) => mergeProjectLocal(project));
+            if (cloneResult.created.length > 0) {
+              toast.success(
+                `Cloned ${cloneResult.created.length} draft project${
+                  cloneResult.created.length === 1 ? '' : 's'
+                } (same config, flights, and SDLS).`
+              );
+            } else if (cloneResult.skipped > 0 && cloneResult.errors.length === 0) {
+              toast.message('Order repeated. Source order had no cloneable project specs.');
+            }
+            if (cloneResult.errors.length > 0) {
+              toast.error(
+                `Some draft projects failed to clone: ${cloneResult.errors.slice(0, 2).join('; ')}`
+              );
+            }
+          } catch (cloneError) {
+            console.error(cloneError);
+            toast.error('Order created, but failed to clone draft projects from the source order.');
+          }
+        }
+      }
+
+      setRepeatSourceOrderId(null);
       setFormData({ ...emptyOrderForm, status_id: defaultStatusId });
       setIsCreateOpen(false);
     } catch (error) {
@@ -251,6 +291,7 @@ export default function OrdersPage() {
     const baseTitle = (order.title ?? '').trim();
     setEditingId(null);
     setIsEditOpen(false);
+    setRepeatSourceOrderId(order.id);
     setFormData({
       order_number: '',
       title: baseTitle
@@ -370,6 +411,7 @@ export default function OrdersPage() {
           <Button
             className="gap-2"
             onClick={() => {
+              setRepeatSourceOrderId(null);
               setFormData({
                 ...emptyOrderForm,
                 status_id: defaultStatusId,
@@ -388,6 +430,7 @@ export default function OrdersPage() {
           onOpenChange={(open) => {
             setIsCreateOpen(open);
             if (!open) {
+              setRepeatSourceOrderId(null);
               setFormData({ ...emptyOrderForm, status_id: defaultStatusId });
             }
           }}
@@ -396,6 +439,12 @@ export default function OrdersPage() {
           customers={customers}
           statuses={statuses}
           onSubmit={handleCreate}
+          titleOverride={repeatSourceOrderId != null ? 'Repeat Order' : undefined}
+          descriptionOverride={
+            repeatSourceOrderId != null
+              ? 'Commercial terms are prefilled. Linked projects will be cloned as Draft with the same configuration, flights, and SDLS counts. Further workflow steps stay manual.'
+              : undefined
+          }
         />
     </div>
 

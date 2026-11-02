@@ -198,6 +198,7 @@ export default function ProjectsPage(){
     flight_count: 1,
     sdls_per_flight: 1,
     sdls_counts_by_flight: [1],
+    hierarchy_config_ids_by_flight: [[]],
     is_existing_project: false,
   });
   const { data: statuses = [] } = useStatusesByTypeQuery('projects');
@@ -216,6 +217,7 @@ export default function ProjectsPage(){
       flight_count: 1,
       sdls_per_flight: 1,
       sdls_counts_by_flight: [1],
+      hierarchy_config_ids_by_flight: [[]],
       is_existing_project: false,
     });
   }
@@ -502,6 +504,15 @@ export default function ProjectsPage(){
     const sdlsCounts = formData.sdls_counts_by_flight
       .slice(0, Number(formData.flight_count))
       .map((count) => Number(count));
+    const configMatrix = (formData.hierarchy_config_ids_by_flight || [])
+      .slice(0, Number(formData.flight_count))
+      .map((row, flightIndex) => {
+        const expected = sdlsCounts[flightIndex] ?? 1;
+        return Array.from({ length: expected }, (_, sdlsIndex) => {
+          const id = Number(row?.[sdlsIndex] || formData.hierarchy_config_id);
+          return id > 0 ? id : formData.hierarchy_config_id;
+        });
+      });
     const validationError = validateProjectCreateForm({
       name: formData.name,
       hierarchyConfigId: formData.hierarchy_config_id,
@@ -509,6 +520,9 @@ export default function ProjectsPage(){
       productType: formData.product_type,
       flightCount: Number(formData.flight_count),
       sdlsCountsByFlight: sdlsCounts,
+      hierarchyConfigIdsByFlight: configMatrix,
+      startDate: formData.start_date,
+      endDate: formData.end_date,
     });
     if (validationError) {
       toast.error(validationError);
@@ -532,6 +546,7 @@ export default function ProjectsPage(){
         // uses the per-flight values below.
         sdls_per_flight: Math.max(...sdlsCounts),
         sdls_counts_by_flight: sdlsCounts,
+        hierarchy_config_ids_by_flight: configMatrix,
         is_existing_project: formData.is_existing_project,
       });
       const createdCount = res.data.count ?? res.data.projects.length;
@@ -596,6 +611,17 @@ export default function ProjectsPage(){
       sdls_counts_by_flight:
         project.sdls_counts_by_flight ??
         Array(project.flight_count ?? 1).fill(project.sdls_per_flight ?? 1),
+      hierarchy_config_ids_by_flight:
+        project.hierarchy_config_ids_by_flight ??
+        (
+          project.sdls_counts_by_flight ??
+          Array(project.flight_count ?? 1).fill(project.sdls_per_flight ?? 1)
+        ).map((count) =>
+          Array.from(
+            { length: Number(count) || 1 },
+            () => project.hierarchy_config_id ?? 0
+          )
+        ),
       is_existing_project: project.is_existing_project ?? false,
     });
     setIsEditOpen(true);
@@ -862,7 +888,17 @@ export default function ProjectsPage(){
                 <Input
                   type="date"
                   value={formData.start_date}
-                  onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                  onChange={(e) => {
+                    const start_date = e.target.value;
+                    setFormData((prev) => ({
+                      ...prev,
+                      start_date,
+                      end_date:
+                        prev.end_date && start_date && prev.end_date < start_date
+                          ? ''
+                          : prev.end_date,
+                    }));
+                  }}
                 />
               </div>
               <div>
@@ -870,6 +906,7 @@ export default function ProjectsPage(){
                 <Input
                   type="date"
                   value={formData.end_date}
+                  min={formData.start_date || undefined}
                   onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
                 />
               </div>

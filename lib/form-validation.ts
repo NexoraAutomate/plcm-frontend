@@ -132,12 +132,18 @@ export function validateOrderForm(input: {
   customerId?: number | null;
   deliveryDate?: string | null;
   productionSupportDate?: string | null;
+  totalValue?: number | null;
 }): string | null {
   if (isBlank(input.title)) return requiredMessage('Title');
   if (isBlank(input.orderDate)) return requiredMessage('Order date');
   if (isBlank(input.currency)) return requiredMessage('Currency');
   if (isMissingId(input.statusId)) return requiredMessage('Status');
   if (isMissingId(input.customerId)) return requiredMessage('Customer');
+  if (input.totalValue != null) {
+    if (!Number.isFinite(input.totalValue) || input.totalValue <= 0) {
+      return 'Total value must be a positive number';
+    }
+  }
   const delivery = (input.deliveryDate ?? '').trim();
   const support = (input.productionSupportDate ?? '').trim();
   if (support && !delivery) {
@@ -149,6 +155,24 @@ export function validateOrderForm(input: {
   return null;
 }
 
+/** Compare YYYY-MM-DD (or ISO) date strings; returns null when either side is blank. */
+export function projectDateRangeError(
+  startDate?: string | null,
+  endDate?: string | null
+): string | null {
+  const start = (startDate ?? '').trim();
+  const end = (endDate ?? '').trim();
+  if (!end) return null;
+  if (!start) return 'Set a start date before the end date';
+  // Date-only compare works for YYYY-MM-DD and ISO prefixes.
+  const startKey = start.slice(0, 10);
+  const endKey = end.slice(0, 10);
+  if (endKey < startKey) {
+    return 'End date cannot be earlier than start date';
+  }
+  return null;
+}
+
 export function validateProjectCreateForm(input: {
   name: string;
   hierarchyConfigId?: number | null;
@@ -156,10 +180,13 @@ export function validateProjectCreateForm(input: {
   productType: string;
   flightCount: number;
   sdlsCountsByFlight: number[];
+  hierarchyConfigIdsByFlight?: number[][] | null;
+  startDate?: string | null;
+  endDate?: string | null;
 }): string | null {
   if (isBlank(input.name)) return requiredMessage('Name');
   if (isMissingId(input.orderId)) return requiredMessage('Order');
-  if (isMissingId(input.hierarchyConfigId)) return requiredMessage('Hierarchy configuration');
+  if (isMissingId(input.hierarchyConfigId)) return requiredMessage('Project configuration');
   if (isBlank(input.productType)) return requiredMessage('Product type');
   const flightCount = Number(input.flightCount);
   if (!Number.isFinite(flightCount) || flightCount < 1) {
@@ -171,6 +198,23 @@ export function validateProjectCreateForm(input: {
   if (input.sdlsCountsByFlight.some((count) => Number(count) < 1)) {
     return 'Each flight must have at least 1 SDLS';
   }
+  if (input.hierarchyConfigIdsByFlight != null) {
+    if (input.hierarchyConfigIdsByFlight.length !== flightCount) {
+      return 'SDLS configuration must be provided for each flight';
+    }
+    for (let flightIndex = 0; flightIndex < flightCount; flightIndex += 1) {
+      const expected = Number(input.sdlsCountsByFlight[flightIndex]);
+      const row = input.hierarchyConfigIdsByFlight[flightIndex] ?? [];
+      if (row.length !== expected) {
+        return `Flight ${flightIndex + 1} needs a configuration for each SDLS`;
+      }
+      if (row.some((configId) => isMissingId(configId))) {
+        return `Select an SDLS configuration for every SDLS on flight ${flightIndex + 1}`;
+      }
+    }
+  }
+  const dateError = projectDateRangeError(input.startDate, input.endDate);
+  if (dateError) return dateError;
   return null;
 }
 
@@ -188,6 +232,8 @@ export function validateProjectEditForm(input: {
   if (isMissingId(input.orderId)) return requiredMessage('Order');
   if (isBlank(input.startDate)) return requiredMessage('Start date');
   if (isBlank(input.endDate)) return requiredMessage('End date');
+  const dateError = projectDateRangeError(input.startDate, input.endDate);
+  if (dateError) return dateError;
   return null;
 }
 

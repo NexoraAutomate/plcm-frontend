@@ -284,6 +284,8 @@ export interface Project {
   flight_count?: number | null
   sdls_per_flight?: number | null
   sdls_counts_by_flight?: number[] | null
+  /** One hierarchy_config_id per SDLS under each flight; omit → project config for all. */
+  hierarchy_config_ids_by_flight?: number[][] | null
   assigned_hm_id?: number | null
   created_by_id?: number | null
   approved_by_id?: number | null
@@ -654,6 +656,7 @@ export interface ProjectDraftCreate {
   flight_count: number
   sdls_per_flight?: number
   sdls_counts_by_flight: number[]
+  hierarchy_config_ids_by_flight?: number[][]
   is_existing_project?: boolean
 }
 

@@ -29,10 +29,10 @@ Execute the requested action: $ARGUMENTS
 | Action | Description |
 |--------|-------------|
 | `load` | Load a feature spec or inline description |
-| `start` | Begin implementation, create branch |
+| `start` | Begin implementation on `main` (no feature branch) |
 | `review` | Check goals met, code quality |
 | `explain` | Document what changed and why |
-| `complete` | Commit, push, merge, reset |
+| `complete` | Commit on `main`, push, reset |
 
 See [actions/](actions/) for detailed instructions.
 

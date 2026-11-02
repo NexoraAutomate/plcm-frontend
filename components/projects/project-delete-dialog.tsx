@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -50,6 +50,8 @@ export function ProjectDeleteDialog({
   const [busy, setBusy] = useState(false);
   const [discardCode, setDiscardCode] = useState('');
   const [discardInput, setDiscardInput] = useState('');
+  const discardInputRef = useRef<HTMLInputElement>(null);
+  const busyRef = useRef(false);
 
   useEffect(() => {
     if (!open || projectId == null) {
@@ -104,11 +106,17 @@ export function ProjectDeleteDialog({
     }
   }, [mode]);
 
+  useEffect(() => {
+    if (mode !== 'discard-confirm') return;
+    discardInputRef.current?.focus();
+  }, [mode, discardCode]);
+
   async function runDelete(
     disposition: ProjectDeleteDisposition,
     confirm = false
   ) {
-    if (projectId == null) return;
+    if (projectId == null || busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     try {
       await onDelete(projectId, {
@@ -120,6 +128,7 @@ export function ProjectDeleteDialog({
     } catch {
       // toast handled by caller
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   }
@@ -214,28 +223,44 @@ export function ProjectDeleteDialog({
                     ledger. Inventory item statuses will not be reverted. Type the
                     confirmation code to continue.
                   </p>
-                  <div className="space-y-2 pt-1">
+                  <form
+                    id="project-discard-form"
+                    className="space-y-2 pt-1"
+                    onSubmit={(event: FormEvent<HTMLFormElement>) => {
+                      event.preventDefault();
+                      if (busy || discardInput !== discardCode) return;
+                      void runDelete('discard', true);
+                    }}
+                  >
                     <Label htmlFor="discard-code">
                       Type {discardCode} to confirm
                     </Label>
                     <Input
+                      ref={discardInputRef}
                       id="discard-code"
                       value={discardInput}
                       onChange={(e) => setDiscardInput(e.target.value)}
                       autoComplete="off"
                       disabled={busy}
+                      onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
+                        if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+                        event.preventDefault();
+                        if (event.repeat || busy || discardInput !== discardCode) return;
+                        void runDelete('discard', true);
+                      }}
                     />
-                  </div>
+                  </form>
                 </>
               )}
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
-          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel type="button" disabled={busy}>Cancel</AlertDialogCancel>
           {mode === 'choice' && (
             <>
               <Button
+                type="button"
                 variant="outline"
                 disabled={busy}
                 onClick={() => void runDelete('revert', true)}
@@ -243,6 +268,7 @@ export function ProjectDeleteDialog({
                 Revert inventory
               </Button>
               <Button
+                type="button"
                 variant="destructive"
                 disabled={busy}
                 onClick={() => setMode('discard-confirm')}
@@ -253,6 +279,7 @@ export function ProjectDeleteDialog({
           )}
           {mode === 'waiting' && (
             <Button
+              type="button"
               variant="destructive"
               disabled={busy}
               onClick={() => setMode('discard-confirm')}
@@ -262,9 +289,10 @@ export function ProjectDeleteDialog({
           )}
           {mode === 'discard-confirm' && (
             <Button
+              type="submit"
+              form="project-discard-form"
               variant="destructive"
               disabled={busy || discardInput !== discardCode}
-              onClick={() => void runDelete('discard', true)}
             >
               Discard and delete
             </Button>
