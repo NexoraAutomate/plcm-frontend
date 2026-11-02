@@ -19,7 +19,7 @@ import { Search, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import * as maintenanceApi from '@/lib/api';
 import * as MaintenanceTypes from '@/lib/models';
-import { maintenanceService } from '@/services/maintenance';
+import { maintenanceService, formatMaintenanceApiError } from '@/services/maintenance';
 import { MaintenanceMiniDashboard } from '@/components/maintenance/MaintenanceMiniDashboard';
 import { MaintenanceLookupDialog } from '@/components/lazy/heavy-editors';
 import { MaintenanceCaseDialog } from '@/components/maintenance/MaintenanceCaseDialog';
@@ -175,9 +175,16 @@ export default function MaintenancePage() {
       const created = await createMaintenanceCase(payload);
       invalidateCaseQueries();
       setLookupCaseId(created.id);
+      setLookupError(null);
       toast.success(`Created maintenance case #${created.id}`);
-    } catch {
-      // Error handled by data store
+    } catch (err) {
+      // Toast is handled by data store; also show inline in the lookup dialog.
+      setLookupError(
+        formatMaintenanceApiError(
+          err,
+          'An open maintenance case already exists for this serial number.'
+        )
+      );
     }
   };
 

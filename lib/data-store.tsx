@@ -26,6 +26,7 @@ import * as MaintenanceTypes from '@/lib/models';
 import { enrichEntitiesWithStatus, enrichEntityWithStatus } from './entity-status';
 import { LIST_BOOTSTRAP_SIZE, HIERARCHY_TYPE_CAP, STATUS_LIST_CAP, appendCapped } from './data-loading';
 import { toast } from 'sonner';
+import { formatMaintenanceApiError } from '@/services/maintenance';
 import { StatusColorProvider } from '@/lib/status-color-context';
 
 interface DataStoreContextType {
@@ -1468,7 +1469,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       toast.success('Maintenance case created successfully');
       return res.data;
     } catch (err) {
-      toast.error('Failed to create maintenance case');
+      toast.error(formatMaintenanceApiError(err, 'Failed to create maintenance case'));
       throw err;
     }
   };

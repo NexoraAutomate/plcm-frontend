@@ -1,4 +1,4 @@
-# Current Feature: Inventory OEM Refs, Warranty & Shelf-Life Expiry
+# Current Feature: Prevent Duplicate Open Maintenance Cases
 
 ## Status
 
@@ -6,23 +6,23 @@ Complete
 
 ## Goals
 
-- [x] On Add Stock / Add Inventory, capture OEM Part Number and OEM Serial Number for reference (`original_part_number` / `original_serial_number`)
-- [x] Add a supplier-warranty toggle; when on, capture warranty end date and persist it on stock units
-- [x] Ensure shelf-life expiry date is captured on Add Stock and stored on units
-- [x] Highlight and/or filter inventory rows whose shelf life or warranty is expired or nearing expiry
-- [x] Persist warranty fields in backend (model, schema, migration, create/update paths)
+- [x] Backend rejects creating a maintenance case when an open/active case already exists for the same entity (serial)
+- [x] Frontend shows a clear error popup/toast with the API message when a duplicate is attempted
+- [x] New cases remain allowed after the previous case is resolved or closed
 
 ## Notes
 
-- OEM PN/SN map to existing `original_part_number` / `original_serial_number` (reference only; PLCM identities stay auto-generated)
-- Warranty: toggle + `warranty_expires_at` date (null when toggle off / not provided)
-- Shelf life already has `shelf_life_expires_at`; surface clearly on Add Stock and keep on instances
-- Expiry UX: row highlighting + filter control on `/inventory` table (expired + within ~30 days)
-- Add Stock currently uses the full Add Inventory dialog via `restockInventoryId`
+- Match on `entity_id` + `entity_type` stored on the case (serial is used for lookup only at create time)
+- Active statuses: `open`, `under_inspection`, `under_repair`
+- Primary UX path: `/maintenance` serial lookup → Create Maintenance Case
+- Surface API `detail` via `formatMaintenanceApiError` in the create toast
 
 ## History
 
 <!-- Completed features (append only) -->
+
+### Inventory OEM Refs, Warranty & Shelf-Life Expiry
+OEM PN/SN refs; warranty toggle + expiry; shelf-life capture; inventory expiry highlight/filter.
 
 ### Sibling Node Groups
 Persist sibling groups on hierarchy config; multi-select; create/rename/ungroup; visual frame.
