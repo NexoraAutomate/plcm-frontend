@@ -10,6 +10,7 @@ export type CloneOrderProjectsResult = {
   created: Project[];
   skipped: number;
   errors: string[];
+  hierarchiesGenerated: number;
 };
 
 function repeatBaseName(name: string): string {
@@ -28,6 +29,20 @@ function toIsoDateOrUndefined(value?: string | null): string | undefined {
   if (!trimmed) return undefined;
   if (trimmed.includes('T')) return trimmed.endsWith('Z') ? trimmed : `${trimmed}Z`;
   return `${trimmed.slice(0, 10)}T00:00:00Z`;
+}
+
+function errorDetail(error: unknown): string | null {
+  if (
+    error &&
+    typeof error === 'object' &&
+    'response' in error &&
+    (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
+  ) {
+    const detail = (error as { response?: { data?: { detail?: string } } }).response
+      ?.data?.detail;
+    return typeof detail === 'string' && detail.trim() ? detail.trim() : null;
+  }
+  return null;
 }
 
 /** Prefer per-flight array; fall back to sdls_per_flight expanded by flight_count. */
@@ -80,6 +95,16 @@ async function hydrateProject(project: Project): Promise<Project> {
   } catch {
     return project;
   }
+}
+
+/**
+ * Approve + generate hierarchy so Systems match the source order's config/SDLS
+ * structure (drafts alone always show Systems = 0).
+ */
+async function materializeClonedProject(project: Project): Promise<Project> {
+  await api.projects.approve(project.id);
+  const generated = await api.projects.generateHierarchy(project.id);
+  return generated.data.project ?? (await api.projects.get(project.id)).data;
 }
 
 /**
@@ -176,7 +201,10 @@ export function buildGroupedDraftClonePayload(
   };
 }
 
-/** Clone source-order projects as Drafts with the same create-draft flight specs. */
+/**
+ * Clone source-order projects with the same create-draft flight specs, then
+ * approve + generate hierarchy so Systems counts match the source order.
+ */
 export async function cloneOrderProjectsAsDrafts(
   sourceOrderId: number,
   newOrderId: number
@@ -188,6 +216,7 @@ export async function cloneOrderProjectsAsDrafts(
   const created: Project[] = [];
   const errors: string[] = [];
   let skipped = 0;
+  let hierarchiesGenerated = 0;
 
   for (const group of groups) {
     const payload = buildGroupedDraftClonePayload(group.projects, newOrderId);
@@ -199,23 +228,34 @@ export async function cloneOrderProjectsAsDrafts(
       continue;
     }
 
+    let projects: Project[] = [];
     try {
       const res = await api.projects.createDraftsByFlight(payload);
-      const projects = res.data.projects ?? [];
-      created.push(...projects);
+      projects = res.data.projects ?? [];
     } catch (error) {
-      const detail =
-        error &&
-        typeof error === 'object' &&
-        'response' in error &&
-        (error as { response?: { data?: { detail?: string } } }).response?.data?.detail;
       errors.push(
-        typeof detail === 'string' && detail.trim()
-          ? `${group.displayName}: ${detail}`
+        errorDetail(error) != null
+          ? `${group.displayName}: ${errorDetail(error)}`
           : `Failed to clone draft projects for “${group.displayName}”`
       );
+      continue;
+    }
+
+    for (const project of projects) {
+      try {
+        const materialized = await materializeClonedProject(project);
+        created.push(materialized);
+        hierarchiesGenerated += 1;
+      } catch (error) {
+        created.push(project);
+        errors.push(
+          errorDetail(error) != null
+            ? `${project.name}: created as draft, but systems were not generated (${errorDetail(error)})`
+            : `${project.name}: created as draft, but systems were not generated`
+        );
+      }
     }
   }
 
-  return { created, skipped, errors };
+  return { created, skipped, errors, hierarchiesGenerated };
 }

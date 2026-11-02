@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,7 +25,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { RequiredMark } from '@/components/ui/required-mark';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
-import { Plus } from 'lucide-react';
+import { ArrowRight, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { HierarchyConfigurationSummary } from '@/lib/models';
 
@@ -117,6 +118,169 @@ function SectionHeading({
   );
 }
 
+function SdlsFlightCards({
+  formData,
+  onFormChange,
+  availableConfigs,
+  structuralDisabled,
+  idPrefix,
+  animated = false,
+}: {
+  formData: CreateDraftProjectFormData;
+  onFormChange: CreateDraftProjectDialogProps['onFormChange'];
+  availableConfigs: HierarchyConfigurationSummary[];
+  structuralDisabled: boolean;
+  idPrefix: string;
+  animated?: boolean;
+}) {
+  const flights = formData.sdls_counts_by_flight.slice(0, formData.flight_count);
+
+  return (
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      {flights.map((count, flightIndex) => {
+        const card = (
+          <div className="flex flex-col gap-3 rounded-lg border bg-background p-3.5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-md bg-primary/10 px-2 text-xs font-semibold text-primary">
+                  F{flightIndex + 1}
+                </span>
+                <div>
+                  <p className="text-sm font-medium leading-none">
+                    Flight {flightIndex + 1}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {count} SDLS
+                    {count === 1 ? '' : 's'} on this flight
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Label
+                  htmlFor={`${idPrefix}-flight-sdls-${flightIndex}`}
+                  className="text-xs text-muted-foreground"
+                >
+                  Count
+                </Label>
+                <Input
+                  id={`${idPrefix}-flight-sdls-${flightIndex}`}
+                  type="number"
+                  min={1}
+                  value={count}
+                  onChange={(e) => {
+                    const nextCount = Math.max(1, Number(e.target.value) || 1);
+                    onFormChange((prev) => {
+                      const counts = [...prev.sdls_counts_by_flight];
+                      counts[flightIndex] = nextCount;
+                      return {
+                        ...prev,
+                        sdls_per_flight: Math.max(...counts),
+                        sdls_counts_by_flight: counts,
+                        hierarchy_config_ids_by_flight: buildConfigMatrix(
+                          counts.slice(0, prev.flight_count),
+                          prev.hierarchy_config_id,
+                          prev.hierarchy_config_ids_by_flight
+                        ),
+                      };
+                    });
+                  }}
+                  disabled={structuralDisabled}
+                  className="h-9 w-20 text-center tabular-nums"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2 border-t pt-3">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                SDLS configuration
+              </p>
+              <div className="grid gap-2">
+                {Array.from({ length: count }, (_, sdlsIndex) => {
+                  const selectedId =
+                    formData.hierarchy_config_ids_by_flight?.[flightIndex]?.[
+                      sdlsIndex
+                    ] || formData.hierarchy_config_id;
+                  return (
+                    <div
+                      key={`${flightIndex}-${sdlsIndex}`}
+                      className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5"
+                    >
+                      <Label
+                        htmlFor={`${idPrefix}-flight-${flightIndex}-sdls-config-${sdlsIndex}`}
+                        className="whitespace-nowrap text-xs text-muted-foreground"
+                      >
+                        SDLS {sdlsIndex + 1}
+                      </Label>
+                      <Select
+                        value={selectedId ? String(selectedId) : ''}
+                        onValueChange={(value) => {
+                          const configId = parseInt(value, 10);
+                          onFormChange((prev) => {
+                            const matrix = buildConfigMatrix(
+                              prev.sdls_counts_by_flight.slice(
+                                0,
+                                prev.flight_count
+                              ),
+                              prev.hierarchy_config_id,
+                              prev.hierarchy_config_ids_by_flight
+                            );
+                            matrix[flightIndex][sdlsIndex] = configId;
+                            return {
+                              ...prev,
+                              hierarchy_config_ids_by_flight: matrix,
+                            };
+                          });
+                        }}
+                        disabled={
+                          structuralDisabled || !formData.hierarchy_config_id
+                        }
+                      >
+                        <SelectTrigger
+                          id={`${idPrefix}-flight-${flightIndex}-sdls-config-${sdlsIndex}`}
+                          className="h-9 w-full"
+                        >
+                          <SelectValue placeholder="Select configuration" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableConfigs.map((config) => (
+                            <SelectItem key={config.id} value={String(config.id)}>
+                              {config.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+
+        if (!animated) {
+          return <div key={flightIndex}>{card}</div>;
+        }
+
+        return (
+          <motion.div
+            key={flightIndex}
+            initial={{ opacity: 0, y: 18, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{
+              delay: 0.12 + flightIndex * 0.045,
+              type: 'spring',
+              stiffness: 380,
+              damping: 28,
+            }}
+          >
+            {card}
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function CreateDraftProjectDialog({
   open,
   onOpenChange,
@@ -134,6 +298,7 @@ export function CreateDraftProjectDialog({
   descriptionOverride,
   allowStructuralEdit = true,
 }: CreateDraftProjectDialogProps) {
+  const [sdlsDialogOpen, setSdlsDialogOpen] = useState(false);
   const isEdit = mode === 'edit';
   const totalSdls = useMemo(
     () =>
@@ -178,16 +343,16 @@ export function CreateDraftProjectDialog({
         </Can>
       ) : null}
 
-      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-5xl">
-        <DialogHeader className="border-b px-6 py-3.5 pr-12 text-left">
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
+        <DialogHeader className="shrink-0 border-b px-6 py-3.5 pr-12 text-left">
           <DialogTitle className="text-lg font-semibold">{dialogTitle}</DialogTitle>
           <DialogDescription className="text-sm leading-relaxed">
             {dialogDescription}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="px-6 py-4">
-          <div className="grid gap-5 lg:grid-cols-2 lg:gap-x-8 lg:gap-y-5">
+        <div className="flex max-h-[calc(90vh-8.5rem)] flex-col gap-4 overflow-y-auto px-6 py-4">
+          <div className="grid gap-4 lg:grid-cols-2 lg:gap-x-8">
             <section>
               <SectionHeading
                 title="Basics"
@@ -304,297 +469,222 @@ export function CreateDraftProjectDialog({
               </div>
 
               {!isEdit ? (
-              <div className="mt-4">
-                <SectionHeading
-                  title="Creation path"
-                  description="Draft needs approval; existing programs generate hierarchy now."
-                />
-                <RadioGroup
-                  value={creationMode}
-                  onValueChange={(value) =>
-                    onFormChange({
-                      ...formData,
-                      is_existing_project: value === 'existing',
-                    })
-                  }
-                  className="grid gap-3 sm:grid-cols-2"
-                  disabled={isCreating}
-                >
-                  <label
-                    className={cn(
-                      'flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 transition-colors',
-                      creationMode === 'draft'
-                        ? 'border-primary bg-primary/5'
-                        : 'hover:bg-muted/40'
-                    )}
+                <div className="mt-4">
+                  <SectionHeading
+                    title="Creation path"
+                    description="Draft needs approval; existing programs generate hierarchy now."
+                  />
+                  <RadioGroup
+                    value={creationMode}
+                    onValueChange={(value) =>
+                      onFormChange({
+                        ...formData,
+                        is_existing_project: value === 'existing',
+                      })
+                    }
+                    className="grid gap-3 sm:grid-cols-2"
+                    disabled={isCreating}
                   >
-                    <RadioGroupItem value="draft" className="mt-0.5" disabled={isCreating} />
-                    <span className="space-y-0.5">
-                      <span className="block text-sm font-medium">New draft</span>
-                      <span className="block text-[11px] leading-snug text-muted-foreground">
-                        Saved as Draft until PD/Admin approval.
+                    <label
+                      className={cn(
+                        'flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 transition-colors',
+                        creationMode === 'draft'
+                          ? 'border-primary bg-primary/5'
+                          : 'hover:bg-muted/40'
+                      )}
+                    >
+                      <RadioGroupItem value="draft" className="mt-0.5" disabled={isCreating} />
+                      <span className="space-y-0.5">
+                        <span className="block text-sm font-medium">New draft</span>
+                        <span className="block text-[11px] leading-snug text-muted-foreground">
+                          Saved as Draft until PD/Admin approval.
+                        </span>
                       </span>
-                    </span>
-                  </label>
+                    </label>
 
-                  <label
-                    className={cn(
-                      'flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 transition-colors',
-                      creationMode === 'existing'
-                        ? 'border-primary bg-primary/5'
-                        : 'hover:bg-muted/40'
-                    )}
-                  >
-                    <RadioGroupItem value="existing" className="mt-0.5" disabled={isCreating} />
-                    <span className="space-y-0.5">
-                      <span className="block text-sm font-medium">Existing project</span>
-                      <span className="block text-[11px] leading-snug text-muted-foreground">
-                        Auto-approved; hierarchy shells generated now.
+                    <label
+                      className={cn(
+                        'flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 transition-colors',
+                        creationMode === 'existing'
+                          ? 'border-primary bg-primary/5'
+                          : 'hover:bg-muted/40'
+                      )}
+                    >
+                      <RadioGroupItem
+                        value="existing"
+                        className="mt-0.5"
+                        disabled={isCreating}
+                      />
+                      <span className="space-y-0.5">
+                        <span className="block text-sm font-medium">Existing project</span>
+                        <span className="block text-[11px] leading-snug text-muted-foreground">
+                          Auto-approved; hierarchy shells generated now.
+                        </span>
                       </span>
-                    </span>
-                  </label>
-                </RadioGroup>
-              </div>
+                    </label>
+                  </RadioGroup>
+                </div>
               ) : null}
             </section>
-
-            <section className="lg:col-span-2">
-              <SectionHeading
-                title="Structure"
-                description="Pick the project configuration, flights, and SDLS per flight. Each SDLS can override configuration."
-              />
-
-              <div className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-                <div className="space-y-1.5">
-                  <Label htmlFor="create-project-config">
-                    Project configuration
-                    <RequiredMark />
-                  </Label>
-                  <Select
-                    value={
-                      formData.hierarchy_config_id
-                        ? String(formData.hierarchy_config_id)
-                        : ''
-                    }
-                    onValueChange={(value) => {
-                      const id = parseInt(value, 10);
-                      const config = availableConfigs.find((item) => item.id === id);
-                      onFormChange((prev) => {
-                        const counts = prev.sdls_counts_by_flight.slice(
-                          0,
-                          prev.flight_count
-                        );
-                        return {
-                          ...prev,
-                          hierarchy_config_id: id,
-                          product_type: config?.product_type_codes?.[0] || '',
-                          // Default every SDLS/flight to the new project configuration.
-                          hierarchy_config_ids_by_flight: buildConfigMatrix(
-                            counts,
-                            id
-                          ),
-                        };
-                      });
-                    }}
-                    disabled={structuralDisabled}
-                  >
-                    <SelectTrigger id="create-project-config" className="h-9 w-full">
-                      <SelectValue placeholder="Select project configuration" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableConfigs.map((config) => (
-                        <SelectItem key={config.id} value={String(config.id)}>
-                          {config.name} ({config.code})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[11px] leading-snug text-muted-foreground">
-                    {selectedConfig
-                      ? `Default for all flights and SDLS: ${selectedConfig.name}.`
-                      : availableConfigs.length === 0
-                        ? 'No available configurations right now. Ask an admin to publish one first.'
-                        : 'Applied to every SDLS by default; override per SDLS below if needed.'}
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="create-project-flight-count">
-                    Number of flights
-                    <RequiredMark />
-                  </Label>
-                  <Input
-                    id="create-project-flight-count"
-                    type="number"
-                    min={1}
-                    value={formData.flight_count}
-                    onChange={(e) => {
-                      const flightCount = Math.max(1, Number(e.target.value) || 1);
-                      onFormChange((prev) => {
-                        const counts = Array.from(
-                          { length: flightCount },
-                          (_, index) => prev.sdls_counts_by_flight[index] ?? 1
-                        );
-                        return {
-                          ...prev,
-                          flight_count: flightCount,
-                          sdls_counts_by_flight: counts,
-                          hierarchy_config_ids_by_flight: buildConfigMatrix(
-                            counts,
-                            prev.hierarchy_config_id,
-                            prev.hierarchy_config_ids_by_flight
-                          ),
-                        };
-                      });
-                    }}
-                    disabled={structuralDisabled}
-                    className="h-9"
-                  />
-                  <p className="text-[11px] leading-snug text-muted-foreground">
-                    One {projectLabel.toLowerCase()} is created for each flight.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-3 space-y-2.5 rounded-lg border bg-muted/20 px-3 py-2.5">
-                <div className="flex flex-wrap items-end justify-between gap-2">
-                  <div>
-                    <Label>
-                      SDLS per flight
-                      <RequiredMark />
-                    </Label>
-                    <p className="text-[11px] text-muted-foreground">
-                      Set SDLS count per flight, then optionally choose each SDLS configuration.
-                    </p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Creating{' '}
-                    <span className="font-medium text-foreground">
-                      {formData.flight_count} {projectWord.toLowerCase()}
-                    </span>
-                    {' · '}
-                    <span className="font-medium text-foreground">
-                      {totalSdls} SDLS
-                    </span>
-                  </p>
-                </div>
-
-                <div className="grid gap-2.5 lg:grid-cols-2">
-                  {formData.sdls_counts_by_flight
-                    .slice(0, formData.flight_count)
-                    .map((count, flightIndex) => (
-                      <div
-                        key={flightIndex}
-                        className="space-y-2 rounded-md border bg-background/70 px-2.5 py-2"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Label
-                            htmlFor={`create-flight-sdls-${flightIndex}`}
-                            className="min-w-14 shrink-0 text-xs font-medium text-muted-foreground"
-                          >
-                            Flight {flightIndex + 1}
-                          </Label>
-                          <Input
-                            id={`create-flight-sdls-${flightIndex}`}
-                            type="number"
-                            min={1}
-                            value={count}
-                            onChange={(e) => {
-                              const nextCount = Math.max(1, Number(e.target.value) || 1);
-                              onFormChange((prev) => {
-                                const counts = [...prev.sdls_counts_by_flight];
-                                counts[flightIndex] = nextCount;
-                                return {
-                                  ...prev,
-                                  sdls_per_flight: Math.max(...counts),
-                                  sdls_counts_by_flight: counts,
-                                  hierarchy_config_ids_by_flight: buildConfigMatrix(
-                                    counts.slice(0, prev.flight_count),
-                                    prev.hierarchy_config_id,
-                                    prev.hierarchy_config_ids_by_flight
-                                  ),
-                                };
-                              });
-                            }}
-                            disabled={structuralDisabled}
-                            className="h-9 w-24"
-                          />
-                          <span className="text-[11px] text-muted-foreground">
-                            SDLS
-                          </span>
-                        </div>
-
-                        <div className="grid gap-1.5 sm:grid-cols-2">
-                          {Array.from({ length: count }, (_, sdlsIndex) => {
-                            const selectedId =
-                              formData.hierarchy_config_ids_by_flight?.[flightIndex]?.[
-                                sdlsIndex
-                              ] || formData.hierarchy_config_id;
-                            return (
-                              <div
-                                key={`${flightIndex}-${sdlsIndex}`}
-                                className="flex items-center gap-1.5"
-                              >
-                                <Label
-                                  htmlFor={`create-flight-${flightIndex}-sdls-config-${sdlsIndex}`}
-                                  className="min-w-12 shrink-0 text-[11px] text-muted-foreground"
-                                >
-                                  SDLS {sdlsIndex + 1}
-                                </Label>
-                                <Select
-                                  value={selectedId ? String(selectedId) : ''}
-                                  onValueChange={(value) => {
-                                    const configId = parseInt(value, 10);
-                                    onFormChange((prev) => {
-                                      const matrix = buildConfigMatrix(
-                                        prev.sdls_counts_by_flight.slice(
-                                          0,
-                                          prev.flight_count
-                                        ),
-                                        prev.hierarchy_config_id,
-                                        prev.hierarchy_config_ids_by_flight
-                                      );
-                                      matrix[flightIndex][sdlsIndex] = configId;
-                                      return {
-                                        ...prev,
-                                        hierarchy_config_ids_by_flight: matrix,
-                                      };
-                                    });
-                                  }}
-                                  disabled={
-                                    structuralDisabled || !formData.hierarchy_config_id
-                                  }
-                                >
-                                  <SelectTrigger
-                                    id={`create-flight-${flightIndex}-sdls-config-${sdlsIndex}`}
-                                    className="h-8 w-full text-xs"
-                                  >
-                                    <SelectValue placeholder="Config" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {availableConfigs.map((config) => (
-                                      <SelectItem
-                                        key={config.id}
-                                        value={String(config.id)}
-                                      >
-                                        {config.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            </section>
           </div>
+
+          <section className="flex flex-col gap-3">
+            <SectionHeading
+              title="Structure"
+              description="Pick the project configuration, flights, and SDLS per flight. Each SDLS can override configuration."
+            />
+
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1.35fr)_minmax(0,0.65fr)]">
+              <div className="space-y-1.5">
+                <Label htmlFor="create-project-config">
+                  Project configuration
+                  <RequiredMark />
+                </Label>
+                <Select
+                  value={
+                    formData.hierarchy_config_id
+                      ? String(formData.hierarchy_config_id)
+                      : ''
+                  }
+                  onValueChange={(value) => {
+                    const id = parseInt(value, 10);
+                    const config = availableConfigs.find((item) => item.id === id);
+                    onFormChange((prev) => {
+                      const counts = prev.sdls_counts_by_flight.slice(
+                        0,
+                        prev.flight_count
+                      );
+                      return {
+                        ...prev,
+                        hierarchy_config_id: id,
+                        product_type: config?.product_type_codes?.[0] || '',
+                        hierarchy_config_ids_by_flight: buildConfigMatrix(counts, id),
+                      };
+                    });
+                  }}
+                  disabled={structuralDisabled}
+                >
+                  <SelectTrigger id="create-project-config" className="h-9 w-full">
+                    <SelectValue placeholder="Select project configuration" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableConfigs.map((config) => (
+                      <SelectItem key={config.id} value={String(config.id)}>
+                        {config.name} ({config.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] leading-snug text-muted-foreground">
+                  {selectedConfig
+                    ? `Default for all flights and SDLS: ${selectedConfig.name}.`
+                    : availableConfigs.length === 0
+                      ? 'No available configurations right now. Ask an admin to publish one first.'
+                      : 'Applied to every SDLS by default; override per SDLS below if needed.'}
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="create-project-flight-count">
+                  Number of flights
+                  <RequiredMark />
+                </Label>
+                <Input
+                  id="create-project-flight-count"
+                  type="number"
+                  min={1}
+                  value={formData.flight_count}
+                  onChange={(e) => {
+                    const flightCount = Math.max(1, Number(e.target.value) || 1);
+                    onFormChange((prev) => {
+                      const counts = Array.from(
+                        { length: flightCount },
+                        (_, index) => prev.sdls_counts_by_flight[index] ?? 1
+                      );
+                      return {
+                        ...prev,
+                        flight_count: flightCount,
+                        sdls_counts_by_flight: counts,
+                        hierarchy_config_ids_by_flight: buildConfigMatrix(
+                          counts,
+                          prev.hierarchy_config_id,
+                          prev.hierarchy_config_ids_by_flight
+                        ),
+                      };
+                    });
+                  }}
+                  disabled={structuralDisabled}
+                  className="h-9"
+                />
+                <p className="text-[11px] leading-snug text-muted-foreground">
+                  One {projectLabel.toLowerCase()} is created for each flight.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border bg-muted/15">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-muted/25 px-4 py-3">
+                <div className="min-w-0">
+                  <Label className="text-sm">
+                    SDLS per flight
+                    <RequiredMark />
+                  </Label>
+                  <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                    Open the flight workspace to set SDLS counts and configurations.
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="rounded-md border bg-background px-2.5 py-1 text-xs font-medium tabular-nums">
+                    {formData.flight_count} {projectWord.toLowerCase()}
+                  </span>
+                  <span className="rounded-md border bg-background px-2.5 py-1 text-xs font-medium tabular-nums">
+                    {totalSdls} SDLS
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 shrink-0 rounded-full border-primary/30 bg-primary/5 text-primary shadow-sm transition-all hover:scale-105 hover:bg-primary hover:text-primary-foreground"
+                    onClick={() => setSdlsDialogOpen(true)}
+                    aria-label="Configure SDLS per flight"
+                    title="Configure SDLS per flight"
+                  >
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="flex w-full flex-wrap gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/30"
+                onClick={() => setSdlsDialogOpen(true)}
+              >
+                {formData.sdls_counts_by_flight
+                  .slice(0, formData.flight_count)
+                  .map((count, flightIndex) => (
+                    <span
+                      key={flightIndex}
+                      className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2.5 py-1.5 text-xs shadow-sm"
+                    >
+                      <span className="font-semibold text-primary">
+                        F{flightIndex + 1}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {count} SDLS{count === 1 ? '' : 's'}
+                      </span>
+                    </span>
+                  ))}
+                {formData.flight_count < 1 ? (
+                  <span className="text-xs text-muted-foreground">
+                    Set number of flights, then configure SDLS here.
+                  </span>
+                ) : null}
+              </button>
+            </div>
+          </section>
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t px-6 py-3.5">
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t px-6 py-3.5">
           <Button
             type="button"
             variant="outline"
@@ -616,6 +706,74 @@ export function CreateDraftProjectDialog({
           </Button>
         </div>
       </DialogContent>
+
+      <Dialog open={sdlsDialogOpen} onOpenChange={setSdlsDialogOpen}>
+        <DialogContent
+          showCloseButton={false}
+          className={cn(
+            'flex h-[min(88vh,820px)] max-h-[88vh] flex-col gap-0 overflow-hidden border-0 bg-transparent p-0 shadow-none sm:max-w-5xl',
+            'data-[state=open]:duration-300 data-[state=open]:!zoom-in-100 data-[state=closed]:!zoom-out-100'
+          )}
+        >
+          <AnimatePresence mode="wait">
+            {sdlsDialogOpen ? (
+              <motion.div
+                key="sdls-workspace"
+                className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border bg-background shadow-2xl"
+                initial={{ opacity: 0, x: 84, scale: 0.9, rotateY: -10 }}
+                animate={{ opacity: 1, x: 0, scale: 1, rotateY: 0 }}
+                exit={{ opacity: 0, x: 40, scale: 0.96 }}
+                transition={{
+                  type: 'spring',
+                  stiffness: 320,
+                  damping: 26,
+                  mass: 0.9,
+                }}
+                style={{ transformPerspective: 1200 }}
+              >
+                <DialogHeader className="shrink-0 border-b px-6 py-4 pr-6 text-left">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                      <DialogTitle className="text-lg font-semibold">
+                        SDLS per flight
+                      </DialogTitle>
+                      <DialogDescription className="text-sm leading-relaxed">
+                        Set how many SDLS each flight gets, then choose a configuration
+                        for every SDLS.
+                      </DialogDescription>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2 text-xs">
+                      <span className="rounded-md border bg-muted/40 px-2.5 py-1 font-medium tabular-nums">
+                        {formData.flight_count} {projectWord.toLowerCase()}
+                      </span>
+                      <span className="rounded-md border bg-muted/40 px-2.5 py-1 font-medium tabular-nums">
+                        {totalSdls} SDLS
+                      </span>
+                    </div>
+                  </div>
+                </DialogHeader>
+
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4">
+                  <SdlsFlightCards
+                    formData={formData}
+                    onFormChange={onFormChange}
+                    availableConfigs={availableConfigs}
+                    structuralDisabled={structuralDisabled}
+                    idPrefix="sdls-dialog"
+                    animated
+                  />
+                </div>
+
+                <div className="flex shrink-0 items-center justify-end gap-2 border-t px-6 py-3.5">
+                  <Button type="button" onClick={() => setSdlsDialogOpen(false)}>
+                    Done
+                  </Button>
+                </div>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

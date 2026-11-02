@@ -65,8 +65,15 @@ export default function OrdersPage() {
   const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility('orders-list', COLUMN_DEFS);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { customers, projects, createOrder, updateOrder, deleteOrder, mergeProjectLocal } =
-    useDataStore();
+  const {
+    customers,
+    projects,
+    createOrder,
+    updateOrder,
+    deleteOrder,
+    mergeProjectLocal,
+    ensureHierarchyTypesLoaded,
+  } = useDataStore();
   const { can } = useAuth();
   const faultMap = useEntityFaultMap();
   const [search, setSearch] = useState('');
@@ -200,18 +207,25 @@ export default function OrdersPage() {
           try {
             const cloneResult = await cloneOrderProjectsAsDrafts(sourceOrderId, newOrder.id);
             cloneResult.created.forEach((project) => mergeProjectLocal(project));
+            if (cloneResult.hierarchiesGenerated > 0) {
+              await ensureHierarchyTypesLoaded(['systems'], { force: true });
+            }
             if (cloneResult.created.length > 0) {
               toast.success(
-                `Cloned ${cloneResult.created.length} draft project${
-                  cloneResult.created.length === 1 ? '' : 's'
-                } (same config, flights, and SDLS).`
+                cloneResult.hierarchiesGenerated > 0
+                  ? `Cloned ${cloneResult.created.length} project${
+                      cloneResult.created.length === 1 ? '' : 's'
+                    } with matching flight specs and generated systems.`
+                  : `Cloned ${cloneResult.created.length} draft project${
+                      cloneResult.created.length === 1 ? '' : 's'
+                    } (same config, flights, and SDLS).`
               );
             } else if (cloneResult.skipped > 0 && cloneResult.errors.length === 0) {
               toast.message('Order repeated. Source order had no cloneable project specs.');
             }
             if (cloneResult.errors.length > 0) {
               toast.error(
-                `Some draft projects failed to clone: ${cloneResult.errors.slice(0, 2).join('; ')}`
+                `Some projects failed to clone fully: ${cloneResult.errors.slice(0, 2).join('; ')}`
               );
             }
           } catch (cloneError) {

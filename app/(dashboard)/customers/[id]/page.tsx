@@ -54,6 +54,7 @@ export default function CustomerDetailPage(){
       deleteSystem,
       updateSystem,
       mergeProjectLocal,
+      ensureHierarchyTypesLoaded,
     } = useDataStore();
     const { can } = useAuth();
     const { showStats, setShowStats } = useListStatsVisibility();
@@ -156,18 +157,25 @@ export default function CustomerDetailPage(){
           try {
             const cloneResult = await cloneOrderProjectsAsDrafts(sourceOrderId, newOrder.id);
             cloneResult.created.forEach((project) => mergeProjectLocal(project));
+            if (cloneResult.hierarchiesGenerated > 0) {
+              await ensureHierarchyTypesLoaded(['systems'], { force: true });
+            }
             if (cloneResult.created.length > 0) {
               toast.success(
-                `Cloned ${cloneResult.created.length} draft project${
-                  cloneResult.created.length === 1 ? '' : 's'
-                } (same config, flights, and SDLS).`
+                cloneResult.hierarchiesGenerated > 0
+                  ? `Cloned ${cloneResult.created.length} project${
+                      cloneResult.created.length === 1 ? '' : 's'
+                    } with matching flight specs and generated systems.`
+                  : `Cloned ${cloneResult.created.length} draft project${
+                      cloneResult.created.length === 1 ? '' : 's'
+                    } (same config, flights, and SDLS).`
               );
             } else if (cloneResult.skipped > 0 && cloneResult.errors.length === 0) {
               toast.message('Order repeated. Source order had no cloneable project specs.');
             }
             if (cloneResult.errors.length > 0) {
               toast.error(
-                `Some draft projects failed to clone: ${cloneResult.errors.slice(0, 2).join('; ')}`
+                `Some projects failed to clone fully: ${cloneResult.errors.slice(0, 2).join('; ')}`
               );
             }
           } catch (cloneError) {
