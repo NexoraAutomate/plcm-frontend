@@ -2,8 +2,8 @@ import type { Edge, Node } from '@xyflow/react';
 import type { EntityLookupNode, lookUpResponse } from '@/lib/models';
 
 export const ENTITY_NODE_WIDTH = 280;
-export const ENTITY_NODE_HEIGHT = 120;
-const LEVEL_GAP = 180;
+export const ENTITY_NODE_HEIGHT = 160;
+const LEVEL_GAP = 200;
 const SIBLING_GAP = 60;
 const SPINE_CENTER_X = 400;
 

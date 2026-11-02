@@ -206,6 +206,7 @@ export default function MaintenancePage() {
       toast.success('Children suspicion workflow started.');
     } catch (err) {
       console.error('Suspect children failed:', err);
+      throw err;
     }
   };
 

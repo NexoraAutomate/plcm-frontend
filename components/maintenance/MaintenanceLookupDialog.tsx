@@ -27,6 +27,10 @@ import {
 import { cn } from '@/lib/utils';
 import { searchProjectSerialNumbers } from '@/lib/serial-numbers';
 import { EntityLookupTree } from './EntityLookupTree';
+import {
+  MaintenanceEntityStockDetailDialog,
+  type MaintenanceEntityStockSelection,
+} from './maintenance-entity-stock-detail-dialog';
 import { MaintenanceQrScanPlaceholder } from './maintenance-qr-scan-placeholder';
 import type { EntityLookupNode, lookUpResponse } from '@/lib/models';
 import { useAuth } from '@/lib/auth-context';
@@ -238,8 +242,89 @@ export function MaintenanceLookupDialog({
     Boolean(lookupResponse) ||
     Boolean(lookupError) ||
     Boolean(caseId);
+  const [stockDetailOpen, setStockDetailOpen] = useState(false);
+  const [stockSelection, setStockSelection] =
+    useState<MaintenanceEntityStockSelection | null>(null);
+  const [lockedLookupSerial, setLockedLookupSerial] = useState<string | null>(null);
+  const [suspectChildrenDone, setSuspectChildrenDone] = useState(false);
+  const [suspectChildrenBusy, setSuspectChildrenBusy] = useState(false);
+  const serialRef = useRef(serialNumber);
+  serialRef.current = serialNumber;
+
+  useEffect(() => {
+    if (!isOpen) {
+      setLockedLookupSerial(null);
+      setSuspectChildrenDone(false);
+      setSuspectChildrenBusy(false);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (lookupResponse && !lookupLoading && !lookupError) {
+      setLockedLookupSerial(serialRef.current.trim());
+      return;
+    }
+    if (!lookupResponse && !lookupLoading) {
+      setLockedLookupSerial(null);
+    }
+  }, [lookupResponse, lookupLoading, lookupError]);
+
+  useEffect(() => {
+    setSuspectChildrenDone(false);
+    setSuspectChildrenBusy(false);
+  }, [caseId, lookupResponse?.matched_entity_id, lookupResponse?.matched_entity_type]);
+
+  const handleSerialChange = (value: string) => {
+    setSerialNumber(value);
+  };
+
+  const handleClearLookup = () => {
+    setLockedLookupSerial(null);
+    setSuspectChildrenDone(false);
+    setSuspectChildrenBusy(false);
+    onClearLookup();
+  };
+
+  const handleSuspectChildren = async () => {
+    if (!onSuspectChildren || suspectChildrenDone || suspectChildrenBusy) return;
+    setSuspectChildrenBusy(true);
+    // Hide immediately to block duplicate clicks while the request runs.
+    setSuspectChildrenDone(true);
+    try {
+      await onSuspectChildren();
+    } catch {
+      setSuspectChildrenDone(false);
+    } finally {
+      setSuspectChildrenBusy(false);
+    }
+  };
+
+  const handleViewEntity = (node: EntityLookupNode) => {
+    setStockSelection({
+      entityType: node.entity_type,
+      entityId: node.entity_id,
+      label: node.label || node.entity_name,
+      partNumber: node.entity_PartNumber,
+      serialNumber: node.entity_SerialNumber,
+    });
+    setStockDetailOpen(true);
+  };
+
+  const trimmedSerial = serialNumber.trim();
+  const lookupDisabled =
+    Boolean(lookupLoading) ||
+    trimmedSerial.length === 0 ||
+    (lockedLookupSerial !== null && trimmedSerial === lockedLookupSerial);
+
+  const showSuspectChildren =
+    Boolean(lookupResponse) &&
+    Boolean(caseId) &&
+    canSuspectChildren &&
+    Boolean(onSuspectChildren) &&
+    !suspectChildrenDone;
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent
         className={cn(
@@ -253,12 +338,12 @@ export function MaintenanceLookupDialog({
 
         <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)]">
           <aside className="space-y-4 border-b bg-muted/20 p-4 sm:p-6 lg:border-b-0 lg:border-r">
-            <SerialNumberField value={serialNumber} onChange={setSerialNumber} />
+            <SerialNumberField value={serialNumber} onChange={handleSerialChange} />
 
             <MaintenanceQrScanPlaceholder
               disabled={lookupLoading}
               onSerialDetected={async (scannedSerial) => {
-                setSerialNumber(scannedSerial);
+                handleSerialChange(scannedSerial);
                 await onLookup(scannedSerial);
               }}
             />
@@ -266,7 +351,7 @@ export function MaintenanceLookupDialog({
             <div className="flex flex-col gap-2">
               <Button
                 onClick={() => onLookup(serialNumber)}
-                disabled={lookupLoading || serialNumber.trim().length === 0}
+                disabled={lookupDisabled}
                 className="w-full"
               >
                 {lookupLoading ? (
@@ -280,7 +365,7 @@ export function MaintenanceLookupDialog({
                 variant="outline"
                 className="w-full gap-2"
                 disabled={lookupLoading || !canClear}
-                onClick={onClearLookup}
+                onClick={handleClearLookup}
               >
                 <Eraser className="h-4 w-4" />
                 Clear lookup
@@ -292,8 +377,16 @@ export function MaintenanceLookupDialog({
                 </Button>
               ) : null}
 
-              {lookupResponse && caseId && canSuspectChildren ? (
-                <Button onClick={onSuspectChildren} variant="secondary" className="w-full">
+              {showSuspectChildren ? (
+                <Button
+                  onClick={() => void handleSuspectChildren()}
+                  variant="secondary"
+                  className="w-full"
+                  disabled={suspectChildrenBusy}
+                >
+                  {suspectChildrenBusy ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
                   Suspect Children
                 </Button>
               ) : null}
@@ -315,8 +408,10 @@ export function MaintenanceLookupDialog({
               <EntityLookupTree
                 response={lookupResponse}
                 caseId={caseId}
-                onSuspectChildren={onSuspectChildren}
+                onSuspectChildren={handleSuspectChildren}
                 onConfirmFault={onConfirmFault}
+                onViewEntity={handleViewEntity}
+                suspectChildrenDone={suspectChildrenDone}
               />
             ) : (
               <div className="flex h-full min-h-[280px] items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
@@ -330,7 +425,7 @@ export function MaintenanceLookupDialog({
           <Button
             variant="outline"
             disabled={lookupLoading || !canClear}
-            onClick={onClearLookup}
+            onClick={handleClearLookup}
             className="gap-2"
           >
             <Eraser className="h-4 w-4" />
@@ -342,5 +437,12 @@ export function MaintenanceLookupDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <MaintenanceEntityStockDetailDialog
+      open={stockDetailOpen}
+      onOpenChange={setStockDetailOpen}
+      selection={stockSelection}
+    />
+    </>
   );
 }
