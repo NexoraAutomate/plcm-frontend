@@ -11,15 +11,25 @@ import {
 import { motion } from 'framer-motion';
 import { TabsList } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import {
-  pillTabsListClassName,
-  pillTabsTriggerClassName,
-  UPLOAD_ACCENT,
-} from '@/components/ui/file-drop-zone';
 
-export { pillTabsListClassName, pillTabsTriggerClassName, UPLOAD_ACCENT };
+/**
+ * App-wide accent for segmented pill tabs (matches Create Inventory dialog).
+ * Prefer importing tab primitives from this module when adding multitabs elsewhere.
+ */
+export const PILL_TABS_ACCENT = '#10A37F';
 
-/** Trigger styles for use with AnimatedPillTabsList (active fill comes from the sliding pill). */
+/** @deprecated Prefer PILL_TABS_ACCENT — kept for upload / legacy imports. */
+export const UPLOAD_ACCENT = PILL_TABS_ACCENT;
+
+/** Outer capsule for segmented controls. */
+export const pillTabsListClassName =
+  'flex h-auto w-full flex-wrap justify-start gap-0.5 rounded-full border bg-background p-1';
+
+/** Static (non-animated) active fill — prefer AnimatedPillTabsList + animatedPillTabsTriggerClassName. */
+export const pillTabsTriggerClassName =
+  'flex-1 rounded-full px-3 py-1.5 text-sm font-medium text-foreground shadow-none data-[state=active]:bg-[var(--pill-tabs-accent,#10A37F)] data-[state=active]:text-white data-[state=active]:shadow-none';
+
+/** Trigger styles for AnimatedPillTabsList (active fill comes from the sliding pill). */
 export const animatedPillTabsTriggerClassName = cn(
   pillTabsTriggerClassName,
   'relative z-10 data-[state=active]:bg-transparent'
@@ -33,8 +43,19 @@ type AnimatedPillTabsListProps = {
 };
 
 /**
- * Pill tab list with a spring-animated indicator that slides along the x-axis
- * when the active tab changes.
+ * App template: pill tab list with a spring-animated indicator that slides
+ * along the x-axis when the active tab changes.
+ *
+ * Usage:
+ * ```tsx
+ * <Tabs value={tab} onValueChange={setTab}>
+ *   <AnimatedPillTabsList value={tab}>
+ *     <TabsTrigger value="a" className={animatedPillTabsTriggerClassName}>A</TabsTrigger>
+ *     <TabsTrigger value="b" className={animatedPillTabsTriggerClassName}>B</TabsTrigger>
+ *   </AnimatedPillTabsList>
+ *   <TabsContent value="a">…</TabsContent>
+ * </Tabs>
+ * ```
  */
 export function AnimatedPillTabsList({
   value,
@@ -80,15 +101,16 @@ export function AnimatedPillTabsList({
       ref={listRef}
       className={cn(pillTabsListClassName, 'relative overflow-hidden', className)}
       style={{
-        borderColor: UPLOAD_ACCENT,
-        ['--upload-accent' as string]: UPLOAD_ACCENT,
+        borderColor: PILL_TABS_ACCENT,
+        ['--pill-tabs-accent' as string]: PILL_TABS_ACCENT,
+        ['--upload-accent' as string]: PILL_TABS_ACCENT,
         ...style,
       }}
     >
       {pill.ready ? (
         <motion.span
           aria-hidden
-          className="pointer-events-none absolute top-1 bottom-1 left-0 rounded-full bg-[var(--upload-accent)]"
+          className="pointer-events-none absolute top-1 bottom-1 left-0 rounded-full bg-[var(--pill-tabs-accent)]"
           initial={false}
           animate={{ x: pill.x, width: pill.width }}
           transition={{ type: 'spring', stiffness: 420, damping: 34, mass: 0.8 }}

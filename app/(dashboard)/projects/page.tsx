@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAuth } from '@/lib/auth-context';
 import { WorkflowRole } from '@/lib/workflow-roles';
-import { Edit, Trash2, Search, GitBranch, ChevronDown, Eye } from 'lucide-react';
+import { Edit, Trash2, Search, GitBranch, ChevronDown, Eye, CircleArrowLeft } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import {
@@ -749,18 +749,39 @@ export default function ProjectsPage(){
           <h1 className="text-3xl font-bold tracking-tight">{entityLabel('project', true)}</h1>
           <p className="text-muted-foreground mt-2 text-sm ">Manage satellite lifecycle {entityLabel('project', true).toLowerCase()}</p>
         </div>
-        <ListStatsVisibilityControls
-          showStats={showStats}
-          onShowStatsChange={setShowStats}
-          onRefresh={pagination.refetch}
-          checkboxLabel="Show KPIs"
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          {orderFilterId != null ? (
+            <Button
+              variant="ghost"
+              className="gap-2 bg-muted/40"
+              onClick={() => router.push(`/orders/${orderFilterId}`)}
+            >
+              <CircleArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+          ) : null}
+          <ListStatsVisibilityControls
+            showStats={showStats}
+            onShowStatsChange={setShowStats}
+            onRefresh={pagination.refetch}
+            checkboxLabel="Show KPIs"
+          />
+        </div>
       </div>
       <div>
         {filteredOrder ? (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="rounded-full border bg-muted px-3 py-1 text-sm">
               Filtered by order: <strong>{filteredOrder.order_number}</strong> — {filteredOrder.title}
+            </span>
+            <Button variant="ghost" size="sm" onClick={() => router.push('/projects')}>
+              Clear order filter
+            </Button>
+          </div>
+        ) : orderFilterId != null ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="rounded-full border bg-muted px-3 py-1 text-sm">
+              Filtered by order ID: <strong>{orderFilterId}</strong>
             </span>
             <Button variant="ghost" size="sm" onClick={() => router.push('/projects')}>
               Clear order filter

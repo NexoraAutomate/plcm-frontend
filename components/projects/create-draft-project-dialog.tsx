@@ -329,6 +329,7 @@ export function CreateDraftProjectDialog({
       open={open}
       onOpenChange={(nextOpen) => {
         if (isCreating) return;
+        if (!nextOpen) setSdlsDialogOpen(false);
         onOpenChange(nextOpen);
       }}
     >

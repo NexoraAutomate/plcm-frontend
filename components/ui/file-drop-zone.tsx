@@ -3,16 +3,16 @@
 import { useCallback, useId, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { Eye, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { UPLOAD_ACCENT } from '@/components/ui/animated-pill-tabs';
 import { cn } from '@/lib/utils';
 
-/** Accent used by upload drop zones and pill tab controls (matches product upload mock). */
-export const UPLOAD_ACCENT = '#10A37F';
-
-export const pillTabsListClassName =
-  'flex h-auto w-full flex-wrap justify-start gap-0.5 rounded-full border bg-background p-1';
-
-export const pillTabsTriggerClassName =
-  'flex-1 rounded-full px-3 py-1.5 text-sm font-medium text-foreground shadow-none data-[state=active]:text-white data-[state=active]:shadow-none';
+/** Re-export accent / pill tab tokens so upload callers can import from one place. */
+export {
+  PILL_TABS_ACCENT,
+  UPLOAD_ACCENT,
+  pillTabsListClassName,
+  pillTabsTriggerClassName,
+} from '@/components/ui/animated-pill-tabs';
 
 export type UploadedFileRowProps = {
   name: string;

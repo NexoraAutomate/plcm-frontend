@@ -11,7 +11,7 @@ import { PageLoader } from '@/components/page-loader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, FileText, Calendar, Layers, Network, Ban, GitBranch, Package, AlertTriangle, Workflow, ChevronDown } from 'lucide-react';
+import { ArrowLeft, FileText, Calendar, Layers, Network, Ban, GitBranch, Package, AlertTriangle, Workflow } from 'lucide-react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
@@ -43,12 +43,11 @@ import { ShortageListPanel } from '@/components/shortages/shortage-list-panel';
 import { useProjectProgressQuery } from '@/hooks/queries';
 import { ConfigChangeBanner } from '@/components/projects/config-change-banner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+  AnimatedPillTabsList,
+  animatedPillTabsTriggerClassName,
+} from '@/components/ui/animated-pill-tabs';
 import { ProjectWorkflowStatus, isProjectReadOnly, workflowStatusLabel } from '@/lib/workflow-status';
 import { isCurrentInstallEntity } from '@/lib/entity-replacement';
 import {
@@ -90,7 +89,6 @@ export default function ProjectDetailPage() {
     Number.isFinite(Number(projectId)) ? Number(projectId) : null
   );
   const { showStats, setShowStats } = useListStatsVisibility();
-  const [tabsOpen, setTabsOpen] = useState(true);
   const tabParam = searchParams.get('tab');
   const activeTab =
     tabParam === 'workflow' ||
@@ -493,99 +491,89 @@ export default function ProjectDetailPage() {
         />
       ) : null}
 
-      <Collapsible open={tabsOpen} onOpenChange={setTabsOpen} className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-sm font-medium">Project workflow</h2>
-            <p className="text-xs text-muted-foreground">
-              Workflow, hierarchy, reservations, and bottlenecks
-            </p>
-          </div>
-          <CollapsibleTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-1.5 shrink-0">
-              {tabsOpen ? 'Collapse' : 'Expand'}
-              <ChevronDown
-                className={cn(
-                  'h-4 w-4 transition-transform',
-                  tabsOpen && 'rotate-180'
-                )}
-              />
-            </Button>
-          </CollapsibleTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-3">
+        <div className="sticky top-0 z-20 -mx-6 border-b border-border/60 bg-background/95 px-6 py-3 backdrop-blur supports-backdrop-filter:bg-background/80">
+          <AnimatedPillTabsList value={activeTab}>
+            <TabsTrigger
+              value="workflow"
+              className={cn(animatedPillTabsTriggerClassName, 'gap-1.5')}
+            >
+              <Workflow className="h-4 w-4" />
+              Workflow
+            </TabsTrigger>
+            <TabsTrigger
+              value="hierarchy"
+              className={cn(animatedPillTabsTriggerClassName, 'gap-1.5')}
+            >
+              <GitBranch className="h-4 w-4" />
+              Generated Hierarchy
+            </TabsTrigger>
+            <TabsTrigger
+              value="reservations"
+              className={cn(animatedPillTabsTriggerClassName, 'gap-1.5')}
+            >
+              <Package className="h-4 w-4" />
+              Inventory Reservations
+            </TabsTrigger>
+            <TabsTrigger
+              value="bottlenecks"
+              className={cn(animatedPillTabsTriggerClassName, 'gap-1.5')}
+            >
+              <AlertTriangle className="h-4 w-4" />
+              Bottlenecks
+            </TabsTrigger>
+          </AnimatedPillTabsList>
         </div>
 
-        <CollapsibleContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-4">
-            <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
-              <TabsTrigger value="workflow" className="gap-1.5">
-                <Workflow className="h-4 w-4" />
-                Workflow
-              </TabsTrigger>
-              <TabsTrigger value="hierarchy" className="gap-1.5">
-                <GitBranch className="h-4 w-4" />
-                Generated Hierarchy
-              </TabsTrigger>
-              <TabsTrigger value="reservations" className="gap-1.5">
-                <Package className="h-4 w-4" />
-                Inventory Reservations
-              </TabsTrigger>
-              <TabsTrigger value="bottlenecks" className="gap-1.5">
-                <AlertTriangle className="h-4 w-4" />
-                Bottlenecks
-              </TabsTrigger>
-            </TabsList>
+        <TabsContent value="workflow" className="mt-0">
+          <ProjectWorkflowActions
+            project={project}
+            users={users}
+            onUpdated={(next) => {
+              setWorkflowProject(next);
+              mergeProjectLocal(next);
+            }}
+          />
+        </TabsContent>
 
-            <TabsContent value="workflow" className="mt-0">
-              <ProjectWorkflowActions
-                project={project}
-                users={users}
-                onUpdated={(next) => {
-                  setWorkflowProject(next);
-                  mergeProjectLocal(next);
-                }}
+        <TabsContent value="hierarchy" className="mt-0">
+          <GeneratedHierarchyCard
+            project={project}
+            configurationLabel={configurationLabel}
+          />
+        </TabsContent>
+
+        <TabsContent value="reservations" className="mt-0 space-y-4">
+          <ProjectReservationsPanel project={project} />
+          {project.status_name === 'READY_FOR_INVENTORY' || highlightShortageId != null ? (
+            <div
+              className={`space-y-2 rounded-lg border p-4 ${
+                hasProjectShortages === false && highlightShortageId == null ? 'hidden' : ''
+              }`}
+            >
+              <div>
+                <h3 className="text-sm font-medium">Shortages</h3>
+                <p className="text-xs text-muted-foreground">
+                  Waiting demand for this project. Matching receipts auto-reserve FCFS.
+                </p>
+              </div>
+              <ShortageListPanel
+                projectId={project.id}
+                pollMs={WORKFLOW_POLL_MS}
+                highlightId={highlightShortageId}
+                onRowsChange={handleProjectShortagesChange}
               />
-            </TabsContent>
+            </div>
+          ) : null}
+        </TabsContent>
 
-            <TabsContent value="hierarchy" className="mt-0">
-              <GeneratedHierarchyCard
-                project={project}
-                configurationLabel={configurationLabel}
-              />
-            </TabsContent>
-
-            <TabsContent value="reservations" className="mt-0 space-y-4">
-              <ProjectReservationsPanel project={project} />
-              {project.status_name === 'READY_FOR_INVENTORY' || highlightShortageId != null ? (
-                <div
-                  className={`space-y-2 rounded-lg border p-4 ${
-                    hasProjectShortages === false && highlightShortageId == null ? 'hidden' : ''
-                  }`}
-                >
-                  <div>
-                    <h3 className="text-sm font-medium">Shortages</h3>
-                    <p className="text-xs text-muted-foreground">
-                      Waiting demand for this project. Matching receipts auto-reserve FCFS.
-                    </p>
-                  </div>
-                  <ShortageListPanel
-                    projectId={project.id}
-                    pollMs={WORKFLOW_POLL_MS}
-                    highlightId={highlightShortageId}
-                    onRowsChange={handleProjectShortagesChange}
-                  />
-                </div>
-              ) : null}
-            </TabsContent>
-
-            <TabsContent value="bottlenecks" className="mt-0">
-              <ProjectBottlenecksPanel
-                data={progressQuery.data}
-                loading={progressQuery.isLoading}
-              />
-            </TabsContent>
-          </Tabs>
-        </CollapsibleContent>
-      </Collapsible>
+        <TabsContent value="bottlenecks" className="mt-0">
+          <ProjectBottlenecksPanel
+            data={progressQuery.data}
+            loading={progressQuery.isLoading}
+          />
+        </TabsContent>
+      </Tabs>
 
       <div className="flex justify-center">
         <Button
