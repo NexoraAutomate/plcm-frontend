@@ -1028,6 +1028,8 @@ export interface HierarchyConfigNode {
   inventory_source?: string
   sibling_group_id?: string | null
   sibling_group_name?: string | null
+  sibling_group_parent_id?: string | null
+  sibling_group_parent_name?: string | null
 }
 
 export interface HierarchyConfiguration {

@@ -6,7 +6,14 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, FileText, Folder, FolderOpen } from 'lucide-react';
+import {
+  ArrowRight,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  Folder,
+  FolderOpen,
+} from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { filterTemplateNames, type TemplateNameItem } from '@/lib/hierarchy-template-names';
@@ -33,6 +40,12 @@ type Props = {
   hiddenLevels?: TemplateNodeLevel[];
   selectedName?: string;
   onSelect?: (item: EntityTreeSelection) => void;
+  /**
+   * When set, hover reveals a quantity field + arrow that calls this instead of
+   * (or in addition to) click-to-select. Used by Add hierarchy node dialog.
+   */
+  onAddEntity?: (item: EntityTreeSelection, quantity: number) => void;
+  maxQuantity?: number;
   draggable?: boolean;
   onDragStart?: (event: React.DragEvent, item: EntityTreeSelection) => void;
   className?: string;
@@ -47,6 +60,8 @@ export function ConfigEntityTypeTree({
   hiddenLevels,
   selectedName,
   onSelect,
+  onAddEntity,
+  maxQuantity = 100,
   draggable,
   onDragStart,
   className,
@@ -54,6 +69,7 @@ export function ConfigEntityTypeTree({
   emptyHint,
 }: Props) {
   const [query, setQuery] = useState('');
+  const [hoverQty, setHoverQty] = useState<Record<string, number>>({});
   const [expanded, setExpanded] = useState<Set<TemplateNodeLevel>>(() => {
     if (defaultExpandedLevels?.length) return new Set(defaultExpandedLevels);
     return new Set<TemplateNodeLevel>();
@@ -87,6 +103,12 @@ export function ConfigEntityTypeTree({
       else next.add(level);
       return next;
     });
+  };
+
+  const qtyFor = (key: string) => {
+    const raw = hoverQty[key];
+    if (raw == null) return 1;
+    return raw;
   };
 
   if (visibleLevels.length === 0) {
@@ -170,21 +192,27 @@ export function ConfigEntityTypeTree({
                             abbreviation: (item.abbreviation || '').toUpperCase(),
                             entityId: item.id,
                           };
+                          const rowKey = `${level}-${item.id}-${item.name}`;
                           const canUse = levelInteractive;
-                          const canClick = canUse && !!onSelect;
+                          const canAdd = canUse && !!onAddEntity;
+                          const canClick = canUse && !!onSelect && !onAddEntity;
                           const canDrag = !!draggable && canUse;
                           const selected =
+                            !onAddEntity &&
                             selectedName === item.name &&
                             (selectableLevel == null || selectableLevel === level);
+                          const qty = qtyFor(rowKey);
                           return (
-                            <li key={`${level}-${item.id}-${item.name}`} role="treeitem">
+                            <li key={rowKey} role="treeitem">
                               <div
                                 role={canClick ? 'button' : undefined}
-                                tabIndex={canClick || canDrag ? 0 : -1}
+                                tabIndex={canClick || canDrag || canAdd ? 0 : -1}
                                 title={
                                   !canUse
                                     ? 'Select a matching parent on the canvas'
-                                    : undefined
+                                    : canAdd
+                                      ? 'Set quantity and add to the group'
+                                      : undefined
                                 }
                                 draggable={canDrag}
                                 onDragStart={(event) => {
@@ -200,6 +228,15 @@ export function ConfigEntityTypeTree({
                                   onSelect?.(payload);
                                 }}
                                 onKeyDown={(event) => {
+                                  if (canAdd && (event.key === 'Enter' || event.key === ' ')) {
+                                    event.preventDefault();
+                                    const safeQty = Math.min(
+                                      maxQuantity,
+                                      Math.max(1, Math.floor(Number(qty) || 1))
+                                    );
+                                    onAddEntity?.(payload, safeQty);
+                                    return;
+                                  }
                                   if (!canClick) return;
                                   if (event.key === 'Enter' || event.key === ' ') {
                                     event.preventDefault();
@@ -207,7 +244,7 @@ export function ConfigEntityTypeTree({
                                   }
                                 }}
                                 className={cn(
-                                  'flex w-full items-center gap-2 rounded-full px-2.5 py-1.5 text-left text-xs transition-colors select-none',
+                                  'group/row flex w-full items-center gap-2 rounded-full px-2.5 py-1.5 text-left text-xs transition-colors select-none',
                                   canUse
                                     ? 'hover:bg-background'
                                     : 'cursor-not-allowed opacity-40',
@@ -228,7 +265,54 @@ export function ConfigEntityTypeTree({
                                 <span className="min-w-0 flex-1 truncate font-medium pointer-events-none">
                                   {item.name}
                                 </span>
-                                {item.abbreviation ? (
+                                {canAdd ? (
+                                  <span
+                                    className={cn(
+                                      'ml-auto flex shrink-0 items-center gap-1 opacity-0 transition-opacity',
+                                      'group-hover/row:opacity-100 focus-within:opacity-100'
+                                    )}
+                                  >
+                                    <Input
+                                      type="number"
+                                      min={1}
+                                      max={maxQuantity}
+                                      step={1}
+                                      aria-label={`Quantity for ${item.name}`}
+                                      className="h-6 w-12 rounded-md px-1.5 text-center text-[11px] tabular-nums"
+                                      value={qty}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onChange={(e) => {
+                                        const raw = e.target.value;
+                                        setHoverQty((prev) => ({
+                                          ...prev,
+                                          [rowKey]:
+                                            raw === ''
+                                              ? 0
+                                              : Number.isNaN(Number(raw))
+                                                ? 0
+                                                : Number(raw),
+                                        }));
+                                      }}
+                                    />
+                                    <button
+                                      type="button"
+                                      title={`Add ${item.name} to group`}
+                                      aria-label={`Add ${item.name} to group`}
+                                      className="flex size-6 items-center justify-center rounded-md bg-teal-600 text-white transition-colors hover:bg-teal-500 disabled:opacity-40"
+                                      disabled={qty < 1 || qty > maxQuantity}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const safeQty = Math.min(
+                                          maxQuantity,
+                                          Math.max(1, Math.floor(Number(qty) || 1))
+                                        );
+                                        onAddEntity?.(payload, safeQty);
+                                      }}
+                                    >
+                                      <ArrowRight className="size-3.5" />
+                                    </button>
+                                  </span>
+                                ) : item.abbreviation ? (
                                   <span
                                     className={cn(
                                       'shrink-0 font-mono text-[10px] pointer-events-none',

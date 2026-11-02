@@ -45,7 +45,9 @@ import {
   Copy,
   Maximize2,
   Minimize2,
+  Pencil,
   Save,
+  Trash2,
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -84,6 +86,8 @@ import {
   DEFAULT_CONFIG_TREE_NODE_FIELD_VISIBILITY,
   DEFAULT_NODE_HEIGHT,
   absoluteFlowPosition,
+  addNodesToSiblingGroup,
+  applyPendingSiblingAdds,
   areSiblingKeys,
   DEFAULT_NODE_WIDTH,
   descendantsOf,
@@ -94,10 +98,18 @@ import {
   isEntityAssigned,
   isHierarchyFullyExpanded,
   layoutHandleIds,
+  nestSiblingGroup,
+  parseSiblingGroupFlowId,
   parentKeysWithChildren,
+  pluralizeEntityName,
   pruneUndersizedSiblingGroups,
+  renameSiblingGroup,
+  setSiblingGroupQuantity,
+  siblingGroupMembers,
+  siblingGroupParentId,
   siblingsOf,
   ungroupSiblingNodes,
+  wouldCreateGroupNestCycle,
   type ConfigTreeEdgeData,
   type ConfigTreeNodeData,
   type ConfigTreeNodeFieldVisibility,
@@ -127,6 +139,18 @@ const MIN_PROXIMITY = 120;
 
 type InteractionMode = 'selection' | 'eraser';
 
+const MAX_NODE_QUANTITY = 100;
+
+type PendingFormItem = {
+  key: string;
+  entityId: number;
+  name: string;
+  abbreviation: string;
+  quantity: number;
+  /** Used when multiple siblings exist and this line’s quantity > 1. */
+  subgroupName: string;
+};
+
 type NodeFormState = {
   mode: 'create' | 'edit';
   clientKey: string;
@@ -134,6 +158,10 @@ type NodeFormState = {
   name: string;
   abbreviation: string;
   inventory_source: InventorySource;
+  /** Create only — sibling group label when more than one node is added. */
+  groupName: string;
+  /** Create only — entities queued into the group (each with its own quantity). */
+  pendingItems: PendingFormItem[];
 };
 
 const ActionsContext = createContext<ConfigTreeNodeActions | null>(null);
@@ -144,16 +172,20 @@ function NodeWithActions(props: NodeProps<Node<ConfigTreeNodeData>>) {
   return <ConfigTreeFlowNode {...props} actions={actions} />;
 }
 
-const GroupToggleContext = createContext<((groupId: string) => void) | null>(
-  null
-);
+type SiblingGroupActions = {
+  onToggleCollapsed: (groupId: string) => void;
+  onEditGroup: (groupId: string) => void;
+};
 
-function SiblingGroupWithToggle(props: NodeProps<Node<SiblingGroupNodeData>>) {
-  const onToggleCollapsed = useContext(GroupToggleContext);
+const GroupActionsContext = createContext<SiblingGroupActions | null>(null);
+
+function SiblingGroupWithActions(props: NodeProps<Node<SiblingGroupNodeData>>) {
+  const actions = useContext(GroupActionsContext);
   return (
     <ConfigTreeSiblingGroupNode
       {...props}
-      onToggleCollapsed={onToggleCollapsed ?? undefined}
+      onToggleCollapsed={actions?.onToggleCollapsed}
+      onEditGroup={actions?.onEditGroup}
     />
   );
 }
@@ -210,6 +242,15 @@ type CanvasProps = {
   onSelectedKeysChange: (keys: string[]) => void;
   onGroupSiblings: (memberIds?: string[]) => void;
   onUngroupSiblings: (groupId?: string) => void;
+  onEditGroup: (groupId: string) => void;
+  onApplyGroupMembership: (input: {
+    nodeKey: string;
+    targetGroupId: string | null;
+  }) => void;
+  onApplyGroupNesting: (input: {
+    childGroupId: string;
+    parentGroupId: string | null;
+  }) => void;
 };
 
 function ConfigTreeCanvasInner({
@@ -242,6 +283,9 @@ function ConfigTreeCanvasInner({
   onSelectedKeysChange,
   onGroupSiblings,
   onUngroupSiblings,
+  onEditGroup,
+  onApplyGroupMembership,
+  onApplyGroupNesting,
   pendingPositions,
   pdfMeta,
 }: CanvasProps) {
@@ -257,7 +301,7 @@ function ConfigTreeCanvasInner({
       draftNodes
         .map(
           (n) =>
-            `${n.client_key}:${n.parent_client_key ?? ''}:${n.level}:${n.sort_order}:${n.sibling_group_id ?? ''}`
+            `${n.client_key}:${n.parent_client_key ?? ''}:${n.level}:${n.sort_order}:${n.sibling_group_id ?? ''}:${n.sibling_group_parent_id ?? ''}`
         )
         .join('|'),
     [draftNodes]
@@ -267,7 +311,7 @@ function ConfigTreeCanvasInner({
       draftNodes
         .map(
           (n) =>
-            `${n.client_key}:${n.name}:${n.abbreviation ?? ''}:${n.description ?? ''}:${normalizeInventorySource(n.inventory_source)}:${n.sibling_group_name ?? ''}`
+            `${n.client_key}:${n.name}:${n.abbreviation ?? ''}:${n.description ?? ''}:${normalizeInventorySource(n.inventory_source)}:${n.sibling_group_name ?? ''}:${n.sibling_group_parent_id ?? ''}`
         )
         .join('|'),
     [draftNodes]
@@ -562,12 +606,13 @@ function ConfigTreeCanvasInner({
   const nodeTypes = useMemo(
     () => ({
       configTree: NodeWithActions,
-      siblingGroup: SiblingGroupWithToggle,
+      siblingGroup: SiblingGroupWithActions,
     }),
     []
   );
 
-  // Drop collapse state for groups that no longer exist
+  // Drop dead collapse state; newly created groups start collapsed by default.
+  const knownGroupIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     const live = new Set(
       draftNodes
@@ -581,6 +626,13 @@ function ConfigTreeCanvasInner({
         if (live.has(id)) next.add(id);
         else changed = true;
       }
+      for (const id of live) {
+        if (!knownGroupIdsRef.current.has(id)) {
+          next.add(id);
+          changed = true;
+        }
+      }
+      knownGroupIdsRef.current = live;
       return changed ? next : prev;
     });
   }, [draftNodes]);
@@ -836,6 +888,72 @@ function ConfigTreeCanvasInner({
     [getClosestEdge, getNodes, locked, readOnly, setEdges, setNodes]
   );
 
+  const hitTestSiblingGroup = useCallback(
+    (
+      node: Node,
+      opts?: { excludeGroupIds?: ReadonlySet<string> }
+    ): string | null => {
+      const all = getNodes();
+      const byId = new Map(
+        all.map((n) => [
+          n.id,
+          { position: n.position, parentId: n.parentId ?? null },
+        ])
+      );
+      const abs = absoluteFlowPosition(node, byId);
+      const nw =
+        typeof node.width === 'number'
+          ? node.width
+          : typeof node.style?.width === 'number'
+            ? node.style.width
+            : DEFAULT_NODE_WIDTH;
+      const nh =
+        typeof node.height === 'number'
+          ? node.height
+          : typeof node.style?.height === 'number'
+            ? node.style.height
+            : DEFAULT_NODE_HEIGHT;
+      const center = { x: abs.x + nw / 2, y: abs.y + nh / 2 };
+
+      let hitGroupId: string | null = null;
+      let hitArea = Number.POSITIVE_INFINITY;
+      for (const candidate of all) {
+        if (candidate.type !== 'siblingGroup') continue;
+        if (candidate.id === node.id) continue;
+        const gid = parseSiblingGroupFlowId(candidate.id);
+        if (!gid) continue;
+        if (opts?.excludeGroupIds?.has(gid)) continue;
+        const gAbs = absoluteFlowPosition(candidate, byId);
+        const gw =
+          typeof candidate.width === 'number'
+            ? candidate.width
+            : typeof candidate.style?.width === 'number'
+              ? candidate.style.width
+              : DEFAULT_NODE_WIDTH;
+        const gh =
+          typeof candidate.height === 'number'
+            ? candidate.height
+            : typeof candidate.style?.height === 'number'
+              ? candidate.style.height
+              : DEFAULT_NODE_HEIGHT;
+        if (
+          center.x >= gAbs.x &&
+          center.x <= gAbs.x + gw &&
+          center.y >= gAbs.y &&
+          center.y <= gAbs.y + gh
+        ) {
+          const area = gw * gh;
+          if (area < hitArea) {
+            hitArea = area;
+            hitGroupId = gid;
+          }
+        }
+      }
+      return hitGroupId;
+    },
+    [getNodes]
+  );
+
   const onNodeDragStop: OnNodeDrag = useCallback(
     (_: ReactMouseEvent, node: Node) => {
       if (locked || readOnly) return;
@@ -845,11 +963,63 @@ function ConfigTreeCanvasInner({
           data: { ...n.data, intersecting: false },
         }))
       );
-      const close = getClosestEdge(node);
       setEdges((es) => es.filter((e) => e.className !== 'temp'));
+
+      // Nest one sibling group inside another (same tier).
+      if (node.type === 'siblingGroup') {
+        const childGroupId = parseSiblingGroupFlowId(node.id);
+        if (!childGroupId) return;
+        const exclude = new Set<string>([childGroupId]);
+        // Exclude descendants to avoid cycles via drop target.
+        for (const draft of draftNodes) {
+          const gid = draft.sibling_group_id?.trim();
+          if (!gid || exclude.has(gid)) continue;
+          if (wouldCreateGroupNestCycle(draftNodes, childGroupId, gid)) {
+            exclude.add(gid);
+          }
+        }
+        const hitGroupId = hitTestSiblingGroup(node, { excludeGroupIds: exclude });
+        const currentParent = siblingGroupParentId(draftNodes, childGroupId);
+        if (hitGroupId !== currentParent) {
+          onApplyGroupNesting({
+            childGroupId,
+            parentGroupId: hitGroupId,
+          });
+        }
+        return;
+      }
+
+      // Sibling-group membership: drop onto a group to join; drag out to leave
+      // (node stays in the configuration either way).
+      if (node.type === 'configTree') {
+        const hitGroupId = hitTestSiblingGroup(node);
+        const currentGroupId =
+          nodesByKey.get(node.id)?.sibling_group_id?.trim() || null;
+        if (hitGroupId !== currentGroupId) {
+          onApplyGroupMembership({
+            nodeKey: node.id,
+            targetGroupId: hitGroupId,
+          });
+          return;
+        }
+      }
+
+      const close = getClosestEdge(node);
       if (close) tryConnect(close.source, close.target);
     },
-    [getClosestEdge, locked, readOnly, setEdges, setNodes, tryConnect]
+    [
+      draftNodes,
+      getClosestEdge,
+      hitTestSiblingGroup,
+      locked,
+      nodesByKey,
+      onApplyGroupMembership,
+      onApplyGroupNesting,
+      readOnly,
+      setEdges,
+      setNodes,
+      tryConnect,
+    ]
   );
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -1045,7 +1215,12 @@ function ConfigTreeCanvasInner({
       />
       <div className="relative min-h-0 min-w-0 flex-1">
         <ActionsContext.Provider value={actions}>
-          <GroupToggleContext.Provider value={toggleGroupCollapsed}>
+          <GroupActionsContext.Provider
+            value={{
+              onToggleCollapsed: toggleGroupCollapsed,
+              onEditGroup,
+            }}
+          >
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -1063,7 +1238,11 @@ function ConfigTreeCanvasInner({
             onSelectionChange={interactive ? onSelectionChange : undefined}
             onNodeDoubleClick={(_, node) => {
               if (!interactive) return;
-              if (node.type === 'siblingGroup') return;
+              if (node.type === 'siblingGroup') {
+                const gid = parseSiblingGroupFlowId(node.id);
+                if (gid) onEditGroup(gid);
+                return;
+              }
               openNodeForm(node.id);
             }}
             nodesDraggable={interactive}
@@ -1163,6 +1342,7 @@ function ConfigTreeCanvasInner({
                 readOnly={readOnly}
                 onGroup={(memberIds) => onGroupSiblings(memberIds)}
                 onUngroup={(groupId) => onUngroupSiblings(groupId)}
+                onEditGroup={onEditGroup}
               />
             ) : null}
 
@@ -1173,7 +1353,7 @@ function ConfigTreeCanvasInner({
               />
             ) : null}
           </ReactFlow>
-          </GroupToggleContext.Provider>
+          </GroupActionsContext.Provider>
         </ActionsContext.Provider>
       </div>
     </div>
@@ -1261,6 +1441,9 @@ export function HierarchyConfigTreeEditor({
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [pendingGroupKeys, setPendingGroupKeys] = useState<string[]>([]);
+  const [editGroupId, setEditGroupId] = useState<string | null>(null);
+  const [editGroupName, setEditGroupName] = useState('');
+  const [editGroupQuantity, setEditGroupQuantity] = useState(2);
   const pendingPositions = useRef(new Map<string, { x: number; y: number }>());
 
   const unassignedCount = useMemo(
@@ -1297,7 +1480,7 @@ export function HierarchyConfigTreeEditor({
     if (!overlayOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      if (form || deleteKey || saveDialogOpen || groupDialogOpen) return;
+      if (form || deleteKey || saveDialogOpen || groupDialogOpen || editGroupId) return;
       event.preventDefault();
       closeFullscreen();
     };
@@ -1306,6 +1489,7 @@ export function HierarchyConfigTreeEditor({
   }, [
     closeFullscreen,
     deleteKey,
+    editGroupId,
     form,
     groupDialogOpen,
     overlayOpen,
@@ -1332,6 +1516,8 @@ export function HierarchyConfigTreeEditor({
         name: isDraftNode(node) ? '' : node.name,
         abbreviation: node.abbreviation ?? '',
         inventory_source: normalizeInventorySource(node.inventory_source),
+        groupName: isDraftNode(node) ? '' : node.name,
+        pendingItems: [],
       });
     },
     [nodesByKey]
@@ -1387,6 +1573,8 @@ export function HierarchyConfigTreeEditor({
           name: '',
           abbreviation: '',
           inventory_source: INVENTORY_SOURCE.TURNKEY,
+          groupName: '',
+          pendingItems: [],
         });
       }
       return key;
@@ -1513,27 +1701,157 @@ export function HierarchyConfigTreeEditor({
       if (groupId) {
         onChange(ungroupSiblingNodes(nodes, { groupId }));
         setLayoutNonce((n) => n + 1);
-        toast.success('Ungrouped');
+        toast.success('Ungrouped — nodes kept in the configuration');
         return;
       }
-      const groupIds = new Set(
-        selectedKeys
-          .map((key) => nodesByKey.get(key)?.sibling_group_id?.trim())
-          .filter((id): id is string => Boolean(id))
+      // Selection: remove only those nodes from their groups (not from config).
+      const keysInGroup = selectedKeys.filter((key) =>
+        Boolean(nodesByKey.get(key)?.sibling_group_id?.trim())
       );
-      if (!groupIds.size) {
+      if (!keysInGroup.length) {
         toast.error('Selected nodes are not in a group');
         return;
       }
-      let next = nodes;
-      for (const id of groupIds) {
-        next = ungroupSiblingNodes(next, { groupId: id });
-      }
-      onChange(next);
+      onChange(
+        pruneUndersizedSiblingGroups(
+          ungroupSiblingNodes(nodes, { keys: keysInGroup })
+        )
+      );
       setLayoutNonce((n) => n + 1);
-      toast.success('Ungrouped');
+      toast.success('Removed from group (still in configuration)');
     },
     [nodes, nodesByKey, onChange, selectedKeys]
+  );
+
+  const openEditGroupDialog = useCallback(
+    (groupId: string) => {
+      const members = siblingGroupMembers(nodes, groupId);
+      if (members.length < 2) {
+        toast.error('Group not found');
+        return;
+      }
+      const name =
+        members.find((m) => m.sibling_group_name?.trim())?.sibling_group_name?.trim() ||
+        members[0].name.trim() ||
+        'Group';
+      setEditGroupId(groupId);
+      setEditGroupName(name);
+      setEditGroupQuantity(members.length);
+    },
+    [nodes]
+  );
+
+  const confirmEditGroupDialog = useCallback(() => {
+    if (!editGroupId) return;
+    const name = editGroupName.trim();
+    if (!name) {
+      toast.error('Enter a group name');
+      return;
+    }
+    const qty = Math.min(
+      MAX_NODE_QUANTITY,
+      Math.max(1, Math.floor(Number(editGroupQuantity) || 1))
+    );
+    let next = renameSiblingGroup(nodes, editGroupId, name);
+    next = setSiblingGroupQuantity(next, editGroupId, qty);
+    onChange(syncInventorySources(next));
+    setEditGroupId(null);
+    setLayoutNonce((n) => n + 1);
+    if (qty < 2) {
+      toast.success('Group dissolved — nodes kept in the configuration');
+    } else {
+      toast.success(`Group updated · ${qty} nodes`);
+    }
+  }, [editGroupId, editGroupName, editGroupQuantity, nodes, onChange]);
+
+  const handleApplyGroupMembership = useCallback(
+    (input: { nodeKey: string; targetGroupId: string | null }) => {
+      const node = nodesByKey.get(input.nodeKey);
+      if (!node) return;
+      const currentGroupId = node.sibling_group_id?.trim() || null;
+      const targetGroupId = input.targetGroupId?.trim() || null;
+      if (currentGroupId === targetGroupId) return;
+
+      if (targetGroupId) {
+        const members = siblingGroupMembers(nodes, targetGroupId);
+        if (members.length < 2) {
+          toast.error('Drop target is not a valid group');
+          return;
+        }
+        const parent = members[0].parent_client_key ?? null;
+        if ((node.parent_client_key ?? null) !== parent) {
+          toast.error('Only siblings under the same parent can join this group');
+          return;
+        }
+        onChange(
+          syncInventorySources(
+            pruneUndersizedSiblingGroups(
+              addNodesToSiblingGroup(nodes, targetGroupId, [input.nodeKey])
+            )
+          )
+        );
+        setLayoutNonce((n) => n + 1);
+        toast.success(
+          currentGroupId ? 'Moved to group' : 'Added to group'
+        );
+        return;
+      }
+
+      if (!currentGroupId) return;
+      onChange(
+        syncInventorySources(
+          pruneUndersizedSiblingGroups(
+            ungroupSiblingNodes(nodes, { keys: [input.nodeKey] })
+          )
+        )
+      );
+      setLayoutNonce((n) => n + 1);
+      toast.success('Removed from group (still in configuration)');
+    },
+    [nodes, nodesByKey, onChange]
+  );
+
+  const handleApplyGroupNesting = useCallback(
+    (input: { childGroupId: string; parentGroupId: string | null }) => {
+      const childId = input.childGroupId.trim();
+      const parentId = input.parentGroupId?.trim() || null;
+      if (!childId) return;
+      const childMembers = siblingGroupMembers(nodes, childId);
+      if (childMembers.length < 2) {
+        toast.error('Dragged group is not valid');
+        return;
+      }
+      const currentParent = siblingGroupParentId(nodes, childId);
+      if (currentParent === parentId) return;
+
+      if (parentId) {
+        if (wouldCreateGroupNestCycle(nodes, childId, parentId)) {
+          toast.error('Cannot nest a group inside its own descendant');
+          return;
+        }
+        const parentMembers = siblingGroupMembers(nodes, parentId);
+        if (parentMembers.length < 2) {
+          toast.error('Drop target is not a valid group');
+          return;
+        }
+        if (
+          (childMembers[0].parent_client_key ?? null) !==
+          (parentMembers[0].parent_client_key ?? null)
+        ) {
+          toast.error('Only same-tier sibling groups can be nested');
+          return;
+        }
+        onChange(nestSiblingGroup(nodes, childId, parentId));
+        setLayoutNonce((n) => n + 1);
+        toast.success('Group nested inside another group');
+        return;
+      }
+
+      onChange(nestSiblingGroup(nodes, childId, null));
+      setLayoutNonce((n) => n + 1);
+      toast.success('Group moved out of parent group');
+    },
+    [nodes, onChange]
   );
 
   const entityOptions = useMemo(() => {
@@ -1541,8 +1859,85 @@ export function HierarchyConfigTreeEditor({
     return filterTemplateNames(entityListItems, form.level);
   }, [entityListItems, form]);
 
+  const pendingNodeCount = useMemo(() => {
+    if (!form) return 0;
+    return form.pendingItems.reduce(
+      (sum, item) => sum + Math.max(0, Math.floor(Number(item.quantity) || 0)),
+      0
+    );
+  }, [form]);
+
   const saveForm = useCallback(() => {
     if (!form) return;
+
+    const hasChildren =
+      form.level !== 'component' &&
+      nodes.some((n) => n.parent_client_key === form.clientKey);
+    const requested = normalizeInventorySource(form.inventory_source);
+    const inventory_source = hasChildren
+      ? requested
+      : INVENTORY_SOURCE.TURNKEY;
+
+    // Multi-entity create (same tier): build from the pending group panel.
+    if (form.mode === 'create' && form.level !== 'system') {
+      if (!form.pendingItems.length) {
+        toast.error('Add at least one entity to the group');
+        return;
+      }
+      const needsSubgroups = form.pendingItems.length > 1;
+      const invalid = form.pendingItems.some(
+        (item) =>
+          !item.name.trim() ||
+          item.quantity < 1 ||
+          item.quantity > MAX_NODE_QUANTITY ||
+          (needsSubgroups &&
+            item.quantity > 1 &&
+            !(item.subgroupName.trim() || item.name.trim()))
+      );
+      if (invalid) {
+        toast.error(
+          needsSubgroups
+            ? 'Each item needs a valid quantity; lines with quantity > 1 need a subgroup name'
+            : 'Each group item needs a valid quantity (1–100)'
+        );
+        return;
+      }
+      const total = form.pendingItems.reduce(
+        (sum, item) => sum + Math.max(1, Math.floor(item.quantity) || 1),
+        0
+      );
+      const groupLabel =
+        form.groupName.trim() || form.pendingItems[0]?.name.trim() || 'Group';
+      if (total > 1 && !groupLabel) {
+        toast.error('Enter a group name');
+        return;
+      }
+
+      const next = applyPendingSiblingAdds(
+        nodes,
+        form.clientKey,
+        form.pendingItems.map((item) => ({
+          name: item.name,
+          abbreviation:
+            item.abbreviation.trim() || suggestAbbreviation(item.name),
+          quantity: item.quantity,
+          subgroupName:
+            item.subgroupName.trim() || pluralizeEntityName(item.name),
+        })),
+        inventory_source,
+        groupLabel
+      );
+      onChange(syncInventorySources(next));
+      setLayoutNonce((n) => n + 1);
+      setForm(null);
+      toast.success(
+        total > 1
+          ? `Added ${total} nodes as “${groupLabel}”`
+          : 'Node details saved'
+      );
+      return;
+    }
+
     const name = form.name.trim();
     if (!name) {
       toast.error('Select or enter an entity name');
@@ -1554,13 +1949,7 @@ export function HierarchyConfigTreeEditor({
       selected?.abbreviation ||
       suggestAbbreviation(name)
     ).toUpperCase();
-    const hasChildren =
-      form.level !== 'component' &&
-      nodes.some((n) => n.parent_client_key === form.clientKey);
-    const requested = normalizeInventorySource(form.inventory_source);
-    const inventory_source = hasChildren
-      ? requested
-      : INVENTORY_SOURCE.TURNKEY;
+
     onChange(
       syncInventorySources(
         nodes.map((n) =>
@@ -1573,6 +1962,65 @@ export function HierarchyConfigTreeEditor({
     setForm(null);
     toast.success(form.mode === 'create' ? 'Node details saved' : 'Node updated');
   }, [entityOptions, form, nodes, onChange]);
+
+  const addPendingEntity = useCallback(
+    (
+      item: { entityId: number; name: string; abbreviation: string },
+      quantity: number
+    ) => {
+      const qty = Math.min(
+        MAX_NODE_QUANTITY,
+        Math.max(1, Math.floor(Number(quantity) || 1))
+      );
+      setForm((prev) => {
+        if (!prev || prev.mode !== 'create') return prev;
+        const existing = prev.pendingItems.find(
+          (p) => p.entityId === item.entityId && p.name === item.name
+        );
+        const nextItems = existing
+          ? prev.pendingItems.map((p) =>
+              p.entityId === item.entityId && p.name === item.name
+                ? {
+                    ...p,
+                    quantity: Math.min(MAX_NODE_QUANTITY, p.quantity + qty),
+                    subgroupName:
+                      p.subgroupName.trim() || pluralizeEntityName(p.name),
+                  }
+                : p
+            )
+          : [
+              ...prev.pendingItems,
+              {
+                key: newClientKey('pi'),
+                entityId: item.entityId,
+                name: item.name,
+                abbreviation: (
+                  item.abbreviation || suggestAbbreviation(item.name)
+                ).toUpperCase(),
+                quantity: qty,
+                subgroupName: pluralizeEntityName(item.name),
+              },
+            ];
+        const defaultGroupName =
+          !prev.groupName.trim() ||
+          prev.pendingItems.some((p) => p.name === prev.groupName.trim())
+            ? prev.pendingItems.length === 0
+              ? item.name
+              : prev.groupName.trim() || item.name
+            : prev.groupName;
+        return {
+          ...prev,
+          pendingItems: nextItems,
+          groupName: defaultGroupName,
+          name: prev.name || item.name,
+          abbreviation:
+            prev.abbreviation ||
+            (item.abbreviation || suggestAbbreviation(item.name)).toUpperCase(),
+        };
+      });
+    },
+    []
+  );
 
   const formCanBuild = Boolean(
     form &&
@@ -1723,6 +2171,9 @@ export function HierarchyConfigTreeEditor({
     onSelectedKeysChange: setSelectedKeys,
     onGroupSiblings: openGroupDialog,
     onUngroupSiblings: handleUngroupSiblings,
+    onEditGroup: openEditGroupDialog,
+    onApplyGroupMembership: handleApplyGroupMembership,
+    onApplyGroupNesting: handleApplyGroupNesting,
   };
 
   const actionButtons =
@@ -1903,6 +2354,87 @@ export function HierarchyConfigTreeEditor({
         </DialogContent>
       </Dialog>
 
+      <Dialog
+        open={!!editGroupId}
+        onOpenChange={(open) => !open && setEditGroupId(null)}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Edit group</DialogTitle>
+            <DialogDescription>
+              Rename this group or change how many members it holds. Lowering
+              quantity removes nodes from the group only — they stay in the
+              configuration. Drag siblings onto or out of the group on the
+              canvas to adjust membership.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cfg-tree-edit-group-name">Group name</Label>
+              <Input
+                id="cfg-tree-edit-group-name"
+                value={editGroupName}
+                onChange={(e) => setEditGroupName(e.target.value)}
+                placeholder="Group name"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    confirmEditGroupDialog();
+                  }
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cfg-tree-edit-group-qty">Quantity</Label>
+              <Input
+                id="cfg-tree-edit-group-qty"
+                type="number"
+                min={1}
+                max={MAX_NODE_QUANTITY}
+                step={1}
+                value={editGroupQuantity}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === '') {
+                    setEditGroupQuantity(0);
+                    return;
+                  }
+                  const next = Number(raw);
+                  setEditGroupQuantity(Number.isNaN(next) ? 0 : next);
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                Increase adds copies of the first member. Decrease ungroups
+                excess members (does not delete them). Set to 1 to dissolve the
+                group.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setEditGroupId(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={confirmEditGroupDialog}
+              disabled={
+                !editGroupName.trim() ||
+                editGroupQuantity < 1 ||
+                editGroupQuantity > MAX_NODE_QUANTITY
+              }
+            >
+              <Pencil className="mr-1.5 h-4 w-4" />
+              Save group
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -1978,15 +2510,24 @@ export function HierarchyConfigTreeEditor({
       </Dialog>
 
       <Dialog open={!!form} onOpenChange={(open) => !open && setForm(null)}>
-        <DialogContent className="flex h-[min(85vh,42rem)] max-h-[85vh] w-full max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
+        <DialogContent
+          className={cn(
+            'flex max-h-[85vh] w-full max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0',
+            form?.mode === 'create' && form.level !== 'system'
+              ? 'h-[min(85vh,44rem)] sm:max-w-4xl'
+              : 'h-[min(85vh,42rem)] sm:max-w-lg'
+          )}
+        >
           <DialogHeader className="shrink-0 space-y-1 border-b px-6 py-4 pr-12">
             <DialogTitle>
               {form?.mode === 'create' ? 'Add hierarchy node' : 'Edit hierarchy node'}
             </DialogTitle>
             <DialogDescription>
-              {form
-                ? `Expand ${levelLabel(form.level)} and pick an entity. Press Ctrl+S or Save.`
-                : null}
+              {form?.mode === 'create' && form.level !== 'system'
+                ? `Hover an entity to set quantity (default 1), then use the arrow to add it to the group. Same-tier entities only (${levelLabel(form.level)}).`
+                : form
+                  ? `Expand ${levelLabel(form.level)} and pick an entity. Press Ctrl+S or Save.`
+                  : null}
             </DialogDescription>
           </DialogHeader>
           {form ? (
@@ -2018,52 +2559,272 @@ export function HierarchyConfigTreeEditor({
                   </p>
                 </div>
               </div>
-              <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4">
-                <div className="flex min-h-32 flex-1 flex-col gap-2 overflow-hidden">
-                  <Label className="shrink-0">Entity list</Label>
-                  <ConfigEntityTypeTree
-                    className="min-h-0 flex-1 overflow-hidden"
-                    entities={entityListItems}
-                    levelLabel={levelLabel}
-                    selectableLevel={form.level}
-                    selectedName={form.name || undefined}
-                    defaultExpandedLevels={[form.level]}
-                    onSelect={(item) => {
-                      setForm((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              name: item.name,
-                              abbreviation: (
-                                item.abbreviation || suggestAbbreviation(item.name)
-                              ).toUpperCase(),
-                            }
-                          : prev
-                      );
-                    }}
-                  />
-                </div>
 
-                <div className="shrink-0 space-y-2">
-                  <Label>Abbreviation</Label>
-                  <Input
-                    className="rounded-full font-mono uppercase"
-                    value={form.abbreviation}
-                    onChange={(e) =>
-                      setForm((prev) =>
-                        prev ? { ...prev, abbreviation: e.target.value.toUpperCase() } : prev
-                      )
-                    }
-                    placeholder={suggestAbbreviation(form.name || 'XX')}
-                  />
+              {form.mode === 'create' && form.level !== 'system' ? (
+                <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 overflow-hidden md:grid-cols-2">
+                  <div className="flex min-h-0 flex-col gap-2 border-b px-4 py-3 md:border-b-0 md:border-r">
+                    <Label className="shrink-0">Entity list</Label>
+                    <ConfigEntityTypeTree
+                      className="min-h-0 flex-1 overflow-hidden"
+                      entities={entityListItems}
+                      levelLabel={levelLabel}
+                      selectableLevel={form.level}
+                      defaultExpandedLevels={[form.level]}
+                      maxQuantity={MAX_NODE_QUANTITY}
+                      onAddEntity={(item, quantity) =>
+                        addPendingEntity(
+                          {
+                            entityId: item.entityId,
+                            name: item.name,
+                            abbreviation: item.abbreviation,
+                          },
+                          quantity
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="flex min-h-0 flex-col gap-3 px-4 py-3">
+                    <div className="flex shrink-0 items-center justify-between gap-2">
+                      <Label>Group being created</Label>
+                      <span className="text-xs tabular-nums text-muted-foreground">
+                        {pendingNodeCount} node{pendingNodeCount === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                    <div className="min-h-0 flex-1 overflow-auto rounded-2xl border bg-muted/15 p-2">
+                      {form.pendingItems.length === 0 ? (
+                        <p className="px-2 py-6 text-center text-xs text-muted-foreground">
+                          Hover an entity on the left, set quantity, and click the
+                          arrow to add it here.
+                        </p>
+                      ) : (
+                        <ul className="space-y-1.5">
+                          {form.pendingItems.map((item) => {
+                            const showSubgroup =
+                              form.pendingItems.length > 1 && item.quantity > 1;
+                            return (
+                              <li
+                                key={item.key}
+                                className="space-y-1.5 rounded-xl border bg-background px-2.5 py-2"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="truncate text-sm font-medium">
+                                      {item.quantity > 1
+                                        ? `${item.quantity}× ${item.name}`
+                                        : item.name}
+                                    </div>
+                                    {item.abbreviation ? (
+                                      <div className="font-mono text-[10px] text-muted-foreground">
+                                        {item.abbreviation}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    max={MAX_NODE_QUANTITY}
+                                    step={1}
+                                    aria-label={`Quantity for ${item.name}`}
+                                    className="h-8 w-16 rounded-md text-center tabular-nums"
+                                    value={item.quantity}
+                                    onChange={(e) => {
+                                      const raw = e.target.value;
+                                      const next =
+                                        raw === ''
+                                          ? 0
+                                          : Number.isNaN(Number(raw))
+                                            ? 0
+                                            : Number(raw);
+                                      setForm((prev) =>
+                                        prev
+                                          ? {
+                                              ...prev,
+                                              pendingItems: prev.pendingItems.map(
+                                                (p) =>
+                                                  p.key === item.key
+                                                    ? {
+                                                        ...p,
+                                                        quantity: next,
+                                                        subgroupName:
+                                                          next > 1 &&
+                                                          !p.subgroupName.trim()
+                                                            ? pluralizeEntityName(
+                                                                p.name
+                                                              )
+                                                            : p.subgroupName,
+                                                      }
+                                                    : p
+                                              ),
+                                            }
+                                          : prev
+                                      );
+                                    }}
+                                  />
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="ghost"
+                                    className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
+                                    title="Remove from group"
+                                    aria-label={`Remove ${item.name} from group`}
+                                    onClick={() =>
+                                      setForm((prev) =>
+                                        prev
+                                          ? {
+                                              ...prev,
+                                              pendingItems:
+                                                prev.pendingItems.filter(
+                                                  (p) => p.key !== item.key
+                                                ),
+                                            }
+                                          : prev
+                                      )
+                                    }
+                                  >
+                                    <Trash2 className="size-3.5" />
+                                  </Button>
+                                </div>
+                                {showSubgroup ? (
+                                  <div className="space-y-1">
+                                    <Label
+                                      htmlFor={`cfg-tree-sub-${item.key}`}
+                                      className="text-[11px] text-muted-foreground"
+                                    >
+                                      Subgroup name
+                                    </Label>
+                                    <Input
+                                      id={`cfg-tree-sub-${item.key}`}
+                                      className="h-8"
+                                      value={item.subgroupName}
+                                      onChange={(e) =>
+                                        setForm((prev) =>
+                                          prev
+                                            ? {
+                                                ...prev,
+                                                pendingItems:
+                                                  prev.pendingItems.map((p) =>
+                                                    p.key === item.key
+                                                      ? {
+                                                          ...p,
+                                                          subgroupName:
+                                                            e.target.value,
+                                                        }
+                                                      : p
+                                                  ),
+                                              }
+                                            : prev
+                                        )
+                                      }
+                                      placeholder={pluralizeEntityName(item.name)}
+                                    />
+                                  </div>
+                                ) : null}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </div>
+                    {pendingNodeCount > 1 ? (
+                      <div className="shrink-0 space-y-1.5">
+                        <Label htmlFor="cfg-tree-node-group-name">Group name</Label>
+                        <Input
+                          id="cfg-tree-node-group-name"
+                          value={form.groupName}
+                          onChange={(e) =>
+                            setForm((prev) =>
+                              prev ? { ...prev, groupName: e.target.value } : prev
+                            )
+                          }
+                          placeholder={
+                            form.pendingItems[0]?.name.trim() || 'Group name'
+                          }
+                        />
+                        {form.pendingItems.length > 1 ? (
+                          <p className="text-[11px] text-muted-foreground">
+                            Same-entity quantities &gt; 1 become nested subgroups;
+                            quantity 1 stays a direct member.
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4">
+                  <div className="flex min-h-32 flex-1 flex-col gap-2 overflow-hidden">
+                    <Label className="shrink-0">Entity list</Label>
+                    <ConfigEntityTypeTree
+                      className="min-h-0 flex-1 overflow-hidden"
+                      entities={entityListItems}
+                      levelLabel={levelLabel}
+                      selectableLevel={form.level}
+                      selectedName={form.name || undefined}
+                      defaultExpandedLevels={[form.level]}
+                      onSelect={(item) => {
+                        setForm((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                name: item.name,
+                                abbreviation: (
+                                  item.abbreviation ||
+                                  suggestAbbreviation(item.name)
+                                ).toUpperCase(),
+                              }
+                            : prev
+                        );
+                      }}
+                    />
+                  </div>
+                  <div className="shrink-0 space-y-2">
+                    <Label>Abbreviation</Label>
+                    <Input
+                      className="rounded-full font-mono uppercase"
+                      value={form.abbreviation}
+                      onChange={(e) =>
+                        setForm((prev) =>
+                          prev
+                            ? { ...prev, abbreviation: e.target.value.toUpperCase() }
+                            : prev
+                        )
+                      }
+                      placeholder={suggestAbbreviation(form.name || 'XX')}
+                    />
+                  </div>
+                </div>
+              )}
 
               <DialogFooter className="shrink-0 border-t px-6 py-4 sm:justify-end">
                 <Button type="button" variant="outline" onClick={() => setForm(null)}>
                   Cancel
                 </Button>
-                <Button type="button" onClick={saveForm} disabled={!form.name.trim()}>
+                <Button
+                  type="button"
+                  onClick={saveForm}
+                  disabled={
+                    form.mode === 'create' && form.level !== 'system'
+                      ? form.pendingItems.length < 1 ||
+                        pendingNodeCount < 1 ||
+                        form.pendingItems.some(
+                          (item) =>
+                            item.quantity < 1 ||
+                            item.quantity > MAX_NODE_QUANTITY ||
+                            (form.pendingItems.length > 1 &&
+                              item.quantity > 1 &&
+                              !(
+                                item.subgroupName.trim() ||
+                                item.name.trim()
+                              ))
+                        ) ||
+                        (pendingNodeCount > 1 &&
+                          !(
+                            form.groupName.trim() ||
+                            form.pendingItems[0]?.name.trim()
+                          ))
+                      : !form.name.trim()
+                  }
+                >
                   Save
                 </Button>
               </DialogFooter>

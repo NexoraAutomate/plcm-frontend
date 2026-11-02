@@ -121,6 +121,10 @@ export type TemplateDraftNode = {
   /** Shared id for a visual/org group of sibling nodes (same parent). */
   sibling_group_id?: string | null;
   sibling_group_name?: string | null;
+  /** When set, this node's group is nested inside another same-tier group. */
+  sibling_group_parent_id?: string | null;
+  /** Display name of the nested parent (used when the parent has no direct leaves). */
+  sibling_group_parent_name?: string | null;
 };
 
 export const DEFAULT_PRODUCT_TYPES = [

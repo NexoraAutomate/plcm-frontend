@@ -158,6 +158,7 @@ function draftFingerprint(draft: Draft): string {
       inventory_source: normalizeInventorySource(n.inventory_source),
       sibling_group_id: n.sibling_group_id ?? null,
       sibling_group_name: n.sibling_group_name ?? null,
+      sibling_group_parent_id: n.sibling_group_parent_id ?? null,
     })),
   });
 }
@@ -208,6 +209,7 @@ function toDraft(config: HierarchyConfiguration): Draft {
       inventory_source: normalizeInventorySource(n.inventory_source),
       sibling_group_id: n.sibling_group_id ?? null,
       sibling_group_name: n.sibling_group_name ?? null,
+      sibling_group_parent_id: n.sibling_group_parent_id ?? null,
     })),
   };
 }
@@ -249,6 +251,7 @@ function draftToExportPayload(draft: Draft): HierarchyConfigurationWrite {
       inventory_source: normalizeInventorySource(n.inventory_source),
       sibling_group_id: n.sibling_group_id?.trim() || null,
       sibling_group_name: n.sibling_group_name?.trim() || null,
+      sibling_group_parent_id: n.sibling_group_parent_id?.trim() || null,
     })),
   };
 }
@@ -307,6 +310,11 @@ function parseConfigJson(parsed: unknown): HierarchyConfigurationWrite {
       typeof node.sibling_group_name === 'string' && node.sibling_group_name.trim()
         ? node.sibling_group_name.trim()
         : null;
+    const siblingGroupParentId =
+      typeof node.sibling_group_parent_id === 'string' &&
+      node.sibling_group_parent_id.trim()
+        ? node.sibling_group_parent_id.trim()
+        : null;
     return {
       client_key: clientKey,
       parent_client_key:
@@ -323,6 +331,7 @@ function parseConfigJson(parsed: unknown): HierarchyConfigurationWrite {
       ),
       sibling_group_id: siblingGroupId,
       sibling_group_name: siblingGroupId ? siblingGroupName : null,
+      sibling_group_parent_id: siblingGroupId ? siblingGroupParentId : null,
     };
   });
 
@@ -717,6 +726,7 @@ export function HierarchyConfigPanel({
     inventory_source: normalizeInventorySource(n.inventory_source),
     sibling_group_id: n.sibling_group_id ?? null,
     sibling_group_name: n.sibling_group_name ?? null,
+    sibling_group_parent_id: n.sibling_group_parent_id ?? null,
   }));
 
   const isDirty = draftFingerprint(draft) !== baselineFingerprint;

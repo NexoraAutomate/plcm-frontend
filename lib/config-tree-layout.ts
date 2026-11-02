@@ -10,6 +10,8 @@ import {
 export type SiblingGroupNodeData = {
   name: string;
   memberCount: number;
+  /** e.g. "2× Relay, 1× Modem" — used on collapsed cards instead of "Group · N nodes". */
+  memberSummary: string;
   collapsed: boolean;
   locked: boolean;
   readOnly: boolean;
@@ -24,21 +26,30 @@ export {
 } from '@/lib/config-tree-node-fields';
 
 export {
+  addNodesToSiblingGroup,
+  applyPendingSiblingAdds,
   areSiblingKeys,
   canLinkLevels,
   childrenOf,
   descendantsOf,
+  expandDraftNodeQuantity,
   filterVisibleHierarchyNodes,
   groupSiblingNodes,
   hasSystemNode,
   isDraftNode,
   isEntityAssigned,
   isHierarchyFullyExpanded,
+  nestSiblingGroup,
   parentKeysWithChildren,
+  pluralizeEntityName,
   pruneUndersizedSiblingGroups,
   renameSiblingGroup,
+  setSiblingGroupQuantity,
+  siblingGroupMembers,
+  siblingGroupParentId,
   siblingsOf,
   ungroupSiblingNodes,
+  wouldCreateGroupNestCycle,
 } from '@/lib/config-tree-draft';
 
 export const DEFAULT_NODE_WIDTH = 176;
@@ -113,12 +124,37 @@ export function parseSiblingGroupFlowId(flowId: string): string | null {
   return flowId.slice('sibling-group-'.length) || null;
 }
 
+/** Build "2× Relay, 1× Modem" style summary for a group (includes nested leaves). */
+export function summarizeSiblingGroupMembers(
+  packs: Map<string, GroupPack>,
+  groupId: string
+): string {
+  const counts = new Map<string, number>();
+  const walk = (gid: string) => {
+    const pack = packs.get(gid);
+    if (!pack) return;
+    for (const member of pack.members) {
+      const name = member.name.trim() || 'Node';
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+    for (const childId of pack.childGroupIds) walk(childId);
+  };
+  walk(groupId);
+  return [...counts.entries()]
+    .map(([name, qty]) => `${qty}× ${name}`)
+    .join(', ');
+}
+
 type GroupPack = {
   groupId: string;
   name: string;
+  parentGroupId: string | null;
   members: TemplateDraftNode[];
-  /** Local top-left of each member inside the group content box (below label). */
+  childGroupIds: string[];
+  /** Local top-left of each direct leaf member inside the group content box. */
   localByKey: Map<string, { x: number; y: number }>;
+  /** Local top-left of each nested child group inside this group. */
+  localByChildGroup: Map<string, { x: number; y: number }>;
   contentWidth: number;
   contentHeight: number;
   width: number;
@@ -138,48 +174,102 @@ function nodeSize(
   };
 }
 
-/** Pack sibling-group members into a tight stack (cross-axis for the flow direction). */
-function packSiblingGroup(
+function groupNestParentId(members: TemplateDraftNode[]): string | null {
+  const parents = new Set(
+    members.map((m) => m.sibling_group_parent_id?.trim() || '')
+  );
+  if (parents.size !== 1) return null;
+  const only = [...parents][0];
+  return only || null;
+}
+
+type PackUnit = {
+  kind: 'node' | 'group';
+  id: string;
+  sort: number;
+  width: number;
+  height: number;
+};
+
+/** Pack a group's direct leaves + nested child packs into one frame. */
+function packSiblingGroupUnits(
   groupId: string,
   members: TemplateDraftNode[],
+  childPacks: GroupPack[],
   direction: LayoutDirection,
   sizeById?: Map<string, { width: number; height: number }>
 ): GroupPack {
-  const ordered = members
+  const orderedMembers = members
     .slice()
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  const units: PackUnit[] = [
+    ...orderedMembers.map((m) => {
+      const size = nodeSize(m.client_key, sizeById);
+      return {
+        kind: 'node' as const,
+        id: m.client_key,
+        sort: m.sort_order ?? 0,
+        width: size.width,
+        height: size.height,
+      };
+    }),
+    ...childPacks.map((pack) => {
+      const sort = Math.min(
+        ...pack.members.map((m) => m.sort_order ?? 0),
+        Number.MAX_SAFE_INTEGER
+      );
+      return {
+        kind: 'group' as const,
+        id: pack.groupId,
+        sort,
+        width: pack.width,
+        height: pack.height,
+      };
+    }),
+  ].sort((a, b) => a.sort - b.sort || a.id.localeCompare(b.id));
+
   const localByKey = new Map<string, { x: number; y: number }>();
+  const localByChildGroup = new Map<string, { x: number; y: number }>();
   let cursor = 0;
   let contentWidth = 0;
   let contentHeight = 0;
-
-  // LR flow → stack members vertically inside the group; TB → stack horizontally.
   const stackVertical = direction === 'LR';
 
-  for (const member of ordered) {
-    const { width, height } = nodeSize(member.client_key, sizeById);
+  for (const unit of units) {
     if (stackVertical) {
-      localByKey.set(member.client_key, { x: 0, y: cursor });
-      cursor += height + SIBLING_GROUP_MEMBER_GAP;
-      contentWidth = Math.max(contentWidth, width);
+      const pos = { x: 0, y: cursor };
+      if (unit.kind === 'node') localByKey.set(unit.id, pos);
+      else localByChildGroup.set(unit.id, pos);
+      cursor += unit.height + SIBLING_GROUP_MEMBER_GAP;
+      contentWidth = Math.max(contentWidth, unit.width);
       contentHeight = cursor - SIBLING_GROUP_MEMBER_GAP;
     } else {
-      localByKey.set(member.client_key, { x: cursor, y: 0 });
-      cursor += width + SIBLING_GROUP_MEMBER_GAP;
+      const pos = { x: cursor, y: 0 };
+      if (unit.kind === 'node') localByKey.set(unit.id, pos);
+      else localByChildGroup.set(unit.id, pos);
+      cursor += unit.width + SIBLING_GROUP_MEMBER_GAP;
       contentWidth = cursor - SIBLING_GROUP_MEMBER_GAP;
-      contentHeight = Math.max(contentHeight, height);
+      contentHeight = Math.max(contentHeight, unit.height);
     }
   }
 
+  if (!units.length) {
+    contentWidth = DEFAULT_NODE_WIDTH;
+    contentHeight = DEFAULT_NODE_HEIGHT;
+  }
+
   const name =
-    ordered.find((m) => m.sibling_group_name?.trim())?.sibling_group_name?.trim() ||
+    orderedMembers.find((m) => m.sibling_group_name?.trim())?.sibling_group_name?.trim() ||
     'Group';
 
   return {
     groupId,
     name,
-    members: ordered,
+    parentGroupId: groupNestParentId(members),
+    members: orderedMembers,
+    childGroupIds: childPacks.map((p) => p.groupId),
     localByKey,
+    localByChildGroup,
     contentWidth,
     contentHeight,
     width: contentWidth + SIBLING_GROUP_PAD_X * 2,
@@ -190,7 +280,8 @@ function packSiblingGroup(
 function collectGroupPacks(
   nodes: TemplateDraftNode[],
   direction: LayoutDirection,
-  sizeById?: Map<string, { width: number; height: number }>
+  sizeById?: Map<string, { width: number; height: number }>,
+  collapsedGroupIds?: ReadonlySet<string>
 ): Map<string, GroupPack> {
   const byGroup = new Map<string, TemplateDraftNode[]>();
   for (const node of nodes) {
@@ -200,10 +291,75 @@ function collectGroupPacks(
     list.push(node);
     byGroup.set(gid, list);
   }
-  const packs = new Map<string, GroupPack>();
+
+  const parentByGroup = new Map<string, string | null>();
   for (const [gid, members] of byGroup) {
-    if (members.length < 2) continue;
-    packs.set(gid, packSiblingGroup(gid, members, direction, sizeById));
+    const parent = groupNestParentId(members);
+    parentByGroup.set(gid, parent && byGroup.has(parent) ? parent : null);
+  }
+
+  // Keep groups that have >= 2 slots (direct leaves + nested child groups).
+  const childrenTmp = new Map<string, string[]>();
+  for (const [gid, parent] of parentByGroup) {
+    if (!parent) continue;
+    const list = childrenTmp.get(parent) ?? [];
+    list.push(gid);
+    childrenTmp.set(parent, list);
+  }
+  for (const gid of [...parentByGroup.keys()]) {
+    const direct = byGroup.get(gid)?.length ?? 0;
+    const nested = childrenTmp.get(gid)?.length ?? 0;
+    if (direct + nested < 2) {
+      parentByGroup.delete(gid);
+    }
+  }
+
+  const childrenByParent = new Map<string, string[]>();
+  for (const [gid, parent] of parentByGroup) {
+    if (!parent) continue;
+    const list = childrenByParent.get(parent) ?? [];
+    list.push(gid);
+    childrenByParent.set(parent, list);
+  }
+
+  const depthOf = (gid: string): number => {
+    let d = 0;
+    let cur = parentByGroup.get(gid) ?? null;
+    const seen = new Set<string>();
+    while (cur) {
+      if (seen.has(cur)) break;
+      seen.add(cur);
+      d += 1;
+      cur = parentByGroup.get(cur) ?? null;
+    }
+    return d;
+  };
+
+  const orderedIds = [...parentByGroup.keys()].sort(
+    (a, b) => depthOf(b) - depthOf(a) || a.localeCompare(b)
+  );
+
+  const packs = new Map<string, GroupPack>();
+  for (const gid of orderedIds) {
+    const members = byGroup.get(gid) ?? [];
+    const childIds = (childrenByParent.get(gid) ?? []).filter((id) =>
+      packs.has(id)
+    );
+    const childPacks = childIds.map((id) => {
+      const child = packs.get(id)!;
+      if (collapsedGroupIds?.has(id)) {
+        return {
+          ...child,
+          width: COLLAPSED_GROUP_WIDTH,
+          height: COLLAPSED_GROUP_HEIGHT,
+        };
+      }
+      return child;
+    });
+    packs.set(
+      gid,
+      packSiblingGroupUnits(gid, members, childPacks, direction, sizeById)
+    );
   }
   return packs;
 }
@@ -219,11 +375,24 @@ export function layoutWithDagre(
   sizeById?: Map<string, { width: number; height: number }>,
   collapsedGroupIds?: ReadonlySet<string>
 ): Map<string, { x: number; y: number }> {
-  const packs = collectGroupPacks(nodes, direction, sizeById);
+  const packs = collectGroupPacks(nodes, direction, sizeById, collapsedGroupIds);
   const memberToGroup = new Map<string, string>();
   for (const [gid, pack] of packs) {
     for (const m of pack.members) memberToGroup.set(m.client_key, gid);
   }
+
+  /** Map a leaf (or its outermost root group) to the dagre node id. */
+  const rootGroupId = (gid: string): string => {
+    let cur = gid;
+    const seen = new Set<string>();
+    while (true) {
+      if (seen.has(cur)) return cur;
+      seen.add(cur);
+      const parent = packs.get(cur)?.parentGroupId;
+      if (!parent || !packs.has(parent)) return cur;
+      cur = parent;
+    }
+  };
 
   const g = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
   // TB: nodesep = horizontal gap at a rank; ranksep = vertical gap between ranks.
@@ -238,11 +407,13 @@ export function layoutWithDagre(
 
   const dagreIdFor = (clientKey: string): string => {
     const gid = memberToGroup.get(clientKey);
-    return gid ? siblingGroupFlowId(gid) : clientKey;
+    if (!gid) return clientKey;
+    return siblingGroupFlowId(rootGroupId(gid));
   };
 
-  // Supernodes for groups
+  // Supernodes for root groups only (nested groups live inside parents).
   for (const [gid, pack] of packs) {
+    if (pack.parentGroupId && packs.has(pack.parentGroupId)) continue;
     const collapsed = collapsedGroupIds?.has(gid);
     g.setNode(siblingGroupFlowId(gid), {
       width: collapsed ? COLLAPSED_GROUP_WIDTH : pack.width,
@@ -289,15 +460,45 @@ export function layoutWithDagre(
     });
   }
 
-  // Place group members from supernode + local pack (absolute coords)
-  for (const [gid, pack] of packs) {
-    const laid = g.node(siblingGroupFlowId(gid));
+  // Place root groups from dagre, then nest children relative to parents (depth order).
+  const depthOf = (gid: string): number => {
+    let d = 0;
+    let cur = packs.get(gid)?.parentGroupId ?? null;
+    const seen = new Set<string>();
+    while (cur && packs.has(cur)) {
+      if (seen.has(cur)) break;
+      seen.add(cur);
+      d += 1;
+      cur = packs.get(cur)?.parentGroupId ?? null;
+    }
+    return d;
+  };
+  const orderedPackIds = [...packs.keys()].sort(
+    (a, b) => depthOf(a) - depthOf(b) || a.localeCompare(b)
+  );
+
+  for (const gid of orderedPackIds) {
+    const pack = packs.get(gid)!;
     const collapsed = collapsedGroupIds?.has(gid);
     const gw = collapsed ? COLLAPSED_GROUP_WIDTH : pack.width;
     const gh = collapsed ? COLLAPSED_GROUP_HEIGHT : pack.height;
-    const groupX = laid ? laid.x - gw / 2 : 0;
-    const groupY = laid ? laid.y - gh / 2 : 0;
-    // Store group origin under a synthetic key for buildGraph (optional)
+
+    let groupX = 0;
+    let groupY = 0;
+    if (pack.parentGroupId && packs.has(pack.parentGroupId)) {
+      const parentOrigin =
+        positions.get(siblingGroupFlowId(pack.parentGroupId)) ?? { x: 0, y: 0 };
+      const parentPack = packs.get(pack.parentGroupId)!;
+      const local =
+        parentPack.localByChildGroup.get(gid) ?? ({ x: 0, y: 0 } as const);
+      groupX = parentOrigin.x + SIBLING_GROUP_PAD_X + local.x;
+      groupY = parentOrigin.y + SIBLING_GROUP_PAD_Y + SIBLING_GROUP_LABEL_H + local.y;
+    } else {
+      const laid = g.node(siblingGroupFlowId(gid));
+      groupX = laid ? laid.x - gw / 2 : 0;
+      groupY = laid ? laid.y - gh / 2 : 0;
+    }
+
     positions.set(siblingGroupFlowId(gid), { x: groupX, y: groupY });
 
     for (const member of pack.members) {
@@ -348,11 +549,28 @@ export function buildGraphFromDraft(input: {
     collapsedGroupIds = new Set<string>(),
   } = input;
 
-  const packs = collectGroupPacks(nodes, direction, sizeById);
+  const packs = collectGroupPacks(
+    nodes,
+    direction,
+    sizeById,
+    collapsedGroupIds
+  );
   const memberToGroup = new Map<string, string>();
   for (const [gid, pack] of packs) {
     for (const m of pack.members) memberToGroup.set(m.client_key, gid);
   }
+
+  const isAncestorCollapsed = (gid: string): boolean => {
+    let cur: string | null = gid;
+    const seen = new Set<string>();
+    while (cur) {
+      if (seen.has(cur)) return false;
+      seen.add(cur);
+      if (collapsedGroupIds.has(cur)) return true;
+      cur = packs.get(cur)?.parentGroupId ?? null;
+    }
+    return false;
+  };
 
   const positions =
     applyAutoLayout || !positionById?.size
@@ -392,45 +610,86 @@ export function buildGraphFromDraft(input: {
   const parentsWithKids = parentsWithChildren ?? parentsFromVisible;
   const handles = layoutHandleIds(direction);
 
-  const groupNodes: Node<SiblingGroupNodeData>[] = [];
-  for (const [gid, pack] of packs) {
-    const collapsed = collapsedGroupIds.has(gid);
-    const origin =
-      positions.get(siblingGroupFlowId(gid)) ??
-      ({ x: 0, y: 0 } as { x: number; y: number });
-    const gw = collapsed ? COLLAPSED_GROUP_WIDTH : pack.width;
-    const gh = collapsed ? COLLAPSED_GROUP_HEIGHT : pack.height;
-    groupNodes.push({
-      id: siblingGroupFlowId(gid),
-      type: 'siblingGroup',
-      position: origin,
-      data: {
-        name: pack.name,
-        memberCount: pack.members.length,
-        collapsed,
-        locked,
-        readOnly,
-        groupId: gid,
-        layoutDirection: direction,
-      },
-      width: gw,
-      height: gh,
-      style: {
+  const depthOf = (gid: string): number => {
+    let d = 0;
+    let cur = packs.get(gid)?.parentGroupId ?? null;
+    const seen = new Set<string>();
+    while (cur && packs.has(cur)) {
+      if (seen.has(cur)) break;
+      seen.add(cur);
+      d += 1;
+      cur = packs.get(cur)?.parentGroupId ?? null;
+    }
+    return d;
+  };
+
+  const groupNodes: Node<SiblingGroupNodeData>[] = [...packs.keys()]
+    .sort((a, b) => depthOf(a) - depthOf(b) || a.localeCompare(b))
+    .filter((gid) => !isAncestorCollapsed(gid) || collapsedGroupIds.has(gid))
+    .filter((gid) => {
+      // Hide nested group entirely when an ancestor is collapsed.
+      const parent = packs.get(gid)?.parentGroupId;
+      if (parent && isAncestorCollapsed(parent)) return false;
+      if (parent && collapsedGroupIds.has(parent)) return false;
+      return true;
+    })
+    .map((gid) => {
+      const pack = packs.get(gid)!;
+      const collapsed = collapsedGroupIds.has(gid);
+      const nestedParentId =
+        pack.parentGroupId && packs.has(pack.parentGroupId)
+          ? siblingGroupFlowId(pack.parentGroupId)
+          : undefined;
+      const parentPack = pack.parentGroupId
+        ? packs.get(pack.parentGroupId)
+        : undefined;
+      const nestedLocal = parentPack?.localByChildGroup.get(gid);
+      const origin =
+        nestedParentId && nestedLocal
+          ? {
+              x: SIBLING_GROUP_PAD_X + nestedLocal.x,
+              y: SIBLING_GROUP_PAD_Y + SIBLING_GROUP_LABEL_H + nestedLocal.y,
+            }
+          : (positions.get(siblingGroupFlowId(gid)) ??
+            ({ x: 0, y: 0 } as { x: number; y: number }));
+      const gw = collapsed ? COLLAPSED_GROUP_WIDTH : pack.width;
+      const gh = collapsed ? COLLAPSED_GROUP_HEIGHT : pack.height;
+      return {
+        id: siblingGroupFlowId(gid),
+        type: 'siblingGroup' as const,
+        position: origin,
+        parentId: nestedParentId,
+        expandParent: false,
+        data: {
+          name: pack.name,
+          memberCount: pack.members.length + pack.childGroupIds.length,
+          memberSummary:
+            summarizeSiblingGroupMembers(packs, gid) ||
+            `${pack.members.length + pack.childGroupIds.length} nodes`,
+          collapsed,
+          locked,
+          readOnly,
+          groupId: gid,
+          layoutDirection: direction,
+        },
         width: gw,
         height: gh,
-      },
-      sourcePosition: handles.sourcePosition,
-      targetPosition: handles.targetPosition,
-      selectable: true,
-      draggable: !locked && !readOnly,
-      connectable: collapsed && !locked && !readOnly,
-      deletable: false,
+        style: {
+          width: gw,
+          height: gh,
+        },
+        sourcePosition: handles.sourcePosition,
+        targetPosition: handles.targetPosition,
+        selectable: true,
+        draggable: !locked && !readOnly,
+        connectable: collapsed && !locked && !readOnly,
+        deletable: false,
+      };
     });
-  }
 
   const hiddenMemberKeys = new Set<string>();
   for (const [gid, pack] of packs) {
-    if (!collapsedGroupIds.has(gid)) continue;
+    if (!isAncestorCollapsed(gid)) continue;
     for (const m of pack.members) hiddenMemberKeys.add(m.client_key);
   }
 
@@ -444,7 +703,9 @@ export function buildGraphFromDraft(input: {
       const pack = gid ? packs.get(gid) : undefined;
       const collapsed = gid ? collapsedGroupIds.has(gid) : false;
       const parentId =
-        gid && pack && !collapsed ? siblingGroupFlowId(gid) : undefined;
+        gid && pack && !collapsed && !isAncestorCollapsed(gid)
+          ? siblingGroupFlowId(gid)
+          : undefined;
       // Always use packed local coords inside groups — never abs-origin deltas
       // (those inflate the parent when TB layout drifts).
       const local = pack?.localByKey.get(node.client_key);

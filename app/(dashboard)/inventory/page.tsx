@@ -1626,90 +1626,6 @@ export default function InventoryPage() {
             </div>
           ) : null}
 
-          <div className="sm:col-span-2 space-y-3">
-            <Label>Picture</Label>
-            <FileDropZone
-              accept="image/*"
-              restLabel="photo files or drop"
-              hint="(jpg, png, webp, etc)"
-              selectedLabel={
-                removePicture
-                  ? null
-                  : pendingPictureFile?.name ||
-                    (formData.picture_url ? 'Current photo on file' : null)
-              }
-              onClear={() => {
-                setFormData({ ...formData, picture_url: '' });
-                setPendingPictureFile(null);
-                setRemovePicture(true);
-              }}
-              onFiles={(files) => {
-                setPendingPictureFile(files[0] ?? null);
-                setRemovePicture(false);
-              }}
-            />
-          </div>
-        </TabsContent>
-
-        <TabsContent value="holder" className={formTabClassName}>
-          {inventoryUsesInstances(selectedEntityType) && mode === 'edit' && editingInstanceId ? (
-            <p className="text-sm text-muted-foreground">
-              Location and holder apply to the selected unit.
-            </p>
-          ) : null}
-          {inventoryUsesInstances(selectedEntityType) && mode === 'create' ? (
-            <p className="text-sm text-muted-foreground">
-              Location and holder apply to each new unit being added.
-            </p>
-          ) : null}
-          <div>
-            <Label>Inventory Holder</Label>
-            {mode === 'create' ? (
-              <>
-                <Input value={inventoryHolderLabel} disabled />
-                <p className="text-xs text-muted-foreground">
-                  Warehouse stock is held by the Inventory Manager who adds the item.
-                </p>
-              </>
-            ) : (
-              <Select
-                value={formData.holder_user_id || ''}
-                onValueChange={(value) => setFormData({ ...formData, holder_user_id: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select inventory holder" />
-                </SelectTrigger>
-                <SelectContent>
-                  {users.map((user) => (
-                    <SelectItem key={user.id} value={String(user.id)}>
-                      {user.full_name || user.username}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-
-          <CascadingLocationSelects
-            tree={definitions.inventory_location_tree}
-            required={mode === 'create'}
-            value={{
-              location_room: formData.location_room,
-              location_cabinet: formData.location_cabinet,
-              location_rack: formData.location_rack,
-            }}
-            onChange={(next) => setFormData({ ...formData, ...next })}
-          />
-
-          <div>
-            <Label>Added Date</Label>
-            <Input
-              type="date"
-              value={formData.added_date}
-              onChange={(e) => setFormData({ ...formData, added_date: e.target.value })}
-            />
-          </div>
-
           {mode === 'create' || editingInstanceId != null ? (
             <>
               <div>
@@ -1802,6 +1718,90 @@ export default function InventoryPage() {
                 />
               </div>
             ) : null}
+          </div>
+
+          <div className="sm:col-span-2 space-y-3">
+            <Label>Picture</Label>
+            <FileDropZone
+              accept="image/*"
+              restLabel="photo files or drop"
+              hint="(jpg, png, webp, etc)"
+              selectedLabel={
+                removePicture
+                  ? null
+                  : pendingPictureFile?.name ||
+                    (formData.picture_url ? 'Current photo on file' : null)
+              }
+              onClear={() => {
+                setFormData({ ...formData, picture_url: '' });
+                setPendingPictureFile(null);
+                setRemovePicture(true);
+              }}
+              onFiles={(files) => {
+                setPendingPictureFile(files[0] ?? null);
+                setRemovePicture(false);
+              }}
+            />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="holder" className={formTabClassName}>
+          {inventoryUsesInstances(selectedEntityType) && mode === 'edit' && editingInstanceId ? (
+            <p className="text-sm text-muted-foreground">
+              Location and holder apply to the selected unit.
+            </p>
+          ) : null}
+          {inventoryUsesInstances(selectedEntityType) && mode === 'create' ? (
+            <p className="text-sm text-muted-foreground">
+              Location and holder apply to each new unit being added.
+            </p>
+          ) : null}
+          <div>
+            <Label>Inventory Holder</Label>
+            {mode === 'create' ? (
+              <>
+                <Input value={inventoryHolderLabel} disabled />
+                <p className="text-xs text-muted-foreground">
+                  Warehouse stock is held by the Inventory Manager who adds the item.
+                </p>
+              </>
+            ) : (
+              <Select
+                value={formData.holder_user_id || ''}
+                onValueChange={(value) => setFormData({ ...formData, holder_user_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select inventory holder" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={String(user.id)}>
+                      {user.full_name || user.username}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          <CascadingLocationSelects
+            tree={definitions.inventory_location_tree}
+            required={mode === 'create'}
+            value={{
+              location_room: formData.location_room,
+              location_cabinet: formData.location_cabinet,
+              location_rack: formData.location_rack,
+            }}
+            onChange={(next) => setFormData({ ...formData, ...next })}
+          />
+
+          <div>
+            <Label>Added Date</Label>
+            <Input
+              type="date"
+              value={formData.added_date}
+              onChange={(e) => setFormData({ ...formData, added_date: e.target.value })}
+            />
           </div>
         </TabsContent>
 
@@ -2427,7 +2427,7 @@ export default function InventoryPage() {
                   )}
                   {isVisible('quantity') && (
                     <SortableTableHead
-                      className="w-36"
+                      className="w-36 text-center"
                       column="quantity"
                       sort={sort}
                       onSort={cycleSort}
@@ -2644,14 +2644,14 @@ export default function InventoryPage() {
                           )}
                           {isVisible('total_used') && <TableCell>{item.totalUsed ?? 0}</TableCell>}
                           {isVisible('quantity') && (
-                            <TableCell className="w-36 align-top">
-                              <div className="flex min-w-0 flex-col gap-0.5 whitespace-normal break-words">
+                            <TableCell className="w-36 align-middle text-center">
+                              <div className="flex min-w-0 flex-col items-center justify-center gap-0.5 whitespace-normal break-words">
                                 <span className="leading-tight">{item.quantity}</span>
                                 {(item.reserved_quantity ?? 0) > 0 ||
                                 (item.instances ?? []).some(isProjectReservedInstance) ? (
                                   <Badge
                                     variant="secondary"
-                                    className="h-auto w-full max-w-full whitespace-normal break-words px-1.5 py-0.5 text-left text-[10px] leading-snug font-normal"
+                                    className="h-auto w-full max-w-full whitespace-normal break-words px-1.5 py-0.5 text-center text-[10px] leading-snug font-normal"
                                   >
                                     {item.available_quantity ??
                                       Math.max(0, item.quantity - (item.reserved_quantity ?? 0))}{' '}

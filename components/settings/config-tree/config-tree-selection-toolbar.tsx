@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { NodeToolbar, useStore } from '@xyflow/react';
-import { Group, Ungroup } from 'lucide-react';
+import { Group, Pencil, Ungroup } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   areSiblingKeys,
@@ -16,6 +16,7 @@ type Props = {
   readOnly: boolean;
   onGroup: (memberIds: string[]) => void;
   onUngroup: (groupId: string) => void;
+  onEditGroup: (groupId: string) => void;
 };
 
 /**
@@ -28,6 +29,7 @@ export function ConfigTreeSelectionToolbar({
   readOnly,
   onGroup,
   onUngroup,
+  onEditGroup,
 }: Props) {
   const selected = useStore((s) => s.nodes.filter((n) => n.selected));
 
@@ -38,7 +40,7 @@ export function ConfigTreeSelectionToolbar({
     if (groupSelected.length === 1 && treeSelected.length === 0) {
       const gid = parseSiblingGroupFlowId(String(groupSelected[0].id));
       return {
-        mode: 'ungroup' as const,
+        mode: 'edit-group' as const,
         anchorId: groupSelected[0].id,
         memberIds: [] as string[],
         groupId: gid,
@@ -84,16 +86,27 @@ export function ConfigTreeSelectionToolbar({
           Group nodes
         </Button>
       ) : (
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          className="h-8 gap-1.5"
-          onClick={() => groupId && onUngroup(groupId)}
-        >
-          <Ungroup className="size-3.5" />
-          Ungroup
-        </Button>
+        <>
+          <Button
+            type="button"
+            size="sm"
+            className="h-8 gap-1.5"
+            onClick={() => groupId && onEditGroup(groupId)}
+          >
+            <Pencil className="size-3.5" />
+            Edit group
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="h-8 gap-1.5"
+            onClick={() => groupId && onUngroup(groupId)}
+          >
+            <Ungroup className="size-3.5" />
+            Ungroup
+          </Button>
+        </>
       )}
     </NodeToolbar>
   );
