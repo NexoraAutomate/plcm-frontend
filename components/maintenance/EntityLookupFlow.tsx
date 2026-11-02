@@ -15,7 +15,6 @@ import {
   BackgroundVariant,
   Controls,
   Handle,
-  MiniMap,
   Position,
   ReactFlow,
   ReactFlowProvider,
@@ -41,14 +40,16 @@ import {
   buildEntityLookupFlow,
   DEFAULT_VISIBLE_FIELDS,
   ENTITY_NODE_WIDTH,
-  getMiniMapNodeColor,
-  getRoleLabel,
   type EntityFlowFieldKey,
   type EntityFlowNodeData,
   toEntityLookupNode,
 } from '@/lib/entity-lookup-flow';
 import type { EntityLookupNode, lookUpResponse } from '@/lib/models';
 import { EntityFlowFieldSlicer } from './EntityFlowFieldSlicer';
+import {
+  EntityLookupWorkflowSheet,
+  type WorkflowFocus,
+} from './entity-lookup-workflow-sheet';
 import { useAuth } from '@/lib/auth-context';
 import { P } from '@/lib/permission-codes';
 
@@ -56,6 +57,7 @@ interface EntityLookupFlowContextValue {
   caseId?: number | null;
   onConfirmFault?: (node: EntityLookupNode) => Promise<void>;
   onViewEntity?: (node: EntityLookupNode) => void;
+  onSerialClick?: (node: EntityFlowNodeData) => void;
   visibleFields: Set<EntityFlowFieldKey>;
 }
 
@@ -75,7 +77,7 @@ const roleStyles: Record<EntityFlowNodeData['role'], string> = {
 
 function EntityFlowNodeComponent({ data }: NodeProps) {
   const nodeData = data as EntityFlowNodeData;
-  const { caseId, onConfirmFault, onViewEntity, visibleFields } =
+  const { caseId, onConfirmFault, onViewEntity, onSerialClick, visibleFields } =
     useContext(EntityLookupFlowContext);
   const { can } = useAuth();
   const canConfirmFault = can(P.confirm_faults);
@@ -84,6 +86,8 @@ function EntityFlowNodeComponent({ data }: NodeProps) {
     (nodeData.role === 'matched' ||
       nodeData.role === 'hardware' ||
       nodeData.role === 'descendant');
+  const serial = nodeData.entity_SerialNumber?.trim();
+  const canOpenWorkflow = Boolean(onSerialClick) && Boolean(serial);
 
   return (
     <div
@@ -100,20 +104,13 @@ function EntityFlowNodeComponent({ data }: NodeProps) {
       <Handle type="target" position={Position.Top} className="bg-muted-foreground!" />
       <Handle type="source" position={Position.Bottom} className="bg-muted-foreground!" />
 
-      {(visibleFields.has('role_label') || visibleFields.has('entity_type')) && (
+      {visibleFields.has('entity_type') ? (
         <div className="mb-2 flex flex-wrap items-start gap-2">
-          {visibleFields.has('role_label') ? (
-            <Badge variant="outline" className="text-[10px] uppercase">
-              {getRoleLabel(nodeData.role)}
-            </Badge>
-          ) : null}
-          {visibleFields.has('entity_type') ? (
-            <Badge variant="secondary" className="text-[10px] uppercase">
-              {nodeData.entity_type}
-            </Badge>
-          ) : null}
+          <Badge variant="secondary" className="text-[10px] uppercase">
+            {nodeData.entity_type}
+          </Badge>
         </div>
-      )}
+      ) : null}
 
       {visibleFields.has('entity_name') ? (
         <p className="line-clamp-2 text-sm font-semibold leading-tight text-foreground">
@@ -126,7 +123,21 @@ function EntityFlowNodeComponent({ data }: NodeProps) {
           <p className="truncate">PN: {nodeData.entity_PartNumber || 'N/A'}</p>
         ) : null}
         {visibleFields.has('serial_number') ? (
-          <p className="truncate">SN: {nodeData.entity_SerialNumber || 'N/A'}</p>
+          canOpenWorkflow ? (
+            <button
+              type="button"
+              className="block max-w-full truncate text-left font-medium text-primary hover:underline"
+              title="Open workflow for this serial"
+              onClick={(event) => {
+                event.stopPropagation();
+                onSerialClick?.(nodeData);
+              }}
+            >
+              SN: {serial}
+            </button>
+          ) : (
+            <p className="truncate">SN: {serial || 'N/A'}</p>
+          )
         ) : null}
         {visibleFields.has('entity_id') ? (
           <p className="truncate">ID: {nodeData.entity_id}</p>
@@ -194,10 +205,12 @@ function EntityLookupFlowCanvas({
   caseId,
   onConfirmFault,
   onViewEntity,
+  onSerialClick,
   visibleFields,
   onToggleField,
   fieldSlicerIdPrefix,
 }: EntityLookupFlowProps & {
+  onSerialClick?: (node: EntityFlowNodeData) => void;
   visibleFields: Set<EntityFlowFieldKey>;
   onToggleField: (field: EntityFlowFieldKey, checked: boolean) => void;
   fieldSlicerIdPrefix: string;
@@ -213,8 +226,8 @@ function EntityLookupFlowCanvas({
   }, [response, setNodes, setEdges]);
 
   const contextValue = useMemo(
-    () => ({ caseId, onConfirmFault, onViewEntity, visibleFields }),
-    [caseId, onConfirmFault, onViewEntity, visibleFields]
+    () => ({ caseId, onConfirmFault, onViewEntity, onSerialClick, visibleFields }),
+    [caseId, onConfirmFault, onViewEntity, onSerialClick, visibleFields]
   );
 
   const handleNodeClick = useCallback(
@@ -258,14 +271,6 @@ function EntityLookupFlowCanvas({
         >
           <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
           <Controls showInteractive={false} />
-          <MiniMap
-            pannable
-            zoomable
-            nodeColor={(node) =>
-              getMiniMapNodeColor((node.data as EntityFlowNodeData)?.role)
-            }
-            maskColor="hsl(var(--background) / 0.75)"
-          />
           <EntityFlowFieldSlicer
             visibleFields={visibleFields}
             onToggleField={onToggleField}
@@ -288,6 +293,8 @@ export function EntityLookupFlow({
     () => new Set(DEFAULT_VISIBLE_FIELDS)
   );
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  const [workflowOpen, setWorkflowOpen] = useState(false);
+  const [workflowFocus, setWorkflowFocus] = useState<WorkflowFocus | null>(null);
 
   const handleToggleField = useCallback((field: EntityFlowFieldKey, checked: boolean) => {
     setVisibleFields((current) => {
@@ -300,6 +307,36 @@ export function EntityLookupFlow({
       return next;
     });
   }, []);
+
+  const handleSerialClick = useCallback((node: EntityFlowNodeData) => {
+    setWorkflowFocus({
+      entityType: node.entity_type,
+      entityId: node.entity_id,
+    });
+    setWorkflowOpen(true);
+  }, []);
+
+  const handleWorkflowViewEntity = useCallback(
+    (node: {
+      entity_type: string;
+      entity_id: number;
+      entity_name: string;
+      entity_PartNumber?: string;
+      entity_SerialNumber?: string;
+      label?: string;
+    }) => {
+      onViewEntity?.({
+        entity_type: node.entity_type,
+        entity_id: node.entity_id,
+        label: node.label || node.entity_name,
+        children: [],
+        entity_name: node.entity_name,
+        entity_PartNumber: node.entity_PartNumber || '',
+        entity_SerialNumber: node.entity_SerialNumber || '',
+      });
+    },
+    [onViewEntity]
+  );
 
   return (
     <>
@@ -325,6 +362,7 @@ export function EntityLookupFlow({
               caseId={caseId}
               onConfirmFault={onConfirmFault}
               onViewEntity={onViewEntity}
+              onSerialClick={handleSerialClick}
               visibleFields={visibleFields}
               onToggleField={handleToggleField}
               fieldSlicerIdPrefix="lookup-inline"
@@ -366,6 +404,7 @@ export function EntityLookupFlow({
                 caseId={caseId}
                 onConfirmFault={onConfirmFault}
                 onViewEntity={onViewEntity}
+                onSerialClick={handleSerialClick}
                 visibleFields={visibleFields}
                 onToggleField={handleToggleField}
                 fieldSlicerIdPrefix="lookup-fullscreen"
@@ -374,6 +413,14 @@ export function EntityLookupFlow({
           </div>
         </DialogContent>
       </Dialog>
+
+      <EntityLookupWorkflowSheet
+        open={workflowOpen}
+        onOpenChange={setWorkflowOpen}
+        response={response}
+        focus={workflowFocus}
+        onViewEntity={handleWorkflowViewEntity}
+      />
     </>
   );
 }
