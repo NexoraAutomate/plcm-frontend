@@ -151,8 +151,12 @@ export default function MaintenancePage() {
       const response = await lookupEntityBySerialNumber(serialNumberValue);
       setLookupResponse(response);
     } catch (err) {
-      console.error('Lookup failed:', err);
-      setLookupError('No entity found for that serial number.');
+      setLookupError(
+        formatMaintenanceApiError(
+          err,
+          `No entity found with serial number '${serialNumberValue}'.`
+        )
+      );
     } finally {
       setLookupLoading(false);
     }

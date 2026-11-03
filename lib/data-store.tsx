@@ -26,7 +26,10 @@ import * as MaintenanceTypes from '@/lib/models';
 import { enrichEntitiesWithStatus, enrichEntityWithStatus } from './entity-status';
 import { LIST_BOOTSTRAP_SIZE, HIERARCHY_TYPE_CAP, STATUS_LIST_CAP, appendCapped } from './data-loading';
 import { toast } from 'sonner';
-import { formatMaintenanceApiError } from '@/services/maintenance';
+import {
+  formatMaintenanceApiError,
+  isExpectedEntityLookupMiss,
+} from '@/services/maintenance';
 import { StatusColorProvider } from '@/lib/status-color-context';
 
 interface DataStoreContextType {
@@ -1534,7 +1537,13 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       const res = await api.maintenanceCases.lookupEntityBySerialNumber(serialNumber);
       return res.data;
     } catch (err) {
-      toast.error('Failed to lookup entity by serial number');
+      // 404/400 are expected lookup outcomes (unknown SN, not installed, not completed).
+      // Callers show those inline; only unexpected failures get a toast here.
+      if (!isExpectedEntityLookupMiss(err)) {
+        toast.error(
+          formatMaintenanceApiError(err, 'Failed to lookup entity by serial number')
+        );
+      }
       throw err;
     }
   };

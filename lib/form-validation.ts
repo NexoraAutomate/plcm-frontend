@@ -27,6 +27,17 @@ export function isMissingId(value: unknown): boolean {
   return !Number.isFinite(n) || n <= 0;
 }
 
+/**
+ * Coerce optional numeric fields from API/forms.
+ * Pydantic Decimals often arrive as JSON strings; blank → null.
+ */
+export function coerceOptionalNumber(value: unknown): number | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'string' && value.trim() === '') return null;
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function requiredMessage(label: string): string {
   return `${label} is required`;
 }
@@ -132,15 +143,17 @@ export function validateOrderForm(input: {
   customerId?: number | null;
   deliveryDate?: string | null;
   productionSupportDate?: string | null;
-  totalValue?: number | null;
+  /** Number, numeric string (API Decimal), or empty. */
+  totalValue?: number | string | null;
 }): string | null {
   if (isBlank(input.title)) return requiredMessage('Title');
   if (isBlank(input.orderDate)) return requiredMessage('Order date');
   if (isBlank(input.currency)) return requiredMessage('Currency');
   if (isMissingId(input.statusId)) return requiredMessage('Status');
   if (isMissingId(input.customerId)) return requiredMessage('Customer');
-  if (input.totalValue != null) {
-    if (!Number.isFinite(input.totalValue) || input.totalValue <= 0) {
+  if (!isBlank(input.totalValue)) {
+    const totalValue = coerceOptionalNumber(input.totalValue);
+    if (totalValue == null || totalValue <= 0) {
       return 'Total value must be a positive number';
     }
   }

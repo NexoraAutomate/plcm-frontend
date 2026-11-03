@@ -25,6 +25,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Eye, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { validateMaintenanceLogForm } from '@/lib/form-validation';
+import {
+  formatMaintenanceApiError,
+  isExpectedEntityLookupMiss,
+} from '@/services/maintenance';
 
 const COLUMN_DEFS: ColumnVisibilityDef[] = [
   { id: 'entity_id', label: 'Entity', alwaysVisible: true },
@@ -133,10 +137,16 @@ export default function MaintenancePage() {
       setLookupResult(lookup);
       setFormData((prev) => ({ ...prev, entity_id: genericRes.data.id }));
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Lookup failed';
+      const message = formatMaintenanceApiError(
+        err,
+        `No entity found with serial number '${formData.serial_number.trim()}'.`
+      );
       setLookupResult(null);
       setLookupError(message);
-      toast.error(message);
+      // Expected not-found / business rules: inline only. Unexpected: toast.
+      if (!isExpectedEntityLookupMiss(err)) {
+        toast.error(message);
+      }
     } finally {
       setIsLookupLoading(false);
     }

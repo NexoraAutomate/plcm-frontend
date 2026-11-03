@@ -23,6 +23,7 @@ import { RequiredMark } from '@/components/ui/required-mark';
 import { ProjectManagerSelect } from '@/components/orders/project-manager-select';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
+import { coerceOptionalNumber } from '@/lib/form-validation';
 import { Plus } from 'lucide-react';
 
 export type OrderFormData = {
@@ -34,7 +35,8 @@ export type OrderFormData = {
   order_date: string;
   delivery_date?: string | null;
   production_support_date?: string | null;
-  total_value?: number | null;
+  /** May be a numeric string when hydrated from API Decimals. */
+  total_value?: number | string | null;
   currency: string;
   project_manager?: string | null;
   remarks?: string | null;
@@ -398,7 +400,7 @@ export function OrderFormDialog({
                   <Input
                     id={`order-${mode}-value`}
                     type="number"
-                    min={0.01}
+                    min={0}
                     step="any"
                     inputMode="decimal"
                     value={formData.total_value ?? ''}
@@ -408,9 +410,8 @@ export function OrderFormDialog({
                         applyFormChange(onFormChange, formData, { total_value: null });
                         return;
                       }
-                      const next = Number(raw);
                       applyFormChange(onFormChange, formData, {
-                        total_value: Number.isFinite(next) ? next : null,
+                        total_value: coerceOptionalNumber(raw),
                       });
                     }}
                     disabled={submitting}
@@ -468,13 +469,14 @@ export function OrderFormDialog({
 
         <div className="flex items-center justify-end gap-2 border-t px-6 py-3.5">
           <Button
+            type="button"
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={submitting}
           >
             Cancel
           </Button>
-          <Button onClick={onSubmit} disabled={submitting}>
+          <Button type="button" onClick={onSubmit} disabled={submitting}>
             {isCreate ? 'Create' : 'Update Order'}
           </Button>
         </div>

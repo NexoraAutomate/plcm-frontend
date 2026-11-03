@@ -39,7 +39,7 @@ import { useColumnVisibility, type ColumnVisibilityDef } from '@/hooks/use-colum
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { Can } from '@/components/auth/can';
 import { P } from '@/lib/permission-codes';
-import { validateOrderForm } from '@/lib/form-validation';
+import { coerceOptionalNumber, validateOrderForm } from '@/lib/form-validation';
 import { cloneOrderProjectsAsDrafts } from '@/lib/clone-order-projects';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -149,6 +149,7 @@ export default function OrdersPage() {
       production_support_date: blankToNull(data.production_support_date),
       project_manager: blankToNull(data.project_manager),
       remarks: blankToNull(data.remarks),
+      total_value: coerceOptionalNumber(data.total_value),
     };
   }
 
@@ -290,7 +291,7 @@ export default function OrdersPage() {
       order_date: order.order_date ?? '',
       delivery_date: order.delivery_date ?? '',
       production_support_date: order.production_support_date ?? '',
-      total_value: order.total_value ?? null,
+      total_value: coerceOptionalNumber(order.total_value),
       currency: order.currency ?? 'PKR',
       project_manager: order.project_manager ?? '',
       remarks: order.remarks ?? '',
@@ -319,7 +320,7 @@ export default function OrdersPage() {
       order_date: todayIsoDate(),
       delivery_date: order.delivery_date ?? '',
       production_support_date: order.production_support_date ?? '',
-      total_value: order.total_value ?? null,
+      total_value: coerceOptionalNumber(order.total_value),
       currency: order.currency ?? 'PKR',
       project_manager: order.project_manager ?? '',
       remarks: order.remarks ?? '',

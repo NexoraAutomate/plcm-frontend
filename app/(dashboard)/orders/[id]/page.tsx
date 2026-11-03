@@ -31,7 +31,7 @@ import {
   type OrderFormData,
 } from '@/components/orders/order-form-dialog';
 import { useStatusesByTypeQuery } from '@/hooks/queries';
-import { validateOrderForm } from '@/lib/form-validation';
+import { coerceOptionalNumber, validateOrderForm } from '@/lib/form-validation';
 
 function formatDate(value?: string | null) {
   if (!value) return '—';
@@ -55,7 +55,7 @@ function orderToFormData(order: Models.Order): OrderFormData {
     order_date: order.order_date ?? '',
     delivery_date: order.delivery_date ?? '',
     production_support_date: order.production_support_date ?? '',
-    total_value: order.total_value ?? null,
+    total_value: coerceOptionalNumber(order.total_value),
     currency: order.currency ?? 'PKR',
     project_manager: order.project_manager ?? '',
     remarks: order.remarks ?? '',
@@ -78,6 +78,7 @@ function sanitizeOrderPayload(data: OrderFormData): OrderFormData {
     production_support_date: blankToNull(data.production_support_date),
     project_manager: blankToNull(data.project_manager),
     remarks: blankToNull(data.remarks),
+    total_value: coerceOptionalNumber(data.total_value),
   };
 }
 

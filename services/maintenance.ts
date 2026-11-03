@@ -83,6 +83,13 @@ export function formatMaintenanceApiError(error: unknown, fallback: string): str
   return fallback;
 }
 
+/** 404/400 from SN lookup are expected business outcomes, not hard failures. */
+export function isExpectedEntityLookupMiss(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) return false;
+  const status = error.response?.status;
+  return status === 404 || status === 400;
+}
+
 export const maintenanceService = {
   getCase: (id: number) => libApi.maintenanceCases.get(id),
   updateMaintenanceCase: (id: number, data: UpdateMaintenanceCasePayload) =>
