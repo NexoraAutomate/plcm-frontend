@@ -1267,6 +1267,16 @@ export interface InventoryStockSeedGroup {
   skipped_reason?: string | null
 }
 
+export interface InventoryStockSeedBootstrapItem {
+  shortage_ids: number[]
+  lru_name: string
+  inventory_type: string
+  part_number?: string | null
+  inventory_id?: number | null
+  action: string
+  reason?: string | null
+}
+
 export interface InventoryStockSeedResult {
   multiplier: number
   groups_processed: number
@@ -1276,9 +1286,15 @@ export interface InventoryStockSeedResult {
   unit_cost: number
   dry_run: boolean
   groups: InventoryStockSeedGroup[]
+  bootstrap_created_groups: number
+  bootstrap_units_added: number
+  bootstrap_skipped: number
+  bootstrap_items: InventoryStockSeedBootstrapItem[]
 }
 
 export interface InventoryStockSeedPayload {
+  bootstrap_missing_shortages?: boolean
+  multiply_stock?: boolean
   multiplier?: number
   unit_cost?: number
   location_room?: string
@@ -1286,7 +1302,31 @@ export interface InventoryStockSeedPayload {
   location_rack?: string
   dry_run?: boolean
   inventory_ids?: number[]
+  shortage_ids?: number[]
   confirm?: string
+}
+
+export interface InventorySeedMissingShortage {
+  shortage_ids: number[]
+  lru_name: string
+  inventory_type: string
+  part_number?: string | null
+  qty_short_total: number
+  existing_inventory_id?: number | null
+  existing_quantity: number
+}
+
+export interface InventorySeedCatalogOption {
+  inventory_id: number
+  name: string
+  inventory_type: string
+  part_number?: string | null
+  quantity: number
+}
+
+export interface InventorySeedOptions {
+  missing_shortages: InventorySeedMissingShortage[]
+  inventory_groups: InventorySeedCatalogOption[]
 }
 
 /** Sidebar badge counts for actions awaiting the current user. */

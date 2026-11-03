@@ -42,6 +42,18 @@ import * as api from '@/lib/api';
 import type { Inventory, InventoryShortage } from '@/lib/models';
 import { parseApiDate } from '@/lib/parse-api-date';
 import { usePageDataRefresh } from '@/components/page-data-refresh';
+import {
+  buildShortageDashboardStats,
+  daysSinceReported,
+  flightGroupKey,
+  groupShortagesByFlightSdls,
+  groupShortagesByItem,
+  isActiveShortage,
+  itemGroupKey,
+  sdlsGroupKey,
+  type ShortageViewMode,
+} from '@/components/shortages/shortage-grouping';
+import { ShortageMiniDashboard } from '@/components/shortages/shortage-mini-dashboard';
 
 function occupiedSerialsFromInventory(item: Inventory | null | undefined): string[] {
   if (!item) return [];
@@ -139,89 +151,6 @@ function apiError(error: unknown, fallback: string): string {
   return typeof detail === 'string' ? detail : fallback;
 }
 
-function flightLabel(row: InventoryShortage): string {
-  return row.flight_name?.trim() || row.flight_code?.trim() || `Flight #${row.flight_id}`;
-}
-
-function sdlsLabel(row: InventoryShortage): string {
-  return row.sdls_name?.trim() || row.sdls_code?.trim() || `SDLS #${row.sdls_id}`;
-}
-
-function flightGroupKey(row: InventoryShortage): string {
-  return `${row.project_id ?? 'p'}:${row.flight_id}`;
-}
-
-function sdlsGroupKey(row: InventoryShortage): string {
-  return `${flightGroupKey(row)}:${row.sdls_id}`;
-}
-
-type ShortageSdlsGroup = {
-  key: string;
-  label: string;
-  rows: InventoryShortage[];
-};
-
-type ShortageFlightGroup = {
-  key: string;
-  label: string;
-  projectId?: number | null;
-  projectName?: string | null;
-  qtyShort: number;
-  sdlsGroups: ShortageSdlsGroup[];
-};
-
-function groupShortagesByFlightSdls(rows: InventoryShortage[]): ShortageFlightGroup[] {
-  const flightMap = new Map<
-    string,
-    {
-      label: string;
-      projectId?: number | null;
-      projectName?: string | null;
-      qtyShort: number;
-      sdlsMap: Map<string, ShortageSdlsGroup>;
-    }
-  >();
-
-  for (const row of rows) {
-    const fKey = flightGroupKey(row);
-    let flight = flightMap.get(fKey);
-    if (!flight) {
-      flight = {
-        label: flightLabel(row),
-        projectId: row.project_id,
-        projectName: row.project_name,
-        qtyShort: 0,
-        sdlsMap: new Map(),
-      };
-      flightMap.set(fKey, flight);
-    }
-    flight.qtyShort += Math.max(0, Number(row.qty_short) || 0);
-
-    const sKey = sdlsGroupKey(row);
-    let sdls = flight.sdlsMap.get(sKey);
-    if (!sdls) {
-      sdls = { key: sKey, label: sdlsLabel(row), rows: [] };
-      flight.sdlsMap.set(sKey, sdls);
-    }
-    sdls.rows.push(row);
-  }
-
-  return Array.from(flightMap.entries()).map(([key, flight]) => ({
-    key,
-    label: flight.label,
-    projectId: flight.projectId,
-    projectName: flight.projectName,
-    qtyShort: flight.qtyShort,
-    sdlsGroups: Array.from(flight.sdlsMap.values()).map((sdls) => ({
-      ...sdls,
-      rows: [...sdls.rows].sort(
-        (a, b) =>
-          parseApiDate(a.requested_at).getTime() - parseApiDate(b.requested_at).getTime()
-      ),
-    })),
-  }));
-}
-
 export function ShortageListPanel({
   projectId,
   inventoryScope = false,
@@ -234,6 +163,7 @@ export function ShortageListPanel({
   const showProjectLink = canUseProjectDetail(user?.roles) && can(P.view_projects);
   const [rows, setRows] = useState<InventoryShortage[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<ShortageViewMode>('flight');
   const [collapsedKeys, setCollapsedKeys] = useState<Set<string>>(() => new Set());
   const [busyId, setBusyId] = useState<number | null>(null);
   const [receiveTarget, setReceiveTarget] = useState<InventoryShortage | null>(null);
@@ -250,9 +180,11 @@ export function ShortageListPanel({
     'component') as HierarchyEntityType;
   const inventoryHolderLabel = user ? formatUserRef(user) : 'Inventory Manager';
 
+  const activeRows = useMemo(() => rows.filter(isActiveShortage), [rows]);
+
   const filteredRows = useMemo(
-    () => rows.filter((row) => shortageMatchesSearch(row, searchQuery)),
-    [rows, searchQuery]
+    () => activeRows.filter((row) => shortageMatchesSearch(row, searchQuery)),
+    [activeRows, searchQuery]
   );
 
   const flightGroups = useMemo(
@@ -260,14 +192,22 @@ export function ShortageListPanel({
     [filteredRows]
   );
 
+  const itemGroups = useMemo(() => groupShortagesByItem(filteredRows), [filteredRows]);
+
+  const dashboardStats = useMemo(() => buildShortageDashboardStats(rows), [rows]);
+
   const allCollapseKeys = useMemo(() => {
     const keys: string[] = [];
-    for (const flight of flightGroups) {
-      keys.push(flight.key);
-      for (const sdls of flight.sdlsGroups) keys.push(sdls.key);
+    if (viewMode === 'flight') {
+      for (const flight of flightGroups) {
+        keys.push(flight.key);
+        for (const sdls of flight.sdlsGroups) keys.push(sdls.key);
+      }
+    } else {
+      for (const item of itemGroups) keys.push(item.key);
     }
     return keys;
-  }, [flightGroups]);
+  }, [flightGroups, itemGroups, viewMode]);
 
   function toggleCollapsed(key: string) {
     setCollapsedKeys((prev) => {
@@ -290,17 +230,17 @@ export function ShortageListPanel({
 
   const loadShortages = useCallback(async () => {
     if (inventoryScope) {
-      const res = await api.inventory.listShortages({ activeOnly: true });
+      const res = await api.inventory.listShortages({ activeOnly: false });
       const nextRows = res.data ?? [];
       setRows(nextRows);
-      onRowsChange?.(nextRows);
+      onRowsChange?.(nextRows.filter(isActiveShortage));
       return;
     }
     if (projectId == null) return;
-    const res = await api.projects.listShortages(projectId, true);
+    const res = await api.projects.listShortages(projectId, false);
     const nextRows = res.data ?? [];
     setRows(nextRows);
-    onRowsChange?.(nextRows);
+    onRowsChange?.(nextRows.filter(isActiveShortage));
   }, [inventoryScope, onRowsChange, projectId]);
 
   /** Refresh button / focus: re-check warehouse stock and FCFS-fulfill open shortages. */
@@ -343,7 +283,10 @@ export function ShortageListPanel({
     if (highlightId == null) return;
     const highlighted = rows.find((row) => row.id === highlightId);
     if (highlighted) {
-      const keysToOpen = [flightGroupKey(highlighted), sdlsGroupKey(highlighted)];
+      const keysToOpen =
+        viewMode === 'item'
+          ? [itemGroupKey(highlighted)]
+          : [flightGroupKey(highlighted), sdlsGroupKey(highlighted)];
       setCollapsedKeys((prev) => {
         const next = new Set(prev);
         let changed = false;
@@ -358,7 +301,39 @@ export function ShortageListPanel({
     }
     const el = document.getElementById(`shortage-${highlightId}`);
     el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  }, [highlightId, rows]);
+  }, [highlightId, rows, viewMode]);
+
+  function renderRowActions(row: InventoryShortage) {
+    return (
+      <div className="flex flex-wrap gap-2">
+        {inventoryScope && isActiveShortage(row) ? (
+          <Can permission={P.inventory_receive}>
+            <Button
+              size="sm"
+              disabled={busyId === row.id}
+              onClick={() => void openReceive(row)}
+            >
+              <PackagePlus className="mr-1 h-3.5 w-3.5" />
+              Add stock
+            </Button>
+          </Can>
+        ) : null}
+        {isActiveShortage(row) ? (
+          <Can permission={P.inventory_reserve}>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busyId === row.id}
+              onClick={() => void handleCancel(row)}
+            >
+              <Ban className="mr-1 h-3.5 w-3.5" />
+              Cancel
+            </Button>
+          </Can>
+        ) : null}
+      </div>
+    );
+  }
 
   async function handleCancel(row: InventoryShortage) {
     setBusyId(row.id);
@@ -535,12 +510,53 @@ export function ShortageListPanel({
 
   if (rows.length === 0) {
     return (
-      <p className="text-xs text-muted-foreground">No open shortages.</p>
+      <p className="text-xs text-muted-foreground">No shortages yet.</p>
     );
   }
 
   return (
     <>
+      <ShortageMiniDashboard stats={dashboardStats} className="mb-4" />
+
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+          <Button
+            type="button"
+            size="sm"
+            variant={viewMode === 'flight' ? 'secondary' : 'ghost'}
+            className="h-8"
+            onClick={() => {
+              setViewMode('flight');
+              setCollapsedKeys(new Set());
+            }}
+          >
+            Flight / SDLS
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={viewMode === 'item' ? 'secondary' : 'ghost'}
+            className="h-8"
+            onClick={() => {
+              setViewMode('item');
+              setCollapsedKeys(new Set());
+            }}
+          >
+            By item
+          </Button>
+        </div>
+        {filteredRows.length > 0 ? (
+          <div className="flex gap-1">
+            <Button type="button" size="sm" variant="ghost" onClick={expandAll}>
+              Expand all
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={collapseAll}>
+              Collapse all
+            </Button>
+          </div>
+        ) : null}
+      </div>
+
       <div className="mb-3 relative">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -552,30 +568,113 @@ export function ShortageListPanel({
           aria-label="Search shortages"
         />
       </div>
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        {searchQuery.trim() && filteredRows.length !== rows.length ? (
+      <div className="mb-2">
+        {searchQuery.trim() && filteredRows.length !== activeRows.length ? (
           <p className="text-xs text-muted-foreground">
-            Showing {filteredRows.length} of {rows.length} shortage
-            {rows.length === 1 ? '' : 's'}
+            Showing {filteredRows.length} of {activeRows.length} open shortage
+            {activeRows.length === 1 ? '' : 's'}
           </p>
         ) : (
           <p className="text-xs text-muted-foreground">
-            Grouped by Flight → SDLS · item, qty short, and when reported
+            {viewMode === 'flight'
+              ? 'Grouped by Flight → SDLS · item, qty short, and when reported'
+              : 'Grouped by item · expand to see Flight / SDLS demand and qty'}
           </p>
         )}
-        {flightGroups.length > 0 ? (
-          <div className="flex gap-1">
-            <Button type="button" size="sm" variant="ghost" onClick={expandAll}>
-              Expand all
-            </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={collapseAll}>
-              Collapse all
-            </Button>
-          </div>
-        ) : null}
       </div>
-      {filteredRows.length === 0 ? (
+      {activeRows.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          No open shortages. Fulfilled history is summarized above.
+        </p>
+      ) : filteredRows.length === 0 ? (
         <p className="text-xs text-muted-foreground">No shortages match your search.</p>
+      ) : viewMode === 'item' ? (
+        <ul className="space-y-2 text-sm">
+          {itemGroups.map((item) => {
+            const itemCollapsed = collapsedKeys.has(item.key);
+            return (
+              <li
+                key={item.key}
+                className="rounded-md border border-violet-600/25 bg-violet-600/5 px-2 py-2"
+              >
+                <button
+                  type="button"
+                  className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 rounded px-1 py-0.5 text-left hover:bg-violet-600/10"
+                  onClick={() => toggleCollapsed(item.key)}
+                  aria-expanded={!itemCollapsed}
+                >
+                  {itemCollapsed ? (
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-violet-700" />
+                  ) : (
+                    <ChevronDown className="h-3.5 w-3.5 shrink-0 text-violet-700" />
+                  )}
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-violet-700">
+                    {item.entityType}
+                  </span>
+                  <span className="font-medium text-violet-950">{item.label}</span>
+                  <Badge variant="destructive" className="h-5 gap-1 px-1.5 text-[10px]">
+                    <AlertTriangle className="h-3 w-3" />
+                    Qty {item.qtyShort}
+                  </Badge>
+                  <span className="text-[10px] text-violet-800/70">
+                    {item.demandCount} demand{item.demandCount === 1 ? '' : 's'}
+                    {item.oldestDays > 0 ? ` · oldest ${item.oldestDays}d` : ''}
+                    {itemCollapsed ? ' · collapsed' : ''}
+                  </span>
+                </button>
+                {!itemCollapsed ? (
+                  <ul className="ml-3 mt-1.5 space-y-1 border-l border-violet-600/30 pl-3">
+                    {item.demands.map((demand) => {
+                      const row = demand.row;
+                      return (
+                        <li
+                          key={demand.key}
+                          id={`shortage-${row.id}`}
+                          className={cn(
+                            'flex flex-wrap items-center justify-between gap-2 rounded-md bg-destructive/5 px-2 py-1.5',
+                            highlightId === row.id &&
+                              'border border-primary ring-2 ring-primary/30'
+                          )}
+                        >
+                          <div className="min-w-0 space-y-0.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-[10px] font-medium uppercase tracking-wide text-sky-700">
+                                Flight
+                              </span>
+                              <span className="font-medium">{demand.flightLabel}</span>
+                              <span className="text-[10px] font-medium uppercase tracking-wide text-teal-700">
+                                SDLS
+                              </span>
+                              <span className="font-medium">{demand.sdlsLabel}</span>
+                              {row.status === 'PARTIAL' ? (
+                                <Badge variant="secondary" className="h-5 text-[10px]">
+                                  Partial
+                                </Badge>
+                              ) : null}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Qty short {row.qty_short}
+                              {row.qty_original !== row.qty_short
+                                ? ` of ${row.qty_original}`
+                                : ''}
+                              {' · '}
+                              Reported {parseApiDate(row.requested_at).toLocaleString()}
+                              {row.requested_by_name ? ` by ${row.requested_by_name}` : ''}
+                              {daysSinceReported(row) > 0
+                                ? ` · ${daysSinceReported(row)}d overdue`
+                                : ''}
+                            </p>
+                          </div>
+                          {renderRowActions(row)}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
       ) : (
         <ul className="space-y-2 text-sm">
           {flightGroups.map((flight) => {
@@ -663,7 +762,7 @@ export function ShortageListPanel({
                                   className={cn(
                                     'flex flex-wrap items-center justify-between gap-2 rounded-md bg-destructive/5 px-2 py-1.5',
                                     highlightId === row.id &&
-                                      'ring-2 ring-primary/30 border border-primary'
+                                      'border border-primary ring-2 ring-primary/30'
                                   )}
                                 >
                                   <div className="min-w-0 space-y-0.5">
@@ -698,36 +797,12 @@ export function ShortageListPanel({
                                       {row.requested_by_name
                                         ? ` by ${row.requested_by_name}`
                                         : ''}
+                                      {daysSinceReported(row) > 0
+                                        ? ` · ${daysSinceReported(row)}d overdue`
+                                        : ''}
                                     </p>
                                   </div>
-                                  <div className="flex flex-wrap gap-2">
-                                    {inventoryScope &&
-                                    (row.status === 'OPEN' || row.status === 'PARTIAL') ? (
-                                      <Can permission={P.inventory_receive}>
-                                        <Button
-                                          size="sm"
-                                          disabled={busyId === row.id}
-                                          onClick={() => void openReceive(row)}
-                                        >
-                                          <PackagePlus className="mr-1 h-3.5 w-3.5" />
-                                          Add stock
-                                        </Button>
-                                      </Can>
-                                    ) : null}
-                                    {row.status === 'OPEN' || row.status === 'PARTIAL' ? (
-                                      <Can permission={P.inventory_reserve}>
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          disabled={busyId === row.id}
-                                          onClick={() => void handleCancel(row)}
-                                        >
-                                          <Ban className="mr-1 h-3.5 w-3.5" />
-                                          Cancel
-                                        </Button>
-                                      </Can>
-                                    ) : null}
-                                  </div>
+                                  {renderRowActions(row)}
                                 </li>
                               ))}
                             </ul>

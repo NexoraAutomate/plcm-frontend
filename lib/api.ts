@@ -1018,6 +1018,8 @@ export const inventory = {
       }>;
     }
   ) => api.put<Models.InventoryChildLink[]>(`/inventory/${inventoryId}/children/`, data),
+  seedTestStockOptions: () =>
+    api.get<Models.InventorySeedOptions>('/inventory/seed-test-stock/options/'),
   seedTestStock: (data: Models.InventoryStockSeedPayload) =>
     api.post<Models.InventoryStockSeedResult>('/inventory/seed-test-stock/', data),
 };

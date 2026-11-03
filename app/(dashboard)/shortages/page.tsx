@@ -2,22 +2,16 @@
 
 import { WORKFLOW_POLL_MS } from '@/lib/data-loading';
 
-import { useCallback, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AlertTriangle } from 'lucide-react';
 import { ShortageListPanel } from '@/components/shortages/shortage-list-panel';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageDataRefreshProvider, PageRefreshButton } from '@/components/page-data-refresh';
-import type { InventoryShortage } from '@/lib/models';
 
 export default function ShortagesPage() {
   const searchParams = useSearchParams();
   const highlightParam = Number(searchParams.get('shortage'));
   const highlightId = Number.isFinite(highlightParam) && highlightParam > 0 ? highlightParam : undefined;
-  const [hasShortages, setHasShortages] = useState<boolean | null>(null);
-  const handleShortagesChange = useCallback((rows: InventoryShortage[]) => {
-    setHasShortages(rows.length > 0);
-  }, []);
 
   return (
     <PageDataRefreshProvider>
@@ -32,15 +26,15 @@ export default function ShortagesPage() {
           </div>
           <PageRefreshButton title="Refresh and auto-fulfill shortages from available stock" />
         </div>
-        <Card className={hasShortages === false ? 'hidden' : ''}>
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <AlertTriangle className="h-4 w-4" />
-              Open shortages
+              Shortages
             </CardTitle>
             <CardDescription>
-              Grouped by Flight → SDLS. Each row shows the short item, quantity, and when it
-              was reported. Refresh also FCFS auto-reserves against warehouse stock on hand.
+              Mini dashboard plus Flight/SDLS or item-wise views. Refresh also FCFS
+              auto-reserves against warehouse stock on hand.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -48,7 +42,6 @@ export default function ShortagesPage() {
               inventoryScope
               pollMs={WORKFLOW_POLL_MS}
               highlightId={highlightId}
-              onRowsChange={handleShortagesChange}
             />
           </CardContent>
         </Card>
