@@ -41,6 +41,7 @@ interface ResolveFaultDialogProps {
 const resolutionOptions: Array<{ value: ResolutionType; label: string }> = [
   { value: ResolutionType.REPAIRED, label: 'Repair' },
   { value: ResolutionType.REPLACED, label: 'Replacement' },
+  { value: ResolutionType.SOFT_FIXED, label: 'Soft Fixed (onsite)' },
   { value: ResolutionType.NO_FAULT_FOUND, label: 'No Fault Found' },
   { value: ResolutionType.DECOMMISSIONED, label: 'Decommissioned' },
 ];

@@ -290,6 +290,13 @@ export const RESOLUTION_TYPE_META: Record<string, WorkflowStatusMeta> = {
     icon: Archive,
     tooltip: 'Entity decommissioned.',
   },
+  soft_fixed: {
+    label: 'Soft Fixed',
+    colorClass:
+      'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950 dark:text-teal-300 dark:border-teal-800',
+    icon: CheckCheck,
+    tooltip: 'Onsite soft fix (reboot / reset / reconnect) — no hardware replace.',
+  },
 };
 
 export const POTENTIALLY_AFFECTED_META: WorkflowStatusMeta = {

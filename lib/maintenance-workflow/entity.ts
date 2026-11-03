@@ -65,6 +65,8 @@ export function mapFaultyEntityStatusFromApi(
     if (
       resolution === ResolutionType.NO_FAULT_FOUND ||
       resolution === 'no_fault_found' ||
+      resolution === ResolutionType.SOFT_FIXED ||
+      resolution === 'soft_fixed' ||
       resolution === ResolutionType.DECOMMISSIONED ||
       resolution === 'decommissioned'
     ) {
@@ -240,7 +242,10 @@ export function isClassifiedFaultType(faultType?: FaultType | string | null): bo
 }
 
 export function resolutionRequiresClassifiedFaultType(resolutionType: ResolutionType): boolean {
-  return resolutionType !== ResolutionType.NO_FAULT_FOUND;
+  return (
+    resolutionType !== ResolutionType.NO_FAULT_FOUND &&
+    resolutionType !== ResolutionType.SOFT_FIXED
+  );
 }
 
 export interface ResolveFaultFields {
@@ -259,7 +264,9 @@ export function buildResolveFaultUpdatePayload(
   const status =
     resolutionType === ResolutionType.NO_FAULT_FOUND
       ? FaultyEntityStatus.NO_FAULT_FOUND
-      : FaultyEntityStatus.RESOLVED;
+      : resolutionType === ResolutionType.SOFT_FIXED
+        ? FaultyEntityStatus.RESOLVED
+        : FaultyEntityStatus.RESOLVED;
 
   return {
     status,

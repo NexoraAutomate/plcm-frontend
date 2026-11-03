@@ -25,6 +25,7 @@ import { MaintenanceActionTable } from '@/components/maintenance/MaintenanceActi
 import { BulkActionsToolbar } from '@/components/maintenance/bulk-actions-toolbar';
 import { EntityDetailSheet } from '@/components/maintenance/entity-detail-sheet';
 import { CaseDetailCards } from '@/components/maintenance/case-detail-cards';
+import { FieldServicePanels } from '@/components/maintenance/field-service-panels';
 import { WorkflowTransitionDialog } from '@/components/maintenance/workflow-transition-dialog';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -553,7 +554,8 @@ export default function MaintenanceCaseInvestigationPage({
             ? ActionType.Repair
             : resolutionType === ResolutionType.REPLACED
             ? ActionType.Replacement
-            : resolutionType === ResolutionType.NO_FAULT_FOUND
+            : resolutionType === ResolutionType.NO_FAULT_FOUND ||
+                resolutionType === ResolutionType.SOFT_FIXED
             ? ActionType.Testing
             : resolutionType === ResolutionType.DECOMMISSIONED
             ? ActionType.Disassembly
@@ -661,6 +663,10 @@ export default function MaintenanceCaseInvestigationPage({
             maintenanceCase={maintenanceCase}
             entities={entities}
             actions={maintenanceActions}
+          />
+          <FieldServicePanels
+            maintenanceCase={maintenanceCase}
+            onCaseUpdated={setMaintenanceCase}
           />
           <CaseDetailCards
             maintenanceCase={maintenanceCase}

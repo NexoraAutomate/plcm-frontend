@@ -731,7 +731,12 @@ export const inventory = {
     }),
   dispositionReworkItem: (
     reworkId: number,
-    data: { outcome: 'repairable' | 'reusable' | 'scrapped' | string; notes?: string | null }
+    data: {
+      outcome: 'repairable' | 'reusable' | 'scrapped' | string
+      notes?: string | null
+      confirm_discard?: boolean
+      force_discard?: boolean
+    }
   ) => api.post<Models.ItemReworkCase>(`/item-rework/${reworkId}/disposition/`, data),
   repairCompleteReworkItem: (reworkId: number, notes?: string | null) =>
     api.post<Models.ItemReworkCase>(`/item-rework/${reworkId}/repair-complete/`, {
@@ -1092,6 +1097,16 @@ export const maintenanceCases = {
   create: (data: Models.CreateMaintenanceCasePayload) => api.post<Models.MaintenanceCase>('/maintenance-cases/', data),
   update: (id: number, data: Models.UpdateMaintenanceCasePayload) => api.put<Models.MaintenanceCase>(`/maintenance-cases/${id}/`, data),
   delete: (id: number) => api.delete(`/maintenance-cases/${id}/`),
+  getProductionSupport: (projectId: number) =>
+    api.get<Models.ProductionSupportPreview>(`/projects/${projectId}/production-support/`),
+  recordOnsiteOutcome: (caseId: number, data: Models.OnsiteOutcomePayload) =>
+    api.post<Models.MaintenanceCase>(`/maintenance-cases/${caseId}/onsite-outcome/`, data),
+  listReturnedUnits: (caseId: number) =>
+    api.get<Models.ReturnedUnit[]>(`/maintenance-cases/${caseId}/returned-units/`),
+  assignInvestigatingPd: (reworkId: number, pdUserId: number) =>
+    api.post<Models.ReturnedUnit>(`/item-rework/${reworkId}/assign-investigating-pd/`, {
+      pd_user_id: pdUserId,
+    }),
   lookupEntityByPartNumber: (partNumber: string) =>
     api.get<Models.lookUpResponse>(`/entities/lookup-by-PN/${encodeURIComponent(partNumber)}/`),
   lookupEntityBySerialNumber: (serialNumber: string) =>
@@ -1100,6 +1115,24 @@ export const maintenanceCases = {
   confirmFault: (caseId: number, data: Models.ConfirmFaultPayload) => api.post(`/maintenance-cases/${caseId}/confirm-fault/`, data),
   adminHierarchyReplace: (data: Models.AdminHierarchyReplacePayload) =>
     api.post<Models.AdminHierarchyReplaceResponse>('/maintenance-cases/admin-hierarchy-replace/', data),
+};
+
+export const oemWarrantyClaims = {
+  list: (skip = 0, limit = 100, filters?: { maintenance_case_id?: number; status?: string }) =>
+    api.get<Models.OemWarrantyClaim[]>('/oem-warranty-claims/', {
+      params: buildQueryParams({
+        skip,
+        limit,
+        maintenance_case_id: filters?.maintenance_case_id,
+        status: filters?.status,
+      }),
+    }),
+  create: (data: { rework_case_id: number; notes?: string; force_discard?: boolean }) =>
+    api.post<Models.OemWarrantyClaim>('/oem-warranty-claims/', data),
+  update: (
+    id: number,
+    data: { status?: string; notes?: string; shipped_at?: string | null }
+  ) => api.put<Models.OemWarrantyClaim>(`/oem-warranty-claims/${id}/`, data),
 };
 
 // Faulty Entities

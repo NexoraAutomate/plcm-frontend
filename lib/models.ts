@@ -1544,6 +1544,12 @@ export interface ItemReworkCase {
   notes?: string | null
   updated_at?: string | null
   events?: ItemReworkEvent[] | null
+  maintenance_case_id?: number | null
+  faulty_entity_id?: number | null
+  investigating_pd_id?: number | null
+  investigating_pd_name?: string | null
+  warranty_claim_id?: number | null
+  warranty_claim_status?: string | null
 }
 
 export interface InventoryRecallTask {
@@ -1755,10 +1761,20 @@ export enum ResolutionType {
   REPAIRED = 'repaired',
   REPLACED = 'replaced',
   NO_FAULT_FOUND   = "no_fault_found",
+  SOFT_FIXED = 'soft_fixed',
   DECOMMISSIONED = "decommissioned",
   /** @deprecated Hidden from UI selectors */
   CLEAR = 'clear',
 }
+
+export type OnsiteOutcome = 'soft_fix' | 'fault_identified' | 'inconclusive';
+export type SoftFixMethod = 'reboot' | 'hard_reset' | 'reconnect' | 'other';
+export type OemWarrantyClaimStatus =
+  | 'open'
+  | 'submitted'
+  | 'accepted'
+  | 'rejected'
+  | 'closed';
 
 export enum ActionType {
   Inspection = 'inspection',
@@ -1803,6 +1819,54 @@ export enum EntityType {
   Component = 'component',
 }
 
+export interface ReturnedUnit {
+  id: number;
+  maintenance_case_id?: number | null;
+  faulty_entity_id?: number | null;
+  investigating_pd_id?: number | null;
+  investigating_pd_name?: string | null;
+  project_id: number;
+  inventory_id: number;
+  part_number?: string | null;
+  serial_number?: string | null;
+  status: string;
+  stage: string;
+  disposition?: string | null;
+  notes?: string | null;
+  opened_at?: string | null;
+  updated_at?: string | null;
+  warranty_expires_at?: string | null;
+  warranty_active?: boolean | null;
+  oem_name?: string | null;
+}
+
+export interface OemWarrantyClaim {
+  id: number;
+  maintenance_case_id?: number | null;
+  faulty_entity_id?: number | null;
+  inventory_id?: number | null;
+  inventory_instance_id?: number | null;
+  rework_case_id?: number | null;
+  oem_name?: string | null;
+  part_number?: string | null;
+  serial_number?: string | null;
+  warranty_expires_at?: string | null;
+  status: OemWarrantyClaimStatus | string;
+  notes?: string | null;
+  shipped_at?: string | null;
+  created_by_id?: number | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ProductionSupportPreview {
+  project_id: number;
+  order_id?: number | null;
+  production_support_date?: string | null;
+  in_production_support?: boolean | null;
+  requires_override: boolean;
+}
+
 // Maintenance Case
 export interface MaintenanceCase {
   id: number;
@@ -1822,6 +1886,16 @@ export interface MaintenanceCase {
   created_at: string;
   updated_at: string;
   project_name?: string;
+  production_support_date?: string | null;
+  in_production_support?: boolean | null;
+  support_override_reason?: string | null;
+  onsite_outcome?: OnsiteOutcome | string | null;
+  onsite_soft_fix_method?: SoftFixMethod | string | null;
+  onsite_notes?: string | null;
+  onsite_recorded_at?: string | null;
+  onsite_recorded_by_id?: number | null;
+  returned_units?: ReturnedUnit[];
+  warranty_claims?: OemWarrantyClaim[];
 }
 
 // Faulty Entity
@@ -1906,9 +1980,17 @@ export interface CreateMaintenanceCasePayload {
   project_id: number;
   description: string;
   status: CaseStatus;
-  entity_id: number;
-  entity_type: string;
+  entity_id?: number;
+  entity_type?: string;
   part_number?:string;
+  support_override_reason?: string;
+}
+
+export interface OnsiteOutcomePayload {
+  onsite_outcome: OnsiteOutcome | string;
+  onsite_soft_fix_method?: SoftFixMethod | string;
+  notes?: string;
+  resolve_soft_fixed?: boolean;
 }
 
 

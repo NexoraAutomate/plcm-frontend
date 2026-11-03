@@ -198,6 +198,7 @@ export function resolveTriggerFromResolution(
     case ResolutionType.REPLACED:
       return 'resolve_replaced';
     case ResolutionType.NO_FAULT_FOUND:
+    case ResolutionType.SOFT_FIXED:
       return 'resolve_no_fault';
     default:
       return 'resolve_repaired';

@@ -134,7 +134,18 @@ export function InspectQueuePanel() {
         await api.inventory.inspectReworkItem(selected.id);
         toast.success('Inspection started');
       } else if (action === 'disposition') {
-        await api.inventory.dispositionReworkItem(selected.id, { outcome });
+        const isMaintenanceLinked = Boolean(selected.maintenance_case_id);
+        let confirmDiscard = false;
+        if (outcome === 'scrapped' && isMaintenanceLinked) {
+          confirmDiscard = window.confirm(
+            'Confirm discard / scrap for this maintenance-returned unit? If OEM warranty is still active, an OEM claim will be opened automatically unless you choose cancel.'
+          );
+          if (!confirmDiscard) return;
+        }
+        await api.inventory.dispositionReworkItem(selected.id, {
+          outcome,
+          confirm_discard: confirmDiscard,
+        });
         toast.success(`Disposition: ${outcome}`);
       } else if (action === 'repair') {
         await api.inventory.repairCompleteReworkItem(selected.id);

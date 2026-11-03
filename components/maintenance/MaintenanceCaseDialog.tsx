@@ -21,7 +21,13 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { validateMaintenanceCaseForm } from '@/lib/form-validation';
-import type { MaintenanceCase, CreateMaintenanceCasePayload, UpdateMaintenanceCasePayload } from '@/lib/models';
+import type {
+  MaintenanceCase,
+  CreateMaintenanceCasePayload,
+  UpdateMaintenanceCasePayload,
+  ProductionSupportPreview,
+} from '@/lib/models';
+import { maintenanceCases } from '@/lib/api';
 import {
   CASE_STATUS_META,
   CASE_WORKFLOW_ORDER,
@@ -61,7 +67,12 @@ export function MaintenanceCaseDialog({
     description: '',
     status: 'open',
     resolution_notes: '',
+    support_override_reason: '',
   });
+  const [supportPreview, setSupportPreview] = React.useState<ProductionSupportPreview | null>(
+    null
+  );
+  const [supportLoading, setSupportLoading] = React.useState(false);
 
   const currentDisplayStatus = useMemo(
     () => mapCaseStatusFromApi(formData.status),
@@ -85,16 +96,43 @@ export function MaintenanceCaseDialog({
         description: editingCase.description ?? '',
         status: editingCase.status,
         resolution_notes: editingCase.resolution_notes || '',
+        support_override_reason: '',
       });
+      setSupportPreview(null);
     } else {
       setFormData({
         project_id: '',
         description: '',
         status: 'open',
         resolution_notes: '',
+        support_override_reason: '',
       });
+      setSupportPreview(null);
     }
   }, [editingCase, isOpen]);
+
+  useEffect(() => {
+    if (editingCase || !formData.project_id) {
+      setSupportPreview(null);
+      return;
+    }
+    let cancelled = false;
+    setSupportLoading(true);
+    maintenanceCases
+      .getProductionSupport(parseInt(formData.project_id, 10))
+      .then((preview) => {
+        if (!cancelled) setSupportPreview(preview);
+      })
+      .catch(() => {
+        if (!cancelled) setSupportPreview(null);
+      })
+      .finally(() => {
+        if (!cancelled) setSupportLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editingCase, formData.project_id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,6 +148,15 @@ export function MaintenanceCaseDialog({
       return;
     }
 
+    if (
+      !editingCase &&
+      supportPreview?.requires_override &&
+      !formData.support_override_reason.trim()
+    ) {
+      toast.error('Production support has ended — enter an override reason to open the case.');
+      return;
+    }
+
     try {
       if (editingCase) {
         await onSubmit({
@@ -121,6 +168,9 @@ export function MaintenanceCaseDialog({
           project_id: parseInt(formData.project_id),
           description: formData.description,
           status: formData.status as CreateMaintenanceCasePayload['status'],
+          support_override_reason: supportPreview?.requires_override
+            ? formData.support_override_reason.trim()
+            : undefined,
         });
       }
       onClose();
@@ -150,7 +200,7 @@ export function MaintenanceCaseDialog({
               <Select
                 value={formData.project_id}
                 onValueChange={(value) =>
-                  setFormData({ ...formData, project_id: value })
+                  setFormData({ ...formData, project_id: value, support_override_reason: '' })
                 }
               >
                 <SelectTrigger id="project_id">
@@ -164,6 +214,21 @@ export function MaintenanceCaseDialog({
                   ))}
                 </SelectContent>
               </Select>
+              {supportLoading ? (
+                <p className="text-xs text-muted-foreground">Checking production support…</p>
+              ) : supportPreview?.requires_override ? (
+                <p className="text-xs text-amber-700 dark:text-amber-300">
+                  Production support ended
+                  {supportPreview.production_support_date
+                    ? ` on ${supportPreview.production_support_date}`
+                    : ''}
+                  . Override reason required.
+                </p>
+              ) : supportPreview?.in_production_support ? (
+                <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                  In production support until {supportPreview.production_support_date}.
+                </p>
+              ) : null}
             </div>
           )}
 
@@ -181,6 +246,20 @@ export function MaintenanceCaseDialog({
               />
             </div>
           )}
+
+          {!editingCase && supportPreview?.requires_override ? (
+            <div className="space-y-2">
+              <Label htmlFor="support_override_reason">Support override reason *</Label>
+              <Input
+                id="support_override_reason"
+                value={formData.support_override_reason}
+                onChange={(e) =>
+                  setFormData({ ...formData, support_override_reason: e.target.value })
+                }
+                placeholder="Why open this case after support ended?"
+              />
+            </div>
+          ) : null}
 
           <div className="space-y-2">
             <Label htmlFor="status">Status *</Label>

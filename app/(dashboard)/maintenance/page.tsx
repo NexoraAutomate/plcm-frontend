@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDataStore } from '@/lib/data-store';
@@ -162,6 +163,31 @@ export default function MaintenancePage() {
       toast.error('No lookup result available to create a case.');
       return;
     }
+    if (!lookupResponses.project_id) {
+      toast.error('Lookup result has no project — cannot open a case.');
+      return;
+    }
+
+    let supportOverride: string | undefined;
+    try {
+      const support = await maintenanceApi.maintenanceCases.getProductionSupport(
+        lookupResponses.project_id
+      );
+      if (support.requires_override) {
+        const reason = window.prompt(
+          `Production support ended${
+            support.production_support_date ? ` on ${support.production_support_date}` : ''
+          }. Enter an override reason to open the case anyway:`
+        );
+        if (!reason?.trim()) {
+          setLookupError('Override reason is required when production support has ended.');
+          return;
+        }
+        supportOverride = reason.trim();
+      }
+    } catch {
+      // If preview fails, allow create and let the API enforce the gate.
+    }
 
     const payload: MaintenanceTypes.CreateMaintenanceCasePayload = {
       project_id: lookupResponses.project_id,
@@ -170,6 +196,7 @@ export default function MaintenancePage() {
       entity_id: lookupResponses.matched_entity_id,
       entity_type: lookupResponses.matched_entity_type.toLowerCase(),
       part_number: lookupResponses.matched_entity_PartNumber,
+      support_override_reason: supportOverride,
     };
     try {
       const created = await createMaintenanceCase(payload);
@@ -301,6 +328,13 @@ export default function MaintenancePage() {
             Maintenance Management
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
+            <Link
+              href="/maintenance/warranty-claims"
+              className="text-foreground underline-offset-4 hover:underline"
+            >
+              OEM warranty claims
+            </Link>
+            {' · '}
             Track maintenance cases, faulty entities, repairs, and deliveries
           </p>
         </div>
