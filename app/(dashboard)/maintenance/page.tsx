@@ -24,6 +24,7 @@ import { maintenanceService, formatMaintenanceApiError } from '@/services/mainte
 import { MaintenanceMiniDashboard } from '@/components/maintenance/MaintenanceMiniDashboard';
 import { MaintenanceLookupDialog } from '@/components/lazy/heavy-editors';
 import { MaintenanceCaseDialog } from '@/components/maintenance/MaintenanceCaseDialog';
+import { MaintenanceCaseHierarchyDialog } from '@/components/maintenance/MaintenanceCaseHierarchyDialog';
 import { MaintenanceTable } from '@/components/maintenance/MaintenanceTable';
 import { fetchMaintenanceCasesPage } from '@/hooks/queries/fetchers';
 import { queryKeys } from '@/hooks/queries/query-keys';
@@ -38,6 +39,50 @@ import type { ListFilterParams } from '@/lib/list-filters';
 import { useAuth } from '@/lib/auth-context';
 import { P } from '@/lib/permission-codes';
 import { useTableSorting } from '@/hooks/use-table-sorting';
+import { normalizeEntityType } from '@/lib/entity-lookup-flow';
+
+async function fetchEntitySerialNumber(
+  entityType: string,
+  entityId: number
+): Promise<string | null> {
+  const type = normalizeEntityType(entityType);
+  try {
+    let entity:
+      | {
+          serial_number?: string | null;
+          original_serial_number?: string | null;
+        }
+      | null = null;
+
+    switch (type) {
+      case 'system':
+        entity = (await maintenanceApi.systems.get(entityId)).data;
+        break;
+      case 'subsystem':
+        entity = (await maintenanceApi.subsystems.get(entityId)).data;
+        break;
+      case 'module':
+        entity = (await maintenanceApi.modules.get(entityId)).data;
+        break;
+      case 'unit':
+        entity = (await maintenanceApi.units.get(entityId)).data;
+        break;
+      case 'component':
+        entity = (await maintenanceApi.components.get(entityId)).data;
+        break;
+      default:
+        return null;
+    }
+
+    return (
+      entity?.serial_number?.trim() ||
+      entity?.original_serial_number?.trim() ||
+      null
+    );
+  } catch {
+    return null;
+  }
+}
 
 export default function MaintenancePage() {
   const router = useRouter();
@@ -63,6 +108,14 @@ export default function MaintenancePage() {
   const [projectFilter, setProjectFilter] = useState<string>('all');
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isLookupOpen, setIsLookupOpen] = useState(false);
+  const [isHierarchyOpen, setIsHierarchyOpen] = useState(false);
+  const [hierarchyCase, setHierarchyCase] =
+    useState<MaintenanceTypes.MaintenanceCase | null>(null);
+  const [hierarchySerial, setHierarchySerial] = useState<string | null>(null);
+  const [hierarchyResponse, setHierarchyResponse] =
+    useState<MaintenanceTypes.lookUpResponse | null>(null);
+  const [hierarchyLoading, setHierarchyLoading] = useState(false);
+  const [hierarchyError, setHierarchyError] = useState<string | null>(null);
   const [editingCase, setEditingCase] = useState<MaintenanceTypes.MaintenanceCase | null>(null);
   const [serialNumber, setSerialNumber] = useState('');
   const [lookupResponses, setLookupResponse] = useState<MaintenanceTypes.lookUpResponse | null>(null);
@@ -284,6 +337,66 @@ export default function MaintenancePage() {
     router.push(`/maintenance/cases/${caseItem.id}`);
   };
 
+  const resolveCaseSerialNumber = async (
+    caseItem: MaintenanceTypes.MaintenanceCase
+  ): Promise<string | null> => {
+    const caseEntityType = normalizeEntityType(String(caseItem.entity_type));
+    try {
+      const res = await maintenanceApi.faultyEntities.listByCaseId(caseItem.id);
+      const withSerial = (res.data || []).filter((entity) => entity.serial_number?.trim());
+      const matched =
+        withSerial.find(
+          (entity) =>
+            entity.entity_id === caseItem.entity_id &&
+            normalizeEntityType(String(entity.entity_type)) === caseEntityType
+        ) ||
+        withSerial.find((entity) => !entity.parent_faulty_entity_id) ||
+        withSerial[0];
+      if (matched?.serial_number?.trim()) {
+        return matched.serial_number.trim();
+      }
+    } catch {
+      // Fall through to hierarchy entity lookup.
+    }
+
+    if (caseItem.entity_id) {
+      return fetchEntitySerialNumber(String(caseItem.entity_type), caseItem.entity_id);
+    }
+    return null;
+  };
+
+  const handleViewHierarchy = async (caseItem: MaintenanceTypes.MaintenanceCase) => {
+    setHierarchyCase(caseItem);
+    setHierarchyResponse(null);
+    setHierarchySerial(null);
+    setHierarchyError(null);
+    setHierarchyLoading(true);
+    setIsHierarchyOpen(true);
+
+    try {
+      const serial = await resolveCaseSerialNumber(caseItem);
+      if (!serial) {
+        setHierarchyError(
+          'No serial number found for this case’s matched entity. Hierarchy requires the serial used at lookup.'
+        );
+        return;
+      }
+
+      setHierarchySerial(serial);
+      const response = await lookupEntityBySerialNumber(serial);
+      setHierarchyResponse(response);
+    } catch (err) {
+      setHierarchyError(
+        formatMaintenanceApiError(
+          err,
+          'Unable to load the hierarchy for this case’s serial number.'
+        )
+      );
+    } finally {
+      setHierarchyLoading(false);
+    }
+  };
+
   const handleStatusFilter = (status: string) => {
     setStatusFilter(status);
   };
@@ -429,6 +542,7 @@ export default function MaintenancePage() {
           onEdit={canEditCase ? handleEdit : undefined}
           onDelete={canDeleteCase ? handleDelete : undefined}
           onView={handleView}
+          onViewHierarchy={handleViewHierarchy}
           isLoading={false}
           getFaultyEntities={getFaultyEntities}
           getMaintenanceActions={getMaintenanceActions}
@@ -489,6 +603,26 @@ export default function MaintenancePage() {
         editingCase={editingCase}
         projects={projects}
         isLoading={isMutating}
+      />
+
+      <MaintenanceCaseHierarchyDialog
+        open={isHierarchyOpen}
+        onOpenChange={(open) => {
+          setIsHierarchyOpen(open);
+          if (!open) {
+            setHierarchyCase(null);
+            setHierarchySerial(null);
+            setHierarchyResponse(null);
+            setHierarchyError(null);
+            setHierarchyLoading(false);
+          }
+        }}
+        caseNumber={hierarchyCase?.case_number}
+        serialNumber={hierarchySerial}
+        lookupResponse={hierarchyResponse}
+        loading={hierarchyLoading}
+        error={hierarchyError}
+        caseId={hierarchyCase?.id}
       />
     </div>
   );

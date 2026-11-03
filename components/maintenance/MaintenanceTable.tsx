@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { Edit, Trash2, ChevronDown, Eye } from 'lucide-react';
+import { Edit, Trash2, ChevronDown, Network } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -32,6 +32,7 @@ interface MaintenanceTableProps {
   onEdit?: (caseItem: MaintenanceCase) => void;
   onDelete?: (caseItem: MaintenanceCase) => void;
   onView?: (caseItem: MaintenanceCase) => void;
+  onViewHierarchy?: (caseItem: MaintenanceCase) => void;
   isLoading?: boolean;
   getFaultyEntities?: (caseId: number) => Promise<FaultyEntity[]>;
   getMaintenanceActions?: (caseId: number, faultyEntityIds: number[]) => Promise<MaintenanceAction[]>;
@@ -61,6 +62,7 @@ export function MaintenanceTable({
   onEdit,
   onDelete,
   onView,
+  onViewHierarchy,
   isLoading = false,
   getFaultyEntities,
   getMaintenanceActions,
@@ -237,15 +239,20 @@ export function MaintenanceTable({
                   <TableRow
                     className={cn(
                       'hover:bg-muted/50',
-                      isExpanded && 'bg-muted/30'
+                      isExpanded && 'bg-muted/30',
+                      onView && 'cursor-pointer'
                     )}
+                    onClick={onView ? () => onView(caseItem) : undefined}
                   >
                     <TableCell className="p-2">
                       <Button
                         variant="ghost"
                         size="sm"
                         className="h-6 w-6 p-0"
-                        onClick={() => toggleExpand(caseItem.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void toggleExpand(caseItem.id);
+                        }}
                       >
                         <ChevronDown
                           className={cn(
@@ -280,16 +287,18 @@ export function MaintenanceTable({
                         {new Date(caseItem.reported_at).toLocaleDateString()}
                       </TableCell>
                     )}
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
-                        {onView && (
+                        {onViewHierarchy && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => onView(caseItem)}
+                            onClick={() => onViewHierarchy(caseItem)}
                             className="h-8 w-8 p-0"
+                            title="View hierarchy"
+                            aria-label="View hierarchy"
                           >
-                            <Eye className="h-4 w-4" />
+                            <Network className="h-4 w-4" />
                           </Button>
                         )}
                         {onEdit && canEditCase && (

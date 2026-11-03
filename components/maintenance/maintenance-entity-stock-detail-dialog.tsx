@@ -475,7 +475,15 @@ export function MaintenanceEntityStockDetailDialog({
   const title =
     entity?.name?.trim() || selection?.label?.trim() || 'Entity stocking detail';
 
-  const lastFault = faultHistory?.history?.[0] ?? null;
+  const isCurrentUnitFault = (item: ProductFaultHistoryItem) =>
+    selection != null &&
+    hardwareOwnerType != null &&
+    normalizeEntityType(item.entity_type) === hardwareOwnerType &&
+    item.entity_id === selection.entityId;
+
+  // Most recent prior fault for this product — exclude the unit currently being viewed.
+  const mostRecentPriorFault =
+    faultHistory?.history?.find((item) => !isCurrentUnitFault(item)) ?? null;
 
   return (
     <>
@@ -570,11 +578,9 @@ export function MaintenanceEntityStockDetailDialog({
                   <div className="space-y-4 p-4 pb-8">
                     <TabsContent value="identification" className="mt-0 space-y-3">
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <DetailCard label="Name" value={entity.name} />
                         <DetailCard label="Description" value={entity.description} />
                         <DetailCard label="OEM Name" value={oemName} />
                         <DetailCard label="SKU" value={inventory?.sku || entity.sku} />
-                        <DetailCard label="Part Number" value={partNumber} />
                         <DetailCard label="Serial Number" value={serialNumber} />
                         <DetailCard label="Supplier Part Number" value={oemPartNumber} />
                         <DetailCard label="Supplier Serial Number" value={oemSerialNumber} />
@@ -629,10 +635,9 @@ export function MaintenanceEntityStockDetailDialog({
                           value={formatDate(installationDate)}
                         />
                         <DetailCard label="Installer" value={installerLabel} />
-                        <DetailCard label="Installed Part Number" value={partNumber} />
-                        <DetailCard label="Installed OEM" value={oemName} />
+                        <DetailCard label="Installer Part Number" value={partNumber} />
                         <DetailCard
-                          label="Installed Serial Number"
+                          label="Installer Serial Number"
                           value={serialNumber}
                         />
                         <DetailCard
@@ -905,7 +910,7 @@ export function MaintenanceEntityStockDetailDialog({
                         <div className="space-y-4">
                           <div className="grid gap-3 sm:grid-cols-2">
                             <StatCard
-                              label="Same OEM faults"
+                              label="Same-OEM Fault Count"
                               value={faultHistory?.same_oem_fault_count ?? 0}
                               hint={
                                 oemName
@@ -914,7 +919,7 @@ export function MaintenanceEntityStockDetailDialog({
                               }
                             />
                             <StatCard
-                              label="Different OEM faults"
+                              label="Other-OEM Fault Count"
                               value={faultHistory?.different_oem_fault_count ?? 0}
                               hint={
                                 oemName
@@ -923,20 +928,21 @@ export function MaintenanceEntityStockDetailDialog({
                               }
                             />
                             <StatCard
-                              label="Total product faults"
+                              label="Total Fault Occurrences"
                               value={faultHistory?.total_fault_count ?? 0}
                             />
                             <StatCard
-                              label="Last fault"
+                              label="Most Recent Fault"
                               value={
-                                formatDateTime(faultHistory?.last_fault_at) || 'None'
+                                formatDateTime(mostRecentPriorFault?.identified_at) ||
+                                'None'
                               }
                               hint={
-                                lastFault
-                                  ? lastFault.entity_name ||
-                                    lastFault.serial_number ||
-                                    `Fault #${lastFault.id}`
-                                  : undefined
+                                mostRecentPriorFault
+                                  ? mostRecentPriorFault.entity_name ||
+                                    mostRecentPriorFault.serial_number ||
+                                    `Fault #${mostRecentPriorFault.id}`
+                                  : 'No prior faults for other units'
                               }
                             />
                           </div>
@@ -960,11 +966,7 @@ export function MaintenanceEntityStockDetailDialog({
                             ) : (
                               <ul className="space-y-2">
                                 {faultHistory.history.map((item) => {
-                                  const isThisUnit =
-                                    selection != null &&
-                                    normalizeEntityType(item.entity_type) ===
-                                      hardwareOwnerType &&
-                                    item.entity_id === selection.entityId;
+                                  const isThisUnit = isCurrentUnitFault(item);
                                   return (
                                     <li key={item.id}>
                                       <button
