@@ -96,9 +96,17 @@ type PlanTreeNode = {
   children: PlanTreeNode[];
 };
 
+type SdlsTreeGroup = {
+  sdlsKey: string;
+  sdlsLabel: string;
+  sdlsId: number | null;
+  children: PlanTreeNode[];
+};
+
 type FlightTreeGroup = {
   flightName: string;
   children: PlanTreeNode[];
+  sdlsGroups: SdlsTreeGroup[];
 };
 
 function flightNameFromRow(row: ReservationPlanItem): string {
@@ -107,8 +115,55 @@ function flightNameFromRow(row: ReservationPlanItem): string {
   );
 }
 
+function sdlsLabelFromRow(row: ReservationPlanItem): string {
+  const parts = row.path
+    .split(' / ')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts[1]) return parts[1];
+  if (row.sdls_id != null) return `SDLS #${row.sdls_id}`;
+  return 'SDLS';
+}
+
 function flightCollapseKey(flightName: string): string {
   return `flight:${flightName}`;
+}
+
+function sdlsCollapseKey(
+  flightName: string,
+  sdlsLabel: string,
+  sdlsId: number | null
+): string {
+  return `sdls:${flightName}:${sdlsId ?? sdlsLabel}`;
+}
+
+function collectSubtreeRows(node: PlanTreeNode): ReservationPlanItem[] {
+  return [node.row, ...node.children.flatMap(collectSubtreeRows)];
+}
+
+function collectNodesRows(nodes: PlanTreeNode[]): ReservationPlanItem[] {
+  return nodes.flatMap(collectSubtreeRows);
+}
+
+function groupSystemNodesBySdls(
+  systemNodes: PlanTreeNode[],
+  flightName: string
+): SdlsTreeGroup[] {
+  const groups: SdlsTreeGroup[] = [];
+  const byKey = new Map<string, SdlsTreeGroup>();
+  for (const node of systemNodes) {
+    const sdlsLabel = sdlsLabelFromRow(node.row);
+    const sdlsId = node.row.sdls_id ?? null;
+    const sdlsKey = sdlsCollapseKey(flightName, sdlsLabel, sdlsId);
+    let group = byKey.get(sdlsKey);
+    if (!group) {
+      group = { sdlsKey, sdlsLabel, sdlsId, children: [] };
+      byKey.set(sdlsKey, group);
+      groups.push(group);
+    }
+    group.children.push(node);
+  }
+  return groups;
 }
 
 /** Build a nested tree from the depth-ordered reservation plan. */
@@ -158,11 +213,14 @@ function groupPlanTreeByFlight(roots: PlanTreeNode[]): FlightTreeGroup[] {
     const name = flightNameFromRow(node.row);
     let group = byName.get(name);
     if (!group) {
-      group = { flightName: name, children: [] };
+      group = { flightName: name, children: [], sdlsGroups: [] };
       byName.set(name, group);
       groups.push(group);
     }
     group.children.push(node);
+  }
+  for (const group of groups) {
+    group.sdlsGroups = groupSystemNodesBySdls(group.children, group.flightName);
   }
   return groups;
 }
@@ -514,6 +572,15 @@ export default function ReserveInventoryPage() {
   const [extraUsers, setExtraUsers] = useState<User[]>([]);
   const [serialByKey, setSerialByKey] = useState<Record<string, string>>({});
   const [developerByKey, setDeveloperByKey] = useState<Record<string, string>>({});
+  /** Flight / SDLS scope developer pick (defaults cascade into child rows). */
+  const [scopeDeveloperByKey, setScopeDeveloperByKey] = useState<Record<string, string>>(
+    {}
+  );
+  /** Entity keys edited individually — skipped by parent Flight/SDLS cascade. */
+  const [developerOverrideKeys, setDeveloperOverrideKeys] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [scopeAssignBusyKey, setScopeAssignBusyKey] = useState<string | null>(null);
   const [collapsedKeys, setCollapsedKeys] = useState<Set<string>>(() => new Set());
   const [selectedFlightName, setSelectedFlightName] = useState<string | null>(null);
   const [selectedSystemId, setSelectedSystemId] = useState<number | null>(null);
@@ -706,7 +773,7 @@ export default function ReserveInventoryPage() {
     );
   }, [planItems, selectedFlightName, selectedSystemId, cardFilter]);
 
-  /** Parent entity + flight keys in the currently visible tree. */
+  /** Parent entity + flight / SDLS keys in the currently visible tree. */
   const scopedParentKeys = useMemo(() => {
     const keys: string[] = [];
     function walk(nodes: PlanTreeNode[]) {
@@ -717,7 +784,10 @@ export default function ReserveInventoryPage() {
     }
     for (const group of flightGroups) {
       keys.push(flightCollapseKey(group.flightName));
-      walk(group.children);
+      for (const sdls of group.sdlsGroups) {
+        keys.push(sdls.sdlsKey);
+        walk(sdls.children);
+      }
     }
     return keys;
   }, [flightGroups]);
@@ -773,6 +843,90 @@ export default function ReserveInventoryPage() {
     if (!raw || raw === NONE_DEVELOPER) return null;
     const id = Number(raw);
     return Number.isFinite(id) && id > 0 ? id : null;
+  }
+
+  function setEntityDeveloper(key: string, value: string, asOverride: boolean) {
+    setDeveloperByKey((prev) => ({ ...prev, [key]: value }));
+    if (asOverride) {
+      setDeveloperOverrideKeys((prev) => {
+        const next = new Set(prev);
+        next.add(key);
+        return next;
+      });
+    }
+  }
+
+  /**
+   * Apply a Flight/SDLS developer default onto descendant rows.
+   * Rows marked as individual overrides are left unchanged.
+   * Persist assign-developer for rows that already allow assignment.
+   */
+  async function applyScopeDeveloper(
+    scopeKey: string,
+    value: string,
+    rows: ReservationPlanItem[],
+    label: string
+  ) {
+    const overrides = developerOverrideKeys;
+    setScopeDeveloperByKey((prev) => ({ ...prev, [scopeKey]: value }));
+    const cascadeKeys = rows.map(rowKey);
+    setDeveloperByKey((prev) => {
+      const next = { ...prev };
+      for (const key of cascadeKeys) {
+        if (overrides.has(key)) continue;
+        next[key] = value;
+      }
+      return next;
+    });
+
+    const developerId =
+      !value || value === NONE_DEVELOPER ? null : Number(value);
+    const assignable = rows.filter(
+      (row) =>
+        row.can_assign_developer &&
+        !overrides.has(rowKey(row)) &&
+        developerId != null &&
+        Number.isFinite(developerId) &&
+        developerId > 0
+    );
+    if (assignable.length === 0) {
+      toast.message(
+        value === NONE_DEVELOPER
+          ? `${label}: developer cleared for child items (overrides kept)`
+          : `${label}: developer set as default for child items`
+      );
+      return;
+    }
+
+    setScopeAssignBusyKey(scopeKey);
+    let ok = 0;
+    let failed = 0;
+    try {
+      for (const row of assignable) {
+        try {
+          await api.hierarchyWorkflow.assignDeveloper(
+            row.target_entity_type,
+            row.target_entity_id,
+            developerId!
+          );
+          ok += 1;
+        } catch {
+          failed += 1;
+        }
+      }
+      if (ok > 0) {
+        toast.success(
+          `${label}: assigned developer to ${ok} item${ok === 1 ? '' : 's'}${
+            failed ? ` · ${failed} failed` : ''
+          }`
+        );
+        await load();
+      } else {
+        toast.error(`${label}: could not assign developer to reserved items`);
+      }
+    } finally {
+      setScopeAssignBusyKey(null);
+    }
   }
 
   async function assignDeveloperForRow(row: ReservationPlanItem) {
@@ -1107,7 +1261,7 @@ export default function ReserveInventoryPage() {
                     <Select
                       value={currentDeveloper}
                       onValueChange={(value) =>
-                        setDeveloperByKey((prev) => ({ ...prev, [key]: value }))
+                        setEntityDeveloper(key, value, true)
                       }
                       disabled={isBusy || !canReserve}
                     >
@@ -1142,7 +1296,7 @@ export default function ReserveInventoryPage() {
                     <Select
                       value={currentDeveloper}
                       onValueChange={(value) =>
-                        setDeveloperByKey((prev) => ({ ...prev, [key]: value }))
+                        setEntityDeveloper(key, value, true)
                       }
                       disabled={isBusy}
                     >
@@ -1480,37 +1634,188 @@ export default function ReserveInventoryPage() {
               {flightGroups.map((group) => {
                 const flightKey = flightCollapseKey(group.flightName);
                 const flightCollapsed = collapsedKeys.has(flightKey);
+                const flightRows = collectNodesRows(group.children);
+                const flightDeveloper =
+                  scopeDeveloperByKey[flightKey] || NONE_DEVELOPER;
+                const flightBusy = scopeAssignBusyKey === flightKey;
                 return (
                   <li
                     key={group.flightName}
                     className="rounded-md border border-sky-600/30 bg-sky-600/5 px-2 py-2"
                   >
-                    <button
-                      type="button"
-                      className="flex w-full flex-wrap items-baseline gap-x-1.5 gap-y-0.5 rounded px-1 py-0.5 text-left hover:bg-sky-600/10"
-                      onClick={() => toggleCollapsed(flightKey)}
-                      aria-expanded={!flightCollapsed}
-                      title={
-                        flightCollapsed
-                          ? `Expand ${group.flightName}`
-                          : `Collapse ${group.flightName}`
-                      }
-                    >
-                      <span className="text-[10px] font-medium uppercase tracking-wide text-sky-700">
-                        Flight
-                      </span>
-                      <span className="font-medium text-sky-950">
-                        {group.flightName}
-                      </span>
-                      <span className="text-[10px] text-sky-800/70">
-                        {flightCollapsed
-                          ? `(${group.children.length} systems collapsed)`
-                          : null}
-                      </span>
-                    </button>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <button
+                        type="button"
+                        className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5 rounded px-1 py-0.5 text-left hover:bg-sky-600/10"
+                        onClick={() => toggleCollapsed(flightKey)}
+                        aria-expanded={!flightCollapsed}
+                        title={
+                          flightCollapsed
+                            ? `Expand ${group.flightName}`
+                            : `Collapse ${group.flightName}`
+                        }
+                      >
+                        <span className="text-[10px] font-medium uppercase tracking-wide text-sky-700">
+                          Flight
+                        </span>
+                        <span className="font-medium text-sky-950">
+                          {group.flightName}
+                        </span>
+                        <span className="text-[10px] text-sky-800/70">
+                          {flightCollapsed
+                            ? `(${group.children.length} systems collapsed)`
+                            : `${group.sdlsGroups.length} SDLS`}
+                        </span>
+                      </button>
+                      <Can permission={P.hierarchy_assign_developer}>
+                        <div
+                          className="flex shrink-0 flex-wrap items-center gap-2 px-1"
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => event.stopPropagation()}
+                        >
+                          <Select
+                            value={flightDeveloper}
+                            onValueChange={(value) =>
+                              void applyScopeDeveloper(
+                                flightKey,
+                                value,
+                                flightRows,
+                                `Flight ${group.flightName}`
+                              )
+                            }
+                            disabled={flightBusy || reservingAll}
+                          >
+                            <SelectTrigger
+                              size="sm"
+                              className="w-44"
+                              aria-label={`Flight developer for ${group.flightName}`}
+                            >
+                              <SelectValue placeholder="Flight developer" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value={NONE_DEVELOPER}>
+                                No developer
+                              </SelectItem>
+                              {developers.map((user) => (
+                                <SelectItem
+                                  key={user.id}
+                                  value={String(user.id)}
+                                >
+                                  {formatUserRef(user)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <span className="text-[10px] text-sky-800/70">
+                            {flightBusy ? 'Applying…' : 'Default for children'}
+                          </span>
+                        </div>
+                      </Can>
+                    </div>
                     {!flightCollapsed ? (
-                      <ul className="ml-3 mt-1 space-y-1.5 border-l border-sky-600/40 pl-3">
-                        {group.children.map((node) => renderPlanNode(node))}
+                      <ul className="ml-3 mt-2 space-y-2 border-l border-sky-600/40 pl-3">
+                        {group.sdlsGroups.map((sdls) => {
+                          const sdlsCollapsed = collapsedKeys.has(sdls.sdlsKey);
+                          const sdlsRows = collectNodesRows(sdls.children);
+                          const sdlsDeveloper =
+                            scopeDeveloperByKey[sdls.sdlsKey] ||
+                            NONE_DEVELOPER;
+                          const sdlsBusy =
+                            scopeAssignBusyKey === sdls.sdlsKey;
+                          return (
+                            <li
+                              key={sdls.sdlsKey}
+                              className="rounded-md border border-amber-700/25 bg-amber-700/5 px-2 py-1.5"
+                            >
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                <button
+                                  type="button"
+                                  className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5 rounded px-1 py-0.5 text-left hover:bg-amber-700/10"
+                                  onClick={() =>
+                                    toggleCollapsed(sdls.sdlsKey)
+                                  }
+                                  aria-expanded={!sdlsCollapsed}
+                                  title={
+                                    sdlsCollapsed
+                                      ? `Expand ${sdls.sdlsLabel}`
+                                      : `Collapse ${sdls.sdlsLabel}`
+                                  }
+                                >
+                                  <span className="text-[10px] font-medium uppercase tracking-wide text-amber-800">
+                                    SDLS
+                                  </span>
+                                  <span className="font-medium text-amber-950">
+                                    {sdls.sdlsLabel}
+                                  </span>
+                                  <span className="text-[10px] text-amber-900/70">
+                                    {sdlsCollapsed
+                                      ? `(${sdls.children.length} systems collapsed)`
+                                      : `${sdls.children.length} system${
+                                          sdls.children.length === 1 ? '' : 's'
+                                        }`}
+                                  </span>
+                                </button>
+                                <Can permission={P.hierarchy_assign_developer}>
+                                  <div
+                                    className="flex shrink-0 flex-wrap items-center gap-2 px-1"
+                                    onClick={(event) =>
+                                      event.stopPropagation()
+                                    }
+                                    onKeyDown={(event) =>
+                                      event.stopPropagation()
+                                    }
+                                  >
+                                    <Select
+                                      value={sdlsDeveloper}
+                                      onValueChange={(value) =>
+                                        void applyScopeDeveloper(
+                                          sdls.sdlsKey,
+                                          value,
+                                          sdlsRows,
+                                          `SDLS ${sdls.sdlsLabel}`
+                                        )
+                                      }
+                                      disabled={sdlsBusy || reservingAll}
+                                    >
+                                      <SelectTrigger
+                                        size="sm"
+                                        className="w-44"
+                                        aria-label={`SDLS developer for ${sdls.sdlsLabel}`}
+                                      >
+                                        <SelectValue placeholder="SDLS developer" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value={NONE_DEVELOPER}>
+                                          No developer
+                                        </SelectItem>
+                                        {developers.map((user) => (
+                                          <SelectItem
+                                            key={user.id}
+                                            value={String(user.id)}
+                                          >
+                                            {formatUserRef(user)}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <span className="text-[10px] text-amber-900/70">
+                                      {sdlsBusy
+                                        ? 'Applying…'
+                                        : 'Updates children'}
+                                    </span>
+                                  </div>
+                                </Can>
+                              </div>
+                              {!sdlsCollapsed ? (
+                                <ul className="ml-3 mt-1.5 space-y-1.5 border-l border-amber-700/35 pl-3">
+                                  {sdls.children.map((node) =>
+                                    renderPlanNode(node)
+                                  )}
+                                </ul>
+                              ) : null}
+                            </li>
+                          );
+                        })}
                       </ul>
                     ) : null}
                   </li>
