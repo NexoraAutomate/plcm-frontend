@@ -293,26 +293,26 @@ export function InventoryEntityFormTabs({
           {mode === 'create' || editingInstanceId != null ? (
             <>
               <div>
-                <Label>OEM Part Number</Label>
+                <Label>Supplier Part Number</Label>
                 <Input
                   value={formData.original_part_number}
                   onChange={(e) =>
                     onFormDataChange({ ...formData, original_part_number: e.target.value })
                   }
-                  placeholder="Manufacturer / OEM part number (reference)"
+                  placeholder="Manufacturer / supplier part number (reference)"
                 />
                 <p className="text-xs text-muted-foreground">
                   Stored for reference only. PLCM part numbers stay system-generated.
                 </p>
               </div>
               <div>
-                <Label>OEM Serial Number</Label>
+                <Label>Supplier Serial Number</Label>
                 <Input
                   value={formData.original_serial_number}
                   onChange={(e) =>
                     onFormDataChange({ ...formData, original_serial_number: e.target.value })
                   }
-                  placeholder="Manufacturer / OEM serial (reference)"
+                  placeholder="Manufacturer / supplier serial (reference)"
                 />
               </div>
             </>
@@ -463,7 +463,7 @@ export function InventoryEntityFormTabs({
               ) : null}
 
               <div className={mode === 'edit' ? undefined : 'sm:col-span-2'}>
-                <Label>Vendor / OEM acronym</Label>
+                <Label>Supplier acronym</Label>
                 <Input
                   value={formData.oem_name}
                   onChange={(e) => {

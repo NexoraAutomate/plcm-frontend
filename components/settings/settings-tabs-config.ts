@@ -8,6 +8,7 @@ import {
   Bell,
   Lock,
   DatabaseBackup,
+  FlaskConical,
 } from 'lucide-react';
 
 export type SettingsTabId =
@@ -17,7 +18,8 @@ export type SettingsTabId =
   | 'status'
   | 'alerts'
   | 'security'
-  | 'backup';
+  | 'backup'
+  | 'test-data';
 
 export type DefinitionsSectionId = 'labels' | 'entity-list' | 'configurations';
 
@@ -109,6 +111,13 @@ export const SETTINGS_TABS: SettingsTabConfig[] = [
     description: 'Download a full backup or restore from an archive',
     icon: DatabaseBackup,
     permission: [P.backup_database, P.restore_database],
+  },
+  {
+    id: 'test-data',
+    label: 'Test Data',
+    description: 'Admin tools to seed inventory stock for manual test cases',
+    icon: FlaskConical,
+    role: 'Admin',
   },
 ];
 

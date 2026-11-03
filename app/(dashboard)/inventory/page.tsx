@@ -5,10 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -24,7 +21,7 @@ import {
 import { toast } from 'sonner';
 import { toastFulfillments } from '@/lib/fcfs-toast';
 import * as api from '@/lib/api';
-import { EntityAttachmentsSection, type PendingAttachmentUpload } from '@/components/entity-attachments-section';
+import { type PendingAttachmentUpload } from '@/components/entity-attachments-section';
 import {
   buildInventoryCreatePayload,
   composeInventoryLocation,
@@ -96,18 +93,16 @@ import {
   useListStatsVisibility,
 } from '@/components/list-stats-visibility';
 import { InventoryKpiDashboard } from '@/components/inventory/inventory-kpi-dashboard';
-import { CascadingLocationSelects } from '@/components/inventory/cascading-location-selects';
 import { useInventoryStatsSummary } from '@/hooks/use-inventory-stats-summary';
 import { FileDropZone } from '@/components/ui/file-drop-zone';
-import {
-  AnimatedPillTabsList,
-  animatedPillTabsTriggerClassName,
-} from '@/components/ui/animated-pill-tabs';
 import { InventoryPictureThumb } from '@/components/inventory/inventory-picture-thumb';
+import {
+  InventoryStockFormTabs,
+  inventoryStockDialogClassName,
+} from '@/components/inventory/inventory-stock-form-tabs';
 import { EntityPicture } from '@/components/entity-picture';
 import {
   costTabToPayload,
-  InventoryCostTab,
   validateInventoryCostTab,
   type InventoryCostTabValue,
 } from '@/components/inventory/inventory-cost-tab';
@@ -120,8 +115,6 @@ import {
   getInventoryWarrantySummary,
   type InventoryExpiryLevel,
 } from '@/lib/inventory-expiry';
-import { Switch } from '@/components/ui/switch';
-
 const ACTION_BTN =
   'h-7 w-7 bg-transparent shadow-none border-0 hover:bg-transparent';
 
@@ -1387,16 +1380,6 @@ export default function InventoryPage() {
     }
   }
 
-  const inventoryDialogClassName =
-    'top-[4vh] flex max-h-[92vh] w-[min(100vw-1.5rem,56rem)] translate-y-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl';
-
-  const formTabClassName =
-    'mt-0 grid grid-cols-1 gap-x-6 gap-y-5 p-1 sm:grid-cols-2 [&>div]:space-y-2 [&>p]:col-span-full';
-
-  const formTabSingleClassName = 'mt-0 space-y-5 p-1 [&>div]:space-y-2';
-
-  const tabTriggerClassName = animatedPillTabsTriggerClassName;
-
   const getEntityDisplayName = (entityType: EntityType) => entityLabel(entityType);
 
   const headerPicturePending =
@@ -1446,522 +1429,136 @@ export default function InventoryPage() {
     } as const;
   })();
 
-  const renderInventoryFormTabs = (
-    mode: 'create' | 'edit',
-    options?: { stickyHeader?: ReactNode }
-  ) => (
-    <Tabs
-      value={formTab}
-      onValueChange={setFormTab}
-      className="flex min-h-0 flex-1 flex-col"
-    >
-      <div className="sticky top-0 z-20 shrink-0 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/80">
-        {options?.stickyHeader}
-        <div className="px-6 py-3">
-          <AnimatedPillTabsList value={formTab}>
-            <TabsTrigger value="general" className={tabTriggerClassName}>
-              General
-            </TabsTrigger>
-            <TabsTrigger value="holder" className={tabTriggerClassName}>
-              Location
-            </TabsTrigger>
-            <TabsTrigger value="cost" className={tabTriggerClassName}>
-              Cost
-            </TabsTrigger>
-            <TabsTrigger value="attachments" className={tabTriggerClassName}>
-              Attachments
-            </TabsTrigger>
-            {mode === 'edit' && showEditUnitsTab ? (
-              <TabsTrigger value="units" className={tabTriggerClassName}>
-                Units
-              </TabsTrigger>
-            ) : null}
-          </AnimatedPillTabsList>
+  const editCostExistingUnits =
+    !restockInventoryId && instances.length > 0
+      ? instances.map((instance) => ({
+          id: instance.id,
+          label: instance.serial_number || `Unit #${instance.id}`,
+          cost:
+            existingUnitCostEdits[instance.id] ??
+            (instance.unit_cost != null ? String(instance.unit_cost) : ''),
+        }))
+      : undefined;
+
+  const inventoryStockFormProps = {
+    formTab,
+    onFormTabChange: setFormTab,
+    selectedEntityType,
+    onEntityTypeChange: setSelectedEntityType,
+    formData,
+    onFormDataChange: setFormData,
+    entityListNames,
+    entityLabel,
+    inventoryHolderLabel,
+    pendingAttachments,
+    onPendingAttachmentsChange: setPendingAttachments,
+    pendingPictureFile,
+    onPendingPictureFileChange: setPendingPictureFile,
+    removePicture,
+    onRemovePictureChange: setRemovePicture,
+    costValue: costTabValueFromForm(),
+    onCostChange: applyCostTabValue,
+    onApplyDefinitionIdentifiers: applyDefinitionIdentifiers,
+  };
+
+  const renderEditUnitsTab = () => (
+    <>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm text-muted-foreground">
+            {instances.length} unit{instances.length === 1 ? '' : 's'} in this group
+          </p>
+          {canCreateInventory ? (
+            <Button type="button" size="sm" variant="outline" onClick={handleAddInstance}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Unit
+            </Button>
+          ) : null}
         </div>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
-        <TabsContent value="general" className={formTabClassName}>
-          {mode === 'create' ? (
-            <>
-              <div>
-                <Label>Inventory Type *</Label>
-                <Select
-                  value={selectedEntityType}
-                  disabled={restockInventoryId != null}
-                  onValueChange={(value) => {
-                    const newType = value as EntityType;
-                    setSelectedEntityType(newType);
-                    setFormData({
-                      ...formData,
-                      inventory_type: value,
-                      name: '',
-                      part_number: '',
-                      serial_number: '',
-                      quantity: formData.quantity || 1,
-                    });
-                  }}
+        <div className="overflow-x-visible rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <SortableTableHead
+                  column="serial_number"
+                  sort={instanceEditorSort}
+                  onSort={cycleInstanceEditorSort}
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="system">{entityLabel('system')}</SelectItem>
-                    <SelectItem value="subsystem">{entityLabel('subsystem')}</SelectItem>
-                    <SelectItem value="module">{entityLabel('module')}</SelectItem>
-                    <SelectItem value="unit">{entityLabel('unit')}</SelectItem>
-                    <SelectItem value="component">{entityLabel('component')}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label>{getEntityDisplayName(selectedEntityType)} Category *</Label>
-                <Select
-                  value={formData.name}
-                  disabled={restockInventoryId != null}
-                  onValueChange={(value) => {
-                    setFormData((prev) =>
-                      applyDefinitionIdentifiers(selectedEntityType, value, prev.oem_name, prev)
-                    );
-                  }}
+                  Unit Identity
+                </SortableTableHead>
+                <SortableTableHead
+                  column="location"
+                  sort={instanceEditorSort}
+                  onSort={cycleInstanceEditorSort}
                 >
-                  <SelectTrigger>
-                    <SelectValue
-                      placeholder={`Select from Entity List (${entityLabel(selectedEntityType)})`}
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {entityListNames.length === 0 ? (
-                      <SelectItem value="__none__" disabled>
-                        {`No ${entityLabel(selectedEntityType, true).toLowerCase()} in Entity List — add in Definitions`}
-                      </SelectItem>
-                    ) : (
-                      entityListNames.map((entry) => (
-                        <SelectItem key={entry.id} value={entry.name}>
-                          {entry.name}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label>Quantity *</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  value={formData.quantity || ''}
-                  onChange={(e) => {
-                    const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
-                    setFormData({ ...formData, quantity: isNaN(val) ? 0 : val });
-                  }}
-                  placeholder="Enter quantity"
-                />
-              </div>
-            </>
-          ) : showEditStockQuantity ? (
-            <div>
-              <Label>Quantity in stock</Label>
-              <Input value={String(formData.quantity || 0)} disabled />
-              <p className="text-xs text-muted-foreground">
-                Use + on the inventory list to restock (opens Add Inventory with this item).
-              </p>
-            </div>
-          ) : null}
-
-          <div className="sm:col-span-2">
-            <Label>Description</Label>
-            <Input
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Short description of this item"
-            />
-          </div>
-
-          <div>
-            <Label>Vendor / OEM acronym</Label>
-            <Input
-              value={formData.oem_name}
-              onChange={(e) => setFormData({ ...formData, oem_name: e.target.value })}
-              placeholder="e.g. AMP"
-            />
-            <p className="text-xs text-muted-foreground">
-              Used when generating part and serial numbers.
-            </p>
-          </div>
-
-          {mode === 'edit' && selectedEntityType === 'component' ? (
-            <div>
-              <Label>SKU</Label>
-              <Input
-                value={formData.sku}
-                onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                placeholder="Component SKU"
-              />
-            </div>
-          ) : null}
-
-          {mode === 'edit' && editingSerialOnly ? (
-            <div className="sm:col-span-2 rounded-lg border bg-muted/20 p-4">
-              <p className="mb-3 text-sm font-medium">Installation</p>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Installation date
-                  </p>
-                  <p className="text-sm">{installationDateLabel}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Installed by
-                  </p>
-                  <p className="text-sm">{installerLabel}</p>
-                </div>
-              </div>
-              <p className="mt-3 text-xs text-muted-foreground">
-                Filled automatically when a developer starts install and HM/PD verifies it.
-              </p>
-            </div>
-          ) : null}
-
-          {mode === 'create' || editingInstanceId != null ? (
-            <>
-              <div>
-                <Label>OEM Part Number</Label>
-                <Input
-                  value={formData.original_part_number}
-                  onChange={(e) =>
-                    setFormData({ ...formData, original_part_number: e.target.value })
-                  }
-                  placeholder="Manufacturer / OEM part number (reference)"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Stored for reference only. PLCM part numbers stay system-generated.
-                </p>
-              </div>
-              <div>
-                <Label>OEM Serial Number</Label>
-                <Input
-                  value={formData.original_serial_number}
-                  onChange={(e) =>
-                    setFormData({ ...formData, original_serial_number: e.target.value })
-                  }
-                  placeholder="Manufacturer / OEM serial (reference)"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Best used when adding a single unit; multi-unit receipts keep PLCM serials.
-                </p>
-              </div>
-            </>
-          ) : null}
-
-          <div>
-            <div className="flex items-center gap-2">
-              <Label>Shelf Life Expires</Label>
-              {mode === 'edit' &&
-              editingSerialOnly &&
-              editInstanceExpiry.hits.some(
-                (hit) => hit.kind === 'shelf_life' && hit.level === 'expired'
-              ) ? (
-                <Badge
-                  variant="outline"
-                  className="h-5 border-rose-300 bg-rose-100/80 px-1.5 text-[10px] font-medium text-rose-900 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-100"
-                >
-                  Expired
-                </Badge>
-              ) : null}
-            </div>
-            <Input
-              type="date"
-              value={formData.shelf_life_expires_at}
-              onChange={(e) =>
-                setFormData({ ...formData, shelf_life_expires_at: e.target.value })
-              }
-            />
-            <p className="text-xs text-muted-foreground">
-              Optional. Highlighted for warehouse stock only — issued and installed-verified
-              units are excluded.
-            </p>
-          </div>
-
-          <div className="sm:col-span-2 space-y-3 rounded-md border p-3">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <Label htmlFor="inventory-warranty-toggle">Supplier warranty</Label>
-                <p className="text-xs text-muted-foreground">
-                  Turn on when the supplier provides a warranty period for this stock.
-                </p>
-              </div>
-              <Switch
-                id="inventory-warranty-toggle"
-                checked={formData.warranty_provided}
-                onCheckedChange={(checked) =>
-                  setFormData({
-                    ...formData,
-                    warranty_provided: checked,
-                    warranty_expires_at: checked ? formData.warranty_expires_at : '',
-                  })
-                }
-              />
-            </div>
-            {formData.warranty_provided ? (
-              <div>
-                <Label>Warranty expires *</Label>
-                <Input
-                  type="date"
-                  value={formData.warranty_expires_at}
-                  onChange={(e) =>
-                    setFormData({ ...formData, warranty_expires_at: e.target.value })
-                  }
-                />
-              </div>
-            ) : null}
-          </div>
-
-          <div className="sm:col-span-2 space-y-3">
-            <Label>Picture</Label>
-            <FileDropZone
-              accept="image/*"
-              restLabel="photo files or drop"
-              hint="(jpg, png, webp, etc)"
-              selectedLabel={
-                removePicture
-                  ? null
-                  : pendingPictureFile?.name ||
-                    (formData.picture_url ? 'Current photo on file' : null)
-              }
-              onClear={() => {
-                setFormData({ ...formData, picture_url: '' });
-                setPendingPictureFile(null);
-                setRemovePicture(true);
-              }}
-              onFiles={(files) => {
-                setPendingPictureFile(files[0] ?? null);
-                setRemovePicture(false);
-              }}
-            />
-          </div>
-        </TabsContent>
-
-        <TabsContent value="holder" className={formTabClassName}>
-          {inventoryUsesInstances(selectedEntityType) && mode === 'edit' && editingInstanceId ? (
-            <p className="text-sm text-muted-foreground">
-              Location and holder apply to the selected unit.
-            </p>
-          ) : null}
-          {inventoryUsesInstances(selectedEntityType) && mode === 'create' ? (
-            <p className="text-sm text-muted-foreground">
-              Location and holder apply to each new unit being added.
-            </p>
-          ) : null}
-          <div>
-            <Label>Inventory Holder</Label>
-            {mode === 'create' ? (
-              <>
-                <Input value={inventoryHolderLabel} disabled />
-                <p className="text-xs text-muted-foreground">
-                  Warehouse stock is held by the Inventory Manager who adds the item.
-                </p>
-              </>
-            ) : (
-              <Select
-                value={formData.holder_user_id || ''}
-                onValueChange={(value) => setFormData({ ...formData, holder_user_id: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select inventory holder" />
-                </SelectTrigger>
-                <SelectContent>
-                  {users.map((user) => (
-                    <SelectItem key={user.id} value={String(user.id)}>
-                      {user.full_name || user.username}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-
-          <CascadingLocationSelects
-            tree={definitions.inventory_location_tree}
-            required={mode === 'create'}
-            value={{
-              location_room: formData.location_room,
-              location_cabinet: formData.location_cabinet,
-              location_rack: formData.location_rack,
-            }}
-            onChange={(next) => setFormData({ ...formData, ...next })}
-          />
-
-          <div>
-            <Label>Added Date</Label>
-            <Input
-              type="date"
-              value={formData.added_date}
-              onChange={(e) => setFormData({ ...formData, added_date: e.target.value })}
-            />
-          </div>
-        </TabsContent>
-
-        <TabsContent value="cost" className={formTabSingleClassName}>
-          {mode === 'edit' && !restockInventoryId ? (
-            <InventoryCostTab
-              quantity={Math.max(instances.length, 1)}
-              value={costTabValueFromForm()}
-              onChange={applyCostTabValue}
-              existingUnits={
-                instances.length > 0
-                  ? instances.map((instance) => ({
-                      id: instance.id,
-                      label:
-                        instance.serial_number ||
-                        `Unit #${instance.id}`,
-                      cost:
-                        existingUnitCostEdits[instance.id] ??
-                        (instance.unit_cost != null
-                          ? String(instance.unit_cost)
-                          : ''),
-                    }))
-                  : undefined
-              }
-              onExistingUnitCostChange={(id, cost) => {
-                setExistingUnitCostEdits((prev) => ({
-                  ...prev,
-                  [Number(id)]: cost,
-                }));
-              }}
-            />
-          ) : (
-            <InventoryCostTab
-              quantity={formData.quantity || 1}
-              value={costTabValueFromForm()}
-              onChange={applyCostTabValue}
-            />
-          )}
-        </TabsContent>
-
-        <TabsContent value="attachments" className={formTabSingleClassName}>
-          <EntityAttachmentsSection
-            ownerType={
-              inventoryUsesInstances(selectedEntityType) && editingInstanceId
-                ? 'inventory_instance'
-                : 'inventory'
-            }
-            ownerId={
-              mode === 'edit'
-                ? inventoryUsesInstances(selectedEntityType)
-                  ? editingInstanceId
-                  : editingId
-                : null
-            }
-            pendingAttachments={pendingAttachments}
-            onPendingAttachmentsChange={setPendingAttachments}
-          />
-        </TabsContent>
-
-        {mode === 'edit' && showEditUnitsTab ? (
-          <TabsContent value="units" className={formTabSingleClassName}>
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm text-muted-foreground">
-                {instances.length} unit{instances.length === 1 ? '' : 's'} in this group
-              </p>
-              {canCreateInventory ? (
-                <Button type="button" size="sm" variant="outline" onClick={handleAddInstance}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Unit
-                </Button>
-              ) : null}
-            </div>
-            <div className="overflow-x-visible rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <SortableTableHead
-                      column="serial_number"
-                      sort={instanceEditorSort}
-                      onSort={cycleInstanceEditorSort}
+                  Location
+                </SortableTableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {instances.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="py-6 text-center text-muted-foreground">
+                    No inventory units yet
+                  </TableCell>
+                </TableRow>
+              ) : (
+                sortedEditorInstances.map((instance) => {
+                  const unitStatus = resolveInventoryInstanceStatus(instance);
+                  return (
+                    <TableRow
+                      key={instance.id}
+                      className={
+                        editingInstanceId === instance.id ? 'bg-muted/50' : undefined
+                      }
                     >
-                      Unit Identity
-                    </SortableTableHead>
-                    <SortableTableHead
-                      column="location"
-                      sort={instanceEditorSort}
-                      onSort={cycleInstanceEditorSort}
-                    >
-                      Location
-                    </SortableTableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {instances.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="py-6 text-center text-muted-foreground">
-                        No inventory units yet
+                      <TableCell className="font-mono text-sm">
+                        {instance.serial_number || '—'}
+                      </TableCell>
+                      <TableCell title={instance.location || undefined}>
+                        {formatInventoryLocationAbbrev(instance)}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={unitStatus} />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Can permission={P.edit_inventory}>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                editingGroup && loadInstanceIntoForm(instance, editingGroup)
+                              }
+                            >
+                              Edit
+                            </Button>
+                          </Can>
+                          <Can permission={P.delete_inventory}>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => {
+                                if (!editingGroup) return;
+                                requestDeleteInstance(editingGroup, instance);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </Can>
+                        </div>
                       </TableCell>
                     </TableRow>
-                  ) : (
-                    sortedEditorInstances.map((instance) => {
-                      const unitStatus = resolveInventoryInstanceStatus(instance);
-                      return (
-                        <TableRow
-                          key={instance.id}
-                          className={
-                            editingInstanceId === instance.id ? 'bg-muted/50' : undefined
-                          }
-                        >
-                          <TableCell className="font-mono text-sm">
-                            {instance.serial_number || '—'}
-                          </TableCell>
-                          <TableCell title={instance.location || undefined}>
-                            {formatInventoryLocationAbbrev(instance)}
-                          </TableCell>
-                          <TableCell>
-                            <StatusBadge status={unitStatus} />
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Can permission={P.edit_inventory}>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() =>
-                                    editingGroup && loadInstanceIntoForm(instance, editingGroup)
-                                  }
-                                >
-                                  Edit
-                                </Button>
-                              </Can>
-                              <Can permission={P.delete_inventory}>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => {
-                                    if (!editingGroup) return;
-                                    requestDeleteInstance(editingGroup, instance);
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </Can>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </TabsContent>
-        ) : null}
-      </div>
-    </Tabs>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+    </>
   );
 
 
@@ -2210,9 +1807,12 @@ export default function InventoryPage() {
                 </DialogTrigger>
               </Can>
             ) : null}
-            <DialogContent className={inventoryDialogClassName}>
-              {renderInventoryFormTabs('create', {
-                stickyHeader: (
+            <DialogContent className={inventoryStockDialogClassName}>
+              <InventoryStockFormTabs
+                mode="create"
+                {...inventoryStockFormProps}
+                lockTypeAndCategory={restockInventoryId != null}
+                stickyHeader={
                   <DialogHeader className="space-y-1 px-6 pt-5 pb-1 text-left">
                     <div className="flex items-start gap-3">
                       <InventoryPictureThumb
@@ -2242,8 +1842,8 @@ export default function InventoryPage() {
                       </div>
                     </div>
                   </DialogHeader>
-                ),
-              })}
+                }
+              />
               <div className="flex shrink-0 justify-end gap-3 border-t bg-background px-6 py-4">
                 <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                   Cancel
@@ -3187,9 +2787,30 @@ export default function InventoryPage() {
           }
         }}
       >
-        <DialogContent className={inventoryDialogClassName}>
-          {renderInventoryFormTabs('edit', {
-            stickyHeader: (
+        <DialogContent className={inventoryStockDialogClassName}>
+          <InventoryStockFormTabs
+            mode="edit"
+            {...inventoryStockFormProps}
+            users={users}
+            editingId={editingId}
+            editingInstanceId={editingInstanceId}
+            editingSerialOnly={editingSerialOnly}
+            showEditStockQuantity={showEditStockQuantity}
+            installationDateLabel={installationDateLabel}
+            installerLabel={installerLabel}
+            shelfLifeExpired={editInstanceExpiry.hits.some(
+              (hit) => hit.kind === 'shelf_life' && hit.level === 'expired'
+            )}
+            unitsTab={showEditUnitsTab ? renderEditUnitsTab() : null}
+            costQuantity={!restockInventoryId ? Math.max(instances.length, 1) : undefined}
+            costExistingUnits={editCostExistingUnits}
+            onExistingUnitCostChange={(id, cost) => {
+              setExistingUnitCostEdits((prev) => ({
+                ...prev,
+                [Number(id)]: cost,
+              }));
+            }}
+            stickyHeader={
               <DialogHeader className="space-y-2 bg-sky-50/40 px-6 pt-5 pb-1 text-left dark:bg-sky-950/20">
                 <div className="flex items-start gap-3">
                   <InventoryPictureThumb
@@ -3297,8 +2918,8 @@ export default function InventoryPage() {
                     : ''}
                 </DialogDescription>
               </DialogHeader>
-            ),
-          })}
+            }
+          />
           <div className="flex shrink-0 justify-end gap-3 border-t bg-background px-6 py-4">
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>
               Cancel

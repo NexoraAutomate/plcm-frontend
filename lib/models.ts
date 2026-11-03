@@ -1257,6 +1257,38 @@ export interface InventoryStatsSummary {
   return_pending_inspect: number
 }
 
+export interface InventoryStockSeedGroup {
+  inventory_id: number
+  name: string
+  part_number?: string | null
+  previous_quantity: number
+  units_added: number
+  new_quantity: number
+  skipped_reason?: string | null
+}
+
+export interface InventoryStockSeedResult {
+  multiplier: number
+  groups_processed: number
+  groups_skipped: number
+  units_added: number
+  location: string
+  unit_cost: number
+  dry_run: boolean
+  groups: InventoryStockSeedGroup[]
+}
+
+export interface InventoryStockSeedPayload {
+  multiplier?: number
+  unit_cost?: number
+  location_room?: string
+  location_cabinet?: string
+  location_rack?: string
+  dry_run?: boolean
+  inventory_ids?: number[]
+  confirm?: string
+}
+
 /** Sidebar badge counts for actions awaiting the current user. */
 export interface PendingActionCounts {
   verify_queue: number

@@ -58,3 +58,11 @@ export const BackupPanel = dynamic(
   () => import('@/components/settings/backup-panel').then((m) => ({ default: m.BackupPanel })),
   { ssr: false, loading: PanelLoader }
 );
+
+export const TestDataPanel = dynamic(
+  () =>
+    import('@/components/settings/test-data-panel').then((m) => ({
+      default: m.TestDataPanel,
+    })),
+  { ssr: false, loading: PanelLoader }
+);

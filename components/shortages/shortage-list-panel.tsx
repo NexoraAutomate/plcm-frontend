@@ -11,25 +11,80 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CascadingLocationSelects } from '@/components/inventory/cascading-location-selects';
 import {
   costTabToPayload,
-  InventoryCostTab,
   validateInventoryCostTab,
   type InventoryCostTabValue,
 } from '@/components/inventory/inventory-cost-tab';
+import { InventoryPictureThumb } from '@/components/inventory/inventory-picture-thumb';
+import {
+  InventoryStockFormTabs,
+  inventoryStockDialogClassName,
+  type InventoryStockFormData,
+} from '@/components/inventory/inventory-stock-form-tabs';
+import type { PendingAttachmentUpload } from '@/components/entity-attachments-section';
 import { Can } from '@/components/auth';
 import { P } from '@/lib/permission-codes';
 import { useAuth } from '@/lib/auth-context';
 import { useAppDefinitions } from '@/lib/app-definitions-context';
-import { composeInventoryLocation } from '@/lib/inventory-entity-fields';
+import { inventoryUsesInstances, type HierarchyEntityType } from '@/lib/entity-hierarchy';
+import { composeInventoryLocation, emptyInventoryEntityForm } from '@/lib/inventory-entity-fields';
+import {
+  extractTrailingSerialSequence,
+  incrementSerialNumber,
+  suggestNextInventorySerial,
+} from '@/lib/inventory-serial';
+import { formatUserRef } from '@/lib/user-display';
 import { canUseProjectDetail } from '@/lib/notification-href';
 import { cn } from '@/lib/utils';
 import * as api from '@/lib/api';
-import type { InventoryShortage } from '@/lib/models';
+import type { Inventory, InventoryShortage } from '@/lib/models';
 import { parseApiDate } from '@/lib/parse-api-date';
 import { usePageDataRefresh } from '@/components/page-data-refresh';
+
+function occupiedSerialsFromInventory(item: Inventory | null | undefined): string[] {
+  if (!item) return [];
+  const values: string[] = [];
+  for (const instance of item.instances ?? []) {
+    if (instance.serial_number?.trim()) values.push(instance.serial_number.trim());
+    if (instance.original_serial_number?.trim()) {
+      values.push(instance.original_serial_number.trim());
+    }
+  }
+  if (item.serial_number?.trim()) values.push(item.serial_number.trim());
+  if (item.original_serial_number?.trim()) values.push(item.original_serial_number.trim());
+  return values;
+}
+
+function suggestNextSupplierSerial(item: Inventory | null | undefined, fallback: string): string {
+  const candidates = [
+    ...(item?.instances ?? []).map((instance) => instance.original_serial_number?.trim() || ''),
+    item?.original_serial_number?.trim() || '',
+  ].filter(Boolean);
+
+  let bestSerial = '';
+  let bestSequence = -1;
+  for (const serial of candidates) {
+    const parsed = extractTrailingSerialSequence(serial);
+    if (!parsed) continue;
+    if (parsed.sequence > bestSequence) {
+      bestSequence = parsed.sequence;
+      bestSerial = serial;
+    }
+  }
+
+  if (bestSerial) return incrementSerialNumber(bestSerial);
+  if (fallback.trim()) return fallback.trim();
+  return '';
+}
+
+function ensureSerialDiffersFromPart(serial: string, partNumber: string): string {
+  const next = serial.trim();
+  const part = partNumber.trim();
+  if (!next) return part ? incrementSerialNumber(part) : '';
+  if (!part || next.toLowerCase() !== part.toLowerCase()) return next;
+  return incrementSerialNumber(next);
+}
 
 function shortageMatchesSearch(row: InventoryShortage, query: string) {
   const q = query.trim().toLowerCase();
@@ -69,6 +124,14 @@ type Props = {
   onRowsChange?: (rows: InventoryShortage[]) => void;
 };
 
+const EMPTY_RECEIVE_COST: InventoryCostTabValue = {
+  currency: 'PKR',
+  costMode: 'batch',
+  bulkQuoteCost: '',
+  unitCost: '',
+  unitCosts: [''],
+};
+
 function apiError(error: unknown, fallback: string): string {
   const detail = (error as { response?: { data?: { detail?: string } } })?.response
     ?.data?.detail;
@@ -96,25 +159,24 @@ export function ShortageListPanel({
   onRowsChange,
 }: Props) {
   const { can, user } = useAuth();
-  const { definitions } = useAppDefinitions();
+  const { entityLabel } = useAppDefinitions();
   const showProjectLink = canUseProjectDetail(user?.roles) && can(P.view_projects);
   const [rows, setRows] = useState<InventoryShortage[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [busyId, setBusyId] = useState<number | null>(null);
   const [receiveTarget, setReceiveTarget] = useState<InventoryShortage | null>(null);
-  const [receivePartNumber, setReceivePartNumber] = useState('');
-  const [receiveSerialNumber, setReceiveSerialNumber] = useState('');
-  const [receiveLocationRoom, setReceiveLocationRoom] = useState('');
-  const [receiveLocationCabinet, setReceiveLocationCabinet] = useState('');
-  const [receiveLocationRack, setReceiveLocationRack] = useState('');
-  const [receiveTab, setReceiveTab] = useState('details');
-  const [receiveCost, setReceiveCost] = useState<InventoryCostTabValue>({
-    currency: 'PKR',
-    costMode: 'batch',
-    bulkQuoteCost: '',
-    unitCost: '',
-    unitCosts: [''],
+  const [receiveForm, setReceiveForm] = useState<InventoryStockFormData>({
+    ...emptyInventoryEntityForm,
   });
+  const [receiveTab, setReceiveTab] = useState('general');
+  const [receiveCost, setReceiveCost] = useState<InventoryCostTabValue>(EMPTY_RECEIVE_COST);
+  const [receiveAttachments, setReceiveAttachments] = useState<PendingAttachmentUpload[]>([]);
+  const [receivePictureFile, setReceivePictureFile] = useState<File | null>(null);
+  const [receiveRemovePicture, setReceiveRemovePicture] = useState(false);
+  const [receiveOccupiedSerials, setReceiveOccupiedSerials] = useState<string[]>([]);
+  const receiveEntityType = (receiveTarget?.target_entity_type ||
+    'component') as HierarchyEntityType;
+  const inventoryHolderLabel = user ? formatUserRef(user) : 'Inventory Manager';
 
   const filteredRows = useMemo(
     () => rows.filter((row) => shortageMatchesSearch(row, searchQuery)),
@@ -178,40 +240,107 @@ export function ShortageListPanel({
     }
   }
 
-  function openReceive(row: InventoryShortage) {
+  async function openReceive(row: InventoryShortage) {
+    const partNumber = (row.suggested_part_number || row.part_number || '').trim();
+    let nextSerial = ensureSerialDiffersFromPart(
+      row.suggested_serial_number || '',
+      partNumber
+    );
+    let nextSupplierSerial = nextSerial;
+    let occupied = [] as string[];
+    let catalog: Inventory | null = null;
+
+    if (row.inventory_id != null) {
+      try {
+        const res = await api.inventory.get(row.inventory_id);
+        catalog = res.data ?? null;
+      } catch {
+        catalog = null;
+      }
+    }
+
+    if (catalog) {
+      occupied = occupiedSerialsFromInventory(catalog);
+      const suggested = suggestNextInventorySerial(catalog);
+      nextSerial = ensureSerialDiffersFromPart(suggested || nextSerial, partNumber);
+      nextSupplierSerial = ensureSerialDiffersFromPart(
+        suggestNextSupplierSerial(catalog, nextSerial),
+        partNumber
+      );
+    }
+
+    setReceiveOccupiedSerials(occupied);
     setReceiveTarget(row);
-    setReceivePartNumber(row.suggested_part_number || row.part_number || '');
-    setReceiveSerialNumber(row.suggested_serial_number || '');
-    setReceiveLocationRoom('');
-    setReceiveLocationCabinet('');
-    setReceiveLocationRack('');
-    setReceiveTab('details');
-    setReceiveCost({
-      currency: 'PKR',
-      costMode: 'batch',
-      bulkQuoteCost: '',
-      unitCost: '',
-      unitCosts: [''],
+    setReceiveForm({
+      ...emptyInventoryEntityForm,
+      inventory_type: row.target_entity_type || 'component',
+      name: row.lru_name || '',
+      quantity: 1,
+      part_number: partNumber,
+      serial_number: nextSerial,
+      // Supplier PN defaults to the product part number and stays editable.
+      original_part_number: partNumber,
+      original_serial_number: nextSupplierSerial,
+      holder_user_id: user?.id ? String(user.id) : '',
     });
+    setReceiveTab('general');
+    setReceiveCost({ ...EMPTY_RECEIVE_COST, unitCosts: [''] });
+    setReceiveAttachments([]);
+    setReceivePictureFile(null);
+    setReceiveRemovePicture(false);
+  }
+
+  async function uploadReceivedExtras(received: Inventory) {
+    if (receivePictureFile && !receiveRemovePicture) {
+      await api.pictures.upload('inventory', received.id, receivePictureFile);
+    }
+    if (receiveAttachments.length === 0) return;
+    const usesInstances = inventoryUsesInstances(receiveEntityType);
+    const instances = received.instances ?? [];
+    const ownerId = usesInstances ? instances[instances.length - 1]?.id : received.id;
+    if (!ownerId) return;
+    for (const attachment of receiveAttachments) {
+      await api.attachments.upload(
+        usesInstances ? 'inventory_instance' : 'inventory',
+        ownerId,
+        attachment.file,
+        {
+          attachment_type: attachment.attachment_type,
+          description: attachment.description,
+        }
+      );
+    }
   }
 
   async function handleReceive() {
     if (!receiveTarget) return;
     const needsLocation = receiveTarget.target_entity_type !== 'component';
+    const partNumber = receiveForm.part_number.trim();
+    const serialNumber = receiveForm.serial_number.trim();
+    const supplierPart = receiveForm.original_part_number.trim();
+    const supplierSerial = receiveForm.original_serial_number.trim() || serialNumber;
     const location = composeInventoryLocation(
-      receiveLocationRoom,
-      receiveLocationCabinet,
-      receiveLocationRack
+      receiveForm.location_room,
+      receiveForm.location_cabinet,
+      receiveForm.location_rack
     );
     const validationError = validateShortageReceiveForm({
       quantity: 1,
-      partNumber: receivePartNumber,
+      partNumber,
+      serialNumber,
+      supplierSerialNumber: supplierSerial,
+      occupiedSerials: receiveOccupiedSerials,
       requireLocation: needsLocation,
       location,
     });
     if (validationError) {
       toast.error(validationError);
-      setReceiveTab('details');
+      setReceiveTab(needsLocation && partNumber && serialNumber ? 'holder' : 'general');
+      return;
+    }
+    if (receiveForm.warranty_provided && !receiveForm.warranty_expires_at.trim()) {
+      toast.error('Enter the warranty end date, or turn off supplier warranty');
+      setReceiveTab('general');
       return;
     }
     const costError = validateInventoryCostTab(receiveCost, 1);
@@ -226,14 +355,26 @@ export function ShortageListPanel({
       const costPayload = costTabToPayload(receiveCost, 1);
       const res = await api.inventory.receiveShortage(receiveTarget.id, {
         quantity: 1,
-        part_number: receivePartNumber.trim() || undefined,
-        serial_numbers: receiveSerialNumber.trim()
-          ? [receiveSerialNumber.trim()]
-          : undefined,
+        part_number: partNumber || undefined,
+        serial_numbers: serialNumber ? [serialNumber] : undefined,
         location: location || undefined,
-        location_room: receiveLocationRoom.trim() || undefined,
-        location_cabinet: receiveLocationCabinet.trim() || undefined,
-        location_rack: receiveLocationRack.trim() || undefined,
+        location_room: receiveForm.location_room.trim() || undefined,
+        location_cabinet: receiveForm.location_cabinet.trim() || undefined,
+        location_rack: receiveForm.location_rack.trim() || undefined,
+        description: receiveForm.description.trim() || undefined,
+        oem_name: receiveForm.oem_name.trim() || undefined,
+        original_part_number: supplierPart || undefined,
+        original_serial_number: supplierSerial || undefined,
+        added_date: receiveForm.added_date
+          ? new Date(receiveForm.added_date).toISOString()
+          : undefined,
+        shelf_life_expires_at: receiveForm.shelf_life_expires_at
+          ? new Date(receiveForm.shelf_life_expires_at).toISOString()
+          : null,
+        warranty_expires_at:
+          receiveForm.warranty_provided && receiveForm.warranty_expires_at
+            ? new Date(receiveForm.warranty_expires_at).toISOString()
+            : null,
         ...costPayload,
       });
       const fulfilled = res.data.fcfs_fulfillments?.length ?? 0;
@@ -242,6 +383,13 @@ export function ShortageListPanel({
           ? `Stock received and ${fulfilled} shortage item${fulfilled === 1 ? '' : 's'} auto-reserved`
           : 'Stock received'
       );
+      try {
+        await uploadReceivedExtras(res.data);
+      } catch (extrasError: unknown) {
+        toast.error(
+          apiError(extrasError, 'Stock received, but picture or attachments failed to upload')
+        );
+      }
       setReceiveTarget(null);
       await refresh();
     } catch (error: unknown) {
@@ -250,6 +398,7 @@ export function ShortageListPanel({
       setBusyId(null);
     }
   }
+
 
   if (rows.length === 0) {
     return (
@@ -325,7 +474,7 @@ export function ShortageListPanel({
                     <Button
                       size="sm"
                       disabled={busyId === row.id}
-                      onClick={() => openReceive(row)}
+                      onClick={() => void openReceive(row)}
                     >
                       <PackagePlus className="mr-1 h-3.5 w-3.5" />
                       Add stock
@@ -356,68 +505,52 @@ export function ShortageListPanel({
           if (!open && busyId == null) setReceiveTarget(null);
         }}
       >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Add stock for shortage</DialogTitle>
-            <DialogDescription>
-              Receive {receiveTarget?.lru_name || 'this item'} directly from the shortage queue.
-              Matching stock is auto-reserved FCFS.
-            </DialogDescription>
-          </DialogHeader>
-          <Tabs value={receiveTab} onValueChange={setReceiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="details">Details</TabsTrigger>
-              <TabsTrigger value="cost">Cost</TabsTrigger>
-            </TabsList>
-            <TabsContent value="details" className="mt-4 space-y-4">
-              <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm space-y-1">
-                <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">Part number</span>
-                  <span className="font-mono text-right">
-                    {receivePartNumber || '—'}
-                  </span>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">Quantity</span>
-                  <span>1</span>
-                </div>
-                {receiveTarget?.target_entity_type !== 'component' ? (
-                  <div className="flex justify-between gap-3">
-                    <span className="text-muted-foreground">Serial number</span>
-                    <span className="font-mono text-right">
-                      {receiveSerialNumber || 'Generated on receive'}
-                    </span>
+        <DialogContent className={inventoryStockDialogClassName}>
+          <InventoryStockFormTabs
+            mode="shortage"
+            formTab={receiveTab}
+            onFormTabChange={setReceiveTab}
+            selectedEntityType={receiveEntityType}
+            formData={receiveForm}
+            onFormDataChange={setReceiveForm}
+            entityListNames={[]}
+            entityLabel={entityLabel}
+            inventoryHolderLabel={inventoryHolderLabel}
+            pendingAttachments={receiveAttachments}
+            onPendingAttachmentsChange={setReceiveAttachments}
+            pendingPictureFile={receivePictureFile}
+            onPendingPictureFileChange={setReceivePictureFile}
+            removePicture={receiveRemovePicture}
+            onRemovePictureChange={setReceiveRemovePicture}
+            costValue={receiveCost}
+            onCostChange={setReceiveCost}
+            costQuantity={1}
+            lockTypeAndCategory
+            lockQuantity
+            disabled={busyId != null}
+            stickyHeader={
+              <DialogHeader className="space-y-1 px-6 pt-5 pb-1 text-left">
+                <div className="flex items-start gap-3">
+                  <InventoryPictureThumb
+                    pendingFile={!receiveRemovePicture ? receivePictureFile : null}
+                    ownerType="inventory"
+                    ownerId={null}
+                    alt={receiveForm.name || 'Shortage item'}
+                    size="md"
+                    showPlaceholder
+                  />
+                  <div className="min-w-0 space-y-1">
+                    <DialogTitle>Add stock for shortage</DialogTitle>
+                    <DialogDescription>
+                      Receive {receiveTarget?.lru_name || 'this item'} directly from the
+                      shortage queue. Matching stock is auto-reserved FCFS.
+                    </DialogDescription>
                   </div>
-                ) : null}
-              </div>
-              {receiveTarget?.target_entity_type !== 'component' ? (
-                <CascadingLocationSelects
-                  tree={definitions.inventory_location_tree}
-                  required
-                  disabled={busyId != null}
-                  value={{
-                    location_room: receiveLocationRoom,
-                    location_cabinet: receiveLocationCabinet,
-                    location_rack: receiveLocationRack,
-                  }}
-                  onChange={(next) => {
-                    setReceiveLocationRoom(next.location_room);
-                    setReceiveLocationCabinet(next.location_cabinet);
-                    setReceiveLocationRack(next.location_rack);
-                  }}
-                />
-              ) : null}
-            </TabsContent>
-            <TabsContent value="cost" className="mt-4">
-              <InventoryCostTab
-                quantity={1}
-                value={receiveCost}
-                onChange={setReceiveCost}
-                disabled={busyId != null}
-              />
-            </TabsContent>
-          </Tabs>
-          <div className="flex justify-end gap-2 pt-2">
+                </div>
+              </DialogHeader>
+            }
+          />
+          <div className="flex shrink-0 justify-end gap-3 border-t bg-background px-6 py-4">
             <Button
               variant="outline"
               onClick={() => setReceiveTarget(null)}
@@ -431,6 +564,7 @@ export function ShortageListPanel({
           </div>
         </DialogContent>
       </Dialog>
+
     </>
   );
 }

@@ -950,6 +950,13 @@ export const inventory = {
       unit_costs?: number[]
       bulk_quote_cost?: number
       currency?: string
+      description?: string
+      oem_name?: string
+      original_part_number?: string
+      original_serial_number?: string
+      added_date?: string
+      shelf_life_expires_at?: string | null
+      warranty_expires_at?: string | null
     }
   ) =>
     api.post<Models.Inventory>('/inventory/shortages/' + shortageId + '/receive/', data),
@@ -1006,6 +1013,8 @@ export const inventory = {
       }>;
     }
   ) => api.put<Models.InventoryChildLink[]>(`/inventory/${inventoryId}/children/`, data),
+  seedTestStock: (data: Models.InventoryStockSeedPayload) =>
+    api.post<Models.InventoryStockSeedResult>('/inventory/seed-test-stock/', data),
 };
 
 // Statuses

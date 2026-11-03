@@ -379,6 +379,9 @@ export function validateIssueInventoryForm(input: {
 export function validateShortageReceiveForm(input: {
   quantity: unknown;
   partNumber: string;
+  serialNumber?: string;
+  supplierSerialNumber?: string;
+  occupiedSerials?: Iterable<string>;
   requireLocation?: boolean;
   location?: string;
 }): string | null {
@@ -387,6 +390,28 @@ export function validateShortageReceiveForm(input: {
     return 'Enter a quantity of at least 1';
   }
   if (isBlank(input.partNumber)) return requiredMessage('Part number');
+  const partNumber = input.partNumber.trim();
+  const serialNumber = (input.serialNumber ?? '').trim();
+  const supplierSerial = (input.supplierSerialNumber ?? '').trim();
+  if (isBlank(serialNumber)) return requiredMessage('Serial number');
+  if (serialNumber.toLowerCase() === partNumber.toLowerCase()) {
+    return 'Serial number must be different from the part number';
+  }
+  if (
+    supplierSerial &&
+    supplierSerial.toLowerCase() === partNumber.toLowerCase()
+  ) {
+    return 'Supplier serial number must be different from the part number';
+  }
+  const occupied = new Set(
+    [...(input.occupiedSerials ?? [])].map((value) => value.trim().toLowerCase()).filter(Boolean)
+  );
+  if (occupied.has(serialNumber.toLowerCase())) {
+    return 'This serial number is already in use';
+  }
+  if (supplierSerial && occupied.has(supplierSerial.toLowerCase())) {
+    return 'This supplier serial number is already in use';
+  }
   if (input.requireLocation && isBlank(input.location)) {
     return requiredMessage('Room / Cabinet / Rack');
   }

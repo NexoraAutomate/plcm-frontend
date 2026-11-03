@@ -12,6 +12,7 @@ export { HierarchyConfigPanel } from './hierarchy-config-panel';
 export { SecurityPanel } from './security-panel';
 export { AlertsPanel } from './alerts-panel';
 export { BackupPanel } from './backup-panel';
+export { TestDataPanel } from './test-data-panel';
 export { UserStatusBadge } from './user-status-badge';
 export { UserLoginHistoryDialog } from './user-login-history-dialog';
 export { UserDetailsDialog } from './user-details-dialog';

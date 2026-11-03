@@ -14,6 +14,7 @@ import {
   AlertsPanel,
   SecurityPanel,
   BackupPanel,
+  TestDataPanel,
 } from '@/components/lazy/settings-panels';
 import {
   SETTINGS_ACCESS_PERMISSIONS,
@@ -43,6 +44,8 @@ function SettingsTabContent({ tab }: { tab: SettingsTabId }) {
       return <SecurityPanel embedded />;
     case 'backup':
       return <BackupPanel embedded />;
+    case 'test-data':
+      return <TestDataPanel embedded />;
     default:
       return null;
   }

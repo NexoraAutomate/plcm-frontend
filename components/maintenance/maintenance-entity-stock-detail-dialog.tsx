@@ -576,8 +576,8 @@ export function MaintenanceEntityStockDetailDialog({
                         <DetailCard label="SKU" value={inventory?.sku || entity.sku} />
                         <DetailCard label="Part Number" value={partNumber} />
                         <DetailCard label="Serial Number" value={serialNumber} />
-                        <DetailCard label="OEM Part Number" value={oemPartNumber} />
-                        <DetailCard label="OEM Serial Number" value={oemSerialNumber} />
+                        <DetailCard label="Supplier Part Number" value={oemPartNumber} />
+                        <DetailCard label="Supplier Serial Number" value={oemSerialNumber} />
                         <DetailCard
                           label="Configuration Item"
                           value={
