@@ -56,6 +56,7 @@ function requestLabel(row: DeveloperAssignedWork) {
   if (row.complete_reported) return 'Waiting for HM accept';
   if (row.issued) return 'Issued';
   if (row.request_status === 'pending') return 'Requested';
+  if (row.last_mark_back_reason) return 'Marked back';
   if (row.reserved) return 'Reserved';
   return 'Assigned';
 }
@@ -621,6 +622,11 @@ export function MyAssignmentsPanel() {
                           {row.entity_type}
                           {row.part_number ? ` · ${row.part_number}` : ''}
                         </div>
+                        {row.last_mark_back_reason ? (
+                          <div className="mt-1 max-w-xs text-xs text-amber-700 dark:text-amber-400">
+                            Marked back: {row.last_mark_back_reason}
+                          </div>
+                        ) : null}
                       </TableCell>
                     )}
                     {isVisible('project_name') && <TableCell>{row.project_name || '—'}</TableCell>}
@@ -640,6 +646,9 @@ export function MyAssignmentsPanel() {
                           ) : null}
                           {row.request_status === 'pending' ? (
                             <Badge variant="outline">Requested</Badge>
+                          ) : null}
+                          {row.last_mark_back_reason ? (
+                            <Badge variant="destructive">Marked back</Badge>
                           ) : null}
                           {row.test_result === 'pass' && !row.verified ? (
                             <Badge variant="outline">Pass</Badge>

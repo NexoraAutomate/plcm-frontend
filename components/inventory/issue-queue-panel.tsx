@@ -49,6 +49,7 @@ import { P } from '@/lib/permission-codes';
 import { usePageDataRefresh } from '@/components/page-data-refresh';
 import { invalidatePendingActionCounts } from '@/hooks/use-pending-action-counts';
 import { uploadIssuanceProformaIfNeeded } from '@/lib/issuance-signature';
+import { IssuanceRemarksDialog } from '@/components/inventory/issuance-remarks-dialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-menu';
@@ -132,7 +133,9 @@ export function IssueQueuePanel() {
   const [flightFilter, setFlightFilter] = useState<string | undefined>();
   const [statusFilter, setStatusFilter] = useState<IssueQueueStatusFilter>(FILTER_ALL);
   const [selected, setSelected] = useState<ItemIssueRequest | null>(null);
+  const [markBackRow, setMarkBackRow] = useState<ItemIssueRequest | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [markingBack, setMarkingBack] = useState(false);
   const signature = useIssueSignature();
 
   const queryClient = useQueryClient();
@@ -313,6 +316,24 @@ export function IssueQueuePanel() {
       toast.error(typeof detail === 'string' ? detail : 'Issue failed');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleMarkBack(notes: string) {
+    if (!markBackRow) return;
+    setMarkingBack(true);
+    try {
+      await api.inventory.markBackItemRequest(markBackRow.id, notes);
+      toast.success('Request marked back to developer');
+      setMarkBackRow(null);
+      await refresh();
+    } catch (error: unknown) {
+      const detail =
+        (error as { response?: { data?: { detail?: string } } })?.response?.data
+          ?.detail || 'Mark back failed';
+      toast.error(typeof detail === 'string' ? detail : 'Mark back failed');
+    } finally {
+      setMarkingBack(false);
     }
   }
 
@@ -545,9 +566,18 @@ export function IssueQueuePanel() {
                   {isVisible('requested_at') && <TableCell>{formatWhen(row.requested_at)}</TableCell>}
                   <TableCell className="text-right">
                     <Can permission={[P.inventory_issue_workflow, P.issue_inventory]}>
-                      <Button size="sm" onClick={() => { signature.reset(); setSelected(row); }}>
-                        Issue
-                      </Button>
+                      <div className="flex flex-wrap justify-end gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setMarkBackRow(row)}
+                        >
+                          Mark back
+                        </Button>
+                        <Button size="sm" onClick={() => { signature.reset(); setSelected(row); }}>
+                          Issue
+                        </Button>
+                      </div>
                     </Can>
                   </TableCell>
                 </TableRow>
@@ -606,6 +636,23 @@ export function IssueQueuePanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <IssuanceRemarksDialog
+        open={markBackRow != null}
+        onOpenChange={(open) => {
+          if (!open && !markingBack) setMarkBackRow(null);
+        }}
+        action={markBackRow ? 'mark_back' : null}
+        itemLabel={
+          markBackRow
+            ? `${markBackRow.inventory_name || 'Item'} · ${
+                markBackRow.assigned_developer_name || `User #${markBackRow.assigned_developer_id}`
+              }`
+            : undefined
+        }
+        busy={markingBack}
+        onConfirm={handleMarkBack}
+      />
     </>
   );
 }

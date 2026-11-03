@@ -783,6 +783,10 @@ export const inventory = {
       notes?: string | null
     }
   ) => api.post<Models.ItemIssueRequest>(`/item-requests/${requestId}/issue/`, data),
+  markBackItemRequest: (requestId: number, notes: string) =>
+    api.post<Models.ItemIssueRequest>(`/item-requests/${requestId}/mark-back/`, {
+      notes,
+    }),
   listIssuances: (params?: {
     status?: string
     issued_to_user_id?: number

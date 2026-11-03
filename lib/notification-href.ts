@@ -177,6 +177,8 @@ function preferredHrefs(item: AppNotification, allowProject: boolean): string[] 
     hrefs.push('/my-assignments', '/inventory/issuances', '/issue-queue', '/inventory');
   } else if (type === 'item_request_created') {
     hrefs.push('/issue-queue', '/my-assignments');
+  } else if (type === 'item_request_marked_back') {
+    hrefs.push('/my-assignments', '/issue-queue');
   } else if (type === 'developer_assigned' || type === 'developer_unassigned') {
     hrefs.push('/my-assignments');
     if (allowProject) hrefs.push(projectHref(projectId));

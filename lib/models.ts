@@ -1443,11 +1443,15 @@ export interface ItemIssueRequest {
   part_number?: string | null
   serial_number?: string | null
   reservation_id: number
-  status: 'pending' | 'issued' | 'cancelled' | string
+  status: 'pending' | 'issued' | 'cancelled' | 'marked_back' | string
   requested_at: string
   issued_at?: string | null
   issued_issuance_id?: number | null
   notes?: string | null
+  mark_back_reason?: string | null
+  marked_back_at?: string | null
+  marked_back_by_user_id?: number | null
+  marked_back_by_name?: string | null
 }
 
 export interface HierarchyAssignDeveloperResult {
@@ -1512,6 +1516,8 @@ export interface DeveloperAssignedWork {
   issued: boolean
   can_request: boolean
   pending_request_id?: number | null
+  last_mark_back_reason?: string | null
+  last_mark_back_at?: string | null
   issuance_id?: number | null
   item_status?: string | null
   test_result?: string | null

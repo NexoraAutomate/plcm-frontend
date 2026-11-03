@@ -13,8 +13,8 @@ export default function IssueQueuePage() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Issue queue</h1>
             <p className="text-sm text-muted-foreground">
-              Developer requests for reserved stock. Issue only with a digital signature or hard-copy
-              acknowledgment.
+              Developer requests for reserved stock. Issue with a signature, or mark back with a
+              reason so the developer can request again.
             </p>
           </div>
           <PageRefreshButton />
@@ -26,7 +26,7 @@ export default function IssueQueuePage() {
               Pending requests
             </CardTitle>
             <CardDescription>
-              Assigned and reserved items waiting for Inventory Manager issue.
+              Issue reserved stock, or mark a request back with a reason for the developer.
             </CardDescription>
           </CardHeader>
           <CardContent>

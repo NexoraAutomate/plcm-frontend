@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { validateIssuanceRemarks } from '@/lib/form-validation';
 
-export type IssuanceRemarksAction = 'return' | 'accept' | 'reject';
+export type IssuanceRemarksAction = 'return' | 'accept' | 'reject' | 'mark_back';
 
 interface IssuanceRemarksDialogProps {
   open: boolean;
@@ -46,6 +46,13 @@ const COPY: Record<
     description: 'Add admin remarks explaining why the return is rejected (item stays with installer).',
     confirm: 'Reject return',
     placeholder: 'Admin remarks…',
+  },
+  mark_back: {
+    title: 'Mark back request',
+    description:
+      'Return this issuance request to the developer with a reason so they can fix and request again.',
+    confirm: 'Mark back',
+    placeholder: 'Why is this request being marked back?',
   },
 };
 
