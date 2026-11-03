@@ -936,6 +936,11 @@ export const inventory = {
         mine: options?.mine ?? false,
       },
     }),
+  reconcileShortages: () =>
+    api.post<{
+      fulfillments: Models.FCFSFulfillment[]
+      fulfilled_count: number
+    }>('/inventory/shortages/reconcile/'),
   receiveShortage: (
     shortageId: number,
     data: {

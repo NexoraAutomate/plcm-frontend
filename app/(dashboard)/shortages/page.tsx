@@ -27,10 +27,10 @@ export default function ShortagesPage() {
             <h1 className="text-2xl font-semibold tracking-tight">Shortages</h1>
             <p className="text-sm text-muted-foreground">
               Open stock shortages waiting for receipt. First-come demand is auto-reserved when
-              matching inventory arrives.
+              matching inventory arrives (including stock added on the Inventory page).
             </p>
           </div>
-          <PageRefreshButton />
+          <PageRefreshButton title="Refresh and auto-fulfill shortages from available stock" />
         </div>
         <Card className={hasShortages === false ? 'hidden' : ''}>
           <CardHeader>
@@ -39,8 +39,8 @@ export default function ShortagesPage() {
               Open shortages
             </CardTitle>
             <CardDescription>
-              All waiting Flight / SDLS demand. Inventory managers can add received stock here;
-              matching part numbers auto-reserve FCFS.
+              Grouped by Flight → SDLS. Each row shows the short item, quantity, and when it
+              was reported. Refresh also FCFS auto-reserves against warehouse stock on hand.
             </CardDescription>
           </CardHeader>
           <CardContent>

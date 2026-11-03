@@ -1103,14 +1103,19 @@ export default function InventoryPage() {
           await syncAttachments(attachOwnerType, attachOwnerId);
         }
       }
-      toastFulfillments(created.data?.fcfs_fulfillments);
-      toast.success(
-        isRestock
-          ? `Added stock to ${formData.name}`
-          : usesInstances
-            ? 'Serialized unit added to inventory group'
-            : 'Inventory item created'
-      );
+      const fulfillments = created.data?.fcfs_fulfillments ?? [];
+      toastFulfillments(fulfillments);
+      if (!fulfillments.length) {
+        toast.success(
+          isRestock
+            ? `Added stock to ${formData.name}`
+            : usesInstances
+              ? 'Serialized unit added to inventory group'
+              : 'Inventory item created'
+        );
+      } else if (isRestock) {
+        toast.success(`Added stock to ${formData.name}`);
+      }
       pagination.invalidate();
 
       resetForm();

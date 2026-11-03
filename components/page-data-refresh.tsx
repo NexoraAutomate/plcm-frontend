@@ -56,9 +56,14 @@ export function usePageDataRefresh(handler: RefreshHandler) {
 type PageRefreshButtonProps = {
   onRefresh?: RefreshHandler;
   className?: string;
+  title?: string;
 };
 
-export function PageRefreshButton({ onRefresh, className }: PageRefreshButtonProps) {
+export function PageRefreshButton({
+  onRefresh,
+  className,
+  title = 'Refresh data',
+}: PageRefreshButtonProps) {
   const context = useContext(PageDataRefreshContext);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -84,8 +89,8 @@ export function PageRefreshButton({ onRefresh, className }: PageRefreshButtonPro
       className={className}
       onClick={() => void handleRefresh()}
       disabled={refreshing}
-      aria-label="Refresh data"
-      title="Refresh data"
+      aria-label={title}
+      title={title}
     >
       <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
       Refresh
