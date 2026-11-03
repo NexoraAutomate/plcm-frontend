@@ -34,7 +34,7 @@ export default function WarrantyClaimsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const rows = await oemWarrantyClaims.list(0, 200, {
+      const { data: rows } = await oemWarrantyClaims.list(0, 200, {
         status: status === 'all' ? undefined : status,
       });
       setClaims(rows);
@@ -54,7 +54,7 @@ export default function WarrantyClaimsPage() {
     try {
       await oemWarrantyClaims.update(claim.id, { status: next });
       toast.success(`Claim #${claim.id} → ${next}`);
-      await load();
+      await load(); // list unwraps .data internally
     } catch (err) {
       toast.error(formatMaintenanceApiError(err, 'Failed to update claim'));
     } finally {

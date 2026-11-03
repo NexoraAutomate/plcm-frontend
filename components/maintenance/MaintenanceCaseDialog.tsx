@@ -120,8 +120,8 @@ export function MaintenanceCaseDialog({
     setSupportLoading(true);
     maintenanceCases
       .getProductionSupport(parseInt(formData.project_id, 10))
-      .then((preview) => {
-        if (!cancelled) setSupportPreview(preview);
+      .then((res) => {
+        if (!cancelled) setSupportPreview(res.data);
       })
       .catch(() => {
         if (!cancelled) setSupportPreview(null);

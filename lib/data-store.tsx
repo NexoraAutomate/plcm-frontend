@@ -831,7 +831,11 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const updateOrder = async (id: number, data: Partial<Models.Order>) => {
     try {
       const res = await api.orders.update(id, data);
-      setOrders(orders.map((o) => (o.id === id ? res.data : o)));
+      setOrders((prev) => {
+        const idx = prev.findIndex((o) => o.id === id);
+        if (idx === -1) return [...prev, res.data];
+        return prev.map((o) => (o.id === id ? res.data : o));
+      });
       toast.success('Order updated successfully');
       return res.data;
     } catch (err) {

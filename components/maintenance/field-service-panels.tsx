@@ -105,12 +105,19 @@ export function FieldServicePanels({
     }
     setSaving(true);
     try {
-      const updated = await maintenanceCases.recordOnsiteOutcome(maintenanceCase.id, {
-        onsite_outcome: outcome,
-        onsite_soft_fix_method: outcome === 'soft_fix' ? method : undefined,
-        notes: notes.trim() || undefined,
-        resolve_soft_fixed: outcome === 'soft_fix',
-      });
+      if (!Number.isFinite(maintenanceCase.id)) {
+        toast.error('Case id is missing — refresh the page and try again.');
+        return;
+      }
+      const { data: updated } = await maintenanceCases.recordOnsiteOutcome(
+        maintenanceCase.id,
+        {
+          onsite_outcome: outcome,
+          onsite_soft_fix_method: outcome === 'soft_fix' ? method : undefined,
+          notes: notes.trim() || undefined,
+          resolve_soft_fixed: outcome === 'soft_fix',
+        }
+      );
       onCaseUpdated(updated);
       toast.success(
         outcome === 'soft_fix'
@@ -134,7 +141,7 @@ export function FieldServicePanels({
         rework_case_id: unit.id,
         notes: 'Opened from maintenance case returned-unit panel',
       });
-      const refreshed = await maintenanceCases.get(maintenanceCase.id);
+      const { data: refreshed } = await maintenanceCases.get(maintenanceCase.id);
       onCaseUpdated(refreshed);
       toast.success('OEM warranty claim opened');
     } catch (err) {

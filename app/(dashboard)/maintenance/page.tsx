@@ -170,9 +170,10 @@ export default function MaintenancePage() {
 
     let supportOverride: string | undefined;
     try {
-      const support = await maintenanceApi.maintenanceCases.getProductionSupport(
-        lookupResponses.project_id
-      );
+      const { data: support } =
+        await maintenanceApi.maintenanceCases.getProductionSupport(
+          lookupResponses.project_id
+        );
       if (support.requires_override) {
         const reason = window.prompt(
           `Production support ended${
