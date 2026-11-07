@@ -1965,6 +1965,15 @@ export interface ReplacementRequestReservation {
   part_number?: string | null;
 }
 
+export interface ReplacementRequestAitAttachment {
+  id: number;
+  replacement_request_id: number;
+  display_name: string;
+  file_id?: number | null;
+  occurrence_attachment_id?: number | null;
+  created_at?: string | null;
+}
+
 export interface ReplacementRequest {
   id: number;
   case_id: number;
@@ -1978,9 +1987,18 @@ export interface ReplacementRequest {
   pd_decision?: string | null;
   reject_reason?: string | null;
   abort_reason?: string | null;
+  issued_serial?: string | null;
+  issued_instance_id?: number | null;
+  issued_at?: string | null;
+  shortage_held?: boolean;
+  red_notified_at?: string | null;
+  quarantined_instance_id?: number | null;
+  ait_decision?: string | null;
+  ait_reject_reason?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
   reservations?: ReplacementRequestReservation[];
+  ait_attachments?: ReplacementRequestAitAttachment[];
 }
 
 export interface DualTrackBoard {
@@ -2012,6 +2030,23 @@ export interface ReplacementRequestReservePayload {
 }
 
 export interface ReplacementRequestPdDecisionPayload {
+  decision: 'approve' | 'reject' | string;
+  reject_reason?: string | null;
+}
+
+export interface ReplacementRequestImIssuePayload {
+  signature_type: string;
+  signature_payload?: string | null;
+  notes?: string | null;
+}
+
+export interface ReplacementRequestAitAttachmentPayload {
+  display_name: string;
+  file_id?: number | null;
+  occurrence_attachment_id?: number | null;
+}
+
+export interface ReplacementRequestAitDecisionPayload {
   decision: 'approve' | 'reject' | string;
   reject_reason?: string | null;
 }

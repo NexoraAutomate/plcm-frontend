@@ -1170,6 +1170,41 @@ export const maintenanceCases = {
       `/maintenance-cases/${caseId}/replacement-requests/${requestId}/pd-decision/`,
       data
     ),
+  requestReplacementIssue: (caseId: number, requestId: number) =>
+    api.post<Models.ReplacementRequest>(
+      `/maintenance-cases/${caseId}/replacement-requests/${requestId}/request-issue/`
+    ),
+  imIssueReplacement: (
+    caseId: number,
+    requestId: number,
+    data: Models.ReplacementRequestImIssuePayload
+  ) =>
+    api.post<Models.ReplacementRequest>(
+      `/maintenance-cases/${caseId}/replacement-requests/${requestId}/im-issue/`,
+      data
+    ),
+  startReplacementAit: (caseId: number, requestId: number) =>
+    api.post<Models.ReplacementRequest>(
+      `/maintenance-cases/${caseId}/replacement-requests/${requestId}/ait/start/`
+    ),
+  uploadReplacementAitAttachment: (
+    caseId: number,
+    requestId: number,
+    data: Models.ReplacementRequestAitAttachmentPayload
+  ) =>
+    api.post<Models.ReplacementRequest>(
+      `/maintenance-cases/${caseId}/replacement-requests/${requestId}/ait/attachments/`,
+      data
+    ),
+  pdDecideReplacementAit: (
+    caseId: number,
+    requestId: number,
+    data: Models.ReplacementRequestAitDecisionPayload
+  ) =>
+    api.post<Models.ReplacementRequest>(
+      `/maintenance-cases/${caseId}/replacement-requests/${requestId}/ait/pd-decision/`,
+      data
+    ),
   getDualTrack: (caseId: number) =>
     api.get<Models.DualTrackBoard>(`/maintenance-cases/${caseId}/dual-track/`),
   lookupEntityByPartNumber: (partNumber: string) =>
