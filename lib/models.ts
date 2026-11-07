@@ -1845,8 +1845,32 @@ export enum ResolutionType {
   CLEAR = 'clear',
 }
 
-export type OnsiteOutcome = 'soft_fix' | 'fault_identified' | 'inconclusive';
+export type OnsiteOutcome =
+  | 'soft_fix'
+  | 'fault_identified'
+  | 'inconclusive'
+  | 'no_fault_found';
 export type SoftFixMethod = 'reboot' | 'hard_reset' | 'reconnect' | 'other';
+export type ConfirmationChannel = 'email' | 'letter' | 'call';
+
+export interface OccurrenceAttachment {
+  id?: number;
+  case_id?: number;
+  display_name: string;
+  file_id?: number | null;
+  category?: string | null;
+  created_at?: string | null;
+}
+
+export interface OccurrenceOfficer {
+  id?: number;
+  case_id?: number;
+  user_id?: number | null;
+  guest_name?: string | null;
+  role_onsite: string;
+  contact?: string | null;
+  created_at?: string | null;
+}
 export type OemWarrantyClaimStatus =
   | 'open'
   | 'submitted'
@@ -1972,6 +1996,13 @@ export interface MaintenanceCase {
   onsite_notes?: string | null;
   onsite_recorded_at?: string | null;
   onsite_recorded_by_id?: number | null;
+  occurrence_date?: string | null;
+  occurrence_fault_type?: string | null;
+  fault_type?: string | null;
+  confirmation_channel?: ConfirmationChannel | string | null;
+  confirmation_reference?: string | null;
+  occurrence_attachments?: OccurrenceAttachment[];
+  occurrence_officers?: OccurrenceOfficer[];
   returned_units?: ReturnedUnit[];
   warranty_claims?: OemWarrantyClaim[];
 }
@@ -2069,6 +2100,22 @@ export interface OnsiteOutcomePayload {
   onsite_soft_fix_method?: SoftFixMethod | string;
   notes?: string;
   resolve_soft_fixed?: boolean;
+  confirm_close_nff?: boolean;
+  occurrence_date?: string | null;
+  fault_type?: string | null;
+  confirmation_channel?: ConfirmationChannel | string | null;
+  confirmation_reference?: string | null;
+  attachments?: Array<{
+    display_name: string;
+    file_id?: number | null;
+    category?: string | null;
+  }>;
+  officers?: Array<{
+    user_id?: number | null;
+    guest_name?: string | null;
+    role_onsite: string;
+    contact?: string | null;
+  }>;
 }
 
 

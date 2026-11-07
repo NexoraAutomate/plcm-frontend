@@ -1,4 +1,4 @@
-# Current Feature: Maintenance Lookup Entity Stock Detail
+# Current Feature: Maintenance Occurrence Report + Dual-Track Replacement
 
 ## Status
 
@@ -6,23 +6,28 @@ In Progress
 
 ## Goals
 
-- [x] Clicking a faulty/matched hardware entity in Maintenance Entity Lookup opens a detail view
-- [x] Detail shows stocking-equivalent fields: OEM, PN/SN, OEM PN/SN, warranty, installer, install dates
-- [x] Detail shows test reports / attachments and BoM for that inventory when available
-- [x] Nested view does not close the parent lookup dialog unexpectedly
-- [x] Restyle as sliding side sheet with AnimatedPillTabs
-- [x] Add Fault History tab: same/different OEM counts, list, last fault, clickable detail
+- [x] P0: CaseStatus untouched; ME/FSE/IE roles + maintenance.* permissions wired; unit tests updated
+- [x] P1: Occurrence Report schema/API/UI (occurrence_date, attachments, officers, fault_type, confirmation, NFF); occurrence_recorded notify
+- [ ] P2: ReplacementRequest model + APIs; dual-track wiring; awaiting_faulty_arrival; dual-track board skeleton
+- [ ] P3: Track A — IM issue, Replaced badge, RED notify, ME custody, AIT upload/gate, reject loop
+- [ ] P4: Track B — reception, IE assign/handover, disposition, PD repair verify, restock/discard
+- [ ] P5: Dual-track close gate; notification matrix; Discarded badge; clear RED
 
 ## Notes
 
-- Entry point: Maintenance Entity Lookup Dialog (`/maintenance` → Lookup)
-- UI: right Sheet (`sm:max-w-xl`) + AnimatedPillTabs (ID / Install / Files / BoM / Faults)
-- Backend: `GET /faulty-entities/product-fault-history/?part_number=&oem_name=`
-- Component: `components/maintenance/maintenance-entity-stock-detail-dialog.tsx`
+- Spec: `plcm-backend/docs/specs/maintenance-occurrence-replacement/01-functional-specification.md`
+- Baseline: existing CaseStatus spine + field-service onsite outcome preserved; augmentation only
+- Permission stubs already exist: `maintenance.occurrence_report`, `maintenance.replacement_request`, `maintenance.ait_upload`, `maintenance.inspection_disposition`
+- Stay on `main` (no feature branch)
+- **This slice:** P0 + P1 only. Replacement CTA is stubbed until P2.
+- Migration: `alembic/versions/m4e5f6a7b8_occurrence_report_p1.py`
 
 ## History
 
 <!-- Completed features (append only) -->
+
+### Maintenance Lookup Entity Stock Detail
+Clicking a faulty/matched hardware entity in Maintenance Entity Lookup opens a sliding side sheet with ID / Install / Files / BoM / Faults tabs.
 
 ### Prevent Duplicate Open Maintenance Cases
 Backend rejects duplicate open cases for the same entity; frontend surfaces API error on create.
