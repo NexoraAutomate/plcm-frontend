@@ -64,7 +64,13 @@ export function AnimatedPillTabsList({
   children,
 }: AnimatedPillTabsListProps) {
   const listRef = useRef<HTMLDivElement>(null);
-  const [pill, setPill] = useState({ x: 0, width: 0, ready: false });
+  const [pill, setPill] = useState({
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    ready: false,
+  });
 
   const updatePill = useCallback(() => {
     const list = listRef.current;
@@ -75,7 +81,9 @@ export function AnimatedPillTabsList({
     const activeRect = active.getBoundingClientRect();
     setPill({
       x: activeRect.left - listRect.left + list.scrollLeft,
+      y: activeRect.top - listRect.top + list.scrollTop,
       width: activeRect.width,
+      height: activeRect.height,
       ready: true,
     });
   }, []);
@@ -89,12 +97,15 @@ export function AnimatedPillTabsList({
     if (!list || typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(() => updatePill());
     observer.observe(list);
+    for (const child of Array.from(list.children)) {
+      if (child instanceof HTMLElement) observer.observe(child);
+    }
     window.addEventListener('resize', updatePill);
     return () => {
       observer.disconnect();
       window.removeEventListener('resize', updatePill);
     };
-  }, [updatePill]);
+  }, [updatePill, children]);
 
   return (
     <TabsList
@@ -110,9 +121,14 @@ export function AnimatedPillTabsList({
       {pill.ready ? (
         <motion.span
           aria-hidden
-          className="pointer-events-none absolute top-1 bottom-1 left-0 rounded-full bg-[var(--pill-tabs-accent)]"
+          className="pointer-events-none absolute left-0 top-0 rounded-full bg-[var(--pill-tabs-accent)]"
           initial={false}
-          animate={{ x: pill.x, width: pill.width }}
+          animate={{
+            x: pill.x,
+            y: pill.y,
+            width: pill.width,
+            height: pill.height,
+          }}
           transition={{ type: 'spring', stiffness: 420, damping: 34, mass: 0.8 }}
         />
       ) : null}

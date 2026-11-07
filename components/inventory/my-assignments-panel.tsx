@@ -39,6 +39,7 @@ import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-menu';
 import { useColumnVisibility, type ColumnVisibilityDef } from '@/hooks/use-column-visibility';
 import { useClientTableSort } from '@/hooks/use-table-sorting';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 function rowKey(row: DeveloperAssignedWork) {
   return `${row.entity_type}:${row.entity_id}`;
@@ -396,9 +397,17 @@ const TAB_META: Record<
 export function MyAssignmentsPanel() {
   const { hasWorkflowRole } = useAuth();
   const canDeleteCompleted = hasWorkflowRole('ADMIN');
+  const isMobile = useIsMobile();
   const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility(
     'my-assignments-list',
     COLUMN_DEFS
+  );
+  const showColumn = useCallback(
+    (id: string) => {
+      if (isMobile) return id === 'name';
+      return isVisible(id);
+    },
+    [isMobile, isVisible]
   );
   const [rows, setRows] = useState<DeveloperAssignedWork[]>([]);
   const [loading, setLoading] = useState(true);
@@ -642,7 +651,14 @@ export function MyAssignmentsPanel() {
     <>
       <div className="space-y-3">
         <Tabs value={lifecycleTab} onValueChange={changeLifecycleTab} className="gap-3">
-          <AnimatedPillTabsList value={lifecycleTab}>
+          <AnimatedPillTabsList
+            value={lifecycleTab}
+            className={cn(
+              isMobile
+                ? 'h-auto flex-col flex-nowrap items-stretch gap-1 rounded-2xl'
+                : 'flex-nowrap overflow-x-auto rounded-full'
+            )}
+          >
             {(Object.keys(TAB_META) as AssignmentLifecycleTab[]).map((tab) => {
               const meta = TAB_META[tab];
               const Icon = meta.icon;
@@ -650,10 +666,18 @@ export function MyAssignmentsPanel() {
                 <TabsTrigger
                   key={tab}
                   value={tab}
-                  className={cn(animatedPillTabsTriggerClassName, 'group gap-1.5')}
+                  className={cn(
+                    animatedPillTabsTriggerClassName,
+                    'group gap-1.5',
+                    isMobile
+                      ? 'w-full shrink-0 justify-start px-3 py-2.5'
+                      : 'min-w-0 shrink-0 grow basis-0'
+                  )}
                 >
-                  <Icon className="h-4 w-4" />
-                  <span className="whitespace-nowrap">{meta.label}</span>
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className={cn(isMobile ? 'flex-1 text-left' : 'truncate')}>
+                    {meta.label}
+                  </span>
                   <span className="rounded-full bg-black/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums group-data-[state=active]:bg-white/20">
                     {tabCounts[tab]}
                   </span>
@@ -782,34 +806,38 @@ export function MyAssignmentsPanel() {
                         ? ` · ${STATUS_FILTER_DEFS.find((d) => d.key === statusFilter)?.label ?? statusFilter}`
                         : ''}
                     </p>
-                    <ColumnVisibilityMenu
-                      columns={COLUMN_DEFS}
-                      visibleIds={visibleIds}
-                      onToggle={toggleColumn}
-                      onReset={resetColumns}
-                    />
+                    {!isMobile ? (
+                      <ColumnVisibilityMenu
+                        columns={COLUMN_DEFS}
+                        visibleIds={visibleIds}
+                        onToggle={toggleColumn}
+                        onReset={resetColumns}
+                      />
+                    ) : null}
                   </div>
                 ) : null}
               </div>
 
               {showBulkActions && tab === lifecycleTab ? (
                 <div className="flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={submitting || selectedRows.length === 0}
-                    onClick={() =>
-                      void requestBulk(
-                        'selected',
-                        selectedRows.map((row) => ({
-                          entity_type: row.entity_type,
-                          entity_id: row.entity_id,
-                        }))
-                      )
-                    }
-                  >
-                    Request selected
-                  </Button>
+                  {!isMobile ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={submitting || selectedRows.length === 0}
+                      onClick={() =>
+                        void requestBulk(
+                          'selected',
+                          selectedRows.map((row) => ({
+                            entity_type: row.entity_type,
+                            entity_id: row.entity_id,
+                          }))
+                        )
+                      }
+                    >
+                      Request selected
+                    </Button>
+                  ) : null}
                   <Button
                     size="sm"
                     disabled={submitting || requestable.length === 0}
@@ -839,10 +867,11 @@ export function MyAssignmentsPanel() {
                     </button>
                   </p>
                 ) : (
-                  <Table>
+                  <div className="w-full min-w-0 overflow-x-auto rounded-md border">
+                  <Table className={cn(!isMobile && 'min-w-[960px]')}>
                     <TableHeader>
                       <TableRow>
-                        {lifecycleTab !== 'completed' ? (
+                        {!isMobile && lifecycleTab !== 'completed' ? (
                           <TableHead className="w-10">
                             <Checkbox
                               checked={allRequestableSelected}
@@ -859,37 +888,37 @@ export function MyAssignmentsPanel() {
                             />
                           </TableHead>
                         ) : null}
-                        {isVisible('name') && (
+                        {showColumn('name') && (
                           <SortableTableHead column="name" sort={sort} onSort={cycleSort}>
                             Item
                           </SortableTableHead>
                         )}
-                        {isVisible('customer_name') && (
+                        {showColumn('customer_name') && (
                           <SortableTableHead column="customer_name" sort={sort} onSort={cycleSort}>
                             Customer
                           </SortableTableHead>
                         )}
-                        {isVisible('flight_name') && (
+                        {showColumn('flight_name') && (
                           <SortableTableHead column="flight_name" sort={sort} onSort={cycleSort}>
                             Flight
                           </SortableTableHead>
                         )}
-                        {isVisible('system_name') && (
+                        {showColumn('system_name') && (
                           <SortableTableHead column="system_name" sort={sort} onSort={cycleSort}>
                             System
                           </SortableTableHead>
                         )}
-                        {isVisible('project_name') && (
+                        {showColumn('project_name') && (
                           <SortableTableHead column="project_name" sort={sort} onSort={cycleSort}>
                             Project
                           </SortableTableHead>
                         )}
-                        {isVisible('serial_number') && (
+                        {showColumn('serial_number') && (
                           <SortableTableHead column="serial_number" sort={sort} onSort={cycleSort}>
                             Serial
                           </SortableTableHead>
                         )}
-                        {isVisible('item_status') && (
+                        {showColumn('item_status') && (
                           <SortableTableHead column="item_status" sort={sort} onSort={cycleSort}>
                             Status
                           </SortableTableHead>
@@ -910,7 +939,7 @@ export function MyAssignmentsPanel() {
                               setActivityOpen(true);
                             }}
                           >
-                            {lifecycleTab !== 'completed' ? (
+                            {!isMobile && lifecycleTab !== 'completed' ? (
                               <TableCell
                                 onClick={(event) => event.stopPropagation()}
                               >
@@ -927,38 +956,48 @@ export function MyAssignmentsPanel() {
                                 />
                               </TableCell>
                             ) : null}
-                            {isVisible('name') && (
-                              <TableCell>
-                                <div className="font-medium">
+                            {showColumn('name') && (
+                              <TableCell className={cn(isMobile ? 'min-w-0' : 'max-w-[220px]')}>
+                                <div className="truncate font-medium">
                                   {row.name || `${row.entity_type} #${row.entity_id}`}
                                 </div>
-                                <div className="text-xs text-muted-foreground">
+                                <div className="truncate text-xs text-muted-foreground">
                                   {row.entity_type}
                                   {row.part_number ? ` · ${row.part_number}` : ''}
                                 </div>
                                 {row.last_mark_back_reason ? (
-                                  <div className="mt-1 max-w-xs text-xs text-amber-700 dark:text-amber-400">
+                                  <div className="mt-1 max-w-xs truncate text-xs text-amber-700 dark:text-amber-400">
                                     Marked back: {row.last_mark_back_reason}
                                   </div>
                                 ) : null}
                               </TableCell>
                             )}
-                            {isVisible('customer_name') && (
-                              <TableCell>{row.customer_name || '—'}</TableCell>
+                            {showColumn('customer_name') && (
+                              <TableCell className="max-w-[140px] truncate">
+                                {row.customer_name || '—'}
+                              </TableCell>
                             )}
-                            {isVisible('flight_name') && (
-                              <TableCell>{row.flight_name || '—'}</TableCell>
+                            {showColumn('flight_name') && (
+                              <TableCell className="max-w-[120px] truncate">
+                                {row.flight_name || '—'}
+                              </TableCell>
                             )}
-                            {isVisible('system_name') && (
-                              <TableCell>{row.system_name || '—'}</TableCell>
+                            {showColumn('system_name') && (
+                              <TableCell className="max-w-[140px] truncate">
+                                {row.system_name || '—'}
+                              </TableCell>
                             )}
-                            {isVisible('project_name') && (
-                              <TableCell>{row.project_name || '—'}</TableCell>
+                            {showColumn('project_name') && (
+                              <TableCell className="max-w-[160px] truncate">
+                                {row.project_name || '—'}
+                              </TableCell>
                             )}
-                            {isVisible('serial_number') && (
-                              <TableCell>{row.serial_number || '—'}</TableCell>
+                            {showColumn('serial_number') && (
+                              <TableCell className="max-w-[120px] truncate">
+                                {row.serial_number || '—'}
+                              </TableCell>
                             )}
-                            {isVisible('item_status') && (
+                            {showColumn('item_status') && (
                               <TableCell onClick={(event) => event.stopPropagation()}>
                                 <div className="flex flex-wrap gap-1">
                                   {primary === 'Awaiting HM' ? (
@@ -1152,6 +1191,7 @@ export function MyAssignmentsPanel() {
                       })}
                     </TableBody>
                   </Table>
+                  </div>
                 )}
               </ListContentSuspense>
             </TabsContent>

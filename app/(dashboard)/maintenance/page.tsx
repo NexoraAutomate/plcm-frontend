@@ -459,7 +459,7 @@ export default function MaintenancePage() {
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => setIsLookupOpen(true)} variant="secondary" className="gap-2">
             <Search className="h-4 w-4" />
-            Lookup by Serial Number
+            Lookup
           </Button>
         </div>
       </div>

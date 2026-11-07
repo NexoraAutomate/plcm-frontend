@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { ArrowRight, HelpCircle, Loader2 } from 'lucide-react';
 import * as api from '@/lib/api';
 import type { AssignmentActivity, DeveloperAssignedWork } from '@/lib/models';
 import { WORKFLOW_AUDIT_ROLE_LABELS } from '@/lib/models';
@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/status-badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface AssignmentActivitySheetProps {
   row: DeveloperAssignedWork | null;
@@ -102,6 +103,7 @@ export function AssignmentActivitySheet({
     row?.name ||
     (row ? `${row.entity_type} #${row.entity_id}` : 'Assignment');
   const steps = activity?.steps ?? [];
+  const tooltipText = `Who acted on ${title}, when, and the current status for this assignment only.`;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -113,10 +115,22 @@ export function AssignmentActivitySheet({
         )}
       >
         <SheetHeader className="shrink-0 space-y-1 border-b px-4 py-4 pr-12 text-left">
-          <SheetTitle className="text-lg">Item workflow</SheetTitle>
-          <SheetDescription>
-            Who acted on {title}, when, and the current status for this assignment only.
-          </SheetDescription>
+          <SheetTitle className="text-lg">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 rounded-sm text-left outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  Item workflow
+                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                  <span className="sr-only">{tooltipText}</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs text-pretty">{tooltipText}</TooltipContent>
+            </Tooltip>
+          </SheetTitle>
+          <SheetDescription className="sr-only">{tooltipText}</SheetDescription>
           <div className="flex flex-wrap items-center gap-1.5 pt-1">
             {activity?.current_status ? (
               <StatusBadge status={activity.current_status} />
@@ -155,8 +169,11 @@ export function AssignmentActivitySheet({
             <ol className="relative min-w-0 space-y-0 border-l border-border pl-5">
               {steps.map((entry, index) => {
                 const isLatest = index === steps.length - 1;
-                const actor = entry.actor_name || (entry.actor_user_id ? `User #${entry.actor_user_id}` : 'System');
+                const actor =
+                  entry.actor_name ||
+                  (entry.actor_user_id ? `User #${entry.actor_user_id}` : 'System');
                 const role = roleLabel(entry.actor_role);
+                const actorLine = role ? `${actor} · ${role}` : actor;
 
                 return (
                   <li key={entry.id} className="relative pb-6 last:pb-0">
@@ -177,35 +194,25 @@ export function AssignmentActivitySheet({
                         >
                           {entry.title}
                         </span>
+                        {entry.status ? (
+                          <StatusBadge status={entry.status} className="text-[10px]" />
+                        ) : null}
                         {isLatest ? (
                           <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                             Current
                           </span>
                         ) : null}
                       </div>
-                      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-                        <dt className="text-muted-foreground">When</dt>
-                        <dd>{formatWhen(entry.occurred_at)}</dd>
-                        <dt className="text-muted-foreground">By</dt>
-                        <dd>
-                          {actor}
-                          {role ? ` · ${role}` : ''}
-                        </dd>
+                      <p className="text-xs text-muted-foreground">{formatWhen(entry.occurred_at)}</p>
+                      <p className="flex flex-wrap items-center gap-1.5 text-xs">
+                        <span>{actorLine}</span>
                         {entry.target_name ? (
                           <>
-                            <dt className="text-muted-foreground">To</dt>
-                            <dd>{entry.target_name}</dd>
+                            <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
+                            <span>{entry.target_name}</span>
                           </>
                         ) : null}
-                        {entry.status ? (
-                          <>
-                            <dt className="text-muted-foreground">Status</dt>
-                            <dd>
-                              <StatusBadge status={entry.status} className="text-[10px]" />
-                            </dd>
-                          </>
-                        ) : null}
-                      </dl>
+                      </p>
                       {entry.remarks ? (
                         <p className="text-xs text-muted-foreground">{entry.remarks}</p>
                       ) : null}
