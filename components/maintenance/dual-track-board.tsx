@@ -14,7 +14,9 @@ import type {
   DualTrackBoard,
   MaintenanceCase,
   ReplacementRequest,
+  ReturnedUnit,
 } from '@/lib/models';
+import { DiscardedBadge } from '@/components/inventory/discarded-badge';
 import { formatMaintenanceApiError } from '@/services/maintenance';
 import { cn } from '@/lib/utils';
 
@@ -26,9 +28,15 @@ function statusLabel(value?: string | null) {
 const RED_OPEN_STATUSES = new Set([
   'shipped_replaced_badge',
   'ait_in_progress',
-  'ait_approved',
   'ait_rejected',
   'im_issue_pending',
+]);
+
+const RED_CLEARED_STATUSES = new Set([
+  'patch_delivered',
+  'track_a_closed',
+  'pd_rejected',
+  'ait_approved',
 ]);
 
 interface DualTrackBoardPanelProps {
@@ -52,6 +60,9 @@ export function DualTrackBoardPanel({
   const [aitRejectReason, setAitRejectReason] = useState('');
   const [aitDisplayName, setAitDisplayName] = useState('');
   const [aitFile, setAitFile] = useState<File | null>(null);
+  const [ieId, setIeId] = useState('');
+  const [repairRejectReason, setRepairRejectReason] = useState('');
+  const [abortReason, setAbortReason] = useState('');
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -87,6 +98,24 @@ export function DualTrackBoardPanel({
     onRequestUpdated?.(data);
   };
 
+  const applyTrackB = (unit: ReturnedUnit) => {
+    setBoard((prev) =>
+      prev
+        ? {
+            ...prev,
+            track_b_status: unit.stage,
+            track_b_rework_id: unit.id,
+            track_b_reception_date: unit.reception_date ?? prev.track_b_reception_date,
+            track_b_discarded: Boolean(unit.discarded),
+            track_b_terminal: Boolean(unit.is_track_b_terminal),
+          }
+        : prev
+    );
+    if (unit.assigned_ie_id != null) {
+      setIeId(String(unit.assigned_ie_id));
+    }
+  };
+
   const trackA = board?.track_a ?? null;
   const status = trackA?.status ?? board?.track_a_status ?? null;
   const canHmAct =
@@ -101,12 +130,41 @@ export function DualTrackBoardPanel({
   const canUploadAit =
     trackA && (status === 'shipped_replaced_badge' || status === 'ait_in_progress');
   const canPdAit = trackA && status === 'ait_in_progress';
+  const canAbort =
+    trackA &&
+    status != null &&
+    status !== 'track_a_closed' &&
+    status !== 'pd_rejected';
   const showRed =
-    Boolean(trackA?.red_notified_at) ||
-    (status != null &&
-      RED_OPEN_STATUSES.has(status) &&
-      status !== 'pd_approved' &&
-      Boolean(trackA?.issued_serial || trackA?.red_notified_at || status === 'im_issue_pending'));
+    status != null &&
+    !RED_CLEARED_STATUSES.has(status) &&
+    Boolean(trackA?.red_notified_at) &&
+    RED_OPEN_STATUSES.has(status);
+
+  const runAbort = async () => {
+    if (!trackA) return;
+    const reason = abortReason.trim();
+    if (!reason) {
+      toast.error('Abort reason is required');
+      return;
+    }
+    setBusy(true);
+    try {
+      const { data } = await maintenanceCases.abortReplacementRequest(
+        maintenanceCase.id,
+        trackA.id,
+        { reason }
+      );
+      applyRequest(data);
+      setAbortReason('');
+      toast.success('Track A aborted; RED cleared');
+      void load();
+    } catch (err) {
+      toast.error(formatMaintenanceApiError(err, 'Failed to abort replacement'));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const runAssign = async () => {
     if (!trackA) return;
@@ -306,6 +364,49 @@ export function DualTrackBoardPanel({
     } finally {
       setBusy(false);
     }
+  };
+
+  const trackBStatus = board?.track_b_status ?? null;
+  const trackBReworkId = board?.track_b_rework_id ?? null;
+  const canReception = trackBReworkId != null && trackBStatus === 'awaiting_faulty_arrival';
+  const canAssignIe = trackBReworkId != null && trackBStatus === 'received';
+  const canHandover = trackBReworkId != null && trackBStatus === 'ie_assigned';
+  const canImIssueToIe = trackBReworkId != null && trackBStatus === 'issued_to_ie';
+  const canDisposition =
+    trackBReworkId != null && trackBStatus === 'inspection_under_process';
+  const canRepairSubmit =
+    trackBReworkId != null && trackBStatus === 'repair_under_progress';
+  const canPdRepair =
+    trackBReworkId != null && trackBStatus === 'repair_under_progress';
+  const canConfirmDiscard =
+    trackBReworkId != null && trackBStatus === 'discard_pending';
+
+  const runTrackB = async (
+    label: string,
+    fn: () => Promise<{ data: ReturnedUnit }>
+  ) => {
+    setBusy(true);
+    try {
+      const { data } = await fn();
+      applyTrackB(data);
+      toast.success(label);
+    } catch (err) {
+      toast.error(formatMaintenanceApiError(err, `${label} failed`));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runAssignIe = async () => {
+    if (trackBReworkId == null) return;
+    const id = Number(ieId);
+    if (!Number.isFinite(id) || id <= 0) {
+      toast.error('Enter a valid IE user id');
+      return;
+    }
+    await runTrackB('IE assigned', () =>
+      maintenanceCases.trackBAssignIe(maintenanceCase.id, trackBReworkId, id)
+    );
   };
 
   const showBoard =
@@ -590,6 +691,34 @@ export function DualTrackBoardPanel({
                       : ''}
                   </p>
                 ) : null}
+                {trackA.abort_reason ? (
+                  <p className="text-xs text-muted-foreground">
+                    Aborted: {trackA.abort_reason}
+                  </p>
+                ) : null}
+                {canAbort ? (
+                  <Can permission={P.maintenance_replacement_request}>
+                    <div className="space-y-2 border-t border-border pt-2">
+                      <p className="text-xs font-medium text-foreground">
+                        Abort Track A (e.g. later NFF)
+                      </p>
+                      <Input
+                        value={abortReason}
+                        onChange={(e) => setAbortReason(e.target.value)}
+                        placeholder="Abort reason"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="destructive"
+                        disabled={busy}
+                        onClick={() => void runAbort()}
+                      >
+                        Abort replacement
+                      </Button>
+                    </div>
+                  </Can>
+                ) : null}
               </>
             )}
           </div>
@@ -597,16 +726,24 @@ export function DualTrackBoardPanel({
           <div className="space-y-3 rounded-md border border-border p-3">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-medium">Track B — Faulty inspection</h3>
-              <Badge
-                variant="outline"
-                className={cn(
-                  'font-normal capitalize',
-                  board?.track_b_status === 'awaiting_faulty_arrival' &&
-                    'border-amber-300 text-amber-900 dark:text-amber-200'
-                )}
-              >
-                {statusLabel(board?.track_b_status ?? 'idle')}
-              </Badge>
+              <div className="flex flex-wrap items-center gap-2">
+                {board?.track_b_discarded ? <DiscardedBadge force /> : null}
+                {board?.track_b_terminal && !board?.track_b_discarded ? (
+                  <Badge variant="secondary" className="font-normal capitalize">
+                    Terminal
+                  </Badge>
+                ) : null}
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    'font-normal capitalize',
+                    board?.track_b_status === 'awaiting_faulty_arrival' &&
+                      'border-amber-300 text-amber-900 dark:text-amber-200'
+                  )}
+                >
+                  {statusLabel(board?.track_b_status ?? 'idle')}
+                </Badge>
+              </div>
             </div>
             <p className="text-sm text-muted-foreground">
               {board?.track_b_status === 'awaiting_faulty_arrival'
@@ -619,6 +756,237 @@ export function DualTrackBoardPanel({
               <p className="text-xs text-muted-foreground">
                 Reception: {board.track_b_reception_date}
               </p>
+            ) : null}
+
+            {canReception ? (
+              <Can permission={P.edit_maintenance_cases}>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() =>
+                    void runTrackB('Reception recorded', () =>
+                      maintenanceCases.trackBReception(
+                        maintenanceCase.id,
+                        trackBReworkId!
+                      )
+                    )
+                  }
+                >
+                  Record reception
+                </Button>
+              </Can>
+            ) : null}
+
+            {canAssignIe ? (
+              <Can permission={P.edit_maintenance_cases}>
+                <div className="space-y-2">
+                  <Label htmlFor="track-b-ie-id">IE user id</Label>
+                  <Input
+                    id="track-b-ie-id"
+                    value={ieId}
+                    onChange={(e) => setIeId(e.target.value)}
+                    placeholder="Inspection Engineer user id"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => void runAssignIe()}
+                  >
+                    Assign IE
+                  </Button>
+                </div>
+              </Can>
+            ) : null}
+
+            {canHandover ? (
+              <Can permission={P.maintenance_inspection_disposition}>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() =>
+                    void runTrackB('Handover requested', () =>
+                      maintenanceCases.trackBHandoverRequest(
+                        maintenanceCase.id,
+                        trackBReworkId!
+                      )
+                    )
+                  }
+                >
+                  Request handover
+                </Button>
+              </Can>
+            ) : null}
+
+            {canImIssueToIe ? (
+              <Can permission={P.edit_maintenance_cases}>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() =>
+                    void runTrackB('Issued to IE', () =>
+                      maintenanceCases.trackBImIssueToIe(
+                        maintenanceCase.id,
+                        trackBReworkId!
+                      )
+                    )
+                  }
+                >
+                  IM issue to IE
+                </Button>
+              </Can>
+            ) : null}
+
+            {canDisposition ? (
+              <Can permission={P.maintenance_inspection_disposition}>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() =>
+                      void runTrackB('Marked repairable', () =>
+                        maintenanceCases.trackBDisposition(
+                          maintenanceCase.id,
+                          trackBReworkId!,
+                          { outcome: 'repairable' }
+                        )
+                      )
+                    }
+                  >
+                    Repairable
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() =>
+                      void runTrackB('Warranty claim path', () =>
+                        maintenanceCases.trackBDisposition(
+                          maintenanceCase.id,
+                          trackBReworkId!,
+                          { outcome: 'warranty' }
+                        )
+                      )
+                    }
+                  >
+                    Warranty
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="destructive"
+                    disabled={busy}
+                    onClick={() =>
+                      void runTrackB('Discard recommended', () =>
+                        maintenanceCases.trackBDisposition(
+                          maintenanceCase.id,
+                          trackBReworkId!,
+                          { outcome: 'discard' }
+                        )
+                      )
+                    }
+                  >
+                    Recommend discard
+                  </Button>
+                </div>
+              </Can>
+            ) : null}
+
+            {canConfirmDiscard ? (
+              <Can permission={P.edit_maintenance_cases}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="destructive"
+                  disabled={busy}
+                  onClick={() =>
+                    void runTrackB('Discard confirmed', () =>
+                      maintenanceCases.trackBConfirmDiscard(
+                        maintenanceCase.id,
+                        trackBReworkId!
+                      )
+                    )
+                  }
+                >
+                  IM confirm discard
+                </Button>
+              </Can>
+            ) : null}
+
+            {canRepairSubmit ? (
+              <Can permission={P.maintenance_inspection_disposition}>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() =>
+                    void runTrackB('Repair submitted for PD', () =>
+                      maintenanceCases.trackBRepairSubmit(
+                        maintenanceCase.id,
+                        trackBReworkId!
+                      )
+                    )
+                  }
+                >
+                  Submit repair evidence
+                </Button>
+              </Can>
+            ) : null}
+
+            {canPdRepair ? (
+              <Can permission={P.edit_maintenance_cases}>
+                <div className="space-y-2">
+                  <Label htmlFor="track-b-repair-reject">Reject reason (if reject)</Label>
+                  <Input
+                    id="track-b-repair-reject"
+                    value={repairRejectReason}
+                    onChange={(e) => setRepairRejectReason(e.target.value)}
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() =>
+                        void runTrackB('Repair approved — restocked', () =>
+                          maintenanceCases.trackBPdRepairDecision(
+                            maintenanceCase.id,
+                            trackBReworkId!,
+                            { decision: 'approve' }
+                          )
+                        )
+                      }
+                    >
+                      Approve repair
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      disabled={busy}
+                      onClick={() =>
+                        void runTrackB('Repair rejected', () =>
+                          maintenanceCases.trackBPdRepairDecision(
+                            maintenanceCase.id,
+                            trackBReworkId!,
+                            {
+                              decision: 'reject',
+                              reject_reason: repairRejectReason.trim() || null,
+                            }
+                          )
+                        )
+                      }
+                    >
+                      Reject repair
+                    </Button>
+                  </div>
+                </div>
+              </Can>
             ) : null}
           </div>
         </div>

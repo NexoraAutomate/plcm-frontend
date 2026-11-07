@@ -68,6 +68,7 @@ import { IssuanceRemarksDialog } from '@/components/inventory/issuance-remarks-d
 import { InventoryLabelDialog } from '@/components/inventory/inventory-label-dialog';
 import { InventoryBulkLabelDialog } from '@/components/inventory/inventory-bulk-label-dialog';
 import { StatusBadge } from '@/components/status-badge';
+import { DiscardedBadge } from '@/components/inventory/discarded-badge';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Can } from '@/components/auth/can';
@@ -1525,7 +1526,10 @@ export default function InventoryPage() {
                         {formatInventoryLocationAbbrev(instance)}
                       </TableCell>
                       <TableCell>
-                        <StatusBadge status={unitStatus} />
+                        <div className="flex flex-wrap items-center gap-1">
+                          <StatusBadge status={unitStatus} />
+                          <DiscardedBadge status={unitStatus} />
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
@@ -2664,14 +2668,24 @@ export default function InventoryPage() {
                                                 }
                                                 title="View reservation details"
                                               >
+                                                <div className="flex flex-wrap items-center gap-1">
+                                                  <StatusBadge
+                                                    status={resolveInventoryInstanceStatus(instance)}
+                                                  />
+                                                  <DiscardedBadge
+                                                    status={resolveInventoryInstanceStatus(instance)}
+                                                  />
+                                                </div>
+                                              </button>
+                                            ) : (
+                                              <div className="flex flex-wrap items-center gap-1">
                                                 <StatusBadge
                                                   status={resolveInventoryInstanceStatus(instance)}
                                                 />
-                                              </button>
-                                            ) : (
-                                              <StatusBadge
-                                                status={resolveInventoryInstanceStatus(instance)}
-                                              />
+                                                <DiscardedBadge
+                                                  status={resolveInventoryInstanceStatus(instance)}
+                                                />
+                                              </div>
                                             )}
                                           </TableCell>
                                           <TableCell className="w-[7.5rem] p-0.5 text-right">

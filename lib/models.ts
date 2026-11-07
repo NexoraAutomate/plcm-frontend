@@ -1927,6 +1927,8 @@ export interface ReturnedUnit {
   faulty_entity_id?: number | null;
   investigating_pd_id?: number | null;
   investigating_pd_name?: string | null;
+  assigned_ie_id?: number | null;
+  assigned_ie_name?: string | null;
   project_id: number;
   inventory_id: number;
   part_number?: string | null;
@@ -1941,6 +1943,8 @@ export interface ReturnedUnit {
   warranty_expires_at?: string | null;
   warranty_active?: boolean | null;
   oem_name?: string | null;
+  is_track_b_terminal?: boolean;
+  discarded?: boolean;
 }
 
 /** Track A sub-status spine (P2 dual-track). */
@@ -2008,6 +2012,8 @@ export interface DualTrackBoard {
   track_b_status?: string | null;
   track_b_rework_id?: number | null;
   track_b_reception_date?: string | null;
+  track_b_discarded?: boolean;
+  track_b_terminal?: boolean;
 }
 
 export interface ReplacementRequestCreatePayload {
@@ -2049,6 +2055,10 @@ export interface ReplacementRequestAitAttachmentPayload {
 export interface ReplacementRequestAitDecisionPayload {
   decision: 'approve' | 'reject' | string;
   reject_reason?: string | null;
+}
+
+export interface ReplacementRequestAbortPayload {
+  reason: string;
 }
 
 export interface OemWarrantyClaim {

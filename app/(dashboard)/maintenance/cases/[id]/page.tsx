@@ -246,12 +246,22 @@ export default function MaintenanceCaseInvestigationPage({
         message: suggestion.message,
         suggestedCaseStatus: MaintenanceCaseWorkflowStatus.RESOLVED,
         execute: async () => {
-          const res = await maintenanceService.updateMaintenanceCase(caseId, {
-            status: CaseStatus.Resolved,
-            resolution_notes: 'All faulty entities resolved or cleared.',
-          });
-          setMaintenanceCase(res.data);
-          toast.success('Maintenance case marked as resolved.');
+          try {
+            const res = await maintenanceService.updateMaintenanceCase(caseId, {
+              status: CaseStatus.Resolved,
+              resolution_notes: 'All faulty entities resolved or cleared.',
+            });
+            setMaintenanceCase(res.data);
+            toast.success('Maintenance case marked as resolved.');
+          } catch (err) {
+            toast.error(
+              formatMaintenanceApiError(
+                err,
+                'Cannot resolve case — dual-track close gate may be blocking'
+              )
+            );
+            throw err;
+          }
         },
       });
     }

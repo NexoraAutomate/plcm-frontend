@@ -1127,6 +1127,74 @@ export const maintenanceCases = {
     api.post<Models.ReturnedUnit>(`/item-rework/${reworkId}/assign-investigating-pd/`, {
       pd_user_id: pdUserId,
     }),
+  trackBReception: (
+    caseId: number,
+    reworkId: number,
+    data: { reception_date?: string | null; notes?: string | null } = {}
+  ) =>
+    api.post<Models.ReturnedUnit>(
+      `/maintenance-cases/${caseId}/returned-units/${reworkId}/reception/`,
+      data
+    ),
+  trackBAssignIe: (caseId: number, reworkId: number, ieUserId: number) =>
+    api.post<Models.ReturnedUnit>(
+      `/maintenance-cases/${caseId}/returned-units/${reworkId}/assign-ie/`,
+      { ie_user_id: ieUserId }
+    ),
+  trackBHandoverRequest: (
+    caseId: number,
+    reworkId: number,
+    data: { notes?: string | null } = {}
+  ) =>
+    api.post<Models.ReturnedUnit>(
+      `/maintenance-cases/${caseId}/returned-units/${reworkId}/handover-request/`,
+      data
+    ),
+  trackBImIssueToIe: (
+    caseId: number,
+    reworkId: number,
+    data: { notes?: string | null } = {}
+  ) =>
+    api.post<Models.ReturnedUnit>(
+      `/maintenance-cases/${caseId}/returned-units/${reworkId}/im-issue-to-ie/`,
+      data
+    ),
+  trackBDisposition: (
+    caseId: number,
+    reworkId: number,
+    data: { outcome: string; notes?: string | null }
+  ) =>
+    api.post<Models.ReturnedUnit>(
+      `/maintenance-cases/${caseId}/returned-units/${reworkId}/disposition/`,
+      data
+    ),
+  trackBConfirmDiscard: (
+    caseId: number,
+    reworkId: number,
+    data: { notes?: string | null } = {}
+  ) =>
+    api.post<Models.ReturnedUnit>(
+      `/maintenance-cases/${caseId}/returned-units/${reworkId}/confirm-discard/`,
+      data
+    ),
+  trackBRepairSubmit: (
+    caseId: number,
+    reworkId: number,
+    data: { notes?: string | null } = {}
+  ) =>
+    api.post<Models.ReturnedUnit>(
+      `/maintenance-cases/${caseId}/returned-units/${reworkId}/repair-submit/`,
+      data
+    ),
+  trackBPdRepairDecision: (
+    caseId: number,
+    reworkId: number,
+    data: { decision: string; reject_reason?: string | null }
+  ) =>
+    api.post<Models.ReturnedUnit>(
+      `/maintenance-cases/${caseId}/returned-units/${reworkId}/pd-repair-decision/`,
+      data
+    ),
   createReplacementRequest: (
     caseId: number,
     data: Models.ReplacementRequestCreatePayload = {}
@@ -1203,6 +1271,15 @@ export const maintenanceCases = {
   ) =>
     api.post<Models.ReplacementRequest>(
       `/maintenance-cases/${caseId}/replacement-requests/${requestId}/ait/pd-decision/`,
+      data
+    ),
+  abortReplacementRequest: (
+    caseId: number,
+    requestId: number,
+    data: Models.ReplacementRequestAbortPayload
+  ) =>
+    api.post<Models.ReplacementRequest>(
+      `/maintenance-cases/${caseId}/replacement-requests/${requestId}/abort/`,
       data
     ),
   getDualTrack: (caseId: number) =>
