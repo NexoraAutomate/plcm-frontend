@@ -414,6 +414,7 @@ export function MyAssignmentsPanel() {
   } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeveloperAssignedWork | null>(null);
   const [activityRow, setActivityRow] = useState<DeveloperAssignedWork | null>(null);
+  const [activityOpen, setActivityOpen] = useState(false);
 
   const queryClient = useQueryClient();
   const refresh = useCallback(async () => {
@@ -447,6 +448,17 @@ export function MyAssignmentsPanel() {
     }
     return counts;
   }, [rows]);
+
+  // Prefer a tab that actually has rows so the page does not look empty
+  // when everything sits under process / completed.
+  useEffect(() => {
+    if (rows.length === 0) return;
+    if (tabCounts[lifecycleTab] > 0) return;
+    const preferred = (['new', 'under_process', 'completed'] as AssignmentLifecycleTab[]).find(
+      (tab) => tabCounts[tab] > 0
+    );
+    if (preferred) setLifecycleTab(preferred);
+  }, [rows.length, tabCounts, lifecycleTab]);
 
   const tabRows = useMemo(
     () => rows.filter((row) => assignmentLifecycleTab(row) === lifecycleTab),
@@ -893,7 +905,10 @@ export function MyAssignmentsPanel() {
                           <TableRow
                             key={key}
                             className="cursor-pointer"
-                            onClick={() => setActivityRow(row)}
+                            onClick={() => {
+                              setActivityRow(row);
+                              setActivityOpen(true);
+                            }}
                           >
                             {lifecycleTab !== 'completed' ? (
                               <TableCell
@@ -1164,9 +1179,13 @@ export function MyAssignmentsPanel() {
     />
       <AssignmentActivitySheet
         row={activityRow}
-        open={activityRow != null}
+        open={activityOpen}
         onOpenChange={(open) => {
-          if (!open) setActivityRow(null);
+          setActivityOpen(open);
+          // Keep row data mounted through the close animation so width stays stable.
+          if (!open) {
+            window.setTimeout(() => setActivityRow(null), 220);
+          }
         }}
       />
       <ConfirmDialog

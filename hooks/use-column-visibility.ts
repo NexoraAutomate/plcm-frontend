@@ -32,6 +32,13 @@ function readStored(tableId: string, columns: ColumnVisibilityDef[]): string[] |
     for (const id of always) {
       if (!ids.includes(id)) ids.push(id);
     }
+    // Columns added after the preference was saved keep their default visibility.
+    for (const col of columns) {
+      if (parsed.includes(col.id)) continue;
+      if (col.alwaysVisible || col.defaultVisible !== false) {
+        if (!ids.includes(col.id)) ids.push(col.id);
+      }
+    }
     return ids.length > 0 ? ids : null;
   } catch {
     return null;
