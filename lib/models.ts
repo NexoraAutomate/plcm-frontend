@@ -1509,6 +1509,11 @@ export interface DeveloperAssignedWork {
   serial_number?: string | null
   project_id?: number | null
   project_name?: string | null
+  customer_name?: string | null
+  flight_name?: string | null
+  system_name?: string | null
+  assigned_hm_id?: number | null
+  assigned_hm_name?: string | null
   assigned_developer_id: number
   reserved: boolean
   reservation_id?: number | null

@@ -1,16 +1,25 @@
-# Current Feature
+# Current Feature: My Assignments Tabs & Cleanup
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Goals will be populated when a feature is loaded -->
+- [x] Add three tabs on My Assignments using the existing multitab layout: New Assignments, Under Process, Completed Assignments
+- [x] Segregate tasks into those tabs by lifecycle (new → under process when worked → completed when done); apply to current records
+- [x] Remove redundant Projects and Item Category filters
+- [x] Regroup workflow status filters by category with modern, self-explanatory color schemas
+- [x] Show "Physical issue stays with Inventory Manager. Assignment can be reverted by HM until the item is issued." as a tooltip on the Assigned items heading (not as CardDescription)
+- [x] Admin can permanently delete completed tasks only; new and in-progress tasks cannot be deleted
 
 ## Notes
 
-<!-- Additional context from the feature spec -->
+- Page: `/my-assignments` (`app/(dashboard)/my-assignments/page.tsx` + `components/inventory/my-assignments-panel.tsx`)
+- Multitab: `AnimatedPillTabsList`
+- Lifecycle: New = not started; Under Process = requested/issued/install/test/rework/etc.; Completed = verified
+- Admin delete: `DELETE /item-assignments/{entity_type}/{entity_id}/` clears assignment after verify; Admin list sees all assignments
+- Pending: manual UI check on localhost:3000/my-assignments
 
 ## History
 

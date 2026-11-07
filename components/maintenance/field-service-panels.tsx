@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import {
@@ -100,6 +100,8 @@ interface FieldServicePanelsProps {
   onCaseUpdated: (next: MaintenanceCase) => void;
   /** Called after a ReplacementRequest is created (P2 dual-track). */
   onReplacementRequested?: () => void;
+  /** True when an open Track A replacement request already exists. */
+  hasOpenReplacementRequest?: boolean;
 }
 
 type DraftOfficer = {
@@ -119,6 +121,7 @@ export function FieldServicePanels({
   maintenanceCase,
   onCaseUpdated,
   onReplacementRequested,
+  hasOpenReplacementRequest = false,
 }: FieldServicePanelsProps) {
   const [outcome, setOutcome] = useState<OnsiteOutcome | ''>('');
   const [method, setMethod] = useState<SoftFixMethod | ''>('');
@@ -133,6 +136,16 @@ export function FieldServicePanels({
   const [claimBusyId, setClaimBusyId] = useState<number | null>(null);
   const [nffDialogOpen, setNffDialogOpen] = useState(false);
   const [creatingRequest, setCreatingRequest] = useState(false);
+  const [localRequestCreated, setLocalRequestCreated] = useState(false);
+
+  const replacementRequestLocked =
+    hasOpenReplacementRequest || localRequestCreated;
+
+  useEffect(() => {
+    if (!hasOpenReplacementRequest) {
+      setLocalRequestCreated(false);
+    }
+  }, [hasOpenReplacementRequest]);
 
   const returnedUnits = maintenanceCase.returned_units ?? [];
   const claims = maintenanceCase.warranty_claims ?? [];
@@ -251,12 +264,17 @@ export function FieldServicePanels({
       toast.error('Record fault_identified Occurrence Report first');
       return;
     }
+    if (replacementRequestLocked) {
+      toast.error('A replacement request is already open for this case');
+      return;
+    }
     setCreatingRequest(true);
     try {
       const primaryFe = maintenanceCase.faulty_entities?.[0];
       await maintenanceCases.createReplacementRequest(maintenanceCase.id, {
         faulty_entity_id: primaryFe?.id ?? null,
       });
+      setLocalRequestCreated(true);
       toast.success('Replacement request created — Track A started');
       onReplacementRequested?.();
     } catch (err) {
@@ -380,16 +398,25 @@ export function FieldServicePanels({
                 </div>
               ) : null}
               {maintenanceCase.onsite_outcome === 'fault_identified' ? (
-                <div className="pt-1">
+                <div className="space-y-1.5 pt-1">
                   <Button
                     type="button"
                     variant="secondary"
                     size="sm"
-                    disabled={creatingRequest}
+                    disabled={creatingRequest || replacementRequestLocked}
                     onClick={() => void handleRequestReplacement()}
                   >
-                    {creatingRequest ? 'Creating…' : 'Request immediate replacement'}
+                    {creatingRequest
+                      ? 'Creating…'
+                      : replacementRequestLocked
+                        ? 'Replacement already requested'
+                        : 'Request immediate replacement'}
                   </Button>
+                  {replacementRequestLocked ? (
+                    <p className="text-xs text-muted-foreground">
+                      Track A is open — manage assignment and approval on the dual-track board below.
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
             </div>

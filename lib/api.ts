@@ -691,6 +691,10 @@ export const inventory = {
     notes?: string | null
   }) => api.post<Models.ItemIssueRequestBulkResult>('/item-requests/bulk/', data),
   listMyAssignments: () => api.get<Models.DeveloperAssignedWork[]>('/item-assignments/mine/'),
+  deleteCompletedAssignment: (entityType: string, entityId: number) =>
+    api.delete<Models.HierarchyAssignDeveloperResult>(
+      `/item-assignments/${entityType}/${entityId}/`
+    ),
   startItemInstall: (entityType: string, entityId: number, notes?: string | null) =>
     api.post<Models.ItemInstallState>(`/item-install/${entityType}/${entityId}/start/`, {
       notes: notes ?? null,

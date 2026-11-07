@@ -105,6 +105,7 @@ export default function MaintenanceCaseInvestigationPage({
   const [pendingWorkflow, setPendingWorkflow] = useState<PendingWorkflowAction | null>(null);
   const [detailTab, setDetailTab] = useState('tree');
   const [dualTrackRefreshKey, setDualTrackRefreshKey] = useState(0);
+  const [hasOpenReplacementRequest, setHasOpenReplacementRequest] = useState(false);
 
   const treeNodes = useMemo(() => buildInvestigationTree(entities), [entities]);
 
@@ -679,11 +680,16 @@ export default function MaintenanceCaseInvestigationPage({
           <FieldServicePanels
             maintenanceCase={maintenanceCase}
             onCaseUpdated={setMaintenanceCase}
-            onReplacementRequested={() => setDualTrackRefreshKey((k) => k + 1)}
+            hasOpenReplacementRequest={hasOpenReplacementRequest}
+            onReplacementRequested={() => {
+              setHasOpenReplacementRequest(true);
+              setDualTrackRefreshKey((k) => k + 1);
+            }}
           />
           <DualTrackBoardPanel
             maintenanceCase={maintenanceCase}
             refreshKey={dualTrackRefreshKey}
+            onOpenReplacementChange={setHasOpenReplacementRequest}
           />
           <CaseDetailCards
             maintenanceCase={maintenanceCase}
