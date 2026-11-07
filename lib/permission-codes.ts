@@ -173,6 +173,12 @@ export const P = {
   config_change_request: 'config_change.request',
   config_change_approve: 'config_change.approve',
   audit_read: 'audit.read',
+
+  // Maintenance dual-track (P0 stubs — enforced from P2+)
+  maintenance_occurrence_report: 'maintenance.occurrence_report',
+  maintenance_replacement_request: 'maintenance.replacement_request',
+  maintenance_ait_upload: 'maintenance.ait_upload',
+  maintenance_inspection_disposition: 'maintenance.inspection_disposition',
 } as const;
 
 export type PermissionCode = (typeof P)[keyof typeof P];
@@ -216,6 +222,10 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [P.project_complete]: 'Mark Project Completed',
   [P.hierarchy_generate]: 'Generate Hierarchy',
   [P.inventory_reserve]: 'Reserve Inventory',
+  [P.maintenance_occurrence_report]: 'Record Occurrence Report',
+  [P.maintenance_replacement_request]: 'Replacement Request (Track A)',
+  [P.maintenance_ait_upload]: 'Upload AIT Results',
+  [P.maintenance_inspection_disposition]: 'Inspection Disposition (Track B)',
   [P.inventory_release]: 'Release Reservation',
   [P.inventory_receive]: 'Receive Inventory',
   [P.inventory_issue_workflow]: 'Issue Inventory (Workflow)',

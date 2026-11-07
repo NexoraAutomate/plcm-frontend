@@ -98,6 +98,8 @@ const FAULT_TYPE_OPTIONS = Object.values(FaultType).map((value) => ({
 interface FieldServicePanelsProps {
   maintenanceCase: MaintenanceCase;
   onCaseUpdated: (next: MaintenanceCase) => void;
+  /** Called after a ReplacementRequest is created (P2 dual-track). */
+  onReplacementRequested?: () => void;
 }
 
 type DraftOfficer = {
@@ -116,6 +118,7 @@ type DraftAttachment = {
 export function FieldServicePanels({
   maintenanceCase,
   onCaseUpdated,
+  onReplacementRequested,
 }: FieldServicePanelsProps) {
   const [outcome, setOutcome] = useState<OnsiteOutcome | ''>('');
   const [method, setMethod] = useState<SoftFixMethod | ''>('');
@@ -129,6 +132,7 @@ export function FieldServicePanels({
   const [saving, setSaving] = useState(false);
   const [claimBusyId, setClaimBusyId] = useState<number | null>(null);
   const [nffDialogOpen, setNffDialogOpen] = useState(false);
+  const [creatingRequest, setCreatingRequest] = useState(false);
 
   const returnedUnits = maintenanceCase.returned_units ?? [];
   const claims = maintenanceCase.warranty_claims ?? [];
@@ -242,6 +246,26 @@ export function FieldServicePanels({
     await submitOccurrence(false);
   };
 
+  const handleRequestReplacement = async () => {
+    if (maintenanceCase.onsite_outcome !== 'fault_identified') {
+      toast.error('Record fault_identified Occurrence Report first');
+      return;
+    }
+    setCreatingRequest(true);
+    try {
+      const primaryFe = maintenanceCase.faulty_entities?.[0];
+      await maintenanceCases.createReplacementRequest(maintenanceCase.id, {
+        faulty_entity_id: primaryFe?.id ?? null,
+      });
+      toast.success('Replacement request created — Track A started');
+      onReplacementRequested?.();
+    } catch (err) {
+      toast.error(formatMaintenanceApiError(err, 'Failed to create replacement request'));
+    } finally {
+      setCreatingRequest(false);
+    }
+  };
+
   const openClaim = async (unit: ReturnedUnit) => {
     setClaimBusyId(unit.id);
     try {
@@ -281,10 +305,6 @@ export function FieldServicePanels({
       },
     ]);
   };
-
-  const showFaultCta =
-    maintenanceCase.onsite_outcome === 'fault_identified' ||
-    outcome === 'fault_identified';
 
   return (
     <div className="space-y-4">
@@ -359,19 +379,16 @@ export function FieldServicePanels({
                   </ul>
                 </div>
               ) : null}
-              {showFaultCta ? (
+              {maintenanceCase.onsite_outcome === 'fault_identified' ? (
                 <div className="pt-1">
                   <Button
                     type="button"
                     variant="secondary"
                     size="sm"
-                    onClick={() =>
-                      toast.info(
-                        'Immediate replacement request lands in the next phase (dual-track).'
-                      )
-                    }
+                    disabled={creatingRequest}
+                    onClick={() => void handleRequestReplacement()}
                   >
-                    Request immediate replacement
+                    {creatingRequest ? 'Creating…' : 'Request immediate replacement'}
                   </Button>
                 </div>
               ) : null}
@@ -576,7 +593,7 @@ export function FieldServicePanels({
                     type="button"
                     variant="secondary"
                     disabled
-                    title="Enabled after recording fault; Track A API in P2"
+                    title="Enabled after recording the Occurrence Report"
                   >
                     Request immediate replacement
                   </Button>
@@ -584,8 +601,8 @@ export function FieldServicePanels({
               </div>
               {outcome === 'fault_identified' ? (
                 <p className="text-xs text-muted-foreground">
-                  After recording, investigation tree continues in parallel. Replacement
-                  request CTA activates once the report is saved (Track A in next phase).
+                  After recording, investigation continues in parallel. The replacement
+                  request CTA activates once the report is saved (starts Track A).
                 </p>
               ) : null}
             </>

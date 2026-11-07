@@ -1937,9 +1937,83 @@ export interface ReturnedUnit {
   notes?: string | null;
   opened_at?: string | null;
   updated_at?: string | null;
+  reception_date?: string | null;
   warranty_expires_at?: string | null;
   warranty_active?: boolean | null;
   oem_name?: string | null;
+}
+
+/** Track A sub-status spine (P2 dual-track). */
+export type ReplacementRequestStatus =
+  | 'replacement_requested'
+  | 'pd_approved'
+  | 'pd_rejected'
+  | 'im_issue_pending'
+  | 'shipped_replaced_badge'
+  | 'ait_in_progress'
+  | 'ait_approved'
+  | 'ait_rejected'
+  | 'patch_delivered'
+  | 'track_a_closed';
+
+export interface ReplacementRequestReservation {
+  id: number;
+  replacement_request_id: number;
+  inventory_reservation_id?: number | null;
+  inventory_instance_id?: number | null;
+  serial_number?: string | null;
+  part_number?: string | null;
+}
+
+export interface ReplacementRequest {
+  id: number;
+  case_id: number;
+  faulty_entity_id?: number | null;
+  faulty_entity_type?: string | null;
+  faulty_entity_ref_id?: number | null;
+  requested_by_id: number;
+  assigned_me_id?: number | null;
+  assigned_me_name?: string | null;
+  status: ReplacementRequestStatus | string;
+  pd_decision?: string | null;
+  reject_reason?: string | null;
+  abort_reason?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  reservations?: ReplacementRequestReservation[];
+}
+
+export interface DualTrackBoard {
+  case_id: number;
+  track_a?: ReplacementRequest | null;
+  track_a_status?: string | null;
+  track_b_status?: string | null;
+  track_b_rework_id?: number | null;
+  track_b_reception_date?: string | null;
+}
+
+export interface ReplacementRequestCreatePayload {
+  faulty_entity_id?: number | null;
+  notes?: string | null;
+}
+
+export interface ReplacementRequestAssignMePayload {
+  assigned_me_id: number;
+}
+
+export interface ReplacementRequestReservePayload {
+  inventory_id?: number | null;
+  inventory_instance_id?: number | null;
+  part_number?: string | null;
+  serial_number?: string | null;
+  target_entity_type?: string | null;
+  target_entity_id?: number | null;
+  notes?: string | null;
+}
+
+export interface ReplacementRequestPdDecisionPayload {
+  decision: 'approve' | 'reject' | string;
+  reject_reason?: string | null;
 }
 
 export interface OemWarrantyClaim {
@@ -2005,6 +2079,7 @@ export interface MaintenanceCase {
   occurrence_officers?: OccurrenceOfficer[];
   returned_units?: ReturnedUnit[];
   warranty_claims?: OemWarrantyClaim[];
+  faulty_entities?: FaultyEntity[];
 }
 
 // Faulty Entity

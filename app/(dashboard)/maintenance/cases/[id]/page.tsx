@@ -26,6 +26,7 @@ import { BulkActionsToolbar } from '@/components/maintenance/bulk-actions-toolba
 import { EntityDetailSheet } from '@/components/maintenance/entity-detail-sheet';
 import { CaseDetailCards } from '@/components/maintenance/case-detail-cards';
 import { FieldServicePanels } from '@/components/maintenance/field-service-panels';
+import { DualTrackBoardPanel } from '@/components/maintenance/dual-track-board';
 import { WorkflowTransitionDialog } from '@/components/maintenance/workflow-transition-dialog';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -103,6 +104,7 @@ export default function MaintenanceCaseInvestigationPage({
   const [workflowDialogOpen, setWorkflowDialogOpen] = useState(false);
   const [pendingWorkflow, setPendingWorkflow] = useState<PendingWorkflowAction | null>(null);
   const [detailTab, setDetailTab] = useState('tree');
+  const [dualTrackRefreshKey, setDualTrackRefreshKey] = useState(0);
 
   const treeNodes = useMemo(() => buildInvestigationTree(entities), [entities]);
 
@@ -667,6 +669,11 @@ export default function MaintenanceCaseInvestigationPage({
           <FieldServicePanels
             maintenanceCase={maintenanceCase}
             onCaseUpdated={setMaintenanceCase}
+            onReplacementRequested={() => setDualTrackRefreshKey((k) => k + 1)}
+          />
+          <DualTrackBoardPanel
+            maintenanceCase={maintenanceCase}
+            refreshKey={dualTrackRefreshKey}
           />
           <CaseDetailCards
             maintenanceCase={maintenanceCase}

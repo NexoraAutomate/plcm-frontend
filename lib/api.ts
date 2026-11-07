@@ -1127,6 +1127,51 @@ export const maintenanceCases = {
     api.post<Models.ReturnedUnit>(`/item-rework/${reworkId}/assign-investigating-pd/`, {
       pd_user_id: pdUserId,
     }),
+  createReplacementRequest: (
+    caseId: number,
+    data: Models.ReplacementRequestCreatePayload = {}
+  ) =>
+    api.post<Models.ReplacementRequest>(
+      `/maintenance-cases/${caseId}/replacement-requests/`,
+      data
+    ),
+  listReplacementRequests: (caseId: number) =>
+    api.get<Models.ReplacementRequest[]>(
+      `/maintenance-cases/${caseId}/replacement-requests/`
+    ),
+  getReplacementRequest: (caseId: number, requestId: number) =>
+    api.get<Models.ReplacementRequest>(
+      `/maintenance-cases/${caseId}/replacement-requests/${requestId}/`
+    ),
+  assignReplacementMe: (
+    caseId: number,
+    requestId: number,
+    data: Models.ReplacementRequestAssignMePayload
+  ) =>
+    api.post<Models.ReplacementRequest>(
+      `/maintenance-cases/${caseId}/replacement-requests/${requestId}/assign-me/`,
+      data
+    ),
+  reserveReplacement: (
+    caseId: number,
+    requestId: number,
+    data: Models.ReplacementRequestReservePayload
+  ) =>
+    api.post<Models.ReplacementRequest>(
+      `/maintenance-cases/${caseId}/replacement-requests/${requestId}/reserve/`,
+      data
+    ),
+  pdDecideReplacement: (
+    caseId: number,
+    requestId: number,
+    data: Models.ReplacementRequestPdDecisionPayload
+  ) =>
+    api.post<Models.ReplacementRequest>(
+      `/maintenance-cases/${caseId}/replacement-requests/${requestId}/pd-decision/`,
+      data
+    ),
+  getDualTrack: (caseId: number) =>
+    api.get<Models.DualTrackBoard>(`/maintenance-cases/${caseId}/dual-track/`),
   lookupEntityByPartNumber: (partNumber: string) =>
     api.get<Models.lookUpResponse>(`/entities/lookup-by-PN/${encodeURIComponent(partNumber)}/`),
   lookupEntityBySerialNumber: (serialNumber: string) =>

@@ -8,7 +8,7 @@ In Progress
 
 - [x] P0: CaseStatus untouched; ME/FSE/IE roles + maintenance.* permissions wired; unit tests updated
 - [x] P1: Occurrence Report schema/API/UI (occurrence_date, attachments, officers, fault_type, confirmation, NFF); occurrence_recorded notify
-- [ ] P2: ReplacementRequest model + APIs; dual-track wiring; awaiting_faulty_arrival; dual-track board skeleton
+- [x] P2: ReplacementRequest model + APIs; dual-track wiring; awaiting_faulty_arrival; dual-track board skeleton
 - [ ] P3: Track A — IM issue, Replaced badge, RED notify, ME custody, AIT upload/gate, reject loop
 - [ ] P4: Track B — reception, IE assign/handover, disposition, PD repair verify, restock/discard
 - [ ] P5: Dual-track close gate; notification matrix; Discarded badge; clear RED
@@ -17,10 +17,11 @@ In Progress
 
 - Spec: `plcm-backend/docs/specs/maintenance-occurrence-replacement/01-functional-specification.md`
 - Baseline: existing CaseStatus spine + field-service onsite outcome preserved; augmentation only
-- Permission stubs already exist: `maintenance.occurrence_report`, `maintenance.replacement_request`, `maintenance.ait_upload`, `maintenance.inspection_disposition`
+- Permission stubs: `maintenance.occurrence_report`, `maintenance.replacement_request` (also granted to HM), `maintenance.ait_upload`, `maintenance.inspection_disposition`
 - Stay on `main` (no feature branch)
-- **This slice:** P0 + P1 only. Replacement CTA is stubbed until P2.
-- Migration: `alembic/versions/m4e5f6a7b8_occurrence_report_p1.py`
+- **This slice complete through P2.** CTA creates ReplacementRequest; dual-track board on case detail.
+- Migrations: `m4e5f6a7b8_occurrence_report_p1.py`, `n5f6a7b8c9_replacement_request_p2.py`
+- P2 APIs: create / assign-me / reserve / pd-decision / dual-track board; Track B `awaiting_faulty_arrival` on PD approve
 
 ## History
 
