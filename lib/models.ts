@@ -1501,6 +1501,32 @@ export interface HierarchyAssignmentStatus {
   can_return?: boolean
 }
 
+export interface AssignmentActivityStep {
+  id: string
+  step: string
+  title: string
+  occurred_at?: string | null
+  actor_user_id?: number | null
+  actor_name?: string | null
+  actor_role?: string | null
+  target_user_id?: number | null
+  target_name?: string | null
+  status?: string | null
+  remarks?: string | null
+}
+
+export interface AssignmentActivity {
+  entity_type: string
+  entity_id: number
+  entity_name?: string | null
+  current_status?: string | null
+  current_status_label: string
+  assigned_developer_id?: number | null
+  assigned_developer_name?: string | null
+  latest_step?: string | null
+  steps: AssignmentActivityStep[]
+}
+
 export interface DeveloperAssignedWork {
   entity_type: string
   entity_id: number
