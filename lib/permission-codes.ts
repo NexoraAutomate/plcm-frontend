@@ -265,6 +265,8 @@ export const NAV_PERMISSIONS: Record<string, PermissionCode | PermissionCode[]> 
   '/my-assignments': MY_ASSIGNMENTS_PERMISSIONS,
   '/verify-queue': P.item_verify,
   '/maintenance': P.view_maintenance_cases,
+  '/maintenance/lookup': P.view_maintenance_cases,
+  '/maintenance/warranty-claims': P.view_maintenance_cases,
   '/notifications': P.view_notifications,
   '/hierarchy-dashboard': P.view_hierarchy_dashboard,
   '/systems': P.view_systems,

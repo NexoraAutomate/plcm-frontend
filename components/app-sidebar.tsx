@@ -29,6 +29,8 @@ import {
   SearchCheck,
   ScrollText,
   ScanLine,
+  Search,
+  Shield,
   ChevronDown,
   ChevronRight,
   Settings,
@@ -178,10 +180,22 @@ const NAV_BY_HREF: Record<string, NavItem> = {
     permission: NAV_PERMISSIONS["/verify-queue"] as PermissionCode,
   },
   "/maintenance": {
-    label: "Maintenance",
+    label: "Cases",
     href: "/maintenance",
     icon: Wrench,
     permission: NAV_PERMISSIONS["/maintenance"] as PermissionCode,
+  },
+  "/maintenance/lookup": {
+    label: "Lookup",
+    href: "/maintenance/lookup",
+    icon: Search,
+    permission: NAV_PERMISSIONS["/maintenance/lookup"] as PermissionCode,
+  },
+  "/maintenance/warranty-claims": {
+    label: "Warranty claims",
+    href: "/maintenance/warranty-claims",
+    icon: Shield,
+    permission: NAV_PERMISSIONS["/maintenance/warranty-claims"] as PermissionCode,
   },
   "/notifications": {
     label: "Notifications",
@@ -199,6 +213,12 @@ const inventorySystemItems: NavItem[] = [
   NAV_BY_HREF["/inventory/issuances"],
   NAV_BY_HREF["/inspect-queue"],
   NAV_BY_HREF["/inventory/storage-locations"],
+];
+
+const maintenanceItems: NavItem[] = [
+  NAV_BY_HREF["/maintenance"],
+  NAV_BY_HREF["/maintenance/lookup"],
+  NAV_BY_HREF["/maintenance/warranty-claims"],
 ];
 
 const administrationItems: NavItem[] = [
@@ -330,7 +350,6 @@ const ENTRY_HREF: Partial<Record<SidebarEntryKey, string>> = {
   "verify-queue": "/verify-queue",
   inventory: "/inventory",
   "issue-queue": "/issue-queue",
-  maintenance: "/maintenance",
   notifications: "/notifications",
 };
 
@@ -343,6 +362,7 @@ function canSeeItem(
 
 type CollapsibleGroupId =
   | "inventory-system"
+  | "maintenance"
   | "project-hierarchy"
   | "definitions"
   | "administration"
@@ -361,6 +381,7 @@ const ALL_NAV_HREFS: string[] = Array.from(
   new Set([
     ...Object.values(NAV_BY_HREF).map((item) => item.href),
     ...inventorySystemItems.map((item) => item.href),
+    ...maintenanceItems.map((item) => item.href),
     ...administrationItems.map((item) => item.href),
     ...definitionsItems.map((item) => item.href),
     ...hierarchyItems.map((item) => item.href),
@@ -534,6 +555,7 @@ export function AppSidebar() {
     Record<CollapsibleGroupId, boolean>
   >({
     "inventory-system": false,
+    maintenance: false,
     "project-hierarchy": false,
     definitions: false,
     administration: false,
@@ -577,6 +599,11 @@ export function AppSidebar() {
     [can, entityLabel]
   );
 
+  const visibleMaintenance = useMemo(
+    () => maintenanceItems.filter((item) => canSeeItem(item, can)),
+    [can]
+  );
+
   const visibleHierarchy = useMemo(
     () =>
       hierarchyItems
@@ -610,6 +637,7 @@ export function AppSidebar() {
       };
       openIf("reporting", pathname.startsWith("/reporting"));
       openIf("inventory-system", pathMatchesAny(pathname, visibleInventorySystem));
+      openIf("maintenance", pathMatchesAny(pathname, visibleMaintenance));
       openIf("project-hierarchy", pathMatchesAny(pathname, visibleHierarchy));
       openIf("definitions", pathMatchesAny(pathname, visibleDefinitions));
       openIf("administration", pathMatchesAny(pathname, visibleAdministration));
@@ -618,6 +646,7 @@ export function AppSidebar() {
   }, [
     pathname,
     visibleInventorySystem,
+    visibleMaintenance,
     visibleHierarchy,
     visibleDefinitions,
     visibleAdministration,
@@ -766,6 +795,14 @@ export function AppSidebar() {
           label: "Inventory System",
           icon: Package,
           items: visibleInventorySystem,
+        });
+      case "maintenance":
+        return renderCollapsibleGroup({
+          id: "maintenance",
+          label: "Maintenance",
+          icon: Wrench,
+          items: visibleMaintenance,
+          href: "/maintenance",
         });
       case "project-hierarchy":
         return renderCollapsibleGroup({

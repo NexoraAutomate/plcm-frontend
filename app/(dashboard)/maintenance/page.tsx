@@ -1,14 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { FaultType, FaultyEntityStatus } from '@/lib/models';
 import {
   Select,
   SelectContent,
@@ -22,7 +20,6 @@ import * as maintenanceApi from '@/lib/api';
 import * as MaintenanceTypes from '@/lib/models';
 import { maintenanceService, formatMaintenanceApiError } from '@/services/maintenance';
 import { MaintenanceMiniDashboard } from '@/components/maintenance/MaintenanceMiniDashboard';
-import { MaintenanceLookupDialog } from '@/components/lazy/heavy-editors';
 import { MaintenanceCaseDialog } from '@/components/maintenance/MaintenanceCaseDialog';
 import { MaintenanceCaseHierarchyDialog } from '@/components/maintenance/MaintenanceCaseHierarchyDialog';
 import { MaintenanceTable } from '@/components/maintenance/MaintenanceTable';
@@ -94,12 +91,9 @@ export default function MaintenancePage() {
   const { sort, cycleSort, listFilterPatch } = useTableSorting();
   const {
     projects,
-    createMaintenanceCase,
     updateMaintenanceCase,
     deleteMaintenanceCase,
     lookupEntityBySerialNumber,
-    suspectChildren,
-    confirmFault,
   } = useDataStore();
 
   const [search, setSearch] = useState('');
@@ -107,7 +101,6 @@ export default function MaintenancePage() {
   const [statusFilter, setStatusFilter] = useState<string>(searchParams.get('status') || 'all');
   const [projectFilter, setProjectFilter] = useState<string>('all');
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isLookupOpen, setIsLookupOpen] = useState(false);
   const [isHierarchyOpen, setIsHierarchyOpen] = useState(false);
   const [hierarchyCase, setHierarchyCase] =
     useState<MaintenanceTypes.MaintenanceCase | null>(null);
@@ -117,11 +110,6 @@ export default function MaintenancePage() {
   const [hierarchyLoading, setHierarchyLoading] = useState(false);
   const [hierarchyError, setHierarchyError] = useState<string | null>(null);
   const [editingCase, setEditingCase] = useState<MaintenanceTypes.MaintenanceCase | null>(null);
-  const [serialNumber, setSerialNumber] = useState('');
-  const [lookupResponses, setLookupResponse] = useState<MaintenanceTypes.lookUpResponse | null>(null);
-  const [lookupCaseId, setLookupCaseId] = useState<number | null>(null);
-  const [lookupLoading, setLookupLoading] = useState(false);
-  const [lookupError, setLookupError] = useState<string | null>(null);
   const [isMutating, setIsMutating] = useState(false);
   const [faultyEntities, setFaultyEntities] = useState<MaintenanceTypes.FaultyEntity[]>([]);
   const [maintenanceActions, setMaintenanceActions] = useState<MaintenanceTypes.MaintenanceAction[]>([]);
@@ -167,8 +155,7 @@ export default function MaintenancePage() {
 
   useEffect(() => {
     if (searchParams.get('lookup') === 'true') {
-      setIsLookupOpen(true);
-      router.replace('/maintenance', { scroll: false });
+      router.replace('/maintenance/lookup');
     }
   }, [searchParams, router]);
 
@@ -192,124 +179,6 @@ export default function MaintenancePage() {
     data: MaintenanceTypes.CreateMaintenanceCasePayload | MaintenanceTypes.UpdateMaintenanceCasePayload
   ) => {
     await handleUpdate(data as MaintenanceTypes.UpdateMaintenanceCasePayload);
-  };
-
-  const handleLookup = async (serialNumberValue: string) => {
-    setLookupError(null);
-    setLookupLoading(true);
-    setLookupResponse(null);
-    setLookupCaseId(null);
-
-    try {
-      const response = await lookupEntityBySerialNumber(serialNumberValue);
-      setLookupResponse(response);
-    } catch (err) {
-      setLookupError(
-        formatMaintenanceApiError(
-          err,
-          `No entity found with serial number '${serialNumberValue}'.`
-        )
-      );
-    } finally {
-      setLookupLoading(false);
-    }
-  };
-
-  const handleCreateCaseFromLookup = async () => {
-    if (!lookupResponses) {
-      toast.error('No lookup result available to create a case.');
-      return;
-    }
-    if (!lookupResponses.project_id) {
-      toast.error('Lookup result has no project — cannot open a case.');
-      return;
-    }
-
-    let supportOverride: string | undefined;
-    try {
-      const { data: support } =
-        await maintenanceApi.maintenanceCases.getProductionSupport(
-          lookupResponses.project_id
-        );
-      if (support.requires_override) {
-        const reason = window.prompt(
-          `Production support ended${
-            support.production_support_date ? ` on ${support.production_support_date}` : ''
-          }. Enter an override reason to open the case anyway:`
-        );
-        if (!reason?.trim()) {
-          setLookupError('Override reason is required when production support has ended.');
-          return;
-        }
-        supportOverride = reason.trim();
-      }
-    } catch {
-      // If preview fails, allow create and let the API enforce the gate.
-    }
-
-    const payload: MaintenanceTypes.CreateMaintenanceCasePayload = {
-      project_id: lookupResponses.project_id,
-      description: `Maintenance case for ${lookupResponses.matched_label}`,
-      status: MaintenanceTypes.CaseStatus.Open,
-      entity_id: lookupResponses.matched_entity_id,
-      entity_type: lookupResponses.matched_entity_type.toLowerCase(),
-      part_number: lookupResponses.matched_entity_PartNumber,
-      support_override_reason: supportOverride,
-    };
-    try {
-      const created = await createMaintenanceCase(payload);
-      invalidateCaseQueries();
-      setLookupCaseId(created.id);
-      setLookupError(null);
-      toast.success(`Created maintenance case #${created.id}`);
-    } catch (err) {
-      // Toast is handled by data store; also show inline in the lookup dialog.
-      setLookupError(
-        formatMaintenanceApiError(
-          err,
-          'An open maintenance case already exists for this serial number.'
-        )
-      );
-    }
-  };
-
-  const handleSuspectChildren = async () => {
-    if (!lookupResponses || !lookupCaseId) return;
-
-    try {
-      await suspectChildren(lookupCaseId, {
-        entity_type: lookupResponses.matched_entity_type.toLowerCase(),
-        entity_id: lookupResponses.matched_entity_id,
-        fault_type: FaultType.UNCLASSIFIED,
-        entity_status: FaultyEntityStatus.SUSPECTED,
-        fault_description: `Suspected issue on ${lookupResponses.matched_label}`,
-        entity_name: lookupResponses.matched_label,
-        serial_number: lookupResponses.matched_entity_serialNumber,
-        part_number: lookupResponses.matched_entity_PartNumber,
-        children: lookupResponses.descendants,
-      });
-      toast.success('Children suspicion workflow started.');
-    } catch (err) {
-      console.error('Suspect children failed:', err);
-      throw err;
-    }
-  };
-
-  const handleConfirmFault = async (node: MaintenanceTypes.EntityLookupNode) => {
-    if (!lookupResponses || !lookupCaseId) return;
-
-    try {
-      await confirmFault(lookupCaseId, {
-        confirmed_entity_type: node.entity_type.toLowerCase(),
-        confirmed_entity_id: node.entity_id,
-        fault_type: 'confirmed',
-        fault_description: `Fault confirmed for ${node.label}`,
-        parent_faulty_entity_id: lookupResponses.matched_entity_id,
-      });
-      toast.success(`Confirmed fault for ${node.label}`);
-    } catch (err) {
-      console.error('Confirm fault failed:', err);
-    }
   };
 
   const handleDelete = async (caseItem: MaintenanceTypes.MaintenanceCase) => {
@@ -440,28 +309,11 @@ export default function MaintenancePage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">
-            Maintenance Management
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            <Link
-              href="/maintenance/warranty-claims"
-              className="text-foreground underline-offset-4 hover:underline"
-            >
-              OEM warranty claims
-            </Link>
-            {' · '}
-            Track maintenance cases, faulty entities, repairs, and deliveries
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={() => setIsLookupOpen(true)} variant="secondary" className="gap-2">
-            <Search className="h-4 w-4" />
-            Lookup
-          </Button>
-        </div>
+      <div>
+        <h2 className="text-base font-semibold tracking-tight">Cases</h2>
+        <p className="text-sm text-muted-foreground">
+          Track maintenance cases, faulty entities, repairs, and deliveries.
+        </p>
       </div>
 
       <MaintenanceMiniDashboard
@@ -563,35 +415,6 @@ export default function MaintenancePage() {
           loading={pagination.fetching}
         />
       </div>
-
-      <MaintenanceLookupDialog
-        isOpen={isLookupOpen}
-        onOpenChange={(open) => {
-          setIsLookupOpen(open);
-          if (!open) {
-            setLookupResponse(null);
-            setLookupError(null);
-            setLookupCaseId(null);
-            setSerialNumber('');
-          }
-        }}
-        serialNumber={serialNumber}
-        setSerialNumber={setSerialNumber}
-        onLookup={handleLookup}
-        onClearLookup={() => {
-          setLookupResponse(null);
-          setLookupError(null);
-          setLookupCaseId(null);
-          setSerialNumber('');
-        }}
-        onCreateCase={handleCreateCaseFromLookup}
-        lookupResponse={lookupResponses}
-        caseId={lookupCaseId}
-        lookupLoading={lookupLoading}
-        lookupError={lookupError}
-        onSuspectChildren={handleSuspectChildren}
-        onConfirmFault={handleConfirmFault}
-      />
 
       <MaintenanceCaseDialog
         isOpen={isEditOpen}
