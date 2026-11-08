@@ -860,7 +860,12 @@ export function DualTrackBoardPanel({
                   ) : null}
 
                   {canHmAct || canPdDecide ? (
-                    <Can permission={P.maintenance_replacement_request}>
+                    <Can
+                      permission={[
+                        P.maintenance_assign_me,
+                        P.maintenance_replacement_approve,
+                      ]}
+                    >
                       <div className="space-y-3 rounded-lg border border-border/70 bg-background/80 p-3">
                         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           <UserRound className="h-3.5 w-3.5" />
@@ -931,31 +936,33 @@ export function DualTrackBoardPanel({
                         ) : null}
 
                         {canHmAct ? (
-                          <div className="flex flex-wrap gap-2">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="secondary"
-                              disabled={busy}
-                              onClick={() => void runAssign()}
-                            >
-                              Assign ME
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              disabled={busy}
-                              onClick={() => void runReserve()}
-                            >
-                              Reserve inventory
-                            </Button>
-                          </div>
+                          <Can permission={P.maintenance_assign_me}>
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                disabled={busy}
+                                onClick={() => void runAssign()}
+                              >
+                                Assign ME
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={busy}
+                                onClick={() => void runReserve()}
+                              >
+                                Reserve inventory
+                              </Button>
+                            </div>
+                          </Can>
                         ) : null}
 
                         {canPdDecide ? (
-                          <>
-                            <Separator />
+                          <Can permission={P.maintenance_replacement_approve}>
                             <div className="space-y-2">
+                              <Separator />
                               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                 PD decision
                               </p>
@@ -990,14 +997,14 @@ export function DualTrackBoardPanel({
                                 </Button>
                               </div>
                             </div>
-                          </>
+                          </Can>
                         ) : null}
                       </div>
                     </Can>
                   ) : null}
 
                   {canMeRequestIssue ? (
-                    <Can permission={P.maintenance_replacement_request}>
+                    <Can permission={P.maintenance_request_issue}>
                       <div className="space-y-2 rounded-lg border border-border/70 p-3">
                         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           ME — request IM issue
@@ -1017,7 +1024,7 @@ export function DualTrackBoardPanel({
                   {canImIssue ? (
                     <Can
                       permission={[
-                        P.maintenance_replacement_request,
+                        P.maintenance_im_issue,
                         P.issue_inventory,
                         P.inventory_issue_workflow,
                       ]}
@@ -1084,7 +1091,7 @@ export function DualTrackBoardPanel({
                   ) : null}
 
                   {canPdAit ? (
-                    <Can permission={P.maintenance_replacement_request}>
+                    <Can permission={P.maintenance_ait_approve}>
                       <div className="space-y-2 rounded-lg border border-border/70 p-3">
                         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           PD — AIT approve / reject
@@ -1131,7 +1138,12 @@ export function DualTrackBoardPanel({
                   ) : null}
 
                   {canAbort ? (
-                    <Can permission={P.maintenance_replacement_request}>
+                    <Can
+                      permission={[
+                        P.maintenance_replacement_approve,
+                        P.maintenance_case_close,
+                      ]}
+                    >
                       <div className="pt-1">
                         <Button
                           type="button"
@@ -1190,7 +1202,7 @@ export function DualTrackBoardPanel({
               ) : null}
 
               {canReception ? (
-                <Can permission={P.edit_maintenance_cases}>
+                <Can permission={P.maintenance_reception}>
                   <Button
                     type="button"
                     size="sm"
@@ -1207,7 +1219,7 @@ export function DualTrackBoardPanel({
               ) : null}
 
               {canAssignIe ? (
-                <Can permission={P.edit_maintenance_cases}>
+                <Can permission={P.maintenance_assign_ie}>
                   <div className="space-y-2 rounded-lg border border-border/70 p-3">
                     <HierarchySearchCombobox
                       label="Inspection engineer"
@@ -1254,7 +1266,7 @@ export function DualTrackBoardPanel({
               ) : null}
 
               {canImIssueToIe ? (
-                <Can permission={P.edit_maintenance_cases}>
+                <Can permission={P.maintenance_im_issue_to_ie}>
                   <Button
                     type="button"
                     size="sm"
@@ -1328,7 +1340,7 @@ export function DualTrackBoardPanel({
               ) : null}
 
               {canConfirmDiscard ? (
-                <Can permission={P.edit_maintenance_cases}>
+                <Can permission={P.maintenance_confirm_discard}>
                   <Button
                     type="button"
                     size="sm"
@@ -1369,7 +1381,7 @@ export function DualTrackBoardPanel({
               ) : null}
 
               {canPdRepair ? (
-                <Can permission={P.edit_maintenance_cases}>
+                <Can permission={P.maintenance_repair_approve}>
                   <div className="space-y-2 rounded-lg border border-border/70 p-3">
                     <Label htmlFor="track-b-repair-reject">Reject reason (if reject)</Label>
                     <Input

@@ -63,10 +63,6 @@ export const CRUD_MODULES: CrudModuleDef[] = [
     key: 'maintenance',
     label: 'Maintenance Logs',
     resource: 'maintenance',
-    extras: [
-      { code: 'approve_maintenance', label: 'Approve' },
-      { code: 'close_maintenance', label: 'Close' },
-    ],
   },
   { key: 'maintenance_cases', label: 'Maintenance Cases', resource: 'maintenance_cases' },
   {
@@ -86,7 +82,6 @@ export const CRUD_MODULES: CrudModuleDef[] = [
     key: 'maintenance_deliveries',
     label: 'Maintenance Deliveries',
     resource: 'maintenance_deliveries',
-    extras: [{ code: 'confirm_maintenance_deliveries', label: 'Confirm deliveries' }],
   },
   { key: 'configuration_history', label: 'Configuration History', resource: 'configuration_history' },
 ];
@@ -136,6 +131,119 @@ export const TOGGLE_SECTIONS: ToggleSectionDef[] = [
       { code: 'inventory.label.print', label: 'Print labels' },
       { code: 'inventory.label.scan', label: 'Scan labels' },
       { code: 'inventory.label.manage', label: 'Manage labels' },
+    ],
+  },
+  {
+    key: 'mmhd_track_a',
+    label: 'Maintenance workflow — Track A (Replacement)',
+    description:
+      'Immediate replacement path: request, PD approval, assign ME, IM issue, AIT',
+    permissions: [
+      {
+        code: 'maintenance.occurrence_report',
+        label: 'Occurrence report',
+        description: 'Record onsite / occurrence report on a case',
+      },
+      {
+        code: 'maintenance.replacement_request',
+        label: 'Replacement request',
+        description: 'Create a Track A replacement request (ME)',
+      },
+      {
+        code: 'maintenance.replacement_approve',
+        label: 'Approve / reject replacement',
+        description: 'PD decision on awaiting replacement approval',
+      },
+      {
+        code: 'maintenance.assign_me',
+        label: 'Assign ME',
+        description: 'Assign maintenance engineer and reserve stock (HM/PD)',
+      },
+      {
+        code: 'maintenance.request_issue',
+        label: 'Request inventory issue',
+        description: 'ME requests IM to issue reserved replacement stock',
+      },
+      {
+        code: 'maintenance.im_issue',
+        label: 'Issue new inventory (Track A)',
+        description: 'IM issues reserved replacement inventory',
+      },
+      {
+        code: 'maintenance.ait_upload',
+        label: 'Start / upload AIT',
+        description: 'ME starts AIT and uploads evidence',
+      },
+      {
+        code: 'maintenance.ait_approve',
+        label: 'Approve / reject AIT',
+        description: 'PD decision on AIT results',
+      },
+    ],
+  },
+  {
+    key: 'mmhd_track_b',
+    label: 'Maintenance workflow — Track B (Inspection / rework)',
+    description:
+      'Faulty return path: reception, assign IE, issue to IE, disposition, repair',
+    permissions: [
+      {
+        code: 'maintenance.reception',
+        label: 'Record reception',
+        description: 'IM records faulty-unit arrival reception',
+      },
+      {
+        code: 'maintenance.assign_ie',
+        label: 'Assign IE',
+        description: 'Assign inspection engineer on Track B (PD/HM)',
+      },
+      {
+        code: 'maintenance.im_issue_to_ie',
+        label: 'Issue to IE',
+        description: 'IM issues faulty unit to IE for inspection',
+      },
+      {
+        code: 'maintenance.inspection_disposition',
+        label: 'Inspection disposition',
+        description: 'IE disposition, handover request, and repair submit',
+      },
+      {
+        code: 'maintenance.repair_approve',
+        label: 'Approve / reject repair',
+        description: 'PD decision on Track B repair outcome',
+      },
+      {
+        code: 'maintenance.confirm_discard',
+        label: 'Confirm discard',
+        description: 'IM confirms discard of unrepairable returned unit',
+      },
+    ],
+  },
+  {
+    key: 'mmhd_case',
+    label: 'Maintenance workflow — Case actions',
+    description: 'Case-level controls shared across tracks',
+    permissions: [
+      {
+        code: 'maintenance.case_close',
+        label: 'Close / resolve case',
+        description: 'Close or resolve a maintenance case',
+      },
+      {
+        code: 'close_maintenance',
+        label: 'Close maintenance log',
+        description: 'Close legacy maintenance log entries',
+      },
+      {
+        code: 'approve_maintenance',
+        label: 'Approve maintenance log',
+        description: 'Approve legacy maintenance log entries',
+      },
+      {
+        code: 'confirm_maintenance_deliveries',
+        label: 'Confirm deliveries',
+        description: 'Confirm maintenance delivery records',
+      },
     ],
   },
   {
