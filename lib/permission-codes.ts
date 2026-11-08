@@ -315,9 +315,8 @@ export const NAV_PERMISSIONS: Record<string, PermissionCode | PermissionCode[]> 
   '/inspect-queue': P.item_inspect,
   '/config-changes': [P.config_change_approve, P.config_change_request],
   '/audit': P.audit_read,
-  '/my-assignments': MY_ASSIGNMENTS_PERMISSIONS,
-  '/my-assignments/bhd': BHD_ASSIGNMENTS_PERMISSIONS,
-  '/my-assignments/mmhd': MMHD_ASSIGNMENTS_PERMISSIONS,
+  // My Assignments (BHD/MMHD) are available to every signed-in user; lists are
+  // personalized server-side (assigned / acted / approval-authorized only).
   '/verify-queue': P.item_verify,
   '/maintenance': P.view_maintenance_cases,
   '/maintenance/lookup': P.view_maintenance_cases,
@@ -398,8 +397,9 @@ export const LANDING_CANDIDATES: Array<{
   { href: '/executive-dashboard', permission: P.view_executive_dashboard },
   { href: '/hierarchy-dashboard', permission: P.view_hierarchy_dashboard },
   { href: '/inventory', permission: P.view_inventory },
-  { href: '/my-assignments/bhd', permission: BHD_ASSIGNMENTS_PERMISSIONS },
-  { href: '/my-assignments/mmhd', permission: MMHD_ASSIGNMENTS_PERMISSIONS },
+  // Prefer assignments home for field roles; routes are open to all signed-in users.
+  { href: '/my-assignments/bhd', permission: [] as PermissionCode[] },
+  { href: '/my-assignments/mmhd', permission: [] as PermissionCode[] },
   { href: '/projects', permission: P.view_projects },
   { href: '/maintenance', permission: P.view_maintenance_cases },
   { href: '/systems', permission: P.view_systems },
@@ -424,7 +424,7 @@ export const ROLE_LANDING: Array<{
   {
     role: 'DEV',
     href: '/my-assignments/bhd',
-    permission: BHD_ASSIGNMENTS_PERMISSIONS,
+    permission: [] as PermissionCode[],
   },
 ];
 
@@ -476,14 +476,12 @@ export function routePermissionForPath(pathname: string): PermissionCode | Permi
   if (normalized === '/inspect-queue' || normalized.startsWith('/inspect-queue/')) {
     return NAV_PERMISSIONS['/inspect-queue'];
   }
-  if (normalized === '/my-assignments/bhd' || normalized.startsWith('/my-assignments/bhd/')) {
-    return NAV_PERMISSIONS['/my-assignments/bhd'];
-  }
-  if (normalized === '/my-assignments/mmhd' || normalized.startsWith('/my-assignments/mmhd/')) {
-    return NAV_PERMISSIONS['/my-assignments/mmhd'];
-  }
-  if (normalized === '/my-assignments' || normalized.startsWith('/my-assignments/')) {
-    return NAV_PERMISSIONS['/my-assignments'];
+  if (
+    normalized === '/my-assignments' ||
+    normalized.startsWith('/my-assignments/')
+  ) {
+    // Authenticated shell is enough — inbox rows are filtered per user.
+    return null;
   }
   if (normalized === '/verify-queue' || normalized.startsWith('/verify-queue/')) {
     return NAV_PERMISSIONS['/verify-queue'];

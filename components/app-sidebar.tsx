@@ -171,13 +171,13 @@ const NAV_BY_HREF: Record<string, NavItem> = {
     label: "BHD assignments",
     href: "/my-assignments/bhd",
     icon: ListChecks,
-    permission: NAV_PERMISSIONS["/my-assignments/bhd"] as PermissionCode[],
+    // Always visible — task list is filtered to the signed-in user.
   },
   "/my-assignments/mmhd": {
     label: "MMHD Assignments",
     href: "/my-assignments/mmhd",
     icon: Wrench,
-    permission: NAV_PERMISSIONS["/my-assignments/mmhd"] as PermissionCode[],
+    // Always visible — task list is filtered to the signed-in user.
   },
   "/verify-queue": {
     label: "Verify Installations",
@@ -613,8 +613,9 @@ export function AppSidebar() {
   );
 
   const visibleMyAssignments = useMemo(
-    () => myAssignmentsItems.filter((item) => canSeeItem(item, can)),
-    [can]
+    // BHD + MMHD are always shown; content is personalized by the APIs.
+    () => myAssignmentsItems,
+    []
   );
 
   const visibleMaintenance = useMemo(
@@ -815,7 +816,7 @@ export function AppSidebar() {
           label: "My Assignments",
           icon: ListChecks,
           items: visibleMyAssignments,
-          href: "/my-assignments",
+          // Parent is expand/collapse only — open BHD or MMHD child links.
         });
       case "inventory-system":
         return renderCollapsibleGroup({
