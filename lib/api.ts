@@ -1117,6 +1117,8 @@ export const maintenanceLogs = {
 
 // Maintenance Cases
 export const maintenanceCases = {
+  listMyAssignments: () =>
+    api.get<Models.MaintenanceAssignedWork[]>('/maintenance-assignments/mine/'),
   list: (skip = 0, limit = 100, filters?: ListFilterParams) =>
     api.get<Models.MaintenanceCase[]>('/maintenance-cases/', {
       params: listParams(skip, limit, undefined, filters),

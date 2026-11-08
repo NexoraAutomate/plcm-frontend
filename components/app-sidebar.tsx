@@ -167,11 +167,17 @@ const NAV_BY_HREF: Record<string, NavItem> = {
     icon: ScrollText,
     permission: NAV_PERMISSIONS["/audit"] as PermissionCode,
   },
-  "/my-assignments": {
-    label: "My Assignments",
-    href: "/my-assignments",
+  "/my-assignments/bhd": {
+    label: "BHD assignments",
+    href: "/my-assignments/bhd",
     icon: ListChecks,
-    permission: NAV_PERMISSIONS["/my-assignments"] as PermissionCode[],
+    permission: NAV_PERMISSIONS["/my-assignments/bhd"] as PermissionCode[],
+  },
+  "/my-assignments/mmhd": {
+    label: "MMHD Assignments",
+    href: "/my-assignments/mmhd",
+    icon: Wrench,
+    permission: NAV_PERMISSIONS["/my-assignments/mmhd"] as PermissionCode[],
   },
   "/verify-queue": {
     label: "Verify Installations",
@@ -219,6 +225,11 @@ const maintenanceItems: NavItem[] = [
   NAV_BY_HREF["/maintenance"],
   NAV_BY_HREF["/maintenance/lookup"],
   NAV_BY_HREF["/maintenance/warranty-claims"],
+];
+
+const myAssignmentsItems: NavItem[] = [
+  NAV_BY_HREF["/my-assignments/bhd"],
+  NAV_BY_HREF["/my-assignments/mmhd"],
 ];
 
 const administrationItems: NavItem[] = [
@@ -343,7 +354,6 @@ const HIERARCHY_LABEL_BY_HREF: Record<string, string> = {
 const ENTRY_HREF: Partial<Record<SidebarEntryKey, string>> = {
   "executive-dashboard": "/executive-dashboard",
   "hierarchy-dashboard": "/hierarchy-dashboard",
-  "my-assignments": "/my-assignments",
   customers: "/customers",
   orders: "/orders",
   projects: "/projects",
@@ -361,6 +371,7 @@ function canSeeItem(
 }
 
 type CollapsibleGroupId =
+  | "my-assignments"
   | "inventory-system"
   | "maintenance"
   | "project-hierarchy"
@@ -380,6 +391,7 @@ function pathMatchesAny(pathname: string, items: { href: string }[]) {
 const ALL_NAV_HREFS: string[] = Array.from(
   new Set([
     ...Object.values(NAV_BY_HREF).map((item) => item.href),
+    ...myAssignmentsItems.map((item) => item.href),
     ...inventorySystemItems.map((item) => item.href),
     ...maintenanceItems.map((item) => item.href),
     ...administrationItems.map((item) => item.href),
@@ -554,6 +566,7 @@ export function AppSidebar() {
   const [openGroups, setOpenGroups] = useState<
     Record<CollapsibleGroupId, boolean>
   >({
+    "my-assignments": false,
     "inventory-system": false,
     maintenance: false,
     "project-hierarchy": false,
@@ -599,6 +612,11 @@ export function AppSidebar() {
     [can, entityLabel]
   );
 
+  const visibleMyAssignments = useMemo(
+    () => myAssignmentsItems.filter((item) => canSeeItem(item, can)),
+    [can]
+  );
+
   const visibleMaintenance = useMemo(
     () => maintenanceItems.filter((item) => canSeeItem(item, can)),
     [can]
@@ -636,6 +654,7 @@ export function AppSidebar() {
         }
       };
       openIf("reporting", pathname.startsWith("/reporting"));
+      openIf("my-assignments", pathMatchesAny(pathname, visibleMyAssignments));
       openIf("inventory-system", pathMatchesAny(pathname, visibleInventorySystem));
       openIf("maintenance", pathMatchesAny(pathname, visibleMaintenance));
       openIf("project-hierarchy", pathMatchesAny(pathname, visibleHierarchy));
@@ -645,6 +664,7 @@ export function AppSidebar() {
     });
   }, [
     pathname,
+    visibleMyAssignments,
     visibleInventorySystem,
     visibleMaintenance,
     visibleHierarchy,
@@ -789,6 +809,14 @@ export function AppSidebar() {
 
   const renderEntry = (entry: SidebarEntryKey) => {
     switch (entry) {
+      case "my-assignments":
+        return renderCollapsibleGroup({
+          id: "my-assignments",
+          label: "My Assignments",
+          icon: ListChecks,
+          items: visibleMyAssignments,
+          href: "/my-assignments",
+        });
       case "inventory-system":
         return renderCollapsibleGroup({
           id: "inventory-system",

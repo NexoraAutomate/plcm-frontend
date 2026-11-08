@@ -174,25 +174,25 @@ function preferredHrefs(item: AppNotification, allowProject: boolean): string[] 
     if (allowProject) hrefs.push(projectReservationsHref(projectId));
     hrefs.push(inventoryReservedHref(item), '/inventory');
   } else if (ISSUE_RETURN_TYPES.has(type)) {
-    hrefs.push('/my-assignments', '/inventory/issuances', '/issue-queue', '/inventory');
+    hrefs.push('/my-assignments/bhd', '/inventory/issuances', '/issue-queue', '/inventory');
   } else if (type === 'item_request_created') {
-    hrefs.push('/issue-queue', '/my-assignments');
+    hrefs.push('/issue-queue', '/my-assignments/bhd');
   } else if (type === 'item_request_marked_back') {
-    hrefs.push('/my-assignments', '/issue-queue');
+    hrefs.push('/my-assignments/bhd', '/issue-queue');
   } else if (type === 'developer_assigned' || type === 'developer_unassigned') {
-    hrefs.push('/my-assignments');
+    hrefs.push('/my-assignments/bhd');
     if (allowProject) hrefs.push(projectHref(projectId));
   } else if (type === 'handover_requested') {
-    hrefs.push('/verify-queue', '/my-assignments');
+    hrefs.push('/verify-queue', '/my-assignments/bhd');
     if (allowProject) hrefs.push(projectHref(projectId));
   } else if (type === 'verified_installed' || type === 'install_started' || type === 'test_passed') {
-    hrefs.push('/verify-queue', '/my-assignments');
+    hrefs.push('/verify-queue', '/my-assignments/bhd');
     if (allowProject) hrefs.push(projectHref(projectId));
   } else if (type === 'test_failed') {
     hrefs.push('/inspect-queue', '/verify-queue', '/inventory');
     if (allowProject) hrefs.push(projectHref(projectId));
   } else if (INSPECT_TYPES.has(type)) {
-    hrefs.push('/inspect-queue', '/inventory', '/my-assignments');
+    hrefs.push('/inspect-queue', '/inventory', '/my-assignments/bhd');
     if (allowProject) hrefs.push(projectHref(projectId));
   } else if (type.startsWith('config_change')) {
     hrefs.push('/config-changes');

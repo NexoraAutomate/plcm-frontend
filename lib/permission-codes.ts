@@ -183,12 +183,32 @@ export const P = {
 
 export type PermissionCode = (typeof P)[keyof typeof P];
 
-/** Any of these grants the My assignments page (sidebar + route). */
-export const MY_ASSIGNMENTS_PERMISSIONS: PermissionCode[] = [
+/** BHD hierarchy developer assignments (sidebar child + route). */
+export const BHD_ASSIGNMENTS_PERMISSIONS: PermissionCode[] = [
   P.view_my_assignments,
   P.item_request,
   P.item_install_test,
   P.hierarchy_assign_developer,
+];
+
+/** MMHD maintenance dual-track inbox (sidebar child + route). */
+export const MMHD_ASSIGNMENTS_PERMISSIONS: PermissionCode[] = [
+  P.view_my_assignments,
+  P.view_maintenance_cases,
+  P.edit_maintenance_cases,
+  P.maintenance_replacement_request,
+  P.maintenance_ait_upload,
+  P.maintenance_inspection_disposition,
+  P.maintenance_occurrence_report,
+  P.inventory_issue_workflow,
+  P.issue_inventory,
+  P.item_inspect,
+];
+
+/** Any of these grants the My assignments nav group (sidebar parent). */
+export const MY_ASSIGNMENTS_PERMISSIONS: PermissionCode[] = [
+  ...BHD_ASSIGNMENTS_PERMISSIONS,
+  ...MMHD_ASSIGNMENTS_PERMISSIONS,
 ];
 
 /** Human-readable labels for tooltips (e.g. disabled export). */
@@ -263,6 +283,8 @@ export const NAV_PERMISSIONS: Record<string, PermissionCode | PermissionCode[]> 
   '/config-changes': [P.config_change_approve, P.config_change_request],
   '/audit': P.audit_read,
   '/my-assignments': MY_ASSIGNMENTS_PERMISSIONS,
+  '/my-assignments/bhd': BHD_ASSIGNMENTS_PERMISSIONS,
+  '/my-assignments/mmhd': MMHD_ASSIGNMENTS_PERMISSIONS,
   '/verify-queue': P.item_verify,
   '/maintenance': P.view_maintenance_cases,
   '/maintenance/lookup': P.view_maintenance_cases,
@@ -343,7 +365,8 @@ export const LANDING_CANDIDATES: Array<{
   { href: '/executive-dashboard', permission: P.view_executive_dashboard },
   { href: '/hierarchy-dashboard', permission: P.view_hierarchy_dashboard },
   { href: '/inventory', permission: P.view_inventory },
-  { href: '/my-assignments', permission: MY_ASSIGNMENTS_PERMISSIONS },
+  { href: '/my-assignments/bhd', permission: BHD_ASSIGNMENTS_PERMISSIONS },
+  { href: '/my-assignments/mmhd', permission: MMHD_ASSIGNMENTS_PERMISSIONS },
   { href: '/projects', permission: P.view_projects },
   { href: '/maintenance', permission: P.view_maintenance_cases },
   { href: '/systems', permission: P.view_systems },
@@ -367,8 +390,8 @@ export const ROLE_LANDING: Array<{
   { role: 'IM', href: '/inventory', permission: P.view_inventory },
   {
     role: 'DEV',
-    href: '/my-assignments',
-    permission: MY_ASSIGNMENTS_PERMISSIONS,
+    href: '/my-assignments/bhd',
+    permission: BHD_ASSIGNMENTS_PERMISSIONS,
   },
 ];
 
@@ -419,6 +442,12 @@ export function routePermissionForPath(pathname: string): PermissionCode | Permi
   }
   if (normalized === '/inspect-queue' || normalized.startsWith('/inspect-queue/')) {
     return NAV_PERMISSIONS['/inspect-queue'];
+  }
+  if (normalized === '/my-assignments/bhd' || normalized.startsWith('/my-assignments/bhd/')) {
+    return NAV_PERMISSIONS['/my-assignments/bhd'];
+  }
+  if (normalized === '/my-assignments/mmhd' || normalized.startsWith('/my-assignments/mmhd/')) {
+    return NAV_PERMISSIONS['/my-assignments/mmhd'];
   }
   if (normalized === '/my-assignments' || normalized.startsWith('/my-assignments/')) {
     return NAV_PERMISSIONS['/my-assignments'];

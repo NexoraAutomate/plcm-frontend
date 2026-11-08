@@ -1,4 +1,4 @@
-# Current Feature: My Assignments Tabs & Cleanup
+# Current Feature: My Assignments — BHD / MMHD Sub-tabs
 
 ## Status
 
@@ -6,24 +6,29 @@ In Progress
 
 ## Goals
 
-- [x] Add three tabs on My Assignments using the existing multitab layout: New Assignments, Under Process, Completed Assignments
-- [x] Segregate tasks into those tabs by lifecycle (new → under process when worked → completed when done); apply to current records
-- [x] Remove redundant Projects and Item Category filters
-- [x] Regroup workflow status filters by category with modern, self-explanatory color schemas
-- [x] Show "Physical issue stays with Inventory Manager. Assignment can be reverted by HM until the item is issued." as a tooltip on the Assigned items heading (not as CardDescription)
-- [x] Admin can permanently delete completed tasks only; new and in-progress tasks cannot be deleted
+- [x] Sidebar **My Assignments** group with children **BHD assignments** and **MMHD Assignments** (not page-level domain tabs)
+- [x] Keep all existing hierarchy developer assignments under **BHD assignments** (current New / Under Process / Completed lifecycle tabs, filters, actions)
+- [x] Add **MMHD Assignments** for maintenance-related work queues: PD replacement approval, Maintenance Engineer, Inventory Manager, Inspection Engineer, and related dual-track tasks
+- [x] Backend: personal list endpoint aggregating maintenance assignments for the current user (mirror `/item-assignments/mine/` pattern)
+- [x] MMHD panel: list/filter with deep links (or actions) into maintenance case dual-track workflow
+- [x] Permissions / pending-action counts: MMHD roles can see their queue; separate BHD/MMHD badges on sidebar children
 
 ## Notes
 
-- Page: `/my-assignments` (`app/(dashboard)/my-assignments/page.tsx` + `components/inventory/my-assignments-panel.tsx`)
-- Multitab: `AnimatedPillTabsList`
-- Lifecycle: New = not started; Under Process = requested/issued/install/test/rework/etc.; Completed = verified
-- Admin delete: `DELETE /item-assignments/{entity_type}/{entity_id}/` clears assignment after verify; Admin list sees all assignments
-- Pending: manual UI check on localhost:3000/my-assignments
+- Sidebar: **My Assignments** collapsible group → children **BHD assignments** (`/my-assignments/bhd`) and **MMHD Assignments** (`/my-assignments/mmhd`)
+- `/my-assignments` redirects to `/my-assignments/bhd`
+- BHD panel: `components/inventory/my-assignments-panel.tsx` → `GET /item-assignments/mine/`
+- MMHD panel: `components/maintenance/mmhd-assignments-panel.tsx` → `GET /maintenance-assignments/mine/`
+- Pending badges: `my_assignments` (BHD) + `mmhd_assignments` (MMHD); parent group sums both
+- Inline MMHD actions for PD/ME/IE/IM + View case; AIT file upload deep-links to case
+- Pending: manual UI check on localhost for both sidebar children
 
 ## History
 
 <!-- Completed features (append only) -->
+
+### My Assignments Tabs & Cleanup
+Three lifecycle tabs (New / Under Process / Completed); removed Projects & Item Category filters; regrouped status chips; Assigned items tooltip; Admin delete completed only. Pending: manual UI check.
 
 ### Maintenance Occurrence Report + Dual-Track Replacement
 P0–P6 complete. Occurrence Report + ReplacementRequest dual-track (Track A AIT / Track B IE) + close gate. CR-MHD-20261107 **Approved with deviations** (GAP-07 customer ack, GAP-08 never-returned SLA, GAP-11 QR custody). Evidence: `plcm-backend/reports/TR-MHD-20261107-P6.md`, `plcm-backend/reports/CR-MHD-20261107.md`; matrix Must Satisfied.

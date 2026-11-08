@@ -1333,6 +1333,7 @@ export interface InventorySeedOptions {
 export interface PendingActionCounts {
   verify_queue: number
   my_assignments: number
+  mmhd_assignments: number
   issue_queue: number
   inspect_queue: number
   issuances: number
@@ -2045,6 +2046,53 @@ export interface DualTrackBoard {
   track_b_reception_date?: string | null;
   track_b_discarded?: boolean;
   track_b_terminal?: boolean;
+}
+
+/** Personal MMHD inbox row from GET /maintenance-assignments/mine/ */
+export type MaintenanceAssignmentLifecycle = 'needs_action' | 'in_progress' | 'closed';
+
+export interface MaintenanceAssignedWork {
+  id: string;
+  track: 'a' | 'b' | string;
+  task_type: string;
+  case_id: number;
+  case_number?: string | null;
+  replacement_request_id?: number | null;
+  rework_id?: number | null;
+  status: string;
+  status_label: string;
+  lifecycle: MaintenanceAssignmentLifecycle | string;
+  needs_action: boolean;
+  project_id?: number | null;
+  project_name?: string | null;
+  entity_type?: string | null;
+  entity_id?: number | null;
+  part_number?: string | null;
+  serial_number?: string | null;
+  assigned_me_id?: number | null;
+  assigned_me_name?: string | null;
+  assigned_ie_id?: number | null;
+  assigned_ie_name?: string | null;
+  investigating_pd_id?: number | null;
+  investigating_pd_name?: string | null;
+  updated_at?: string | null;
+  href: string;
+  has_reservation?: boolean;
+  can_pd_decide?: boolean;
+  can_assign_me?: boolean;
+  can_me_request_issue?: boolean;
+  can_im_issue?: boolean;
+  can_start_ait?: boolean;
+  can_upload_ait?: boolean;
+  can_pd_ait?: boolean;
+  can_reception?: boolean;
+  can_assign_ie?: boolean;
+  can_handover?: boolean;
+  can_im_issue_to_ie?: boolean;
+  can_disposition?: boolean;
+  can_repair_submit?: boolean;
+  can_pd_repair?: boolean;
+  can_confirm_discard?: boolean;
 }
 
 export interface ReplacementRequestCreatePayload {

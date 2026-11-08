@@ -72,6 +72,7 @@ export const ROLE_SIDEBAR_ORDER: Record<WorkflowRoleCode, SidebarEntryKey[]> = {
   ],
   IM: [
     'inventory-system',
+    'my-assignments',
     'hierarchy-dashboard',
     'notifications',
     'reporting',

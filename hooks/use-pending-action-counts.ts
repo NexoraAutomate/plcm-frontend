@@ -10,6 +10,7 @@ import type { PendingActionCounts } from '@/lib/models';
 const EMPTY_COUNTS: PendingActionCounts = {
   verify_queue: 0,
   my_assignments: 0,
+  mmhd_assignments: 0,
   issue_queue: 0,
   inspect_queue: 0,
   issuances: 0,
@@ -22,7 +23,8 @@ const EMPTY_COUNTS: PendingActionCounts = {
 /** Map sidebar href → pending-action count field. */
 export const PENDING_COUNT_BY_HREF: Record<string, keyof PendingActionCounts> = {
   '/verify-queue': 'verify_queue',
-  '/my-assignments': 'my_assignments',
+  '/my-assignments/bhd': 'my_assignments',
+  '/my-assignments/mmhd': 'mmhd_assignments',
   '/issue-queue': 'issue_queue',
   '/inspect-queue': 'inspect_queue',
   '/inventory/issuances': 'issuances',
