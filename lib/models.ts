@@ -2118,6 +2118,18 @@ export interface ReplacementRequestReservePayload {
   notes?: string | null;
 }
 
+/** Free warehouse serial from GET .../replacement-requests/{id}/available-stock/ */
+export interface ReplacementStockOption {
+  inventory_id: number;
+  inventory_instance_id?: number | null;
+  name: string;
+  part_number: string;
+  serial_number: string;
+  configuration_item?: string | null;
+  oem_name?: string | null;
+  location?: string | null;
+}
+
 export interface ReplacementRequestPdDecisionPayload {
   decision: 'approve' | 'reject' | string;
   reject_reason?: string | null;

@@ -5,9 +5,8 @@ import Link from 'next/link';
 import { ExternalLink, Loader2, Search, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { inventory, maintenanceCases, users } from '@/lib/api';
-import { buildReplacementStockRows, type ReplacementStockRow } from '@/lib/entity-replacement';
-import { isInventoryInStock } from '@/lib/inventory-filter';
+import { maintenanceCases, users } from '@/lib/api';
+import { type ReplacementStockRow } from '@/lib/entity-replacement';
 import type { MaintenanceAssignedWork, User } from '@/lib/models';
 import { cn } from '@/lib/utils';
 import { formatMaintenanceApiError } from '@/services/maintenance';
@@ -181,31 +180,31 @@ export function MmhdAssignmentsPanel() {
   );
 
   const loadStockForRow = useCallback(async (row: MaintenanceAssignedWork) => {
-    const entityType = (row.entity_type || 'unit').trim().toLowerCase() || 'unit';
     setStockLoading(true);
     setStockRows([]);
     setPartNumber(row.part_number?.trim() || '');
     setStockKey('');
+    if (row.replacement_request_id == null) {
+      setStockLoading(false);
+      toast.error('This assignment has no replacement request to reserve against');
+      return;
+    }
     try {
-      const res = await inventory.list(0, 1000, entityType);
-      const typed = (res.data ?? []).filter(
-        (item) =>
-          item.inventory_type?.toLowerCase() === entityType && isInventoryInStock(item)
+      const res = await maintenanceCases.listReplacementStock(
+        row.case_id,
+        row.replacement_request_id
       );
-      const withInstances = await Promise.all(
-        typed.map(async (item) => {
-          if ((item.instances ?? []).length > 0 || Number(item.quantity) <= 0) {
-            return item;
-          }
-          try {
-            const instanceRes = await inventory.listInstances(item.id);
-            return { ...item, instances: instanceRes.data ?? [] };
-          } catch {
-            return item;
-          }
-        })
-      );
-      const rows = buildReplacementStockRows(withInstances.filter(isInventoryInStock));
+      const rows: ReplacementStockRow[] = (res.data ?? []).map((item, index) => ({
+        srNo: index + 1,
+        inventoryId: item.inventory_id,
+        instanceId: item.inventory_instance_id ?? undefined,
+        name: item.name,
+        partNumber: item.part_number || '—',
+        serialNumber: item.serial_number || '—',
+        configurationItem: item.configuration_item ?? undefined,
+        oemName: item.oem_name ?? undefined,
+        location: item.location ?? undefined,
+      }));
       setStockRows(rows);
       const preferredPn = (row.part_number || '').trim();
       if (preferredPn) {

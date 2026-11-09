@@ -237,7 +237,9 @@ export function DualTrackBoardPanel({
     '';
 
   useEffect(() => {
-    if (!entityTypeForStock) {
+    // Case-page reserve is an Admin override. PD reserves from MMHD assignments,
+    // and the warehouse catalog list is not visible to Project Director.
+    if (!isPrivilegedAdminRole(user?.roles) || !entityTypeForStock) {
       setStockRows([]);
       return;
     }
@@ -297,6 +299,7 @@ export function DualTrackBoardPanel({
     entityTypeForStock,
     maintenanceCase.faulty_entities,
     maintenanceCase.part_number,
+    user?.roles,
   ]);
 
   const applyRequest = (data: ReplacementRequest) => {

@@ -166,6 +166,9 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
     role_id: '',
     is_active: true,
   });
+  /** Only send password when the admin actually typed in the field (avoids autofill 400s). */
+  const [editPasswordTouched, setEditPasswordTouched] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({
     open: false,
     id: null,
@@ -285,7 +288,10 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
 
   async function handleUpdate() {
     if (!editingId) return;
-    const nextPassword = editFormData.password.trim();
+    const nextPassword =
+      editPasswordTouched && editFormData.password.trim()
+        ? editFormData.password.trim()
+        : '';
     const validationError = validateUserEditForm({
       fullName: editFormData.full_name,
       email: editFormData.email,
@@ -293,19 +299,33 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
       passwordPolicy,
     });
     if (validationError) {
-      setActionError({ open: true, title: 'Cannot update user', message: validationError });
+      setEditError(validationError);
       return;
     }
+    setEditError(null);
     try {
-      const userData: Partial<Models.User> & { password?: string; email?: string | null } = {
+      // Apply profile/status first so a password-policy failure cannot block status changes.
+      await api.users.update(editingId, {
         full_name: editFormData.full_name,
         email: editFormData.email.trim() || null,
         is_active: editFormData.is_active,
-      };
+      } as Partial<Models.User> & { email?: string | null });
+
       if (nextPassword) {
-        userData.password = nextPassword;
+        try {
+          await api.users.update(editingId, { password: nextPassword });
+        } catch (passwordErr) {
+          const message = apiErrorDetail(
+            passwordErr,
+            'Password was not changed. It must meet the password policy and cannot reuse a recent password.'
+          );
+          setEditError(message);
+          toast.success('User details updated, but password was not changed');
+          await pagination.invalidate();
+          await refreshStats();
+          return;
+        }
       }
-      await api.users.update(editingId, userData);
 
       // Only assign when the role actually changed. Re-sending the Admin role
       // (e.g. password-only edits) is blocked by the API as bootstrap-only.
@@ -328,21 +348,16 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
         role_id: '',
         is_active: true,
       });
+      setEditPasswordTouched(false);
+      setEditError(null);
       setEditingId(null);
       setIsEditOpen(false);
       toast.success('User updated successfully');
       await pagination.invalidate();
       await refreshStats();
     } catch (err) {
-      console.error('Failed to update user:', err);
-      setActionError({
-        open: true,
-        title: 'Cannot update user',
-        message: apiErrorDetail(
-          err,
-          'Update failed. If you entered a new password, it must meet the password policy.'
-        ),
-      });
+      const message = apiErrorDetail(err, 'Failed to update user');
+      setEditError(message);
     }
   }
 
@@ -375,6 +390,8 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
     const firstRoleName = roleName(user.roles?.[0]);
     const foundRole = roles.find((r) => r.name === firstRoleName);
     setEditingId(user.id);
+    setEditPasswordTouched(false);
+    setEditError(null);
     setEditFormData({
       username: user.username,
       password: '',
@@ -701,15 +718,24 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
               <Label>New Password (optional)</Label>
               <Input
                 type="password"
+                name="new-user-password"
                 autoComplete="new-password"
                 value={editFormData.password}
-                onChange={(e) => setEditFormData({ ...editFormData, password: e.target.value })}
+                onChange={(e) => {
+                  setEditPasswordTouched(true);
+                  setEditFormData({ ...editFormData, password: e.target.value });
+                }}
                 placeholder="Leave blank to keep current password"
               />
               <p className="mt-1 text-xs text-muted-foreground">
                 Leave blank to keep the current password. {passwordPolicyHint(passwordPolicy)}
               </p>
             </div>
+            {editError ? (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {editError}
+              </div>
+            ) : null}
             {adminOnly && (
               <div className="flex items-center justify-between rounded-lg border px-3 py-3">
                 <div>

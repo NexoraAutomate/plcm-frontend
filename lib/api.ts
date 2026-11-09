@@ -1234,6 +1234,10 @@ export const maintenanceCases = {
       `/maintenance-cases/${caseId}/replacement-requests/${requestId}/assign-me/`,
       data
     ),
+  listReplacementStock: (caseId: number, requestId: number) =>
+    api.get<Models.ReplacementStockOption[]>(
+      `/maintenance-cases/${caseId}/replacement-requests/${requestId}/available-stock/`
+    ),
   reserveReplacement: (
     caseId: number,
     requestId: number,
