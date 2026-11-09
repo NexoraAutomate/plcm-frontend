@@ -754,7 +754,15 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       setUsers(users.filter((u) => u.id !== id));
       toast.success('User deleted successfully');
     } catch (err) {
-      toast.error('Failed to delete user');
+      const detail =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+          : undefined;
+      toast.error(
+        typeof detail === 'string' && detail.trim()
+          ? detail
+          : 'Cannot delete this user. Deactivate the user instead.'
+      );
       throw err;
     }
   };

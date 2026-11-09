@@ -58,13 +58,17 @@ Re-running is safe: existing `DEMO-*` configs, users, and serials are skipped.
 
 ## 3. Account cheat sheet
 
-| Username | Password | Role |
-|----------|----------|------|
-| `admin` | `password@82768243` | Admin |
-| `demo-pd` | `Demo@pd123` | ProjectDirector |
-| `demo-hm` | `Demo@hm123` | HierarchyManager |
-| `demo-im` | `Demo@im123` | InventoryManager |
-| `demo-dev` | `Demo@dev123` | Developer |
+| Username | Password | Email | Role |
+|----------|----------|-------|------|
+| `admin` | `password@82768243` | — | Admin |
+| `demo-pd` | `Demo@pd123` | `demo-pd@example.com` | ProjectDirector |
+| `demo-hm` | `Demo@hm123` | `demo-hm@example.com` | HierarchyManager |
+| `demo-im` | `Demo@im123` | `demo-im@example.com` | InventoryManager |
+| `demo-dev` | `Demo@dev123` | `demo-dev@example.com` | Developer |
+| `demo-me` | `Demo@me123` | `demo-me@example.com` | MaintenanceEngineer |
+| `demo-fse` | `Demo@fse123` | `demo-fse@example.com` | FieldServiceEngineer |
+| `demo-ie` | `Demo@ie123` | `demo-ie@example.com` | InspectionEngineer |
+| `demo-maintenance` | `Demo@maint123` | `demo-maintenance@example.com` | Maintenance (legacy) |
 
 Log out between role switches (or use a private window per role).
 

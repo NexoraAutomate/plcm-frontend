@@ -31,6 +31,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -169,6 +170,35 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
     open: false,
     id: null,
   });
+  const [actionError, setActionError] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+  }>({
+    open: false,
+    title: '',
+    message: '',
+  });
+
+  function apiErrorDetail(err: unknown, fallback: string): string {
+    const detail = axios.isAxiosError(err)
+      ? (err.response?.data as { detail?: unknown } | undefined)?.detail
+      : undefined;
+    if (typeof detail === 'string' && detail.trim()) return detail;
+    if (Array.isArray(detail)) {
+      const parts = detail
+        .map((item) =>
+          typeof item === 'string'
+            ? item
+            : item && typeof item === 'object' && 'msg' in item
+              ? String((item as { msg: unknown }).msg)
+              : null
+        )
+        .filter((part): part is string => Boolean(part));
+      if (parts.length) return parts.join(' ');
+    }
+    return fallback;
+  }
   const [historyUser, setHistoryUser] = useState<Models.User | null>(null);
   const [detailsUser, setDetailsUser] = useState<Models.User | null>(null);
 
@@ -255,24 +285,25 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
 
   async function handleUpdate() {
     if (!editingId) return;
+    const nextPassword = editFormData.password.trim();
     const validationError = validateUserEditForm({
       fullName: editFormData.full_name,
       email: editFormData.email,
-      password: editFormData.password,
+      password: nextPassword,
       passwordPolicy,
     });
     if (validationError) {
-      toast.error(validationError);
+      setActionError({ open: true, title: 'Cannot update user', message: validationError });
       return;
     }
     try {
-      const userData: Partial<Models.User> & { password?: string } = {
+      const userData: Partial<Models.User> & { password?: string; email?: string | null } = {
         full_name: editFormData.full_name,
-        email: editFormData.email,
+        email: editFormData.email.trim() || null,
         is_active: editFormData.is_active,
       };
-      if (editFormData.password) {
-        userData.password = editFormData.password;
+      if (nextPassword) {
+        userData.password = nextPassword;
       }
       await api.users.update(editingId, userData);
 
@@ -304,28 +335,39 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
       await refreshStats();
     } catch (err) {
       console.error('Failed to update user:', err);
-      const detail = axios.isAxiosError(err)
-        ? (err.response?.data as { detail?: string } | undefined)?.detail
-        : undefined;
-      toast.error(typeof detail === 'string' ? detail : 'Failed to update user');
+      setActionError({
+        open: true,
+        title: 'Cannot update user',
+        message: apiErrorDetail(
+          err,
+          'Update failed. If you entered a new password, it must meet the password policy.'
+        ),
+      });
     }
   }
 
   async function confirmDelete() {
     if (deleteConfirm.id === null) return;
+    const userId = deleteConfirm.id;
+    setDeleteConfirm({ open: false, id: null });
     try {
-      await api.users.delete(deleteConfirm.id);
+      await api.users.delete(userId);
       toast.success('User deleted successfully');
       await pagination.invalidate();
       await refreshStats();
     } catch (err) {
-      console.error('Failed to delete user:', err);
-      const detail = axios.isAxiosError(err)
-        ? (err.response?.data as { detail?: string } | undefined)?.detail
-        : undefined;
-      toast.error(typeof detail === 'string' ? detail : 'Failed to delete user');
-    } finally {
-      setDeleteConfirm({ open: false, id: null });
+      const message = apiErrorDetail(
+        err,
+        'Cannot delete this user. Deactivate the user instead.'
+      );
+      // Open after confirm dialog unmounts so the error modal is not blocked.
+      window.setTimeout(() => {
+        setActionError({
+          open: true,
+          title: 'Cannot delete user',
+          message,
+        });
+      }, 0);
     }
   }
 
@@ -336,8 +378,8 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
     setEditFormData({
       username: user.username,
       password: '',
-      full_name: user.full_name,
-      email: user.email,
+      full_name: user.full_name || '',
+      email: user.email || '',
       role_id: foundRole ? foundRole.id.toString() : '',
       is_active: user.is_active !== false,
     });
@@ -438,6 +480,7 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
                 <Label>Password *</Label>
                 <Input
                   type="password"
+                  autoComplete="new-password"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   placeholder="Set initial password"
@@ -658,10 +701,14 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
               <Label>New Password (optional)</Label>
               <Input
                 type="password"
+                autoComplete="new-password"
                 value={editFormData.password}
                 onChange={(e) => setEditFormData({ ...editFormData, password: e.target.value })}
                 placeholder="Leave blank to keep current password"
               />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Leave blank to keep the current password. {passwordPolicyHint(passwordPolicy)}
+              </p>
             </div>
             {adminOnly && (
               <div className="flex items-center justify-between rounded-lg border px-3 py-3">
@@ -728,6 +775,32 @@ export function UsersPanel({ embedded = false }: UsersPanelProps) {
         description="Are you sure you want to delete this user? This action cannot be undone."
         onConfirm={confirmDelete}
       />
+
+      <Dialog
+        open={actionError.open}
+        onOpenChange={(open) =>
+          setActionError((prev) => ({
+            ...prev,
+            open,
+            title: open ? prev.title : '',
+            message: open ? prev.message : '',
+          }))
+        }
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{actionError.title || 'Action failed'}</DialogTitle>
+            <DialogDescription>{actionError.message}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              onClick={() => setActionError({ open: false, title: '', message: '' })}
+            >
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <UserLoginHistoryDialog
         open={!!historyUser}
