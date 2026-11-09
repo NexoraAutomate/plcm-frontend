@@ -50,9 +50,9 @@ export function EntityNameWithFault({
   faultMap,
 }: EntityNameWithFaultProps) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex min-w-0 items-center gap-2">
       <EntityFaultPing entityType={entityType} entityId={entityId} faultMap={faultMap} />
-      <span>{name}</span>
+      <span className="truncate">{name}</span>
     </div>
   );
 }

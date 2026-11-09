@@ -17,6 +17,11 @@ const TABS = [
     match: (pathname: string) => pathname.startsWith('/maintenance/lookup'),
   },
   {
+    href: '/maintenance/returned-units',
+    label: 'Returned Units',
+    match: (pathname: string) => pathname.startsWith('/maintenance/returned-units'),
+  },
+  {
     href: '/maintenance/warranty-claims',
     label: 'Warranty claims',
     match: (pathname: string) => pathname.startsWith('/maintenance/warranty-claims'),

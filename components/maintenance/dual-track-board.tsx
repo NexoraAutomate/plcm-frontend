@@ -6,7 +6,6 @@ import {
   ClipboardList,
   Loader2,
   Package,
-  RefreshCw,
   ShieldAlert,
   UserRound,
   Wrench,
@@ -26,8 +25,10 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import { useAuth } from '@/lib/auth-context';
 import { HierarchySearchCombobox } from '@/components/hierarchy-dashboard/hierarchy-search-combobox';
 import { DiscardedBadge } from '@/components/inventory/discarded-badge';
 import { attachments, inventory, maintenanceCases, users } from '@/lib/api';
@@ -98,21 +99,45 @@ const TRACK_A_STEPS = [
   'patch_delivered',
 ] as const;
 
+type PdRejectOutcome = 'issue_fixed' | 'modification_required';
+
 interface DualTrackBoardPanelProps {
   maintenanceCase: MaintenanceCase;
   /** Bump to force a board refresh (e.g. after create CTA). */
   refreshKey?: number;
   onRequestUpdated?: (req: ReplacementRequest) => void;
+  /** Refresh parent case after PD reject closes it (issue_fixed). */
+  onCaseUpdated?: (next: MaintenanceCase) => void;
   /** Notifies parent when an open Track A request is present. */
   onOpenReplacementChange?: (hasOpen: boolean) => void;
+  /** PD rejected with modification_required — occurrence report becomes editable. */
+  onModificationRequiredChange?: (required: boolean) => void;
+  /** Live Track A progress for the case progress stepper branch. */
+  onTrackAProgressChange?: (
+    progress: {
+      status: string | null;
+      assignedMeId?: number | null;
+      hasReservation?: boolean;
+    } | null
+  ) => void;
+}
+
+function isModificationRequiredRequest(req?: ReplacementRequest | null) {
+  return (
+    req?.status === 'pd_rejected' && req.reject_outcome === 'modification_required'
+  );
 }
 
 export function DualTrackBoardPanel({
   maintenanceCase,
   refreshKey = 0,
   onRequestUpdated,
+  onCaseUpdated,
   onOpenReplacementChange,
+  onModificationRequiredChange,
+  onTrackAProgressChange,
 }: DualTrackBoardPanelProps) {
+  const { user } = useAuth();
   const [board, setBoard] = useState<DualTrackBoard | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -129,6 +154,7 @@ export function DualTrackBoardPanel({
 
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [rejectOutcome, setRejectOutcome] = useState<PdRejectOutcome | ''>('');
   const [aitRejectDialogOpen, setAitRejectDialogOpen] = useState(false);
   const [aitRejectReason, setAitRejectReason] = useState('');
   const [abortDialogOpen, setAbortDialogOpen] = useState(false);
@@ -151,12 +177,27 @@ export function DualTrackBoardPanel({
       onOpenReplacementChange?.(
         Boolean(data.track_a) && status != null && OPEN_REPLACEMENT_STATUSES.has(status)
       );
+      onModificationRequiredChange?.(isModificationRequiredRequest(data.track_a));
+      onTrackAProgressChange?.(
+        data.track_a
+          ? {
+              status,
+              assignedMeId: data.track_a.assigned_me_id ?? null,
+              hasReservation: (data.track_a.reservations?.length ?? 0) > 0,
+            }
+          : null
+      );
     } catch (err) {
       toast.error(formatMaintenanceApiError(err, 'Failed to load dual-track board'));
     } finally {
       setLoading(false);
     }
-  }, [maintenanceCase.id, onOpenReplacementChange]);
+  }, [
+    maintenanceCase.id,
+    onOpenReplacementChange,
+    onModificationRequiredChange,
+    onTrackAProgressChange,
+  ]);
 
   useEffect(() => {
     void load();
@@ -270,6 +311,12 @@ export function DualTrackBoardPanel({
     );
     onRequestUpdated?.(data);
     onOpenReplacementChange?.(OPEN_REPLACEMENT_STATUSES.has(data.status));
+    onModificationRequiredChange?.(isModificationRequiredRequest(data));
+    onTrackAProgressChange?.({
+      status: data.status ?? null,
+      assignedMeId: data.assigned_me_id ?? null,
+      hasReservation: (data.reservations?.length ?? 0) > 0,
+    });
   };
 
   const applyTrackB = (unit: ReturnedUnit) => {
@@ -292,13 +339,47 @@ export function DualTrackBoardPanel({
 
   const trackA = board?.track_a ?? null;
   const status = trackA?.status ?? board?.track_a_status ?? null;
-  const canHmAct =
+  const hasMeAssigned = Boolean(trackA?.assigned_me_id);
+  const hasReservation = (trackA?.reservations?.length ?? 0) > 0;
+  const isAdminEditor = isPrivilegedAdminRole(user?.roles);
+  // Workflow-gated actions — each option only when its step is reached.
+  // Admin may edit ME / reservation outside the normal PD/MMHD path.
+  const canPdDecide = Boolean(trackA && status === 'replacement_requested');
+  const canAssignMe = Boolean(
     trackA &&
-    (status === 'replacement_requested' ||
-      status === 'pd_approved' ||
-      status === 'im_issue_pending');
-  const canPdDecide = trackA && status === 'replacement_requested';
-  const canMeRequestIssue = trackA && status === 'pd_approved';
+      status != null &&
+      status !== 'pd_rejected' &&
+      status !== 'track_a_closed' &&
+      (isAdminEditor ||
+        status === 'pd_approved' ||
+        status === 'im_issue_pending' ||
+        status === 'ait_rejected')
+  );
+  const meAssignmentLocked = hasMeAssigned && !isAdminEditor;
+  const canReserveStock = Boolean(
+    trackA &&
+      hasMeAssigned &&
+      status != null &&
+      status !== 'pd_rejected' &&
+      status !== 'track_a_closed' &&
+      (isAdminEditor
+        ? true
+        : (status === 'pd_approved' || status === 'im_issue_pending') &&
+          (!hasReservation || trackA.shortage_held))
+  );
+  // Part/serial reservation is done by PD in MMHD; case page only for Admin override.
+  const showReserveEditor = canReserveStock && isAdminEditor;
+  const showReserveReadonly =
+    hasReservation && !isAdminEditor && !showReserveEditor;
+  const canResubmit =
+    trackA &&
+    status === 'pd_rejected' &&
+    trackA.reject_outcome === 'modification_required' &&
+    user?.id != null &&
+    Number(user.id) === Number(trackA.requested_by_id);
+  const canMeRequestIssue = Boolean(
+    trackA && status === 'pd_approved' && hasMeAssigned && hasReservation
+  );
   const canImIssue = trackA && status === 'im_issue_pending';
   const canStartAit = trackA && status === 'shipped_replaced_badge';
   const canUploadAit =
@@ -366,57 +447,6 @@ export function DualTrackBoardPanel({
     return TRACK_A_STEPS.indexOf(status as (typeof TRACK_A_STEPS)[number]);
   }, [status]);
 
-  const ensureMeAndReserve = async (req: ReplacementRequest) => {
-    const selectedMe = Number(meId);
-    const needsMe =
-      !req.assigned_me_id ||
-      (Number.isFinite(selectedMe) && selectedMe > 0 && selectedMe !== req.assigned_me_id);
-
-    if (needsMe) {
-      if (!Number.isFinite(selectedMe) || selectedMe <= 0) {
-        toast.error('Select a maintenance engineer before continuing');
-        return null;
-      }
-      const assigned = await maintenanceCases.assignReplacementMe(
-        maintenanceCase.id,
-        req.id,
-        { assigned_me_id: selectedMe }
-      );
-      req = assigned.data;
-      applyRequest(req);
-    }
-
-    const hasReservation = (req.reservations?.length ?? 0) > 0;
-    if (!hasReservation) {
-      if (!selectedStock && !partNumber.trim()) {
-        toast.error('Select a part number and serial before continuing');
-        return null;
-      }
-      const reserved = await maintenanceCases.reserveReplacement(
-        maintenanceCase.id,
-        req.id,
-        {
-          inventory_id: selectedStock?.inventoryId ?? null,
-          inventory_instance_id: selectedStock?.instanceId ?? null,
-          part_number:
-            selectedStock?.partNumber?.trim() || partNumber.trim() || null,
-          serial_number:
-            selectedStock?.serialNumber && selectedStock.serialNumber !== '—'
-              ? selectedStock.serialNumber
-              : null,
-          target_entity_type:
-            req.faulty_entity_type || maintenanceCase.entity_type || null,
-          target_entity_id:
-            req.faulty_entity_ref_id ?? maintenanceCase.entity_id ?? null,
-        }
-      );
-      req = reserved.data;
-      applyRequest(req);
-    }
-
-    return req;
-  };
-
   const runAssign = async () => {
     if (!trackA) return;
     const id = Number(meId);
@@ -479,16 +509,14 @@ export function DualTrackBoardPanel({
     if (!trackA) return;
     setBusy(true);
     try {
-      const prepared = await ensureMeAndReserve(trackA);
-      if (!prepared) return;
       const { data } = await maintenanceCases.pdDecideReplacement(
         maintenanceCase.id,
-        prepared.id,
+        trackA.id,
         { decision: 'approve', reject_reason: null }
       );
       await load();
       onRequestUpdated?.(data);
-      toast.success('Replacement approved — ME and inventory locked in');
+      toast.success('Replacement approved — assign an ME next');
     } catch (err) {
       toast.error(formatMaintenanceApiError(err, 'PD approval failed'));
     } finally {
@@ -499,6 +527,10 @@ export function DualTrackBoardPanel({
   const runPdReject = async () => {
     if (!trackA) return;
     const reason = rejectReason.trim();
+    if (!rejectOutcome) {
+      toast.error('Choose whether the issue is fixed or modification is required');
+      return;
+    }
     if (!reason) {
       toast.error('Reject reason is required');
       return;
@@ -508,16 +540,50 @@ export function DualTrackBoardPanel({
       const { data } = await maintenanceCases.pdDecideReplacement(
         maintenanceCase.id,
         trackA.id,
-        { decision: 'reject', reject_reason: reason }
+        {
+          decision: 'reject',
+          reject_reason: reason,
+          reject_outcome: rejectOutcome,
+        }
       );
       setRejectDialogOpen(false);
       setRejectReason('');
+      setRejectOutcome('');
       await load();
       onRequestUpdated?.(data);
       onOpenReplacementChange?.(false);
-      toast.success('Replacement rejected');
+      if (rejectOutcome === 'issue_fixed') {
+        try {
+          const refreshed = await maintenanceCases.get(maintenanceCase.id);
+          onCaseUpdated?.(refreshed.data);
+        } catch {
+          /* board already updated; case refresh is best-effort */
+        }
+        toast.success('Issue fixed — maintenance case closed');
+      } else {
+        toast.success('Modification required — sent back to requester');
+      }
     } catch (err) {
       toast.error(formatMaintenanceApiError(err, 'PD reject failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runResubmit = async () => {
+    if (!trackA) return;
+    setBusy(true);
+    try {
+      const { data } = await maintenanceCases.resubmitReplacementRequest(
+        maintenanceCase.id,
+        trackA.id
+      );
+      await load();
+      onRequestUpdated?.(data);
+      onOpenReplacementChange?.(true);
+      toast.success('Re-submitted for PD approval');
+    } catch (err) {
+      toast.error(formatMaintenanceApiError(err, 'Failed to resubmit for PD approval'));
     } finally {
       setBusy(false);
     }
@@ -551,13 +617,19 @@ export function DualTrackBoardPanel({
 
   const runRequestIssue = async () => {
     if (!trackA) return;
+    if (!trackA.assigned_me_id) {
+      toast.error('Assign an ME before requesting IM issue');
+      return;
+    }
+    if ((trackA.reservations?.length ?? 0) === 0) {
+      toast.error('Reserve inventory before requesting IM issue');
+      return;
+    }
     setBusy(true);
     try {
-      const prepared = await ensureMeAndReserve(trackA);
-      if (!prepared) return;
       const { data } = await maintenanceCases.requestReplacementIssue(
         maintenanceCase.id,
-        prepared.id
+        trackA.id
       );
       applyRequest(data);
       toast.success('IM issue requested');
@@ -736,36 +808,13 @@ export function DualTrackBoardPanel({
   return (
     <>
       <Card className="overflow-hidden border-border/80 shadow-sm">
-        <CardHeader className="space-y-3 border-b border-border/70 bg-gradient-to-br from-muted/40 via-background to-background pb-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="space-y-1">
-              <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                <ClipboardList className="h-4 w-4 text-muted-foreground" />
-                Dual-track board
-              </CardTitle>
-              <p className="max-w-2xl text-sm text-muted-foreground">
-                Track A immediate replacement runs in parallel with Track B faulty return &amp;
-                inspection.
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => void load()}
-              disabled={loading || busy}
-            >
-              {loading ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3.5 w-3.5" />
-              )}
-              Refresh
-            </Button>
-          </div>
+        <CardHeader className="px-4 py-3 sm:px-5">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <ClipboardList className="h-4 w-4 text-muted-foreground" />
+            Dual-track board
+          </CardTitle>
         </CardHeader>
-        <CardContent className="p-4 sm:p-5">
+        <CardContent className="space-y-4 p-4 pt-0 sm:p-5 sm:pt-0">
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-4 shadow-xs">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -859,19 +908,76 @@ export function DualTrackBoardPanel({
                     </ul>
                   ) : null}
 
-                  {canHmAct || canPdDecide ? (
-                    <Can
-                      permission={[
-                        P.maintenance_assign_me,
-                        P.maintenance_replacement_approve,
-                      ]}
-                    >
+                  {canPdDecide ? (
+                    <Can permission={P.maintenance_replacement_approve}>
+                      <div className="space-y-2 rounded-lg border border-border/70 bg-background/80 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          PD decision
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Approve the replacement request to continue. After approval you can
+                          assign an ME, then reserve inventory. Reject asks whether the issue is
+                          fixed (closes the case) or modification is required (returns to
+                          requester).
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => void runPdApprove()}
+                          >
+                            {busy ? (
+                              <>
+                                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                                Approving…
+                              </>
+                            ) : (
+                              'Approve replacement'
+                            )}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            disabled={busy}
+                            onClick={() => setRejectDialogOpen(true)}
+                          >
+                            Reject…
+                          </Button>
+                        </div>
+                      </div>
+                    </Can>
+                  ) : null}
+
+                  {hasMeAssigned && meAssignmentLocked ? (
+                    <div className="space-y-2 rounded-lg border border-border/70 bg-muted/30 p-3">
+                      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <UserRound className="h-3.5 w-3.5" />
+                        Maintenance engineer
+                      </div>
+                      <p className="text-sm font-medium text-foreground">
+                        {trackA?.assigned_me_name || (meId ? `User #${meId}` : 'Assigned')}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Already assigned — selection is locked on this case. PD reserves
+                        part/serial in MMHD assignments.
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {canAssignMe && !meAssignmentLocked ? (
+                    <Can permission={P.maintenance_assign_me}>
                       <div className="space-y-3 rounded-lg border border-border/70 bg-background/80 p-3">
                         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           <UserRound className="h-3.5 w-3.5" />
-                          Assign ME &amp; reserve stock
+                          Assign maintenance engineer
                         </div>
-
+                        <p className="text-xs text-muted-foreground">
+                          Available after PD approval. Inventory reservation unlocks once an ME
+                          is assigned
+                          {isAdminEditor ? ' (Admin may edit anytime).' : '.'}
+                        </p>
                         <HierarchySearchCombobox
                           label="Maintenance engineer"
                           placeholder={
@@ -884,7 +990,28 @@ export function DualTrackBoardPanel({
                           disabled={busy || assigneesLoading}
                           labelClassName="text-xs"
                         />
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={busy}
+                          onClick={() => void runAssign()}
+                        >
+                          {hasMeAssigned ? 'Reassign ME' : 'Assign ME'}
+                        </Button>
+                      </div>
+                    </Can>
+                  ) : null}
 
+                  {showReserveEditor ? (
+                    <Can permission={[P.maintenance_assign_me, P.inventory_reserve]}>
+                      <div className="space-y-3 rounded-lg border border-border/70 bg-background/80 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Reserve inventory (Admin)
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Admin override — PD normally selects part/serial in MMHD
+                          assignments.
+                        </p>
                         <div className="grid gap-3 sm:grid-cols-2">
                           <HierarchySearchCombobox
                             label="Part number"
@@ -921,7 +1048,6 @@ export function DualTrackBoardPanel({
                             labelClassName="text-xs"
                           />
                         </div>
-
                         {selectedStock ? (
                           <p className="text-xs text-muted-foreground">
                             Selected:{' '}
@@ -934,73 +1060,43 @@ export function DualTrackBoardPanel({
                             {selectedStock.location ? ` · ${selectedStock.location}` : ''}
                           </p>
                         ) : null}
-
-                        {canHmAct ? (
-                          <Can permission={P.maintenance_assign_me}>
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="secondary"
-                                disabled={busy}
-                                onClick={() => void runAssign()}
-                              >
-                                Assign ME
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                disabled={busy}
-                                onClick={() => void runReserve()}
-                              >
-                                Reserve inventory
-                              </Button>
-                            </div>
-                          </Can>
-                        ) : null}
-
-                        {canPdDecide ? (
-                          <Can permission={P.maintenance_replacement_approve}>
-                            <div className="space-y-2">
-                              <Separator />
-                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                PD decision
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                Approve assigns the selected ME, reserves the chosen serial, then
-                                advances Track A. Reject opens a reason dialog.
-                              </p>
-                              <div className="flex flex-wrap gap-2">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  disabled={busy}
-                                  onClick={() => void runPdApprove()}
-                                >
-                                  {busy ? (
-                                    <>
-                                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                                      Approving…
-                                    </>
-                                  ) : (
-                                    'Approve replacement'
-                                  )}
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="destructive"
-                                  disabled={busy}
-                                  onClick={() => setRejectDialogOpen(true)}
-                                >
-                                  Reject…
-                                </Button>
-                              </div>
-                            </div>
-                          </Can>
-                        ) : null}
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={busy}
+                          onClick={() => void runReserve()}
+                        >
+                          Reserve inventory
+                        </Button>
                       </div>
                     </Can>
+                  ) : null}
+
+                  {showReserveReadonly ? (
+                    <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                      Inventory reserved
+                      {(trackA?.reservations?.[0]?.part_number ||
+                        trackA?.reservations?.[0]?.serial_number) && (
+                        <>
+                          {' · '}
+                          {[
+                            trackA.reservations?.[0]?.part_number,
+                            trackA.reservations?.[0]?.serial_number,
+                          ]
+                            .filter(Boolean)
+                            .join(' / ')}
+                        </>
+                      )}
+                      . Part/serial is selected by PD in MMHD assignments.
+                    </div>
+                  ) : null}
+
+                  {canReserveStock && !isAdminEditor && !hasReservation ? (
+                    <div className="rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                      Next: PD selects part number and serial in{' '}
+                      <span className="font-medium text-foreground">MMHD assignments</span> to
+                      reserve inventory.
+                    </div>
                   ) : null}
 
                   {canMeRequestIssue ? (
@@ -1122,8 +1218,33 @@ export function DualTrackBoardPanel({
                   {trackA.pd_decision === 'reject' && trackA.reject_reason ? (
                     <p className="flex items-start gap-1.5 text-xs text-destructive">
                       <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                      Rejected: {trackA.reject_reason}
+                      Rejected
+                      {trackA.reject_outcome === 'issue_fixed'
+                        ? ' (issue fixed — case closed)'
+                        : trackA.reject_outcome === 'modification_required'
+                          ? ' (modification required)'
+                          : ''}
+                      : {trackA.reject_reason}
                     </p>
+                  ) : null}
+
+                  {canResubmit ? (
+                    <div className="space-y-2 rounded-lg border border-amber-200/80 bg-amber-50/50 p-3 dark:border-amber-900 dark:bg-amber-950/30">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Modification required
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Update the request as needed, then re-submit for PD approval.
+                      </p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() => void runResubmit()}
+                      >
+                        {busy ? 'Re-submitting…' : 'Re-submit for PD approval'}
+                      </Button>
+                    </div>
                   ) : null}
                   {trackA.ait_decision === 'reject' && trackA.ait_reject_reason ? (
                     <p className="text-xs text-destructive">
@@ -1435,24 +1556,73 @@ export function DualTrackBoardPanel({
         </CardContent>
       </Card>
 
-      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+      <Dialog
+        open={rejectDialogOpen}
+        onOpenChange={(open) => {
+          setRejectDialogOpen(open);
+          if (!open) {
+            setRejectReason('');
+            setRejectOutcome('');
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Reject replacement request</DialogTitle>
             <DialogDescription>
-              Provide a clear reason. Track A will move to rejected and the request CTA can be used
-              again after rejection.
+              Choose the outcome, then provide a clear reason.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 py-1">
-            <Label htmlFor="pd-reject-reason">Reject reason</Label>
-            <Textarea
-              id="pd-reject-reason"
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="Why is this replacement being rejected?"
-              rows={4}
-            />
+          <div className="space-y-4 py-1">
+            <div className="space-y-2">
+              <Label>What should happen?</Label>
+              <RadioGroup
+                value={rejectOutcome}
+                onValueChange={(value) => setRejectOutcome(value as PdRejectOutcome)}
+                className="gap-2"
+              >
+                <label
+                  htmlFor="pd-reject-issue-fixed"
+                  className="flex cursor-pointer items-start gap-3 rounded-lg border bg-background px-3 py-2.5"
+                >
+                  <RadioGroupItem id="pd-reject-issue-fixed" value="issue_fixed" className="mt-0.5" />
+                  <span className="space-y-0.5">
+                    <span className="block text-sm font-medium">Issue is fixed</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Close the maintenance case now. The stepper skips mid steps and links
+                      directly to Closed.
+                    </span>
+                  </span>
+                </label>
+                <label
+                  htmlFor="pd-reject-modification"
+                  className="flex cursor-pointer items-start gap-3 rounded-lg border bg-background px-3 py-2.5"
+                >
+                  <RadioGroupItem
+                    id="pd-reject-modification"
+                    value="modification_required"
+                    className="mt-0.5"
+                  />
+                  <span className="space-y-0.5">
+                    <span className="block text-sm font-medium">Modification required</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Send back to the requester so they can update and re-submit for PD
+                      approval.
+                    </span>
+                  </span>
+                </label>
+              </RadioGroup>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pd-reject-reason">Reject reason</Label>
+              <Textarea
+                id="pd-reject-reason"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Why is this replacement being rejected?"
+                rows={4}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button
@@ -1466,10 +1636,16 @@ export function DualTrackBoardPanel({
             <Button
               type="button"
               variant="destructive"
-              disabled={busy || !rejectReason.trim()}
+              disabled={busy || !rejectReason.trim() || !rejectOutcome}
               onClick={() => void runPdReject()}
             >
-              {busy ? 'Rejecting…' : 'Confirm reject'}
+              {busy
+                ? 'Rejecting…'
+                : rejectOutcome === 'issue_fixed'
+                  ? 'Close case'
+                  : rejectOutcome === 'modification_required'
+                    ? 'Send for modification'
+                    : 'Confirm reject'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1133,6 +1133,10 @@ export const maintenanceCases = {
     api.post<Models.MaintenanceCase>(`/maintenance-cases/${caseId}/onsite-outcome/`, data),
   listReturnedUnits: (caseId: number) =>
     api.get<Models.ReturnedUnit[]>(`/maintenance-cases/${caseId}/returned-units/`),
+  listAllReturnedUnits: (skip = 0, limit = 200) =>
+    api.get<Models.ReturnedUnit[]>('/maintenance-returned-units/', {
+      params: { skip, limit },
+    }),
   assignInvestigatingPd: (reworkId: number, pdUserId: number) =>
     api.post<Models.ReturnedUnit>(`/item-rework/${reworkId}/assign-investigating-pd/`, {
       pd_user_id: pdUserId,
@@ -1247,6 +1251,10 @@ export const maintenanceCases = {
     api.post<Models.ReplacementRequest>(
       `/maintenance-cases/${caseId}/replacement-requests/${requestId}/pd-decision/`,
       data
+    ),
+  resubmitReplacementRequest: (caseId: number, requestId: number) =>
+    api.post<Models.ReplacementRequest>(
+      `/maintenance-cases/${caseId}/replacement-requests/${requestId}/resubmit/`
     ),
   requestReplacementIssue: (caseId: number, requestId: number) =>
     api.post<Models.ReplacementRequest>(

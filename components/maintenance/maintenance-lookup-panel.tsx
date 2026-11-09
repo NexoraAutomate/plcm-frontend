@@ -5,7 +5,6 @@ import {
   Check,
   ChevronsUpDown,
   Eraser,
-  FilePlus2,
   Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -340,32 +339,6 @@ export function MaintenanceLookupPanel({
               <TooltipContent>Clear lookup</TooltipContent>
             </Tooltip>
 
-            {showCreateCase ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="icon"
-                    className="h-10 w-10 shrink-0"
-                    disabled={busy}
-                    onClick={() => void onCreateCase()}
-                    aria-label="Create maintenance case"
-                  >
-                    {createCaseLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <FilePlus2 className="h-4 w-4" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  Create maintenance case for{' '}
-                  {lookupResponse?.matched_label || 'this entity'}
-                </TooltipContent>
-              </Tooltip>
-            ) : null}
-
             {lookupLoading ? (
               <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -401,6 +374,9 @@ export function MaintenanceLookupPanel({
               caseId={caseId}
               onConfirmFault={onConfirmFault}
               onViewEntity={handleViewEntity}
+              onCreateCase={onCreateCase}
+              createCaseLoading={createCaseLoading}
+              showCreateCase={showCreateCase}
             />
           ) : (
             <div className="flex h-full min-h-[24rem] items-center justify-center rounded-xl border border-dashed border-border/80 bg-muted/20 p-6 text-center text-sm text-muted-foreground">

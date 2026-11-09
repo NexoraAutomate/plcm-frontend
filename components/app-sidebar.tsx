@@ -197,6 +197,12 @@ const NAV_BY_HREF: Record<string, NavItem> = {
     icon: Search,
     permission: NAV_PERMISSIONS["/maintenance/lookup"] as PermissionCode,
   },
+  "/maintenance/returned-units": {
+    label: "Returned Units",
+    href: "/maintenance/returned-units",
+    icon: PackageCheck,
+    permission: NAV_PERMISSIONS["/maintenance/returned-units"] as PermissionCode,
+  },
   "/maintenance/warranty-claims": {
     label: "Warranty claims",
     href: "/maintenance/warranty-claims",
@@ -224,6 +230,7 @@ const inventorySystemItems: NavItem[] = [
 const maintenanceItems: NavItem[] = [
   NAV_BY_HREF["/maintenance"],
   NAV_BY_HREF["/maintenance/lookup"],
+  NAV_BY_HREF["/maintenance/returned-units"],
   NAV_BY_HREF["/maintenance/warranty-claims"],
 ];
 

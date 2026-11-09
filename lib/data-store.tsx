@@ -1527,7 +1527,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       setMaintenanceCases(maintenanceCases.filter((c) => c.id !== id));
       toast.success('Maintenance case deleted successfully');
     } catch (err) {
-      toast.error('Failed to delete maintenance case');
+      toast.error(formatMaintenanceApiError(err, 'Failed to delete maintenance case'));
       throw err;
     }
   };

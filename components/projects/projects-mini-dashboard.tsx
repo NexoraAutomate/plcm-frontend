@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { useAppDefinitions } from '@/lib/app-definitions-context';
 import { useRouter } from 'next/navigation';
 import {
@@ -125,7 +125,7 @@ function KpiTile({
   onClick,
   progress,
 }: {
-  label: string;
+  label: ReactNode;
   value: string | number;
   sub?: string;
   icon: LucideIcon;
@@ -135,30 +135,38 @@ function KpiTile({
   progress?: number;
 }) {
   const body = (
-    <div className="flex items-start justify-between gap-2">
-      <div className="min-w-0">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {label}
-        </p>
-        <p className="mt-1 text-2xl font-bold tabular-nums tracking-tight">{value}</p>
-        {sub ? <p className="mt-1 text-xs text-muted-foreground">{sub}</p> : null}
+    <div className="flex items-center justify-between gap-2 sm:items-start sm:gap-2">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline justify-between gap-3 sm:block">
+          <p className="text-[10px] font-medium uppercase leading-tight tracking-wide text-muted-foreground sm:text-xs">
+            {label}
+          </p>
+          <p className="text-lg font-bold tabular-nums tracking-tight sm:mt-1 sm:text-2xl">
+            {value}
+          </p>
+        </div>
+        {sub ? (
+          <p className="mt-0.5 truncate text-[11px] text-muted-foreground sm:mt-1 sm:text-xs">
+            {sub}
+          </p>
+        ) : null}
         {typeof progress === 'number' ? (
-          <Progress value={Math.min(100, Math.max(0, progress))} className="mt-2 h-1.5" />
+          <Progress value={Math.min(100, Math.max(0, progress))} className="mt-1.5 h-1 sm:mt-2 sm:h-1.5" />
         ) : null}
       </div>
       <div
         className={cn(
-          'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
+          'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10 sm:rounded-xl',
           ACCENT_ICON[accent]
         )}
       >
-        <Icon className="h-5 w-5" />
+        <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
       </div>
     </div>
   );
 
   const className = cn(
-    'rounded-xl border border-l-4 bg-card p-4 text-left shadow-sm transition-all',
+    'rounded-lg border border-l-4 bg-card px-3 py-2 text-left shadow-sm transition-all sm:rounded-xl sm:p-4',
     ACCENT_BORDER[accent],
     onClick && 'cursor-pointer hover:shadow-md hover:scale-[1.01]',
     active && 'ring-2 ring-primary/40'
@@ -294,8 +302,8 @@ export function ProjectsMiniDashboard({
     : `All ${entityLabel('project', true).toLowerCase()}`;
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+    <div className="space-y-3 sm:space-y-4">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-5">
         <KpiTile
           label={`Total ${entityLabel('project', true)}`}
           value={displayTotal}
@@ -340,18 +348,20 @@ export function ProjectsMiniDashboard({
 
       <div className="grid gap-3 lg:grid-cols-2">
         <Card className="shadow-sm">
-          <CardHeader className="pb-2">
+          <CardHeader className="px-4 pb-2 pt-4 sm:px-6 sm:pt-6">
             <CardTitle className="text-sm font-medium">
               {entityLabel('project', true)} by Status
             </CardTitle>
-            <CardDescription>Click a segment or legend item to filter the table</CardDescription>
+            <CardDescription className="hidden sm:block">
+              Click a segment or legend item to filter the table
+            </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
             {projectStatusData.length === 0 ? (
-              <p className="py-12 text-center text-sm text-muted-foreground">No projects yet</p>
+              <p className="py-8 text-center text-sm text-muted-foreground sm:py-12">No projects yet</p>
             ) : (
-              <div className="flex flex-col items-stretch gap-4 sm:flex-row sm:items-center">
-                <div className="relative mx-auto h-[220px] w-full max-w-[220px] shrink-0">
+              <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
+                <div className="relative mx-auto h-[180px] w-full max-w-[180px] shrink-0 sm:h-[220px] sm:max-w-[220px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
@@ -360,8 +370,8 @@ export function ProjectsMiniDashboard({
                         nameKey="name"
                         cx="50%"
                         cy="50%"
-                        innerRadius={62}
-                        outerRadius={88}
+                        innerRadius="45%"
+                        outerRadius="72%"
                         paddingAngle={3}
                         strokeWidth={0}
                         className="cursor-pointer"
@@ -432,47 +442,52 @@ export function ProjectsMiniDashboard({
         </Card>
 
         <Card className="shadow-sm">
-          <CardHeader className="pb-2">
+          <CardHeader className="px-4 pb-2 pt-4 sm:px-6 sm:pt-6">
             <CardTitle className="text-sm font-medium">Progress Distribution</CardTitle>
-            <CardDescription>
+            <CardDescription className="hidden sm:block">
               How {entityLabel('project', true).toLowerCase()} cluster by completion
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
             {projects.length === 0 ? (
-              <p className="py-12 text-center text-sm text-muted-foreground">No projects yet</p>
+              <p className="py-8 text-center text-sm text-muted-foreground sm:py-12">No projects yet</p>
             ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart
-                  data={progressBandData}
-                  layout="vertical"
-                  margin={{ left: 8, right: 28, top: 8, bottom: 8 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" horizontal={false} />
-                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10 }} />
-                  <YAxis type="category" dataKey="name" width={64} tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(v: number) => [v, entityLabel('project', true)]} />
-                  <Bar dataKey="value" name={entityLabel('project', true)} radius={[0, 6, 6, 0]} barSize={22}>
-                    {progressBandData.map((band) => (
-                      <Cell key={band.name} fill={band.fill} />
-                    ))}
-                    <ChartValueLabelList />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="h-[180px] w-full sm:h-[220px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={progressBandData}
+                    layout="vertical"
+                    margin={{ left: 4, right: 20, top: 4, bottom: 4 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" horizontal={false} />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10 }} />
+                    <YAxis type="category" dataKey="name" width={64} tick={{ fontSize: 11 }} />
+                    <Tooltip formatter={(v: number) => [v, entityLabel('project', true)]} />
+                    <Bar dataKey="value" name={entityLabel('project', true)} radius={[0, 6, 6, 0]} barSize={22}>
+                      {progressBandData.map((band) => (
+                        <Cell key={band.name} fill={band.fill} />
+                      ))}
+                      <ChartValueLabelList />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             )}
           </CardContent>
         </Card>
 
         <Card className="shadow-sm">
-          <CardHeader className="pb-2">
+          <CardHeader className="px-4 pb-2 pt-4 sm:px-6 sm:pt-6">
             <CardTitle className="text-sm font-medium">Needs Attention</CardTitle>
-            <CardDescription>
+            <CardDescription className="hidden sm:block">
               Overdue first, then lowest progress · {totalSystems} linked{' '}
               {entityLabel('system', true).toLowerCase()}
             </CardDescription>
+            <CardDescription className="sm:hidden">
+              {totalSystems} linked {entityLabel('system', true).toLowerCase()}
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-1.5">
+          <CardContent className="space-y-1.5 px-4 pb-4 sm:px-6 sm:pb-6">
             {attentionProjects.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 No active {entityLabel('project', true).toLowerCase()} need attention
@@ -522,45 +537,48 @@ export function ProjectsMiniDashboard({
         </Card>
 
         <Card className="shadow-sm">
-          <CardHeader className="pb-2">
+          <CardHeader className="px-4 pb-2 pt-4 sm:px-6 sm:pt-6">
             <CardTitle className="text-sm font-medium">
               {entityLabel('project', true)} Starts
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="hidden sm:block">
               Monthly start dates
               {filteredOrder ? ` for ${filteredOrder.order_number}` : ''}
             </CardDescription>
+            <CardDescription className="sm:hidden">Monthly starts</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
             {projectsTimeline.length === 0 ? (
-              <p className="py-12 text-center text-sm text-muted-foreground">
+              <p className="py-8 text-center text-sm text-muted-foreground sm:py-12">
                 No start dates recorded
               </p>
             ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <AreaChart data={projectsTimeline} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="projectsPageFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="oklch(0.62 0.15 250)" stopOpacity={0.35} />
-                      <stop offset="95%" stopColor="oklch(0.62 0.15 250)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 10 }} width={28} />
-                  <Tooltip />
-                  <Area
-                    type="monotone"
-                    dataKey="value"
-                    name={entityLabel('project', true)}
-                    stroke="oklch(0.55 0.14 250)"
-                    fill="url(#projectsPageFill)"
-                    strokeWidth={2}
-                  >
-                    <ChartValueLabelList />
-                  </Area>
-                </AreaChart>
-              </ResponsiveContainer>
+              <div className="h-[180px] w-full sm:h-[220px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={projectsTimeline} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="projectsPageFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="oklch(0.62 0.15 250)" stopOpacity={0.35} />
+                        <stop offset="95%" stopColor="oklch(0.62 0.15 250)" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 10 }} width={28} />
+                    <Tooltip />
+                    <Area
+                      type="monotone"
+                      dataKey="value"
+                      name={entityLabel('project', true)}
+                      stroke="oklch(0.55 0.14 250)"
+                      fill="url(#projectsPageFill)"
+                      strokeWidth={2}
+                    >
+                      <ChartValueLabelList />
+                    </Area>
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             )}
           </CardContent>
         </Card>

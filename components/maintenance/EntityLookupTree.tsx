@@ -14,6 +14,9 @@ interface EntityLookupTreeProps {
   onSuspectChildren?: () => Promise<void>;
   onConfirmFault?: (node: EntityLookupNode) => Promise<void>;
   onViewEntity?: (node: EntityLookupNode) => void;
+  onCreateCase?: () => Promise<void>;
+  createCaseLoading?: boolean;
+  showCreateCase?: boolean;
   /** When true, Suspect Children controls stay hidden after a successful run. */
   suspectChildrenDone?: boolean;
 }
@@ -56,6 +59,9 @@ export function EntityLookupTree({
   onSuspectChildren,
   onConfirmFault,
   onViewEntity,
+  onCreateCase,
+  createCaseLoading = false,
+  showCreateCase = false,
   suspectChildrenDone = false,
 }: EntityLookupTreeProps) {
   const { can } = useAuth();
@@ -132,6 +138,9 @@ export function EntityLookupTree({
         caseId={caseId}
         onConfirmFault={onConfirmFault}
         onViewEntity={onViewEntity}
+        onCreateCase={onCreateCase}
+        createCaseLoading={createCaseLoading}
+        showCreateCase={showCreateCase}
       />
 
       {showSuspectChildren ? (

@@ -39,6 +39,7 @@ import { ProjectsMiniDashboard } from '@/components/lazy/list-dashboards';
 import { SortableTableHead } from '@/components/data-table/sortable-table-head';
 import { ColumnVisibilityMenu } from '@/components/data-table/column-visibility-menu';
 import { useColumnVisibility, type ColumnVisibilityDef } from '@/hooks/use-column-visibility';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { buildListFilters } from '@/lib/list-page-filter-utils';
 import { toDateInputValue } from '@/lib/hierarchy-install-fields';
 import { isProjectStructurallyFrozen, workflowStatusLabel } from '@/lib/workflow-status';
@@ -73,6 +74,14 @@ const COLUMN_DEFS: ColumnVisibilityDef[] = [
   { id: 'systems', label: 'Systems' },
   { id: 'progress', label: '% Progress' },
 ];
+
+/** On small screens default to Name (+ Actions); other fields stay available via Columns. */
+function projectsColumnDefs(isMobile: boolean): ColumnVisibilityDef[] {
+  if (!isMobile) return COLUMN_DEFS;
+  return COLUMN_DEFS.map((col) =>
+    col.alwaysVisible || col.id === 'name' ? col : { ...col, defaultVisible: false }
+  );
+}
 
 function ProjectSystemProgressRows({
   projectId,
@@ -146,8 +155,13 @@ export default function ProjectsPage(){
   const { entityLabel } = useAppDefinitions();
   const { hasWorkflowRole } = useAuth();
   const isAdminUser = hasWorkflowRole(WorkflowRole.ADMIN);
+  const isMobile = useIsMobile();
   const { showStats, setShowStats } = useListStatsVisibility();
-  const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility('projects-list', COLUMN_DEFS);
+  const columnDefs = useMemo(() => projectsColumnDefs(isMobile), [isMobile]);
+  const { visibleIds, isVisible, toggleColumn, resetColumns } = useColumnVisibility(
+    isMobile ? 'projects-list-mobile' : 'projects-list',
+    columnDefs
+  );
   const projectTableColSpan = visibleIds.length + 1;
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({
     open: false,
@@ -174,6 +188,8 @@ export default function ProjectsPage(){
   const orderFilterId = Number.isFinite(parsedOrderFilterId) ? parsedOrderFilterId : null;
   const [statusFilter, setStatusFilter] = useState<string>(statusFilterParam || 'Total');
   const [groupByProjectName, setGroupByProjectName] = useState(false);
+  /** Mobile always groups by name; desktop keeps the checkbox preference. */
+  const effectiveGroupByProjectName = isMobile || groupByProjectName;
   const [expandedProjectGroups, setExpandedProjectGroups] = useState<Set<string>>(
     () => new Set()
   );
@@ -372,17 +388,25 @@ export default function ProjectsPage(){
             </TableCell>
           )}
           {isVisible('name') && (
-            <TableCell className={cn('font-medium', options?.indented && 'pl-10')}>
-              <div className="flex items-center gap-2">
-                <EntityNameWithFault
-                  name={project.name}
-                  entityType="project"
-                  entityId={project.id}
-                  faultMap={faultMap}
-                />
+            <TableCell
+              className={cn(
+                'font-medium',
+                options?.indented && 'pl-10',
+                isMobile && 'max-w-0 w-full'
+              )}
+            >
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="min-w-0 flex-1 truncate">
+                  <EntityNameWithFault
+                    name={project.name}
+                    entityType="project"
+                    entityId={project.id}
+                    faultMap={faultMap}
+                  />
+                </div>
                 {isExistingProject(project) ? <ExistingProjectBadge /> : null}
                 {project.delete_requested_at ? (
-                  <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+                  <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-900 dark:bg-amber-950 dark:text-amber-100">
                     Pending delete
                   </span>
                 ) : null}
@@ -457,8 +481,8 @@ export default function ProjectsPage(){
               </div>
             </TableCell>
           )}
-          <TableCell className="text-right">
-            <div className="flex gap-2 justify-end">
+          <TableCell className="w-[1%] whitespace-nowrap text-right">
+            <div className="flex justify-end gap-1 sm:gap-2">
               <Link
                 href={`/projects/${project.id}`}
                 onClick={(e) => e.stopPropagation()}
@@ -743,11 +767,15 @@ export default function ProjectsPage(){
   const filteredOrder = orderFilterId ? orders.find((o) => o.id === orderFilterId) : null;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{entityLabel('project', true)}</h1>
-          <p className="text-muted-foreground mt-2 text-sm ">Manage satellite lifecycle {entityLabel('project', true).toLowerCase()}</p>
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+            {entityLabel('project', true)}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground sm:mt-2">
+            Manage satellite lifecycle {entityLabel('project', true).toLowerCase()}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {orderFilterId != null ? (
@@ -815,8 +843,8 @@ export default function ProjectsPage(){
         </div>
       )}
 
-      <div className="flex gap-4 items-center">
-        <div className="flex-1 relative">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+        <div className="relative min-w-0 flex-1">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search projects..."
@@ -839,15 +867,38 @@ export default function ProjectsPage(){
         />
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-          <div>
-            <CardTitle>All {entityLabel('project', true)}</CardTitle>
-            <CardDescription>
-              Showing {projects.length} on this page · {pagination.total} matching
-            </CardDescription>
+      <Card className="overflow-hidden">
+        <CardHeader className="space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <CardTitle className="leading-none">All {entityLabel('project', true)}</CardTitle>
+              <CardDescription className="mt-1.5 hidden sm:block">
+                Showing {projects.length} on this page · {pagination.total} matching
+              </CardDescription>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <ColumnVisibilityMenu
+                columns={columnDefs}
+                visibleIds={visibleIds}
+                onToggle={toggleColumn}
+                onReset={resetColumns}
+                iconOnly
+                variant="dialog"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 shrink-0 px-0"
+                asChild
+              >
+                <Link href="/hierarchy-dashboard" title="Hierarchy Dashboard">
+                  <GitBranch className="h-4 w-4" />
+                  <span className="sr-only">Hierarchy Dashboard</span>
+                </Link>
+              </Button>
+            </div>
           </div>
-          <div className="flex shrink-0 items-center gap-3">
+          {!isMobile ? (
             <div className="flex items-center gap-2">
               <Checkbox
                 id="group-by-project-name"
@@ -859,28 +910,16 @@ export default function ProjectsPage(){
               />
               <Label
                 htmlFor="group-by-project-name"
-                className="cursor-pointer text-sm font-normal whitespace-nowrap"
+                className="cursor-pointer whitespace-nowrap text-sm font-normal"
               >
                 Group by {entityLabel('project').toLowerCase()} name
               </Label>
             </div>
-            <ColumnVisibilityMenu
-              columns={COLUMN_DEFS}
-              visibleIds={visibleIds}
-              onToggle={toggleColumn}
-              onReset={resetColumns}
-            />
-            <Button variant="outline" size="sm" className="shrink-0" asChild>
-              <Link href="/hierarchy-dashboard">
-                <GitBranch className="mr-2 h-4 w-4" />
-                Hierarchy Dashboard
-              </Link>
-            </Button>
-          </div>
+          ) : null}
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6">
           <ListContentSuspense loading={pagination.fetching}>
-          <Table containerClassName="rounded-md border">
+          <Table containerClassName="rounded-md border overflow-x-auto">
               <TableHeader>
                 <TableRow>
                   {isVisible('serial') && <TableHead className="w-12 text-center">#</TableHead>}
@@ -903,7 +942,7 @@ export default function ProjectsPage(){
                   {isVisible('progress') && (
                     <SortableTableHead column="progress" sort={sort} onSort={cycleSort}>% Progress</SortableTableHead>
                   )}
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="w-[1%] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -916,7 +955,7 @@ export default function ProjectsPage(){
                       No projects found
                     </TableCell>
                   </TableRow>
-                ) : groupByProjectName ? (
+                ) : effectiveGroupByProjectName ? (
                   projectGroups.flatMap((group) => {
                     if (!shouldShowProjectGroup(group)) {
                       return group.projects.map((project) => renderProjectRow(project));

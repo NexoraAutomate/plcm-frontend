@@ -104,8 +104,15 @@ export default function MaintenanceCaseInvestigationPage({
   const [workflowDialogOpen, setWorkflowDialogOpen] = useState(false);
   const [pendingWorkflow, setPendingWorkflow] = useState<PendingWorkflowAction | null>(null);
   const [detailTab, setDetailTab] = useState('tree');
+  const [fieldServiceTab, setFieldServiceTab] = useState('occurrence');
   const [dualTrackRefreshKey, setDualTrackRefreshKey] = useState(0);
   const [hasOpenReplacementRequest, setHasOpenReplacementRequest] = useState(false);
+  const [modificationRequired, setModificationRequired] = useState(false);
+  const [trackAProgress, setTrackAProgress] = useState<{
+    status: string | null;
+    assignedMeId?: number | null;
+    hasReservation?: boolean;
+  } | null>(null);
 
   const treeNodes = useMemo(() => buildInvestigationTree(entities), [entities]);
 
@@ -656,20 +663,6 @@ export default function MaintenanceCaseInvestigationPage({
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link
-          href="/maintenance"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Maintenance cases
-        </Link>
-        <Button variant="outline" size="sm" onClick={refresh} disabled={isLoading}>
-          <RefreshCw className={cn('mr-2 h-3.5 w-3.5', isLoading && 'animate-spin')} />
-          Refresh
-        </Button>
-      </div>
-
       {maintenanceCase ? (
         <>
           <MaintenanceCaseSummary
@@ -677,29 +670,124 @@ export default function MaintenanceCaseInvestigationPage({
             entities={entities}
             actions={maintenanceActions}
           />
-          <FieldServicePanels
-            maintenanceCase={maintenanceCase}
-            onCaseUpdated={setMaintenanceCase}
-            hasOpenReplacementRequest={hasOpenReplacementRequest}
-            onReplacementRequested={() => {
-              setHasOpenReplacementRequest(true);
-              setDualTrackRefreshKey((k) => k + 1);
-            }}
-          />
-          <DualTrackBoardPanel
-            maintenanceCase={maintenanceCase}
-            refreshKey={dualTrackRefreshKey}
-            onOpenReplacementChange={setHasOpenReplacementRequest}
-          />
-          <CaseDetailCards
-            maintenanceCase={maintenanceCase}
-            entities={entities}
-            actions={maintenanceActions}
-          />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Link
+              href="/maintenance"
+              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Maintenance Cases
+            </Link>
+            <Button variant="outline" size="sm" onClick={refresh} disabled={isLoading}>
+              <RefreshCw className={cn('mr-2 h-3.5 w-3.5', isLoading && 'animate-spin')} />
+              Refresh
+            </Button>
+          </div>
+          <Card>
+            <CardContent className="space-y-4 p-4 sm:p-5">
+              <Tabs
+                value={fieldServiceTab}
+                onValueChange={setFieldServiceTab}
+                className="space-y-4"
+              >
+                <AnimatedPillTabsList value={fieldServiceTab}>
+                  <TabsTrigger
+                    value="occurrence"
+                    className={animatedPillTabsTriggerClassName}
+                  >
+                    Occurrence Report
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="dual-track"
+                    className={animatedPillTabsTriggerClassName}
+                  >
+                    Dual-track board
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="returned"
+                    className={animatedPillTabsTriggerClassName}
+                  >
+                    Return Units
+                  </TabsTrigger>
+                </AnimatedPillTabsList>
+
+                <TabsContent value="occurrence" className="mt-0 space-y-4">
+                  <FieldServicePanels
+                    maintenanceCase={maintenanceCase}
+                    onCaseUpdated={setMaintenanceCase}
+                    hasOpenReplacementRequest={hasOpenReplacementRequest}
+                    modificationRequired={modificationRequired}
+                    sections={['occurrence']}
+                    onOccurrenceUpdated={() => setDualTrackRefreshKey((k) => k + 1)}
+                    onReplacementRequested={() => {
+                      setHasOpenReplacementRequest(true);
+                      setTrackAProgress((prev) =>
+                        prev ?? {
+                          status: 'replacement_requested',
+                          assignedMeId: null,
+                          hasReservation: false,
+                        }
+                      );
+                      setDualTrackRefreshKey((k) => k + 1);
+                      setFieldServiceTab('dual-track');
+                    }}
+                  />
+                </TabsContent>
+
+                <TabsContent
+                  value="dual-track"
+                  forceMount
+                  className={cn(
+                    'mt-0 space-y-4',
+                    fieldServiceTab !== 'dual-track' && 'hidden'
+                  )}
+                >
+                  <CaseDetailCards
+                    maintenanceCase={maintenanceCase}
+                    entities={entities}
+                    actions={maintenanceActions}
+                    trackAProgress={trackAProgress}
+                    refreshKey={dualTrackRefreshKey}
+                  />
+                  <DualTrackBoardPanel
+                    maintenanceCase={maintenanceCase}
+                    refreshKey={dualTrackRefreshKey}
+                    onCaseUpdated={setMaintenanceCase}
+                    onOpenReplacementChange={setHasOpenReplacementRequest}
+                    onModificationRequiredChange={setModificationRequired}
+                    onTrackAProgressChange={setTrackAProgress}
+                  />
+                </TabsContent>
+
+                <TabsContent value="returned" className="mt-0 space-y-4">
+                  <FieldServicePanels
+                    maintenanceCase={maintenanceCase}
+                    onCaseUpdated={setMaintenanceCase}
+                    sections={['returned']}
+                  />
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
         </>
       ) : (
-        <div className="rounded-lg border border-dashed border-border bg-muted p-6 text-sm text-muted-foreground">
-          Loading maintenance case details...
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Link
+              href="/maintenance"
+              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Maintenance Cases
+            </Link>
+            <Button variant="outline" size="sm" onClick={refresh} disabled={isLoading}>
+              <RefreshCw className={cn('mr-2 h-3.5 w-3.5', isLoading && 'animate-spin')} />
+              Refresh
+            </Button>
+          </div>
+          <div className="rounded-lg border border-dashed border-border bg-muted p-6 text-sm text-muted-foreground">
+            Loading maintenance case details...
+          </div>
         </div>
       )}
 

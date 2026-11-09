@@ -1,14 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { useMemo } from 'react';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { MaintenanceCaseStatusBadge } from './badges';
 import { CaseStatus, type MaintenanceCase, type MaintenanceAction, type FaultyEntity } from '@/lib/models';
@@ -71,13 +64,23 @@ const STATUS_METRICS: Array<{
   },
 ];
 
-function MetaField({ label, value, className }: { label: string; value: string; className?: string }) {
+function MetaField({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
   return (
     <div className={cn('min-w-0', className)}>
-      <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/80">
+      <dt className="text-[9px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/80">
         {label}
       </dt>
-      <dd className="mt-0.5 truncate text-sm font-medium text-foreground">{value}</dd>
+      <dd className="mt-0.5 truncate text-xs font-medium text-foreground md:text-[13px]">
+        {value}
+      </dd>
     </div>
   );
 }
@@ -117,8 +120,6 @@ export function MaintenanceCaseSummary({
   actions = [],
   projectName,
 }: MaintenanceCaseSummaryProps) {
-  const [showKpis, setShowKpis] = useState(false);
-
   const projectLabel = projectName || maintenanceCase.project_name || '—';
   const reporterLabel = formatUserRef(maintenanceCase.reported_by_user) || '—';
   const isCaseResolved =
@@ -130,6 +131,7 @@ export function MaintenanceCaseSummary({
       : 'Pending';
   const notesLabel = maintenanceCase.resolution_notes?.trim() || 'No notes yet';
   const reportedLabel = new Date(maintenanceCase.reported_at).toLocaleDateString();
+  const description = maintenanceCase.description?.trim() || 'No description';
 
   const entityLabel = useMemo(() => {
     const named = entities.find((entity) => entity.entity_name?.trim());
@@ -139,87 +141,40 @@ export function MaintenanceCaseSummary({
   }, [entities, maintenanceCase.part_number]);
 
   return (
-    <Collapsible open={showKpis} onOpenChange={setShowKpis}>
-      <Card className="overflow-hidden border-border/80 shadow-sm">
-        <div
-          className={cn(
-            'flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-5',
-            showKpis && 'border-b border-border/60 bg-muted/30'
-          )}
-        >
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1.5">
-            <h1 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
-              {maintenanceCase.case_number}
-            </h1>
-            <MaintenanceCaseStatusBadge
-              maintenanceCase={maintenanceCase}
-              entities={entities}
-              actions={actions}
-              className="rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-            />
-            <span className="hidden text-muted-foreground/40 sm:inline" aria-hidden>
-              ·
-            </span>
-            <p className="min-w-0 truncate text-sm text-muted-foreground">
-              <span className="font-medium text-foreground/85">{projectLabel}</span>
-              {entityLabel ? (
-                <>
-                  <span className="mx-1.5 text-muted-foreground/40">·</span>
-                  <span>{entityLabel}</span>
-                </>
-              ) : null}
-            </p>
-          </div>
-
-          <CollapsibleTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="shrink-0 text-muted-foreground"
-              aria-label={showKpis ? 'Hide case details' : 'Show case details'}
-            >
-              {showKpis ? 'Hide details' : 'Details'}
-              <ChevronDown
-                className={cn(
-                  'h-4 w-4 transition-transform duration-200',
-                  showKpis && 'rotate-180'
-                )}
-              />
-            </Button>
-          </CollapsibleTrigger>
+    <Card className="overflow-hidden border-border/80 shadow-sm">
+      <div className="space-y-3 px-4 py-3 sm:px-5 sm:py-3.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1.5">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+            {maintenanceCase.case_number}
+          </h1>
+          <MaintenanceCaseStatusBadge
+            maintenanceCase={maintenanceCase}
+            entities={entities}
+            actions={actions}
+            className="rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+          />
+          {entityLabel ? (
+            <p className="min-w-0 truncate text-sm text-muted-foreground">{entityLabel}</p>
+          ) : null}
         </div>
 
-        <CollapsibleContent>
-          <div className="space-y-0">
-            <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:px-5 sm:py-3.5">
-              <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
-                {maintenanceCase.description}
-              </p>
-              <div className="shrink-0 rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-right">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/80">
-                  Reported
-                </p>
-                <p className="mt-0.5 text-sm font-medium tabular-nums text-foreground">
-                  {reportedLabel}
-                </p>
-              </div>
-            </div>
+        <p className="line-clamp-2 max-w-4xl text-xs leading-relaxed text-muted-foreground md:text-sm">
+          {description}
+        </p>
 
-            <dl className="grid grid-cols-1 gap-x-6 gap-y-3 border-t border-border/60 px-4 py-3.5 sm:grid-cols-2 sm:px-5 lg:grid-cols-4">
-              <MetaField label="Project" value={projectLabel} />
-              <MetaField label="Reported by" value={reporterLabel} />
-              <MetaField label="Resolved" value={resolvedLabel} />
-              <MetaField
-                label="Notes"
-                value={notesLabel}
-                className="sm:col-span-2 lg:col-span-1"
-              />
-            </dl>
-          </div>
-        </CollapsibleContent>
-      </Card>
-    </Collapsible>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 border-t border-border/60 pt-3 sm:grid-cols-3 lg:grid-cols-5">
+          <MetaField label="Project" value={projectLabel} />
+          <MetaField label="Reported" value={reportedLabel} />
+          <MetaField label="Reported by" value={reporterLabel} />
+          <MetaField label="Resolved" value={resolvedLabel} />
+          <MetaField
+            label="Notes"
+            value={notesLabel}
+            className="col-span-2 sm:col-span-3 lg:col-span-1"
+          />
+        </dl>
+      </div>
+    </Card>
   );
 }
 

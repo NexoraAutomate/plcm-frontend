@@ -5,13 +5,16 @@ import Link from 'next/link';
 import { ExternalLink, Loader2, Search, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { maintenanceCases, users } from '@/lib/api';
+import { inventory, maintenanceCases, users } from '@/lib/api';
+import { buildReplacementStockRows, type ReplacementStockRow } from '@/lib/entity-replacement';
+import { isInventoryInStock } from '@/lib/inventory-filter';
 import type { MaintenanceAssignedWork, User } from '@/lib/models';
 import { cn } from '@/lib/utils';
 import { formatMaintenanceApiError } from '@/services/maintenance';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsTrigger } from '@/components/ui/tabs';
@@ -48,10 +51,15 @@ type DialogMode =
   | 'ait_reject'
   | 'pd_repair_reject'
   | 'assign_me'
-  | 'assign_ie';
+  | 'assign_ie'
+  | 'reserve';
 
 function userDisplayName(user: User) {
   return user.full_name?.trim() || user.username;
+}
+
+function stockRowKey(row: ReplacementStockRow): string {
+  return row.instanceId != null ? `i-${row.instanceId}` : `inv-${row.inventoryId}-${row.srNo}`;
 }
 
 function lifecycleOf(row: MaintenanceAssignedWork): LifecycleTab {
@@ -82,7 +90,14 @@ export function MmhdAssignmentsPanel() {
   const [dialogMode, setDialogMode] = useState<DialogMode>(null);
   const [activeRow, setActiveRow] = useState<MaintenanceAssignedWork | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [rejectOutcome, setRejectOutcome] = useState<'issue_fixed' | 'modification_required' | ''>(
+    ''
+  );
   const [assigneeId, setAssigneeId] = useState('');
+  const [stockRows, setStockRows] = useState<ReplacementStockRow[]>([]);
+  const [stockLoading, setStockLoading] = useState(false);
+  const [partNumber, setPartNumber] = useState('');
+  const [stockKey, setStockKey] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -133,6 +148,80 @@ export function MmhdAssignmentsPanel() {
     [assignees]
   );
 
+  const partNumberOptions = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of stockRows) {
+      const pn = row.partNumber?.trim();
+      if (!pn || pn === '—') continue;
+      map.set(pn, (map.get(pn) ?? 0) + 1);
+    }
+    return [...map.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([pn, count]) => ({
+        value: pn,
+        label: pn,
+        description: `${count} serial${count === 1 ? '' : 's'} available`,
+      }));
+  }, [stockRows]);
+
+  const serialOptions = useMemo(() => {
+    const pn = partNumber.trim().toLowerCase();
+    return stockRows
+      .filter((row) => !pn || row.partNumber.toLowerCase() === pn)
+      .map((row) => ({
+        value: stockRowKey(row),
+        label: row.serialNumber && row.serialNumber !== '—' ? row.serialNumber : `Stock #${row.srNo}`,
+        description: [row.partNumber, row.location, row.oemName].filter(Boolean).join(' · '),
+      }));
+  }, [partNumber, stockRows]);
+
+  const selectedStock = useMemo(
+    () => stockRows.find((row) => stockRowKey(row) === stockKey) ?? null,
+    [stockKey, stockRows]
+  );
+
+  const loadStockForRow = useCallback(async (row: MaintenanceAssignedWork) => {
+    const entityType = (row.entity_type || 'unit').trim().toLowerCase() || 'unit';
+    setStockLoading(true);
+    setStockRows([]);
+    setPartNumber(row.part_number?.trim() || '');
+    setStockKey('');
+    try {
+      const res = await inventory.list(0, 1000, entityType);
+      const typed = (res.data ?? []).filter(
+        (item) =>
+          item.inventory_type?.toLowerCase() === entityType && isInventoryInStock(item)
+      );
+      const withInstances = await Promise.all(
+        typed.map(async (item) => {
+          if ((item.instances ?? []).length > 0 || Number(item.quantity) <= 0) {
+            return item;
+          }
+          try {
+            const instanceRes = await inventory.listInstances(item.id);
+            return { ...item, instances: instanceRes.data ?? [] };
+          } catch {
+            return item;
+          }
+        })
+      );
+      const rows = buildReplacementStockRows(withInstances.filter(isInventoryInStock));
+      setStockRows(rows);
+      const preferredPn = (row.part_number || '').trim();
+      if (preferredPn) {
+        const match = rows.find(
+          (stock) => stock.partNumber.toLowerCase() === preferredPn.toLowerCase()
+        );
+        if (match) setPartNumber(match.partNumber);
+      }
+    } catch {
+      setStockRows([]);
+      toast.error('Failed to load available inventory');
+    } finally {
+      setStockLoading(false);
+    }
+  }, []);
+
   const tabCounts = useMemo(() => {
     const counts: Record<LifecycleTab, number> = {
       needs_action: 0,
@@ -182,7 +271,11 @@ export function MmhdAssignmentsPanel() {
     setDialogMode(null);
     setActiveRow(null);
     setRejectReason('');
+    setRejectOutcome('');
     setAssigneeId('');
+    setStockRows([]);
+    setPartNumber('');
+    setStockKey('');
   };
 
   const withBusy = async (row: MaintenanceAssignedWork, fn: () => Promise<void>) => {
@@ -201,6 +294,7 @@ export function MmhdAssignmentsPanel() {
     setActiveRow(row);
     setDialogMode(mode);
     setRejectReason('');
+    setRejectOutcome('');
     setAssigneeId(
       mode === 'assign_me' && row.assigned_me_id
         ? String(row.assigned_me_id)
@@ -208,6 +302,13 @@ export function MmhdAssignmentsPanel() {
           ? String(row.assigned_ie_id)
           : ''
     );
+    if (mode === 'reserve') {
+      void loadStockForRow(row);
+    } else {
+      setStockRows([]);
+      setPartNumber('');
+      setStockKey('');
+    }
   };
 
   const runPdDecide = async (row: MaintenanceAssignedWork, decision: 'approve' | 'reject') => {
@@ -227,18 +328,36 @@ export function MmhdAssignmentsPanel() {
 
   const confirmPdReject = async () => {
     if (!activeRow?.replacement_request_id) return;
+    if (!rejectOutcome) {
+      toast.error('Choose whether the issue is fixed or modification is required');
+      return;
+    }
     if (!rejectReason.trim()) {
       toast.error('Reject reason is required');
       return;
     }
     const row = activeRow;
+    const outcome = rejectOutcome;
     closeDialog();
     await withBusy(row, async () => {
       await maintenanceCases.pdDecideReplacement(row.case_id, row.replacement_request_id!, {
         decision: 'reject',
         reject_reason: rejectReason.trim(),
+        reject_outcome: outcome,
       });
-      toast.success('Replacement rejected');
+      toast.success(
+        outcome === 'issue_fixed'
+          ? 'Issue fixed — maintenance case closed'
+          : 'Modification required — sent back to requester'
+      );
+    });
+  };
+
+  const runResubmit = async (row: MaintenanceAssignedWork) => {
+    if (row.replacement_request_id == null) return;
+    await withBusy(row, async () => {
+      await maintenanceCases.resubmitReplacementRequest(row.case_id, row.replacement_request_id!);
+      toast.success('Re-submitted for PD approval');
     });
   };
 
@@ -256,6 +375,30 @@ export function MmhdAssignmentsPanel() {
         assigned_me_id: id,
       });
       toast.success('ME assigned');
+    });
+  };
+
+  const confirmReserve = async () => {
+    if (!activeRow?.replacement_request_id) return;
+    if (!selectedStock && !partNumber.trim()) {
+      toast.error('Select a part number and serial to reserve');
+      return;
+    }
+    const row = activeRow;
+    closeDialog();
+    await withBusy(row, async () => {
+      await maintenanceCases.reserveReplacement(row.case_id, row.replacement_request_id!, {
+        inventory_id: selectedStock?.inventoryId ?? null,
+        inventory_instance_id: selectedStock?.instanceId ?? null,
+        part_number: selectedStock?.partNumber?.trim() || partNumber.trim() || null,
+        serial_number:
+          selectedStock?.serialNumber && selectedStock.serialNumber !== '—'
+            ? selectedStock.serialNumber
+            : null,
+        target_entity_type: row.entity_type || null,
+        target_entity_id: row.entity_id ?? null,
+      });
+      toast.success('Replacement inventory reserved');
     });
   };
 
@@ -448,7 +591,20 @@ export function MmhdAssignmentsPanel() {
         </Button>
       );
     }
-    if (row.can_assign_me) {
+    if (row.can_resubmit) {
+      buttons.push(
+        <Button
+          key="resubmit"
+          size="sm"
+          variant="secondary"
+          disabled={busy}
+          onClick={() => void runResubmit(row)}
+        >
+          Re-submit for PD
+        </Button>
+      );
+    }
+    if (row.can_assign_me && !row.assigned_me_id) {
       buttons.push(
         <Button
           key="assign-me"
@@ -458,6 +614,19 @@ export function MmhdAssignmentsPanel() {
           onClick={() => openDialog('assign_me', row)}
         >
           Assign ME…
+        </Button>
+      );
+    }
+    if (row.can_reserve) {
+      buttons.push(
+        <Button
+          key="reserve"
+          size="sm"
+          variant="secondary"
+          disabled={busy}
+          onClick={() => openDialog('reserve', row)}
+        >
+          Reserve inventory…
         </Button>
       );
     }
@@ -772,7 +941,7 @@ export function MmhdAssignmentsPanel() {
           if (!open) closeDialog();
         }}
       >
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
               {dialogMode === 'ait_reject'
@@ -781,16 +950,67 @@ export function MmhdAssignmentsPanel() {
                   ? 'Reject repair'
                   : 'Reject replacement'}
             </DialogTitle>
-            <DialogDescription>Provide a reason for the rejection.</DialogDescription>
+            <DialogDescription>
+              {dialogMode === 'pd_reject'
+                ? 'Choose the outcome, then provide a reason.'
+                : 'Provide a reason for the rejection.'}
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="mmhd-reject-reason">Reason</Label>
-            <Textarea
-              id="mmhd-reject-reason"
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              rows={3}
-            />
+          <div className="space-y-4">
+            {dialogMode === 'pd_reject' ? (
+              <div className="space-y-2">
+                <Label>What should happen?</Label>
+                <RadioGroup
+                  value={rejectOutcome}
+                  onValueChange={(value) =>
+                    setRejectOutcome(value as 'issue_fixed' | 'modification_required')
+                  }
+                  className="gap-2"
+                >
+                  <label
+                    htmlFor="mmhd-reject-issue-fixed"
+                    className="flex cursor-pointer items-start gap-3 rounded-lg border bg-background px-3 py-2.5"
+                  >
+                    <RadioGroupItem
+                      id="mmhd-reject-issue-fixed"
+                      value="issue_fixed"
+                      className="mt-0.5"
+                    />
+                    <span className="space-y-0.5">
+                      <span className="block text-sm font-medium">Issue is fixed</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Close the maintenance case now (stepper skips to Closed).
+                      </span>
+                    </span>
+                  </label>
+                  <label
+                    htmlFor="mmhd-reject-modification"
+                    className="flex cursor-pointer items-start gap-3 rounded-lg border bg-background px-3 py-2.5"
+                  >
+                    <RadioGroupItem
+                      id="mmhd-reject-modification"
+                      value="modification_required"
+                      className="mt-0.5"
+                    />
+                    <span className="space-y-0.5">
+                      <span className="block text-sm font-medium">Modification required</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Send back to the requester to update and re-submit for PD approval.
+                      </span>
+                    </span>
+                  </label>
+                </RadioGroup>
+              </div>
+            ) : null}
+            <div className="space-y-2">
+              <Label htmlFor="mmhd-reject-reason">Reason</Label>
+              <Textarea
+                id="mmhd-reject-reason"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                rows={3}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={closeDialog}>
@@ -799,6 +1019,7 @@ export function MmhdAssignmentsPanel() {
             <Button
               type="button"
               variant="destructive"
+              disabled={dialogMode === 'pd_reject' && (!rejectOutcome || !rejectReason.trim())}
               onClick={() =>
                 void (dialogMode === 'ait_reject'
                   ? confirmAitReject()
@@ -807,7 +1028,13 @@ export function MmhdAssignmentsPanel() {
                     : confirmPdReject())
               }
             >
-              Reject
+              {dialogMode === 'pd_reject'
+                ? rejectOutcome === 'issue_fixed'
+                  ? 'Close case'
+                  : rejectOutcome === 'modification_required'
+                    ? 'Send for modification'
+                    : 'Reject'
+                : 'Reject'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -848,6 +1075,77 @@ export function MmhdAssignmentsPanel() {
               }
             >
               Assign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={dialogMode === 'reserve'}
+        onOpenChange={(open) => {
+          if (!open) closeDialog();
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Reserve replacement inventory</DialogTitle>
+            <DialogDescription>
+              Select part number and serial for {activeRow?.case_number || 'this case'} after ME
+              allocation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <HierarchySearchCombobox
+              label="Part number"
+              placeholder={stockLoading ? 'Loading part numbers…' : 'Search part number'}
+              value={partNumber}
+              options={partNumberOptions}
+              onChange={(value) => {
+                setPartNumber(value);
+                setStockKey('');
+              }}
+              onClear={() => {
+                setPartNumber('');
+                setStockKey('');
+              }}
+              disabled={stockLoading}
+            />
+            <HierarchySearchCombobox
+              label="Serial number"
+              placeholder={
+                !partNumber
+                  ? 'Select a part number first'
+                  : stockLoading
+                    ? 'Loading serials…'
+                    : 'Search serial number'
+              }
+              value={stockKey}
+              options={serialOptions}
+              onChange={setStockKey}
+              onClear={() => setStockKey('')}
+              disabled={stockLoading || !partNumber}
+            />
+          </div>
+          {selectedStock ? (
+            <p className="text-xs text-muted-foreground">
+              Selected:{' '}
+              <span className="font-medium text-foreground">{selectedStock.partNumber}</span>
+              {selectedStock.serialNumber && selectedStock.serialNumber !== '—'
+                ? ` / ${selectedStock.serialNumber}`
+                : ''}
+              {selectedStock.location ? ` · ${selectedStock.location}` : ''}
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={closeDialog}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={stockLoading || (!selectedStock && !partNumber.trim())}
+              onClick={() => void confirmReserve()}
+            >
+              Reserve inventory
             </Button>
           </DialogFooter>
         </DialogContent>

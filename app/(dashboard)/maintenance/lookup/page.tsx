@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useDataStore } from '@/lib/data-store';
@@ -14,6 +15,7 @@ import { useAuth } from '@/lib/auth-context';
 import { P } from '@/lib/permission-codes';
 
 export default function MaintenanceLookupPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { can } = useAuth();
   const canSuspectChildren = can(P.suspect_children);
@@ -31,6 +33,13 @@ export default function MaintenanceLookupPage() {
   const [lookupLoading, setLookupLoading] = useState(false);
   const [createCaseLoading, setCreateCaseLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
+
+  const clearLookupState = () => {
+    setLookupResponse(null);
+    setLookupError(null);
+    setLookupCaseId(null);
+    setSerialNumber('');
+  };
 
   const invalidateCaseQueries = () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceCasesPage() });
@@ -123,7 +132,6 @@ export default function MaintenanceLookupPage() {
     try {
       const created = await createMaintenanceCase(payload);
       invalidateCaseQueries();
-      setLookupCaseId(created.id);
       setLookupError(null);
 
       try {
@@ -140,6 +148,9 @@ export default function MaintenanceLookupPage() {
           formatMaintenanceApiError(err, 'Case created, but suspecting children failed.')
         );
       }
+
+      clearLookupState();
+      router.push(`/maintenance/cases/${created.id}`);
     } catch (err) {
       setLookupError(
         formatMaintenanceApiError(
@@ -174,12 +185,7 @@ export default function MaintenanceLookupPage() {
       serialNumber={serialNumber}
       setSerialNumber={setSerialNumber}
       onLookup={handleLookup}
-      onClearLookup={() => {
-        setLookupResponse(null);
-        setLookupError(null);
-        setLookupCaseId(null);
-        setSerialNumber('');
-      }}
+      onClearLookup={clearLookupState}
       onCreateCase={handleCreateCaseFromLookup}
       lookupResponse={lookupResponses}
       caseId={lookupCaseId}

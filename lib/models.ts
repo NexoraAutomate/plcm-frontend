@@ -1956,6 +1956,7 @@ export enum EntityType {
 export interface ReturnedUnit {
   id: number;
   maintenance_case_id?: number | null;
+  case_number?: string | null;
   faulty_entity_id?: number | null;
   investigating_pd_id?: number | null;
   investigating_pd_name?: string | null;
@@ -2022,6 +2023,7 @@ export interface ReplacementRequest {
   status: ReplacementRequestStatus | string;
   pd_decision?: string | null;
   reject_reason?: string | null;
+  reject_outcome?: 'issue_fixed' | 'modification_required' | string | null;
   abort_reason?: string | null;
   issued_serial?: string | null;
   issued_instance_id?: number | null;
@@ -2079,7 +2081,9 @@ export interface MaintenanceAssignedWork {
   href: string;
   has_reservation?: boolean;
   can_pd_decide?: boolean;
+  can_resubmit?: boolean;
   can_assign_me?: boolean;
+  can_reserve?: boolean;
   can_me_request_issue?: boolean;
   can_im_issue?: boolean;
   can_start_ait?: boolean;
@@ -2117,6 +2121,8 @@ export interface ReplacementRequestReservePayload {
 export interface ReplacementRequestPdDecisionPayload {
   decision: 'approve' | 'reject' | string;
   reject_reason?: string | null;
+  /** Required when rejecting: issue_fixed closes the case; modification_required returns to opener. */
+  reject_outcome?: 'issue_fixed' | 'modification_required' | string | null;
 }
 
 export interface ReplacementRequestImIssuePayload {
@@ -2199,6 +2205,9 @@ export interface MaintenanceCase {
   fault_type?: string | null;
   confirmation_channel?: ConfirmationChannel | string | null;
   confirmation_reference?: string | null;
+  /** PD rejected with issue_fixed — stepper draws a skip arc to Closed. */
+  workflow_skip_to_closed?: boolean;
+  workflow_skip_from_status?: string | null;
   occurrence_attachments?: OccurrenceAttachment[];
   occurrence_officers?: OccurrenceOfficer[];
   returned_units?: ReturnedUnit[];

@@ -25,7 +25,7 @@ import {
   type NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Maximize2, Minimize2 } from 'lucide-react';
+import { FilePlus2, Loader2, Maximize2, Minimize2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -198,6 +198,9 @@ interface EntityLookupFlowProps {
   caseId?: number | null;
   onConfirmFault?: (node: EntityLookupNode) => Promise<void>;
   onViewEntity?: (node: EntityLookupNode) => void;
+  onCreateCase?: () => Promise<void>;
+  createCaseLoading?: boolean;
+  showCreateCase?: boolean;
 }
 
 function EntityLookupFlowCanvas({
@@ -209,6 +212,9 @@ function EntityLookupFlowCanvas({
   visibleFields,
   onToggleField,
   fieldSlicerIdPrefix,
+  onCreateCase,
+  createCaseLoading = false,
+  showCreateCase = false,
 }: EntityLookupFlowProps & {
   onSerialClick?: (node: EntityFlowNodeData) => void;
   visibleFields: Set<EntityFlowFieldKey>;
@@ -275,6 +281,25 @@ function EntityLookupFlowCanvas({
             visibleFields={visibleFields}
             onToggleField={onToggleField}
             idPrefix={fieldSlicerIdPrefix}
+            besideAction={
+              showCreateCase && onCreateCase ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={createCaseLoading}
+                  onClick={() => void onCreateCase()}
+                  aria-label="Create maintenance case"
+                  className="h-9 shadow-md"
+                >
+                  {createCaseLoading ? (
+                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  ) : (
+                    <FilePlus2 className="mr-1.5 h-4 w-4" />
+                  )}
+                  Create maintenance case
+                </Button>
+              ) : undefined
+            }
           />
           <FitViewOnLoad dependencyKey={dependencyKey} />
         </ReactFlow>
@@ -288,6 +313,9 @@ export function EntityLookupFlow({
   caseId,
   onConfirmFault,
   onViewEntity,
+  onCreateCase,
+  createCaseLoading = false,
+  showCreateCase = false,
 }: EntityLookupFlowProps) {
   const [visibleFields, setVisibleFields] = useState<Set<EntityFlowFieldKey>>(
     () => new Set(DEFAULT_VISIBLE_FIELDS)
@@ -366,6 +394,9 @@ export function EntityLookupFlow({
               visibleFields={visibleFields}
               onToggleField={handleToggleField}
               fieldSlicerIdPrefix="lookup-inline"
+              onCreateCase={onCreateCase}
+              createCaseLoading={createCaseLoading}
+              showCreateCase={showCreateCase}
             />
           </ReactFlowProvider>
         </div>
@@ -408,6 +439,9 @@ export function EntityLookupFlow({
                 visibleFields={visibleFields}
                 onToggleField={handleToggleField}
                 fieldSlicerIdPrefix="lookup-fullscreen"
+                onCreateCase={onCreateCase}
+                createCaseLoading={createCaseLoading}
+                showCreateCase={showCreateCase}
               />
             </ReactFlowProvider>
           </div>

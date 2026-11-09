@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { AttachmentUploadDialog } from '@/components/attachment-upload-dialog';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { Button } from '@/components/ui/button';
 import { FileDropZone, UploadedFileRow } from '@/components/ui/file-drop-zone';
 import { attachmentDisplayTitle, attachmentTypeLabel } from '@/lib/attachment-types';
 import type { EntityAttachment } from '@/lib/models';
@@ -12,6 +13,10 @@ import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
 import { P } from '@/lib/permission-codes';
 
+type PendingDeleteTarget =
+  | { kind: 'pending'; id: string; name: string }
+  | { kind: 'saved'; id: number; name: string };
+
 type AttachmentOwnerType =
   | 'system'
   | 'subsystem'
@@ -19,7 +24,9 @@ type AttachmentOwnerType =
   | 'unit'
   | 'component'
   | 'inventory'
-  | 'inventory_instance';
+  | 'inventory_instance'
+  | 'maintenance_case'
+  | 'replacement_request';
 
 export interface PendingAttachmentUpload {
   id: string;
@@ -62,6 +69,7 @@ export function EntityAttachmentsSection({
   const [queueOpen, setQueueOpen] = useState(false);
   const [seedFile, setSeedFile] = useState<File | null>(null);
   const [editingAttachment, setEditingAttachment] = useState<EntityAttachment | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<PendingDeleteTarget | null>(null);
   const canManage = Boolean(ownerId);
 
   function openUploadWithFile(file: File | null, queued: boolean) {
@@ -159,6 +167,32 @@ export function EntityAttachmentsSection({
     onPendingAttachmentsChange?.(pendingAttachments.filter((item) => item.id !== id));
   };
 
+  const confirmDeleteAttachment = () => {
+    if (!deleteTarget) return;
+    if (deleteTarget.kind === 'pending') {
+      removePending(deleteTarget.id);
+    } else {
+      void handleDeleteAttachment(deleteTarget.id);
+    }
+    setDeleteTarget(null);
+  };
+
+  const deleteConfirmDialog = (
+    <ConfirmDialog
+      open={deleteTarget != null}
+      onOpenChange={(open) => {
+        if (!open) setDeleteTarget(null);
+      }}
+      title="Delete attachment"
+      description={
+        deleteTarget
+          ? `Are you sure you want to delete "${deleteTarget.name}"? This action cannot be undone.`
+          : 'Are you sure you want to delete this attachment? This action cannot be undone.'
+      }
+      onConfirm={confirmDeleteAttachment}
+    />
+  );
+
   if (!canManage) {
     return (
       <div className="space-y-3 rounded-lg border bg-muted/40 p-4">
@@ -182,7 +216,13 @@ export function EntityAttachmentsSection({
                 name={pendingLabel(item)}
                 subtitle={`${attachmentTypeLabel(item.attachment_type)} · ${item.file.name}`}
                 onView={() => openLocalFile(item.file)}
-                onDelete={() => removePending(item.id)}
+                onDelete={() =>
+                  setDeleteTarget({
+                    kind: 'pending',
+                    id: item.id,
+                    name: pendingLabel(item),
+                  })
+                }
               />
             ))}
           </div>
@@ -197,6 +237,7 @@ export function EntityAttachmentsSection({
           initialFile={seedFile}
           onSubmit={handleQueueUpload}
         />
+        {deleteConfirmDialog}
       </div>
     );
   }
@@ -242,7 +283,12 @@ export function EntityAttachmentsSection({
               onEdit={canUpload ? () => setEditingAttachment(attachment) : undefined}
               onDelete={
                 canDelete
-                  ? () => void handleDeleteAttachment(attachment.id)
+                  ? () =>
+                      setDeleteTarget({
+                        kind: 'saved',
+                        id: attachment.id,
+                        name: attachmentDisplayTitle(attachment),
+                      })
                   : undefined
               }
             />
@@ -271,6 +317,7 @@ export function EntityAttachmentsSection({
         attachment={editingAttachment ?? undefined}
         onSubmit={handleUpdateAttachment}
       />
+      {deleteConfirmDialog}
     </div>
   );
 }

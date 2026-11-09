@@ -21,7 +21,8 @@ export default function MaintenanceLayout({
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Maintenance</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Track cases, look up equipment by serial, and manage OEM warranty claims.
+            Track cases, look up equipment, review returned units, and manage OEM warranty
+            claims.
           </p>
         </div>
         <MaintenanceSectionNav />
