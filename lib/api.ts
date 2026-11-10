@@ -791,10 +791,22 @@ export const inventory = {
       notes?: string | null
     }
   ) => api.post<Models.ItemIssueRequest>(`/item-requests/${requestId}/issue/`, data),
+  issueItemRequestsBulk: (data: {
+    request_ids: number[]
+    signature_type: string
+    signature_payload?: string | null
+    notes?: string | null
+  }) =>
+    api.post<Models.ItemIssueRequestBulkActionResult>('/item-requests/issue-bulk/', data),
   markBackItemRequest: (requestId: number, notes: string) =>
     api.post<Models.ItemIssueRequest>(`/item-requests/${requestId}/mark-back/`, {
       notes,
     }),
+  markBackItemRequestsBulk: (data: { request_ids: number[]; notes: string }) =>
+    api.post<Models.ItemIssueRequestBulkActionResult>(
+      '/item-requests/mark-back-bulk/',
+      data
+    ),
   listIssuances: (params?: {
     status?: string
     issued_to_user_id?: number

@@ -1,4 +1,4 @@
-# Current Feature: My Assignments — BHD / MMHD Sub-tabs
+# Current Feature: Issue Queue — Multi-Item Issue / Mark Back
 
 ## Status
 
@@ -6,26 +6,27 @@ In Progress
 
 ## Goals
 
-- [x] Sidebar **My Assignments** group with children **BHD assignments** and **MMHD Assignments** (not page-level domain tabs)
-- [x] Keep all existing hierarchy developer assignments under **BHD assignments** (current New / Under Process / Completed lifecycle tabs, filters, actions)
-- [x] Add **MMHD Assignments** for maintenance-related work queues: PD replacement approval, Maintenance Engineer, Inventory Manager, Inspection Engineer, and related dual-track tasks
-- [x] Backend: personal list endpoint aggregating maintenance assignments for the current user (mirror `/item-assignments/mine/` pattern)
-- [x] MMHD panel: list/filter with deep links (or actions) into maintenance case dual-track workflow
-- [x] Permissions / pending-action counts: MMHD roles can see their queue; separate BHD/MMHD badges on sidebar children
+- [x] Inventory Manager can select multiple pending Issue Queue rows for the **same developer** and Issue or Mark Back them together
+- [x] Multi-item Issue uses **one shared digital signature** applied to all selected requests
+- [x] For hard-copy confirmation: generate a **simple printable report** listing all selected items (part number, serial number, and related details) with a blank developer signature box
+- [x] After printing/signing, IM can scan the filled form and attach it to the bulk issue instance (proforma upload)
+- [x] Multi-item Mark Back uses one shared remarks reason for all selected requests
+- [x] Backend supports bulk issue and bulk mark-back (same developer validation; shared signature / notes)
 
 ## Notes
 
-- Sidebar: **My Assignments** collapsible group → children **BHD assignments** (`/my-assignments/bhd`) and **MMHD Assignments** (`/my-assignments/mmhd`)
-- `/my-assignments` redirects to `/my-assignments/bhd`
-- BHD panel: `components/inventory/my-assignments-panel.tsx` → `GET /item-assignments/mine/`
-- MMHD panel: `components/maintenance/mmhd-assignments-panel.tsx` → `GET /maintenance-assignments/mine/`
-- Pending badges: `my_assignments` (BHD) + `mmhd_assignments` (MMHD); parent group sums both
-- Inline MMHD actions for PD/ME/IE/IM + View case; AIT file upload deep-links to case
-- Pending: manual UI check on localhost for both sidebar children
+- Route: `/issue-queue` → `components/inventory/issue-queue-panel.tsx`
+- Bulk APIs: `POST /item-requests/issue-bulk/`, `POST /item-requests/mark-back-bulk/` (same developer required)
+- Single-item APIs unchanged; FE uses single endpoints for one row, bulk for 2+
+- HARD_COPY: `lib/download-multi-issuance-form.ts` downloads a jsPDF form; scanned file uploaded to each issuance via `uploadIssuanceProformaToManyIfNeeded`
+- Selection constraint: only rows with the same `assigned_developer_id` may be batched
 
 ## History
 
 <!-- Completed features (append only) -->
+
+### My Assignments — BHD / MMHD Sub-tabs
+Sidebar My Assignments group with BHD / MMHD children; MMHD personal list endpoint; dual-track inline actions; pending badges. Pending: manual UI check on localhost.
 
 ### My Assignments Tabs & Cleanup
 Three lifecycle tabs (New / Under Process / Completed); removed Projects & Item Category filters; regrouped status chips; Assigned items tooltip; Admin delete completed only. Pending: manual UI check.

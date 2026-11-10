@@ -1704,6 +1704,10 @@ export interface ItemIssueRequestBulkResult {
   }>
 }
 
+export interface ItemIssueRequestBulkActionResult {
+  items: ItemIssueRequest[]
+}
+
 export interface InventoryConsumeResult {
   inventory: Inventory
   consumed_instance?: InventoryInstance | null

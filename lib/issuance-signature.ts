@@ -11,6 +11,19 @@ export async function uploadIssuanceProformaIfNeeded(
   await api.inventory.uploadIssuanceProforma(issuanceId, proformaFile);
 }
 
+/** Attach the same scanned hard-copy form to every issuance in a bulk issue. */
+export async function uploadIssuanceProformaToManyIfNeeded(
+  issuanceIds: Array<number | null | undefined>,
+  signatureType: SignatureKind,
+  proformaFile: File | null | undefined
+) {
+  if (signatureType !== 'HARD_COPY' || !proformaFile) return;
+  const uniqueIds = [...new Set(issuanceIds.filter((id): id is number => typeof id === 'number'))];
+  for (const issuanceId of uniqueIds) {
+    await api.inventory.uploadIssuanceProforma(issuanceId, proformaFile);
+  }
+}
+
 export function issuanceHasSignatureArtifacts(row: {
   signature_type?: string | null;
   has_signature_attachment?: boolean | null;

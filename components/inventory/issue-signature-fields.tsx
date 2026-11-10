@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -25,6 +26,7 @@ type Props = {
   proformaFile: File | null;
   onProformaFileChange: (value: File | null) => void;
   disabled?: boolean;
+  hardCopyActions?: ReactNode;
 };
 
 export function IssueSignatureFields({
@@ -37,6 +39,7 @@ export function IssueSignatureFields({
   proformaFile,
   onProformaFileChange,
   disabled,
+  hardCopyActions,
 }: Props) {
   return (
     <div className="space-y-3">
@@ -64,6 +67,7 @@ export function IssueSignatureFields({
         />
       ) : (
         <div className="space-y-3">
+          {hardCopyActions ? <div>{hardCopyActions}</div> : null}
           <label className="flex items-start gap-2 text-sm">
             <Checkbox
               checked={hardCopyAck}
