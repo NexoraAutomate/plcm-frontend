@@ -201,6 +201,9 @@ export function hierarchyEntityToFormData(
     serial_number?: string | null;
     status_id?: number | null;
     oem_name?: string | null;
+    original_part_number?: string | null;
+    original_serial_number?: string | null;
+    warranty_expires_at?: string | null;
     installation_date?: string | null;
     installed_by_id?: number | null;
     picture_url?: string | null;
@@ -215,15 +218,25 @@ export function hierarchyEntityToFormData(
     }
   }
 
+  const serialNumber =
+    entity.serial_number?.trim() || entity.original_serial_number?.trim() || '';
+  const warrantyExpires = entity.warranty_expires_at
+    ? entity.warranty_expires_at.slice(0, 10)
+    : '';
+
   return {
     ...emptyInventoryEntityForm,
     inventory_type: entityType,
     name: entity.name,
     description: entity.description || '',
     part_number: entity.part_number || '',
-    serial_number: entity.serial_number || '',
+    serial_number: serialNumber,
     status_id: entity.status_id ? String(entity.status_id) : '',
     oem_name: entity.oem_name?.trim() || '',
+    original_part_number: entity.original_part_number?.trim() || '',
+    original_serial_number: entity.original_serial_number?.trim() || serialNumber,
+    warranty_provided: Boolean(warrantyExpires),
+    warranty_expires_at: warrantyExpires,
     installation_date: installationDate,
     installed_by_id: entity.installed_by_id ? String(entity.installed_by_id) : '',
     picture_url: entity.picture_url || '',
@@ -239,19 +252,31 @@ export function buildInventoryCreatePayload(
 ) {
   const entityType = selectedEntityType as HierarchyEntityType;
   const context = options?.context ?? 'inventory';
-  const group = inventoryGroupFieldsFromForm(formData, entityType, removePicture);
+  // Existing-project hierarchy UI collects OEM Part Number; use it as the
+  // catalog part # when a system-generated part # was never assigned.
+  const hierarchyFormData =
+    context === 'hierarchy' && !formData.part_number.trim() && formData.original_part_number.trim()
+      ? {
+          ...formData,
+          part_number: formData.original_part_number.trim(),
+          configuration_item:
+            formData.configuration_item.trim() || formData.original_part_number.trim(),
+        }
+      : formData;
+  const group = inventoryGroupFieldsFromForm(hierarchyFormData, entityType, removePicture);
   const withDefaultLocation =
     context === 'hierarchy'
       ? {
-          ...formData,
-          location: formData.location || 'On-site',
-          location_room: formData.location_room || formData.location || 'On-site',
+          ...hierarchyFormData,
+          location: hierarchyFormData.location || 'On-site',
+          location_room:
+            hierarchyFormData.location_room || hierarchyFormData.location || 'On-site',
         }
-      : formData;
+      : hierarchyFormData;
   const instance = inventoryUsesInstances(entityType)
     ? inventoryInstanceFieldsFromForm(withDefaultLocation, removePicture)
     : {};
-  const quantity = formData.quantity > 0 ? formData.quantity : 1;
+  const quantity = hierarchyFormData.quantity > 0 ? hierarchyFormData.quantity : 1;
   return { ...group, ...instance, quantity };
 }
 

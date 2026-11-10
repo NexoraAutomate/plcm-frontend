@@ -321,12 +321,23 @@ export async function createHierarchyEntityFromForm(options: {
   const statusId = Number(formData.status_id ?? formData.id);
   const hasOemField = Object.prototype.hasOwnProperty.call(formData, 'oem_name');
   const formOemName = String(formData.oem_name ?? '').trim();
+  const formOemPartNumber = String(formData.original_part_number ?? '').trim();
+  const formSerialNumber = String(formData.serial_number ?? '').trim();
+  const formOriginalSerial = String(formData.original_serial_number ?? '').trim();
   const created = await createEntity({
     name,
     description: String(formData.description || ''),
     ...installPayload,
     // Hierarchy OEM is an entity field; form value wins over inventory copy.
     ...(hasOemField ? { oem_name: formOemName || null } : {}),
+    // Existing-project form values win when provided; otherwise keep inventory copy.
+    ...(formOemPartNumber ? { original_part_number: formOemPartNumber } : {}),
+    ...(formSerialNumber
+      ? {
+          serial_number: formSerialNumber,
+          original_serial_number: formOriginalSerial || formSerialNumber,
+        }
+      : {}),
     // Keep form / first hierarchy status — never leave inventory status on the entity.
     status_id: Number.isFinite(statusId) && statusId > 0 ? statusId : undefined,
     installed_by_id:

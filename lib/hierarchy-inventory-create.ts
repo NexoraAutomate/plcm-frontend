@@ -67,11 +67,14 @@ export async function createHierarchyEntityWithInventoryForm(options: {
     name: string;
     description: string;
     part_number: string;
+    serial_number?: string;
     status_id: string;
     sku: string;
     installed_by_id: string;
     installation_date: string;
     oem_name: string;
+    original_part_number?: string;
+    original_serial_number?: string;
   };
 }) {
   const usesInstances = inventoryUsesInstances(options.selectedEntityType);
@@ -97,6 +100,8 @@ export async function createHierarchyEntityWithInventoryForm(options: {
   const inventoryDetail = await api.inventory.get(createdInventory.id);
   const inventoryItem = inventoryDetail.data;
   const instanceId = usesInstances ? getLatestInstanceId(inventoryItem) : undefined;
+  const formSerial = (options.formData.serial_number || '').trim();
+  const formOemPart = (options.formData.original_part_number || '').trim();
 
   const hierarchyFormData: Record<string, unknown> = {
     name: options.formData.name,
@@ -107,6 +112,10 @@ export async function createHierarchyEntityWithInventoryForm(options: {
     installed_by_id: options.formData.installed_by_id,
     installation_date: options.formData.installation_date,
     oem_name: options.formData.oem_name,
+    original_part_number: formOemPart || undefined,
+    original_serial_number:
+      formSerial || (options.formData.original_serial_number || '').trim() || undefined,
+    serial_number: formSerial || undefined,
     ...(instanceId != null ? { inventory_instance_id: String(instanceId) } : {}),
   };
 

@@ -203,15 +203,21 @@ export function useInventoryEntityForm(options: {
   );
 
   const validateCreate = useCallback((): string | null => {
+    const isHierarchy = context === 'hierarchy';
+    // Existing-project hierarchy forms capture OEM Part Number instead of a
+    // system-generated PLCM part # — accept either for serialized validation.
+    const partNumber = isHierarchy
+      ? formData.part_number.trim() || formData.original_part_number.trim()
+      : formData.part_number;
     const baseError = validateInventoryForm({
       name: formData.name,
-      partNumber: formData.part_number,
+      partNumber,
       location: formData.location,
       quantity: formData.quantity,
       unitCost: formData.unit_cost,
       usesInstances: inventoryUsesInstances(selectedEntityType),
       supportsQuantity: true,
-      isHierarchy: context === 'hierarchy',
+      isHierarchy,
       isComponent: selectedEntityType === 'component',
       entityCategoryLabel: entityLabel(selectedEntityType),
     });

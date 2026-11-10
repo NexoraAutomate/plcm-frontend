@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,7 @@ import { createHierarchyEntityWithInventoryForm } from '@/lib/hierarchy-inventor
 import { hierarchyEntityToFormData } from '@/lib/inventory-entity-fields';
 import { useDataStore } from '@/lib/data-store';
 import { useAppDefinitions } from '@/lib/app-definitions-context';
+import type { Inventory } from '@/lib/models';
 import * as api from '@/lib/api';
 
 export interface HierarchyEntityInventoryDialogProps {
@@ -41,6 +42,8 @@ export interface HierarchyEntityInventoryDialogProps {
     serial_number?: string | null;
     status_id?: number | null;
     oem_name?: string | null;
+    original_part_number?: string | null;
+    original_serial_number?: string | null;
     installation_date?: string | null;
     installed_by_id?: number | null;
     picture_url?: string | null;
@@ -49,6 +52,50 @@ export interface HierarchyEntityInventoryDialogProps {
   description?: string;
   onSaved?: (entityId: number) => void | Promise<void>;
   extraPayload?: Record<string, unknown>;
+}
+
+type LinkedInventoryExtras = {
+  original_part_number?: string;
+  original_serial_number?: string;
+  serial_number?: string;
+  warranty_expires_at?: string | null;
+  inventoryId?: number;
+  instanceId?: number;
+};
+
+function pickLinkedInventoryExtras(items: Inventory[]): LinkedInventoryExtras {
+  if (!items.length) return {};
+
+  const withWarranty =
+    items.find((item) => item.warranty_expires_at) ||
+    items.find((item) =>
+      (item.instances ?? []).some((instance) => instance.warranty_expires_at)
+    ) ||
+    items[0];
+
+  const instanceWithWarranty = (withWarranty.instances ?? []).find(
+    (instance) => instance.warranty_expires_at
+  );
+  const firstInstance = withWarranty.instances?.[0];
+  const warrantySource = instanceWithWarranty || firstInstance || withWarranty;
+
+  return {
+    original_part_number:
+      withWarranty.original_part_number?.trim() ||
+      firstInstance?.original_part_number?.trim() ||
+      undefined,
+    original_serial_number:
+      withWarranty.original_serial_number?.trim() ||
+      firstInstance?.original_serial_number?.trim() ||
+      undefined,
+    serial_number:
+      withWarranty.serial_number?.trim() ||
+      firstInstance?.serial_number?.trim() ||
+      undefined,
+    warranty_expires_at: warrantySource.warranty_expires_at ?? null,
+    inventoryId: withWarranty.id,
+    instanceId: instanceWithWarranty?.id ?? firstInstance?.id,
+  };
 }
 
 export function HierarchyEntityInventoryDialog({
@@ -79,11 +126,50 @@ export function HierarchyEntityInventoryDialog({
     runSilentEntityBatch,
   } = useDataStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [linkedExtras, setLinkedExtras] = useState<LinkedInventoryExtras>({});
+
+  useEffect(() => {
+    if (!open || !entityId) {
+      setLinkedExtras({});
+      return;
+    }
+
+    let cancelled = false;
+    void api.inventory
+      .listByEntity(entityId)
+      .then((res) => {
+        if (cancelled) return;
+        setLinkedExtras(pickLinkedInventoryExtras(res.data ?? []));
+      })
+      .catch(() => {
+        if (!cancelled) setLinkedExtras({});
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, entityId]);
 
   const initialFormData = useMemo(() => {
     if (!open || !entity) return undefined;
-    return hierarchyEntityToFormData(entity, entityType);
-  }, [open, entity, entityType]);
+    const base = hierarchyEntityToFormData(entity, entityType);
+    return {
+      ...base,
+      original_part_number:
+        base.original_part_number || linkedExtras.original_part_number || '',
+      original_serial_number:
+        base.original_serial_number || linkedExtras.original_serial_number || '',
+      serial_number: base.serial_number || linkedExtras.serial_number || '',
+      warranty_provided: Boolean(
+        base.warranty_expires_at || linkedExtras.warranty_expires_at
+      ),
+      warranty_expires_at: base.warranty_expires_at
+        ? base.warranty_expires_at
+        : linkedExtras.warranty_expires_at
+          ? linkedExtras.warranty_expires_at.slice(0, 10)
+          : '',
+    };
+  }, [open, entity, entityType, linkedExtras]);
 
   const form = useInventoryEntityForm({
     entityType,
@@ -94,6 +180,76 @@ export function HierarchyEntityInventoryDialog({
     lockEntityName: Boolean(entityId && entity?.name),
   });
 
+  async function syncLinkedInventoryWarranty() {
+    if (!linkedExtras.inventoryId) return;
+
+    const warrantyExpiresAt =
+      form.formData.warranty_provided && form.formData.warranty_expires_at
+        ? new Date(form.formData.warranty_expires_at).toISOString()
+        : null;
+
+    await api.inventory.update(linkedExtras.inventoryId, {
+      warranty_expires_at: warrantyExpiresAt,
+      original_part_number: form.formData.original_part_number.trim() || undefined,
+      oem_name: form.formData.oem_name.trim() || undefined,
+    });
+
+    if (linkedExtras.instanceId) {
+      await api.inventory.updateInstance(linkedExtras.instanceId, {
+        warranty_expires_at: warrantyExpiresAt,
+        original_part_number: form.formData.original_part_number.trim() || undefined,
+        original_serial_number:
+          form.formData.serial_number.trim() ||
+          form.formData.original_serial_number.trim() ||
+          undefined,
+        serial_number: form.formData.serial_number.trim() || undefined,
+      });
+    }
+  }
+
+  async function updateExistingEntity() {
+    if (entityId == null) return entityId;
+
+    const updateEntityByType = buildUpdateEntityByType({
+      updateSystem,
+      updateSubsystem,
+      updateModule,
+      updateUnit,
+      updateComponent,
+    });
+
+    const serialNumber = form.formData.serial_number.trim();
+    const oemPartNumber = form.formData.original_part_number.trim();
+    const partNumber = form.formData.part_number.trim() || oemPartNumber;
+
+    await updateEntityByType(entityType, {
+      id: entityId,
+      description: form.formData.description,
+      oem_name: form.formData.oem_name.trim() || null,
+      part_number: partNumber || null,
+      configuration_item:
+        form.formData.configuration_item.trim() || partNumber || null,
+      original_part_number: oemPartNumber || null,
+      serial_number: serialNumber || null,
+      original_serial_number: serialNumber || form.formData.original_serial_number.trim() || null,
+      installation_date: form.formData.installation_date
+        ? new Date(form.formData.installation_date).toISOString()
+        : null,
+      installed_by_id: form.formData.installed_by_id
+        ? Number(form.formData.installed_by_id)
+        : null,
+      ...extraPayload,
+    });
+
+    try {
+      await syncLinkedInventoryWarranty();
+    } catch (error) {
+      console.warn('Failed to sync linked inventory warranty/OEM refs:', error);
+    }
+
+    return entityId;
+  }
+
   async function handleSubmit() {
     const validationError = form.validateCreate();
     if (validationError) {
@@ -103,43 +259,48 @@ export function HierarchyEntityInventoryDialog({
 
     setIsSubmitting(true);
     try {
-      const createEntityByType = buildCreateEntityByType(
-        {
-          createSystem,
-          createSubsystem,
-          createModule,
-          createUnit,
-          createComponent,
-        },
-        { silent: true }
-      );
-      const updateEntityByType = buildUpdateEntityByType({
-        updateSystem,
-        updateSubsystem,
-        updateModule,
-        updateUnit,
-        updateComponent,
-      });
+      let targetId: number;
 
-      const saved = await runSilentEntityBatch(async () =>
-        createHierarchyEntityWithInventoryForm({
-          entityType,
-          parentId,
-          selectedEntityType: form.selectedEntityType,
-          buildInventoryPayload: form.buildInventoryPayload,
-          createEntityByType,
-          updateEntityByType,
-          existingEntityId: entityId,
-          extraPayload,
-          removePicture: form.removePicture,
-          pendingPictureFile: form.pendingPictureFile,
-          pendingPictureFiles: form.pendingPictureFiles,
-          pendingAttachments: form.pendingAttachments,
-          formData: form.formData,
-        })
-      );
+      if (entityId != null) {
+        targetId = await runSilentEntityBatch(async () => updateExistingEntity());
+      } else {
+        const createEntityByType = buildCreateEntityByType(
+          {
+            createSystem,
+            createSubsystem,
+            createModule,
+            createUnit,
+            createComponent,
+          },
+          { silent: true }
+        );
+        const updateEntityByType = buildUpdateEntityByType({
+          updateSystem,
+          updateSubsystem,
+          updateModule,
+          updateUnit,
+          updateComponent,
+        });
 
-      const targetId = entityId ?? saved.id;
+        const saved = await runSilentEntityBatch(async () =>
+          createHierarchyEntityWithInventoryForm({
+            entityType,
+            parentId,
+            selectedEntityType: form.selectedEntityType,
+            buildInventoryPayload: form.buildInventoryPayload,
+            createEntityByType,
+            updateEntityByType,
+            extraPayload,
+            removePicture: form.removePicture,
+            pendingPictureFile: form.pendingPictureFile,
+            pendingPictureFiles: form.pendingPictureFiles,
+            pendingAttachments: form.pendingAttachments,
+            formData: form.formData,
+          })
+        );
+        targetId = saved.id;
+      }
+
       const pictureFiles =
         form.pendingPictureFiles.length > 0
           ? form.pendingPictureFiles

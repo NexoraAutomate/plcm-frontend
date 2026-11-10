@@ -390,9 +390,75 @@ export function InventoryEntityFormTabs({
                         }}
                         placeholder="e.g. AMP"
                       />
-                      <p className="text-[11px] text-muted-foreground">
-                        Part # / Serial # are generated from the name and OEM (not entered manually).
-                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-xs">OEM Part Number</Label>
+                      <Input
+                        className="h-8"
+                        value={formData.original_part_number}
+                        onChange={(e) =>
+                          onFormDataChange({
+                            ...formData,
+                            original_part_number: e.target.value,
+                          })
+                        }
+                        placeholder="Manufacturer / OEM part number"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Serial Number</Label>
+                      <Input
+                        className="h-8"
+                        value={formData.serial_number}
+                        onChange={(e) =>
+                          onFormDataChange({ ...formData, serial_number: e.target.value })
+                        }
+                        placeholder="Hardware serial number"
+                      />
+                    </div>
+                    <div className="space-y-2 rounded-md border p-2.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <Label
+                            htmlFor="hierarchy-entity-warranty-toggle"
+                            className="text-xs"
+                          >
+                            Supplier Warranty
+                          </Label>
+                          <p className="text-[11px] text-muted-foreground">
+                            Turn on when the supplier provides a warranty period.
+                          </p>
+                        </div>
+                        <Switch
+                          id="hierarchy-entity-warranty-toggle"
+                          checked={formData.warranty_provided}
+                          onCheckedChange={(checked) =>
+                            onFormDataChange({
+                              ...formData,
+                              warranty_provided: checked,
+                              warranty_expires_at: checked
+                                ? formData.warranty_expires_at
+                                : '',
+                            })
+                          }
+                        />
+                      </div>
+                      {formData.warranty_provided ? (
+                        <div>
+                          <Label className="text-xs">Warranty expires *</Label>
+                          <Input
+                            className="h-8"
+                            type="date"
+                            value={formData.warranty_expires_at}
+                            onChange={(e) =>
+                              onFormDataChange({
+                                ...formData,
+                                warranty_expires_at: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                      ) : null}
                     </div>
                   </CardContent>
                 </Card>
