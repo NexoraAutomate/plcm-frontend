@@ -7,6 +7,7 @@ import { resolveWorkflowRoles } from '@/lib/workflow-roles';
  * `inventory-system` is the full Inventory System group.
  */
 export type SidebarEntryKey =
+  | 'onboarding'
   | 'executive-dashboard'
   | 'hierarchy-dashboard'
   | 'my-assignments'
@@ -26,6 +27,7 @@ export type SidebarEntryKey =
 
 /** Default / Admin: full nav with new groupings */
 export const FALLBACK_SIDEBAR_ORDER: SidebarEntryKey[] = [
+  'onboarding',
   'executive-dashboard',
   'hierarchy-dashboard',
   'my-assignments',
@@ -45,6 +47,7 @@ export const FALLBACK_SIDEBAR_ORDER: SidebarEntryKey[] = [
 export const ROLE_SIDEBAR_ORDER: Record<WorkflowRoleCode, SidebarEntryKey[]> = {
   ADMIN: FALLBACK_SIDEBAR_ORDER,
   PD: [
+    'onboarding',
     'executive-dashboard',
     'hierarchy-dashboard',
     'my-assignments',
@@ -58,6 +61,7 @@ export const ROLE_SIDEBAR_ORDER: Record<WorkflowRoleCode, SidebarEntryKey[]> = {
     'definitions',
   ],
   HM: [
+    'onboarding',
     'hierarchy-dashboard',
     'executive-dashboard',
     'projects',
@@ -71,6 +75,7 @@ export const ROLE_SIDEBAR_ORDER: Record<WorkflowRoleCode, SidebarEntryKey[]> = {
     'definitions',
   ],
   IM: [
+    'onboarding',
     'inventory-system',
     'my-assignments',
     'hierarchy-dashboard',
@@ -79,13 +84,18 @@ export const ROLE_SIDEBAR_ORDER: Record<WorkflowRoleCode, SidebarEntryKey[]> = {
     'definitions',
   ],
   DEV: [
+    'onboarding',
     'my-assignments',
     'inventory',
     'notifications',
   ],
+  // ME / FSE / IE use the full fallback layout (incl. Onboarding).
+  ME: FALLBACK_SIDEBAR_ORDER,
+  FSE: FALLBACK_SIDEBAR_ORDER,
+  IE: FALLBACK_SIDEBAR_ORDER,
 };
 
-const ROLE_PRIORITY: WorkflowRoleCode[] = ['ADMIN', 'PD', 'HM', 'IM', 'DEV'];
+const ROLE_PRIORITY: WorkflowRoleCode[] = ['ADMIN', 'PD', 'HM', 'IM', 'DEV', 'ME', 'FSE', 'IE'];
 
 /** Highest-priority Spec 00 workflow role for sidebar layout. */
 export function primarySidebarRole(

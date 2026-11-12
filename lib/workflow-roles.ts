@@ -1,6 +1,7 @@
 /**
  * Spec 00 — workflow role codes ↔ DB Role.name mapping.
  * Use ROLE / WORKFLOW_ROLE_NAMES with <Can role=…> for later action gates.
+ * ME / FSE / IE align with backend app/domain/workflow_roles.py (MMHD dual-track).
  */
 
 export const WorkflowRole = {
@@ -9,17 +10,23 @@ export const WorkflowRole = {
   HM: 'HM',
   IM: 'IM',
   DEV: 'DEV',
+  ME: 'ME',
+  FSE: 'FSE',
+  IE: 'IE',
 } as const;
 
 export type WorkflowRoleCode = (typeof WorkflowRole)[keyof typeof WorkflowRole];
 
-/** Spec code → Role.name stored in backend DEFAULT_ROLES */
+/** Spec code → Role.name stored in backend DEFAULT_ROLES / workflow seed */
 export const WORKFLOW_ROLE_DB_NAMES: Record<WorkflowRoleCode, string> = {
   ADMIN: 'Admin',
   PD: 'ProjectDirector',
   HM: 'HierarchyManager',
   IM: 'InventoryManager',
   DEV: 'Developer',
+  ME: 'MaintenanceEngineer',
+  FSE: 'FieldServiceEngineer',
+  IE: 'InspectionEngineer',
 };
 
 export const WORKFLOW_ROLE_LABELS: Record<WorkflowRoleCode, string> = {
@@ -28,6 +35,9 @@ export const WORKFLOW_ROLE_LABELS: Record<WorkflowRoleCode, string> = {
   HM: 'Hierarchy Manager',
   IM: 'Inventory Manager',
   DEV: 'Developer',
+  ME: 'Maintenance Engineer',
+  FSE: 'Field Service Engineer',
+  IE: 'Inspection Engineer',
 };
 
 /** Convenience: DB names for <Can role={[ROLE.HM, ROLE.ADMIN]} /> */
@@ -37,6 +47,9 @@ export const ROLE = {
   HM: WORKFLOW_ROLE_DB_NAMES.HM,
   IM: WORKFLOW_ROLE_DB_NAMES.IM,
   DEV: WORKFLOW_ROLE_DB_NAMES.DEV,
+  ME: WORKFLOW_ROLE_DB_NAMES.ME,
+  FSE: WORKFLOW_ROLE_DB_NAMES.FSE,
+  IE: WORKFLOW_ROLE_DB_NAMES.IE,
 } as const;
 
 const DB_TO_CODE: Record<string, WorkflowRoleCode> = Object.fromEntries(
@@ -61,6 +74,15 @@ const ALIASES: Record<string, WorkflowRoleCode> = {
   inventorymanager: 'IM',
   dev: 'DEV',
   developer: 'DEV',
+  me: 'ME',
+  'maintenance engineer': 'ME',
+  maintenanceengineer: 'ME',
+  fse: 'FSE',
+  'field service engineer': 'FSE',
+  fieldserviceengineer: 'FSE',
+  ie: 'IE',
+  'inspection engineer': 'IE',
+  inspectionengineer: 'IE',
 };
 
 export function normalizeWorkflowRole(role: string | null | undefined): WorkflowRoleCode | null {

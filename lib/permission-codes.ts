@@ -484,6 +484,10 @@ export function routePermissionForPath(pathname: string): PermissionCode | Permi
     // Authenticated shell is enough — inbox rows are filtered per user.
     return null;
   }
+  if (normalized === '/onboarding' || normalized.startsWith('/onboarding/')) {
+    // Intentionally open to every authenticated user (training hub).
+    return null;
+  }
   if (normalized === '/verify-queue' || normalized.startsWith('/verify-queue/')) {
     return NAV_PERMISSIONS['/verify-queue'];
   }

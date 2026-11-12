@@ -39,6 +39,7 @@ import {
   LayoutTemplate,
   PackageCheck,
   MapPinned,
+  GraduationCap,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -83,6 +84,12 @@ type NavGroup = {
 };
 
 const NAV_BY_HREF: Record<string, NavItem> = {
+  "/onboarding": {
+    label: "Onboarding",
+    href: "/onboarding",
+    icon: GraduationCap,
+    // Always visible — training hub for every signed-in user.
+  },
   "/executive-dashboard": {
     label: "Executive Dashboard",
     href: "/executive-dashboard",
@@ -359,6 +366,7 @@ const HIERARCHY_LABEL_BY_HREF: Record<string, string> = {
 };
 
 const ENTRY_HREF: Partial<Record<SidebarEntryKey, string>> = {
+  onboarding: "/onboarding",
   "executive-dashboard": "/executive-dashboard",
   "hierarchy-dashboard": "/hierarchy-dashboard",
   customers: "/customers",
