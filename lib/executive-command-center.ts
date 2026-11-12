@@ -32,25 +32,6 @@ function monthLabel(raw: string): string {
   return raw.slice(0, 3);
 }
 
-function padCalendarMonths(
-  maps: Record<string, number>[]
-): { name: string; values: number[] }[] {
-  // Collapse YYYY-MM keys into Jan–Dec buckets (current calendar view).
-  const byMonth = maps.map(() => Object.fromEntries(MONTHS.map((m) => [m, 0])) as Record<string, number>);
-  maps.forEach((map, mi) => {
-    for (const [key, value] of Object.entries(map)) {
-      const label = monthLabel(key);
-      if (label in byMonth[mi]) {
-        byMonth[mi][label] += Number(value) || 0;
-      }
-    }
-  });
-  return MONTHS.map((name) => ({
-    name,
-    values: byMonth.map((m) => m[name] ?? 0),
-  }));
-}
-
 function toMonthMap(points: ChartDataPoint[]): Record<string, number> {
   const map: Record<string, number> = {};
   for (const p of points) {
@@ -180,39 +161,79 @@ function faultTypeBuckets(points: ChartDataPoint[]): ExecNamedValue[] {
     .sort((a, b) => b.value - a.value);
 }
 
+function collapseToCalendarMonths(map: Record<string, number>): Record<string, number> {
+  const byMonth = Object.fromEntries(MONTHS.map((m) => [m, 0])) as Record<string, number>;
+  for (const [key, value] of Object.entries(map)) {
+    const label = monthLabel(key);
+    if (label in byMonth) byMonth[label] += Number(value) || 0;
+  }
+  return byMonth;
+}
+
 function buildPortfolioTrend(data: ExecutiveDashboardResponse | null): {
   series: ExecSeriesPoint[];
-  totals: { started: number; completed: number; delayed: number };
+  totals: {
+    total: number;
+    started: number;
+    ongoing: number;
+    completed: number;
+    delayed: number;
+  };
 } {
-  const startedMap = toMonthMap(data?.projects.timeline ?? []);
-  const completedMap = toMonthMap(data?.projects.completed_timeline ?? []);
+  const startedMonthly = collapseToCalendarMonths(toMonthMap(data?.projects.timeline ?? []));
+  const completedMonthly = collapseToCalendarMonths(
+    toMonthMap(data?.projects.completed_timeline ?? [])
+  );
+  const delayedMonthly = collapseToCalendarMonths(
+    toMonthMap(data?.projects.delayed_timeline ?? [])
+  );
 
-  // Delayed-by-month: count overdue projects by the month their end_date fell due.
-  const delayedMap: Record<string, number> = {};
-  for (const p of data?.projects.progress ?? []) {
-    if ((p.days_overdue ?? 0) <= 0 || !p.end_date) continue;
-    const key = p.end_date.slice(0, 7);
-    delayedMap[key] = (delayedMap[key] ?? 0) + 1;
-  }
+  const currentMonthIdx = new Date().getMonth(); // 0 = Jan
+  let cumStarted = 0;
+  let cumCompleted = 0;
+  let lastDelayed = 0;
 
-  const rows = padCalendarMonths([startedMap, completedMap, delayedMap]);
-  const series: ExecSeriesPoint[] = rows.map((row) => ({
-    month: row.name,
-    started: row.values[0] ?? 0,
-    completed: row.values[1] ?? 0,
-    delayed: row.values[2] ?? 0,
-  }));
+  const series: ExecSeriesPoint[] = MONTHS.map((month, idx) => {
+    const inPastOrCurrent = idx <= currentMonthIdx;
+    const started = inPastOrCurrent ? startedMonthly[month] ?? 0 : 0;
+    const completedNew = inPastOrCurrent ? completedMonthly[month] ?? 0 : 0;
+
+    if (inPastOrCurrent) {
+      cumStarted += started;
+      cumCompleted += completedNew;
+      lastDelayed = delayedMonthly[month] ?? lastDelayed;
+    }
+
+    const total = cumStarted;
+    const completed = cumCompleted;
+    const ongoing = Math.max(0, total - completed);
+    const delayed = inPastOrCurrent ? delayedMonthly[month] ?? 0 : lastDelayed;
+
+    return {
+      month,
+      total,
+      started,
+      ongoing,
+      completed,
+      delayed,
+    };
+  });
 
   const delayedTotal = kpiValue(data, 'delayed_projects');
-  const startedSum = series.reduce((s, r) => s + Number(r.started || 0), 0);
-  const completedSum = series.reduce((s, r) => s + Number(r.completed || 0), 0);
+  const startedSum = series
+    .slice(0, currentMonthIdx + 1)
+    .reduce((s, r) => s + Number(r.started || 0), 0);
+  const completedNow = cumCompleted || kpiValue(data, 'completed_projects');
+  const totalNow = cumStarted || kpiValue(data, 'total_projects');
 
   return {
     series,
     totals: {
+      total: totalNow,
       started: startedSum,
-      completed: completedSum || kpiValue(data, 'completed_projects'),
-      delayed: delayedTotal,
+      ongoing: Math.max(0, totalNow - completedNow),
+      completed: completedNow,
+      delayed: delayedTotal || lastDelayed,
     },
   };
 }
@@ -453,7 +474,7 @@ export function buildCommandCenterViewModel(
     healthMomPts !== null ? Number((healthMomPts / 100).toFixed(2)) : null;
 
   const { series: portfolioTrend, totals: portfolioTotals } = buildPortfolioTrend(data);
-  const sparkline = portfolioTrend.map((p) => Number(p.started) || 0);
+  const sparkline = portfolioTrend.map((p) => Number(p.total) || Number(p.started) || 0);
   const startedMom = momChange(sparkline);
 
   const projectsByStatus = aggregateStatus(data?.projects.status_distribution ?? []);
@@ -529,7 +550,7 @@ export function buildCommandCenterViewModel(
       trend: healthAvailable ? healthTrend : undefined,
       insight: healthAvailable
         ? insight(
-            `(Total projects − Delayed projects) ÷ Total projects × 100 = (${totalProjects} − ${delayedProjects}) ÷ ${totalProjects} × 100 = ${healthPct}%. Delayed = end date in the past and status ≠ Completed.${
+            `(Total projects − Delayed projects) ÷ Total projects × 100 = (${totalProjects} − ${delayedProjects}) ÷ ${totalProjects} × 100 = ${healthPct}%. Delayed = end date in the past while status is still active (not Completed / Cancelled / Superseded).${
               healthMomPts !== null
                 ? ` MoM change = current health − prior-month health (portfolio as of last month-end) = ${healthMomPts > 0 ? '+' : ''}${healthMomPts} percentage points.`
                 : ' MoM change requires a prior-month portfolio (projects created before this month); none available yet.'
@@ -546,14 +567,14 @@ export function buildCommandCenterViewModel(
       trend: trendFromChange(kpiChange(data, 'active_projects') ?? startedMom),
       sparkline,
       insight: insight(
-        `Active programs = active_projects KPI (projects whose status is not Completed or On Hold) = ${activePrograms}. Related portfolio size: ${totalOrders} order(s), ${totalProjects} total project(s). Sparkline = projects created per month from the portfolio timeline.`,
+        `Active programs = active_projects KPI (projects whose status is not Completed, Cancelled, Superseded, or On Hold) = ${activePrograms}. Related portfolio size: ${totalOrders} order(s), ${totalProjects} total project(s). Sparkline = projects created per month from the portfolio timeline.`,
         'Shows concurrent delivery load. Rising active programs without matching completions or staffing signals capacity risk.'
       ),
     },
     portfolioTrend,
     portfolioTotals,
     portfolioInsight: insight(
-      'Started = projects created that month. Completed = projects marked Completed by end_date month. Delayed = overdue lifecycle projects counted in the month their end_date fell due. Right-side totals: annual started/completed sums and current delayed KPI. Axis shows full Jan–Dec; Y scales to 100 (or higher in steps of 20 if needed).',
+      'Five series through the calendar year: Total Projects = cumulative started; Started = new projects that month; Completed = cumulative completions to date; On Going = Total − Completed that month; Delayed = rolling count of unresolved past-due projects (carry forward until resolved). Right-side totals are current-year snapshots. Axis shows full Jan–Dec; Y scales to 100 (or higher in steps of 20 if needed).',
       'Compare intake vs completions to spot backlog growth. Rising delayed counts mean schedule recovery should be the executive focus.'
     ),
     mttr: {
@@ -625,23 +646,23 @@ export function buildCommandCenterViewModel(
       value: delayedProjects,
       trend: trendFromAbsolute(kpiChangeValue(data, 'delayed_projects'), { invertPositive: true }),
       insight: insight(
-        `Count of lifecycle projects where end_date < now = ${delayedProjects} of ${totalProjects} total. MoM = current delayed − delayed count as of last month-end.`,
+        `Count of active projects where end_date < now = ${delayedProjects} of ${totalProjects} total. MoM = current delayed − delayed count as of last month-end.`,
         'Each delayed project is a contractual and resource risk. Drill into Top Delayed for days overdue and owners.'
       ),
     },
     projectsByStatus,
     projectsByStatusInsight: insight(
-      'Buckets: Completed and On Hold come from project status. Lifecycle statuses (Initiation, Planning, Execution, Monitoring) become Delayed when end_date is past, otherwise On Track.',
+      'Buckets: Completed and On Hold come from project status. Active workflow statuses (Draft, Approved, Hierarchy Generated, Ready For Inventory, Ready To Deliver) become Delayed when end_date is past, otherwise On Track.',
       'A healthy mix skews to On Track and Completed. Growth in Delayed should trigger schedule recovery; On Hold growth signals stalled commitments.'
     ),
     milestones,
     milestonesInsight: insight(
-      'Each point is a lifecycle project deadline (end_date) in the rolling next-6-months window. Priority from urgency: overdue ≥30d Critical, ≥14d High, ≥7d Medium; upcoming ≤7d Critical, ≤14d High, ≤30d Medium, else Low. Filled markers = overdue; hollow = upcoming. Right totals count markers by priority.',
+      'Each point is an active project deadline (end_date) in the rolling next-6-months window. Priority from urgency: overdue ≥30d Critical, ≥14d High, ≥7d Medium; upcoming ≤7d Critical, ≤14d High, ≤30d Medium, else Low. Filled markers = overdue; hollow = upcoming. Right totals count markers by priority.',
       'Clusters of Critical/High points show where schedule risk concentrates — use them to prioritize recovery and upcoming delivery gates.'
     ),
     topDelayed,
     topDelayedInsight: insight(
-      'Top 5 lifecycle projects with end_date < now, ranked by days overdue = floor((now − end_date) / 1 day).',
+      'Top active projects with end_date < now, ranked by days overdue = floor((now − end_date) / 1 day).',
       'Start recovery with the longest-overdue programs; they usually carry the highest customer and cost exposure.'
     ),
     systemAvailability,

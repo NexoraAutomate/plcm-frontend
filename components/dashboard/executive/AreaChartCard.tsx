@@ -4,19 +4,57 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Area } from '@ant-design/charts';
 import { DashboardCard } from './DashboardCard';
 import type { ExecInsight, ExecSeriesPoint } from './types';
-import { EXEC } from './theme';
+import { EXEC, EXEC_TOOLTIP_INTERACTION } from './theme';
 import { useExecTheme } from './use-exec-theme';
 
 const SERIES = [
-  { key: 'Projects Started', color: EXEC.purple, totalKey: 'started' as const, label: 'Started' },
-  { key: 'Projects Completed', color: EXEC.cyan, totalKey: 'completed' as const, label: 'Completed' },
-  { key: 'Delayed Projects', color: EXEC.orange, totalKey: 'delayed' as const, label: 'Delayed' },
+  {
+    key: 'Total',
+    color: EXEC.success,
+    totalKey: 'total' as const,
+    label: 'Total',
+    dataKey: 'total' as const,
+  },
+  {
+    key: 'Started',
+    color: EXEC.purple,
+    totalKey: 'started' as const,
+    label: 'Started',
+    dataKey: 'started' as const,
+  },
+  {
+    key: 'On Going',
+    color: EXEC.cyan,
+    totalKey: 'ongoing' as const,
+    label: 'On Going',
+    dataKey: 'ongoing' as const,
+  },
+  {
+    key: 'Completed',
+    color: EXEC.yellow,
+    totalKey: 'completed' as const,
+    label: 'Completed',
+    dataKey: 'completed' as const,
+  },
+  {
+    key: 'Delayed',
+    color: EXEC.orange,
+    totalKey: 'delayed' as const,
+    label: 'Delayed',
+    dataKey: 'delayed' as const,
+  },
 ] as const;
 
 interface AreaChartCardProps {
   title?: string;
   data: ExecSeriesPoint[];
-  totals?: { started: number; completed: number; delayed: number };
+  totals?: {
+    total: number;
+    started: number;
+    ongoing: number;
+    completed: number;
+    delayed: number;
+  };
   className?: string;
   onClick?: () => void;
   insight?: ExecInsight;
@@ -51,17 +89,29 @@ function useFitOneLine(text: string, maxPx: number, minPx: number) {
   return { ref, fontSize };
 }
 
+/** Nice Y-axis ceiling from the series peak (≈12% headroom). */
+function niceAxisMax(peak: number): number {
+  if (!Number.isFinite(peak) || peak <= 0) return 10;
+  const target = peak * 1.12;
+  const exp = Math.floor(Math.log10(target));
+  const mag = 10 ** Math.max(exp, 0);
+  const n = target / mag;
+  const nice =
+    n <= 1 ? 1 : n <= 1.5 ? 1.5 : n <= 2 ? 2 : n <= 3 ? 3 : n <= 4 ? 4 : n <= 5 ? 5 : n <= 6 ? 6 : n <= 8 ? 8 : 10;
+  return Math.max(Math.ceil(nice * mag), Math.ceil(peak));
+}
+
 function scaleForArea(sizePx: number) {
   const size = Math.max(sizePx, 1);
   return {
-    axis: Math.min(12, Math.max(8, size * 0.055)),
-    legend: Math.min(12, Math.max(8, size * 0.05)),
-    legendLine: Math.min(4, Math.max(2, size * 0.015)),
-    legendW: Math.min(18, Math.max(10, size * 0.08)),
-    totalLabel: Math.min(11, Math.max(8, size * 0.045)),
-    totalValue: Math.min(24, Math.max(14, size * 0.12)),
-    lineWidth: Math.min(2.5, Math.max(1.25, size * 0.01)),
-    totalsCol: Math.min(72, Math.max(52, size * 0.32)),
+    axis: Math.min(11, Math.max(7, size * 0.05)),
+    legend: Math.min(10, Math.max(7, size * 0.04)),
+    legendLine: Math.min(2.5, Math.max(1.25, size * 0.01)),
+    legendW: Math.min(12, Math.max(6, size * 0.055)),
+    totalLabel: Math.min(9, Math.max(7, size * 0.035)),
+    totalValue: Math.min(16, Math.max(11, size * 0.07)),
+    lineWidth: Math.min(1.6, Math.max(1, size * 0.007)),
+    totalsCol: Math.min(72, Math.max(52, size * 0.28)),
   };
 }
 
@@ -120,29 +170,20 @@ export function AreaChartCard({
   const chartData = useMemo(() => {
     const rows: { month: string; value: number; type: string }[] = [];
     for (const row of data) {
-      rows.push({
-        month: String(row.month),
-        value: Number(row.started ?? 0),
-        type: 'Projects Started',
-      });
-      rows.push({
-        month: String(row.month),
-        value: Number(row.completed ?? 0),
-        type: 'Projects Completed',
-      });
-      rows.push({
-        month: String(row.month),
-        value: Number(row.delayed ?? 0),
-        type: 'Delayed Projects',
-      });
+      for (const s of SERIES) {
+        rows.push({
+          month: String(row.month),
+          value: Number(row[s.dataKey] ?? 0),
+          type: s.key,
+        });
+      }
     }
     return rows;
   }, [data]);
 
   const yMax = useMemo(() => {
     const peak = chartData.reduce((m, r) => Math.max(m, r.value), 0);
-    if (peak <= 100) return 100;
-    return Math.ceil(peak / 20) * 20;
+    return niceAxisMax(peak);
   }, [chartData]);
 
   const chartHeight = Math.max(90, Math.floor(host.h));
@@ -164,7 +205,7 @@ export function AreaChartCard({
         theme: chartTheme,
         shapeField: 'smooth',
         style: {
-          fillOpacity: 0.22,
+          fillOpacity: 0.18,
           lineWidth: scale.lineWidth,
         },
         scale: {
@@ -196,7 +237,7 @@ export function AreaChartCard({
             gridLineWidth: 1,
             line: false,
             tick: false,
-            tickCount: 6,
+            tickCount: 5,
             labelFormatter: (v: number) => String(Math.round(Number(v))),
           },
         },
@@ -212,6 +253,7 @@ export function AreaChartCard({
         },
         interaction: {
           tooltip: {
+            ...EXEC_TOOLTIP_INTERACTION,
             shared: true,
             series: true,
             crosshairs: true,
@@ -244,13 +286,13 @@ export function AreaChartCard({
 
         <div className="flex min-h-0 flex-1 flex-col px-2.5 pb-2 pt-0.5 sm:px-3 sm:pb-2.5">
           <div
-            className="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1 sm:gap-x-4"
+            className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 sm:gap-x-2.5"
             style={{ fontSize: scale.legend }}
           >
             {SERIES.map((s) => (
               <span
                 key={s.key}
-                className="inline-flex items-center gap-1.5 whitespace-nowrap text-[#E5E7EB]"
+                className="inline-flex items-center gap-1 whitespace-nowrap text-[var(--exec-text-secondary)]"
               >
                 <span
                   className="inline-block shrink-0 rounded-full"
@@ -267,7 +309,7 @@ export function AreaChartCard({
           </div>
 
           <div
-            className="grid min-h-0 flex-1 gap-2"
+            className="grid min-h-0 flex-1 gap-1.5"
             style={{
               gridTemplateColumns: totals
                 ? `minmax(0,1fr) ${Math.round(scale.totalsCol)}px`
@@ -276,29 +318,29 @@ export function AreaChartCard({
           >
             <div
               ref={chartHostRef}
-              className="relative min-h-[100px] min-w-0 overflow-hidden"
+              className="relative min-h-0 min-w-0"
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
             >
               {chartData.length ? (
-                <div className="absolute inset-0 overflow-hidden">
+                <div className="absolute inset-0">
                   <Area {...config} />
                 </div>
               ) : null}
             </div>
 
             {totals ? (
-              <div className="flex flex-col justify-center gap-2 border-l border-[var(--exec-border)] pl-2 sm:gap-3 sm:pl-2.5">
+              <div className="flex h-full min-h-0 flex-col justify-evenly border-l border-[var(--exec-border)] pl-1.5 sm:pl-2">
                 {SERIES.map((s) => (
-                  <div key={s.totalKey} className="min-w-0">
+                  <div key={s.totalKey} className="min-w-0 shrink">
                     <p
-                      className="font-medium leading-none text-[var(--exec-muted)]"
+                      className="truncate font-medium leading-none text-[var(--exec-muted)]"
                       style={{ fontSize: scale.totalLabel }}
                     >
                       {s.label}
                     </p>
                     <p
-                      className="mt-0.5 font-bold leading-none tabular-nums tracking-tight sm:mt-1"
+                      className="mt-0.5 truncate font-bold leading-none tabular-nums tracking-tight"
                       style={{ color: s.color, fontSize: scale.totalValue }}
                     >
                       {totals[s.totalKey]}

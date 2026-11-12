@@ -170,6 +170,12 @@
   --exec-card-shadow: 0 0 0 1px rgba(255, 255, 255, 0.02);
 }
 
+/* AntV / G2 tooltips — sit above executive cards (often overflow:hidden) */
+body > .g2-tooltip,
+.g2-tooltip {
+  z-index: 10000 !important;
+}
+
 .loader {
   width: 64px;
   aspect-ratio: 1;

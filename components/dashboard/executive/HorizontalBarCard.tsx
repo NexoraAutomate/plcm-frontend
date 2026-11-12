@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { Bar } from '@ant-design/charts';
 import { DashboardCard } from './DashboardCard';
 import type { ExecInsight, ExecNamedValue } from './types';
-import { EXEC } from './theme';
+import { EXEC, EXEC_TOOLTIP_INTERACTION } from './theme';
 import { useExecTheme } from './use-exec-theme';
 
 interface HorizontalBarCardProps {
@@ -35,7 +35,6 @@ export function HorizontalBarCard({
         data: sorted,
         xField: 'value',
         yField: 'name',
-        height: 155,
         autoFit: true,
         legend: false,
         theme: chartTheme,
@@ -60,6 +59,7 @@ export function HorizontalBarCard({
           style: { fill: exec.muted, fontSize: 10 },
         },
         tooltip: true,
+        interaction: { tooltip: EXEC_TOOLTIP_INTERACTION },
         onReady: (plot: {
           on: (event: string, cb: (evt: { data?: { data?: ExecNamedValue } }) => void) => void;
         }) => {
@@ -74,8 +74,12 @@ export function HorizontalBarCard({
   );
 
   return (
-    <DashboardCard className={className} title={title} insight={insight}>
-      <div className="h-[155px]">{sorted.length ? <Bar {...config} /> : null}</div>
+    <DashboardCard className={className} title={title} insight={insight} noPadding>
+      <div className="relative min-h-0 flex-1 px-2 pb-2 pt-1">
+        <div className="absolute inset-2">
+          {sorted.length ? <Bar {...config} /> : null}
+        </div>
+      </div>
     </DashboardCard>
   );
 }

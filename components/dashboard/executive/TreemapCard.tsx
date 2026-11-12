@@ -39,6 +39,9 @@ export function TreemapCard({
     () => ({
       backgroundColor: 'transparent',
       tooltip: {
+        appendToBody: true,
+        confiner: false,
+        extraCssText: 'z-index:10000;',
         formatter: (info: { name: string; value: number }) =>
           `${info.name}<br/>Systems: ${info.value}`,
       },
@@ -94,22 +97,24 @@ export function TreemapCard({
   );
 
   return (
-    <DashboardCard className={className} title={title} insight={insight}>
-      <div className="h-[160px]">
-        {tree.length ? (
-          <ReactECharts
-            option={option}
-            style={{ height: 160, width: '100%' }}
-            opts={{ renderer: 'canvas' }}
-            notMerge
-            lazyUpdate
-            onEvents={{
-              click: (params: { data?: ExecTreemapNode }) => {
-                if (params.data && onNodeClick) onNodeClick(params.data);
-              },
-            }}
-          />
-        ) : null}
+    <DashboardCard className={className} title={title} insight={insight} noPadding>
+      <div className="relative min-h-0 flex-1 px-1 pb-1 pt-0.5">
+        <div className="absolute inset-1">
+          {tree.length ? (
+            <ReactECharts
+              option={option}
+              style={{ height: '100%', width: '100%' }}
+              opts={{ renderer: 'canvas' }}
+              notMerge
+              lazyUpdate
+              onEvents={{
+                click: (params: { data?: ExecTreemapNode }) => {
+                  if (params.data && onNodeClick) onNodeClick(params.data);
+                },
+              }}
+            />
+          ) : null}
+        </div>
       </div>
     </DashboardCard>
   );

@@ -37,6 +37,8 @@ import {
   workflowStatusColor,
   workflowStatusLabel,
 } from '@/lib/workflow-status';
+import { isProjectOverdue } from '@/lib/project-overdue';
+import { OverdueBadge } from '@/components/projects/overdue-badge';
 
 const PROJECT_STATUS_COLORS: Record<string, string> = {
   Initiation: 'oklch(0.55 0.02 250)',
@@ -90,19 +92,6 @@ function isTerminalStatus(statusName: string): boolean {
 
 function isCompletedStatus(statusName: string): boolean {
   return workflowStatusLabel(statusName).toLowerCase() === 'completed';
-}
-
-function startOfToday(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function isOverdue(project: Project, statusName: string): boolean {
-  if (isTerminalStatus(statusName) || !project.end_date) return false;
-  const end = new Date(project.end_date);
-  if (Number.isNaN(end.getTime())) return false;
-  return end < startOfToday();
 }
 
 function statusFill(code: string, name: string, index: number): string {
@@ -257,7 +246,7 @@ export function ProjectsMiniDashboard({
     return [...projects]
       .map((p) => {
         const statusName = getProjectStatusName(p);
-        const overdue = isOverdue(p, statusName);
+        const overdue = isProjectOverdue(p, statusName);
         return {
           project: p,
           statusName,
@@ -290,8 +279,8 @@ export function ProjectsMiniDashboard({
   const activeCount = projects.filter(
     (p) => !isTerminalStatus(getProjectStatusName(p))
   ).length;
-  const atRiskCount = projects.filter((p) =>
-    isOverdue(p, getProjectStatusName(p))
+  const overdueCount = projects.filter((p) =>
+    isProjectOverdue(p, getProjectStatusName(p))
   ).length;
 
   const statusTotal = projectStatusData.reduce((sum, d) => sum + d.value, 0);
@@ -329,8 +318,8 @@ export function ProjectsMiniDashboard({
           progress={avgProgress}
         />
         <KpiTile
-          label="At Risk"
-          value={atRiskCount}
+          label="Overdue"
+          value={overdueCount}
           sub="Past end date"
           icon={AlertTriangle}
           accent="orange"
@@ -513,11 +502,7 @@ export function ProjectsMiniDashboard({
                       <span className="min-w-0 flex-1 truncate text-sm font-medium">
                         {project.name}
                       </span>
-                      {overdue ? (
-                        <span className="shrink-0 rounded-md bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700 dark:bg-orange-950 dark:text-orange-300">
-                          Overdue
-                        </span>
-                      ) : null}
+                      {overdue ? <OverdueBadge /> : null}
                       <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                         {progress}%
                       </span>

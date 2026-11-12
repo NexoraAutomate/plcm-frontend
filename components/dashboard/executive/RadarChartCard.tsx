@@ -46,23 +46,30 @@ export function RadarChartCard({
           data: [{ value: data.map((d) => d.value), name: 'Availability' }],
         },
       ],
-      tooltip: { trigger: 'item' },
+      tooltip: {
+        trigger: 'item',
+        appendToBody: true,
+        confiner: false,
+        extraCssText: 'z-index:10000;',
+      },
     }),
     [data, exec.gaugeTrack, exec.grid, exec.muted]
   );
 
   return (
-    <DashboardCard className={className} title={title} insight={insight}>
-      <div className="h-[160px]">
-        {data.length ? (
-          <ReactECharts
-            option={option}
-            style={{ height: 160, width: '100%' }}
-            opts={{ renderer: 'canvas' }}
-            notMerge
-            lazyUpdate
-          />
-        ) : null}
+    <DashboardCard className={className} title={title} insight={insight} noPadding>
+      <div className="relative min-h-0 flex-1 px-1 pb-1 pt-0.5">
+        <div className="absolute inset-1">
+          {data.length ? (
+            <ReactECharts
+              option={option}
+              style={{ height: '100%', width: '100%' }}
+              opts={{ renderer: 'canvas' }}
+              notMerge
+              lazyUpdate
+            />
+          ) : null}
+        </div>
       </div>
     </DashboardCard>
   );

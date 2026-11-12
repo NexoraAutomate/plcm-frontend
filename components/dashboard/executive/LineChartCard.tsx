@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { Line } from '@ant-design/charts';
 import { DashboardCard } from './DashboardCard';
 import type { ExecInsight, ExecNamedValue, ExecSeriesPoint } from './types';
-import { EXEC } from './theme';
+import { EXEC, EXEC_TOOLTIP_INTERACTION } from './theme';
 import { useExecTheme } from './use-exec-theme';
 
 interface LineChartCardProps {
@@ -32,7 +32,6 @@ export function LineChartCard({
         data,
         xField: 'name',
         yField: 'value',
-        height: 145,
         autoFit: true,
         legend: false,
         theme: chartTheme,
@@ -51,13 +50,18 @@ export function LineChartCard({
           },
         },
         tooltip: true,
+        interaction: { tooltip: EXEC_TOOLTIP_INTERACTION },
       }) as Record<string, unknown>,
     [chartTheme, color, data, exec.card, exec.grid, exec.muted]
   );
 
   return (
-    <DashboardCard className={className} title={title} onClick={onClick} insight={insight}>
-      <div className="h-[145px]">{data.length ? <Line {...config} /> : null}</div>
+    <DashboardCard className={className} title={title} onClick={onClick} insight={insight} noPadding>
+      <div className="relative min-h-0 flex-1 px-2 pb-2 pt-1">
+        <div className="absolute inset-2">
+          {data.length ? <Line {...config} /> : null}
+        </div>
+      </div>
     </DashboardCard>
   );
 }
@@ -88,7 +92,6 @@ export function DualLineChartCard({ title, data, className, insight }: DualLineC
         yField: 'value',
         colorField: 'type',
         seriesField: 'type',
-        height: 145,
         autoFit: true,
         theme: chartTheme,
         legend: {
@@ -115,13 +118,23 @@ export function DualLineChartCard({ title, data, className, insight }: DualLineC
           },
         },
         tooltip: { shared: true },
+        interaction: {
+          tooltip: {
+            ...EXEC_TOOLTIP_INTERACTION,
+            shared: true,
+          },
+        },
       }) as Record<string, unknown>,
     [chartData, chartTheme, exec.grid, exec.muted]
   );
 
   return (
-    <DashboardCard className={className} title={title} insight={insight}>
-      <div className="h-[145px]">{chartData.length ? <Line {...config} /> : null}</div>
+    <DashboardCard className={className} title={title} insight={insight} noPadding>
+      <div className="relative min-h-0 flex-1 px-2 pb-2 pt-1">
+        <div className="absolute inset-2">
+          {chartData.length ? <Line {...config} /> : null}
+        </div>
+      </div>
     </DashboardCard>
   );
 }

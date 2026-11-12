@@ -82,6 +82,18 @@ export function getExecChartTheme(isDark: boolean): 'classicDark' | 'classic' {
   return isDark ? 'classicDark' : 'classic';
 }
 
+/** Mount tooltips on body so they paint above overflow-hidden dashboard cards. */
+export const EXEC_TOOLTIP_INTERACTION = {
+  mount: 'body' as const,
+  css: {
+    '.g2-tooltip': {
+      'z-index': '10000',
+      'pointer-events': 'none',
+      'box-shadow': '0 8px 24px rgba(0, 0, 0, 0.35)',
+    },
+  },
+};
+
 export const EXEC_DONUT_COLORS = [
   EXEC.success,
   EXEC.orange,

@@ -61,7 +61,9 @@ import * as api from '@/lib/api';
 import type { HierarchyConfigurationSummary } from '@/lib/models';
 import { useAppDefinitions } from '@/lib/app-definitions-context';
 import { ExistingProjectBadge } from '@/components/projects/existing-project-badge';
+import { OverdueBadge } from '@/components/projects/overdue-badge';
 import { isExistingProject } from '@/lib/project-existing';
+import { isProjectOverdue } from '@/lib/project-overdue';
 import { validateProjectCreateForm } from '@/lib/form-validation';
 
 const COLUMN_DEFS: ColumnVisibilityDef[] = [
@@ -372,6 +374,9 @@ export default function ProjectsPage(){
   ) {
     const owner = users.find((u) => u.id === project.owner_id);
     const status = statuses.find((s) => s.id === project.status_id);
+    const statusName =
+      status?.status_name || project.status_name || 'Unknown';
+    const overdue = isProjectOverdue(project, statusName);
     const serial = serialByProjectId.get(project.id) ?? '—';
     const systemCount = getCount(systemCountByProject, project.id);
     const canExpandSystems = systemCount > 1;
@@ -405,6 +410,7 @@ export default function ProjectsPage(){
                   />
                 </div>
                 {isExistingProject(project) ? <ExistingProjectBadge /> : null}
+                {overdue ? <OverdueBadge /> : null}
                 {project.delete_requested_at ? (
                   <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-900 dark:bg-amber-950 dark:text-amber-100">
                     Pending delete
@@ -416,7 +422,7 @@ export default function ProjectsPage(){
           {isVisible('owner_id') && <TableCell>{owner?.full_name || 'N/A'}</TableCell>}
           {isVisible('status_id') && (
             <TableCell>
-              <StatusBadge status={status?.status_name || 'Unknown'} />
+              <StatusBadge status={statusName} />
             </TableCell>
           )}
           {isVisible('start_date') && (
@@ -427,7 +433,14 @@ export default function ProjectsPage(){
             </TableCell>
           )}
           {isVisible('end_date') && (
-            <TableCell className="text-sm text-muted-foreground">
+            <TableCell
+              className={cn(
+                'text-sm',
+                overdue
+                  ? 'font-medium text-orange-700 dark:text-orange-300'
+                  : 'text-muted-foreground'
+              )}
+            >
               {project.end_date
                 ? new Date(project.end_date).toLocaleDateString()
                 : '—'}
