@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pie } from '@ant-design/charts';
 import { DashboardCard } from './DashboardCard';
 import type { ExecInsight, ExecNamedValue } from './types';
-import { EXEC } from './theme';
+import { EXEC, EXEC_TOOLTIP_INTERACTION } from './theme';
 import { useExecTheme } from './use-exec-theme';
 
 interface DonutChartCardProps {
@@ -141,6 +141,7 @@ export function DonutChartCard({
         },
         label: false,
         tooltip: true,
+        interaction: { tooltip: EXEC_TOOLTIP_INTERACTION },
         style: { stroke: exec.card, lineWidth: scale.stroke },
         onReady: (plot: {
           on: (event: string, cb: (evt: { data?: { data?: ExecNamedValue } }) => void) => void;

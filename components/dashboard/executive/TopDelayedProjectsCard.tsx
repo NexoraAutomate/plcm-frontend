@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { DashboardCard } from './DashboardCard';
 import type { ExecInsight, ExecNamedValue } from './types';
 import { EXEC } from './theme';
+import { OverdueBadge } from '@/components/projects/overdue-badge';
 
 /** Aim for ~4.5 rows visible so the 5th peeks and signals scroll. */
 const VISIBLE_ROWS = 4.5;
@@ -166,12 +167,15 @@ export function TopDelayedProjectsCard({
                       style={{ height: rowHeight }}
                       onClick={() => onBarClick?.(item)}
                     >
-                      <p
-                        className="truncate font-medium leading-tight text-[var(--exec-text)]"
-                        style={{ fontSize: nameSize }}
-                      >
-                        {item.name}
-                      </p>
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <p
+                          className="min-w-0 flex-1 truncate font-medium leading-tight text-[var(--exec-text)]"
+                          style={{ fontSize: nameSize }}
+                        >
+                          {item.name}
+                        </p>
+                        {item.value > 0 ? <OverdueBadge /> : null}
+                      </div>
                       <div
                         className="flex items-center"
                         style={{ gap: Math.max(4, scale.gap * 0.7), marginTop: rowHeight * 0.06 }}

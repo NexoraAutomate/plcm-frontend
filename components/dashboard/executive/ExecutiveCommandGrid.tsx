@@ -62,10 +62,10 @@ export function ExecutiveCommandGrid({
 }: ExecutiveCommandGridProps) {
   return (
     <div
-      className="executive-command-center grid h-full min-h-0 w-full gap-3 overflow-hidden p-3"
+      className="executive-command-center grid h-full min-h-0 w-full gap-2 overflow-hidden p-2 sm:gap-3 sm:p-3"
       style={{
         background: 'var(--exec-bg)',
-        gridTemplateRows: 'minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.95fr)',
+        gridTemplateRows: 'minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.95fr)',
         gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
         fontFamily: 'var(--font-exec-inter), Inter, system-ui, sans-serif',
       }}
@@ -92,7 +92,7 @@ export function ExecutiveCommandGrid({
       </div>
 
       <AreaChartCard
-        className="col-span-4 min-h-0"
+        className="col-span-5 min-h-0 min-w-0"
         data={model.portfolioTrend}
         totals={model.portfolioTotals}
         insight={model.portfolioInsight}
@@ -100,9 +100,9 @@ export function ExecutiveCommandGrid({
       />
 
       <div
-        className="col-span-5 grid min-h-0 min-w-0 gap-2 sm:gap-3"
+        className="col-span-4 grid min-h-0 min-w-0 gap-2 sm:gap-3"
         style={{
-          gridTemplateColumns: 'repeat(3, minmax(0, 1fr)) minmax(0, 1.1fr)',
+          gridTemplateColumns: 'repeat(3, minmax(0, 1fr)) minmax(0, 1.05fr)',
           gridTemplateRows: 'minmax(0, 1fr) auto',
         }}
       >

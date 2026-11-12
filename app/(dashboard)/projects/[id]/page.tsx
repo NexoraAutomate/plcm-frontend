@@ -19,6 +19,8 @@ import { EntityForm } from '@/components/entity-form';
 import { HierarchyEntityInventoryDialog } from '@/components/hierarchy/hierarchy-entity-inventory-create-dialog';
 import { isExistingProject } from '@/lib/project-existing';
 import { ExistingProjectBadge } from '@/components/projects/existing-project-badge';
+import { OverdueBadge } from '@/components/projects/overdue-badge';
+import { isProjectOverdue } from '@/lib/project-overdue';
 import { P } from '@/lib/permission-codes';
 import { useCallback, useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
@@ -379,6 +381,7 @@ export default function ProjectDetailPage() {
 
   const hierarchyReadOnly = isProjectReadOnly(project.status_name);
   const isExisting = isExistingProject(project);
+  const isOverdue = isProjectOverdue(project, project.status_name);
 
   return (
     <div className="space-y-6">
@@ -402,12 +405,19 @@ export default function ProjectDetailPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-3xl font-bold tracking-tight">{project.name}</h1>
-            {isExisting ? <ExistingProjectBadge /> : null}
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <h1 className="min-w-0 truncate text-3xl font-bold tracking-tight">
+              {project.name}
+            </h1>
+            {isExisting ? <ExistingProjectBadge className="shrink-0" /> : null}
+            {isOverdue ? (
+              <OverdueBadge className="shrink-0 px-2 py-0.5 text-[11px] leading-5" />
+            ) : null}
           </div>
-          <p className="text-sm text-muted-foreground mt-1">Manage {entityLabel('system', true).toLowerCase()} and hierarchy</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Manage {entityLabel('system', true).toLowerCase()} and hierarchy
+          </p>
         </div>
         <ListStatsVisibilityControls
           showStats={showStats}
@@ -455,7 +465,15 @@ export default function ProjectDetailPage() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs text-muted-foreground">Delivery Date</p>
-                    <p className="text-sm font-medium truncate">{project.end_date}</p>
+                    <p
+                      className={
+                        isOverdue
+                          ? 'truncate text-sm font-medium text-orange-700 dark:text-orange-300'
+                          : 'truncate text-sm font-medium'
+                      }
+                    >
+                      {project.end_date}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -473,8 +491,9 @@ export default function ProjectDetailPage() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs text-muted-foreground">Status</p>
-                    <div className="flex items-center gap-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <StatusBadge status={project.status_name || 'Unknown'} />
+                      {isOverdue ? <OverdueBadge /> : null}
                       <EntityStatusHistorySheet
                         entityType="project"
                         entityPk={project.id}

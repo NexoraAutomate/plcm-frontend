@@ -69,6 +69,8 @@ export interface ProjectAnalyticsSection {
   status_distribution: ChartDataPoint[];
   timeline: ChartDataPoint[];
   completed_timeline?: ChartDataPoint[];
+  /** Rolling unresolved delayed count as of each month-end (YYYY-MM). */
+  delayed_timeline?: ChartDataPoint[];
   progress: ProjectProgressItem[];
 }
 

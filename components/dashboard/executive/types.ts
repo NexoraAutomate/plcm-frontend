@@ -99,7 +99,13 @@ export interface CommandCenterViewModel {
     insight: ExecInsight;
   };
   portfolioTrend: ExecSeriesPoint[];
-  portfolioTotals: { started: number; completed: number; delayed: number };
+  portfolioTotals: {
+    total: number;
+    started: number;
+    ongoing: number;
+    completed: number;
+    delayed: number;
+  };
   portfolioInsight: ExecInsight;
   mttr: ExecGaugeMetric;
   mtbf: ExecGaugeMetric;
