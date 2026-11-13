@@ -1329,6 +1329,45 @@ export interface InventorySeedOptions {
   inventory_groups: InventorySeedCatalogOption[]
 }
 
+export interface WorkflowDemoUserOption {
+  username: string
+  full_name: string
+  email: string
+  role: string
+  password: string
+  exists: boolean
+  is_active?: boolean | null
+  user_id?: number | null
+  role_missing: boolean
+}
+
+export interface WorkflowDemoUserOptions {
+  users: WorkflowDemoUserOption[]
+}
+
+export interface WorkflowDemoUserSeedPayload {
+  usernames?: string[]
+  roles?: string[]
+  dry_run?: boolean
+  confirm?: string
+}
+
+export interface WorkflowDemoUserSeedItem {
+  username: string
+  role: string
+  action: string
+  reason?: string | null
+  user_id?: number | null
+}
+
+export interface WorkflowDemoUserSeedResult {
+  dry_run: boolean
+  created: number
+  updated: number
+  skipped: number
+  items: WorkflowDemoUserSeedItem[]
+}
+
 /** Sidebar badge counts for actions awaiting the current user. */
 export interface PendingActionCounts {
   verify_queue: number

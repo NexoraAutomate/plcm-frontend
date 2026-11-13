@@ -115,7 +115,7 @@ export const SETTINGS_TABS: SettingsTabConfig[] = [
   {
     id: 'test-data',
     label: 'Test Data',
-    description: 'Admin tools to seed inventory stock for manual test cases',
+    description: 'Admin tools to seed inventory stock and demo role users for manual test cases',
     icon: FlaskConical,
     role: 'Admin',
   },

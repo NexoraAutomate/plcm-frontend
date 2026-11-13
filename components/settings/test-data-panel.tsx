@@ -12,11 +12,13 @@ import { SettingsSection } from '@/components/settings/settings-section';
 import { SettingsCard } from '@/components/settings/settings-card';
 import { AccessRestricted } from '@/components/auth/access-restricted';
 import { useAuth } from '@/lib/auth-context';
-import { inventory } from '@/lib/api';
+import { inventory, users } from '@/lib/api';
 import type {
   InventorySeedCatalogOption,
   InventorySeedMissingShortage,
   InventoryStockSeedResult,
+  WorkflowDemoUserOption,
+  WorkflowDemoUserSeedResult,
 } from '@/lib/models';
 
 export type TestDataPanelProps = {
@@ -62,18 +64,43 @@ export function TestDataPanel({ embedded = false }: TestDataPanelProps) {
   const [seeding, setSeeding] = useState(false);
   const [lastResult, setLastResult] = useState<InventoryStockSeedResult | null>(null);
 
+  const [demoUsers, setDemoUsers] = useState<WorkflowDemoUserOption[]>([]);
+  const [selectedDemoUsernames, setSelectedDemoUsernames] = useState<Set<string>>(
+    new Set()
+  );
+  const [demoConfirmText, setDemoConfirmText] = useState('');
+  const [demoPreviewing, setDemoPreviewing] = useState(false);
+  const [demoSeeding, setDemoSeeding] = useState(false);
+  const [lastDemoResult, setLastDemoResult] =
+    useState<WorkflowDemoUserSeedResult | null>(null);
+
   const loadOptions = useCallback(async () => {
     setLoadingOptions(true);
     try {
-      const res = await inventory.seedTestStockOptions();
-      const missing = res.data.missing_shortages || [];
-      const groups = res.data.inventory_groups || [];
+      const [stockRes, demoRes] = await Promise.all([
+        inventory.seedTestStockOptions(),
+        users.seedDemoRolesOptions(),
+      ]);
+      const missing = stockRes.data.missing_shortages || [];
+      const groups = stockRes.data.inventory_groups || [];
+      const demo = demoRes.data.users || [];
       setMissingShortages(missing);
       setInventoryGroups(groups);
       setSelectedShortageKeys(new Set(missing.map(shortageSelectionKey)));
       setSelectedInventoryIds(
         new Set(groups.filter((group) => group.quantity > 0).map((group) => group.inventory_id))
       );
+      setDemoUsers(demo);
+      setSelectedDemoUsernames((prev) => {
+        if (prev.size === 0) {
+          return new Set(demo.map((item) => item.username));
+        }
+        const next = new Set<string>();
+        for (const item of demo) {
+          if (prev.has(item.username)) next.add(item.username);
+        }
+        return next.size > 0 ? next : new Set(demo.map((item) => item.username));
+      });
     } catch (error) {
       toast.error(await extractApiError(error, 'Failed to load seed options'));
     } finally {
@@ -134,6 +161,75 @@ export function TestDataPanel({ embedded = false }: TestDataPanelProps) {
       else next.delete(id);
       return next;
     });
+  }
+
+  function toggleDemoUsername(username: string, checked: boolean) {
+    setSelectedDemoUsernames((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(username);
+      else next.delete(username);
+      return next;
+    });
+  }
+
+  const selectedDemoUsernameList = useMemo(
+    () => Array.from(selectedDemoUsernames),
+    [selectedDemoUsernames]
+  );
+
+  const canApplyDemo =
+    demoConfirmText === CONFIRM_PHRASE &&
+    !demoSeeding &&
+    !demoPreviewing &&
+    !loadingOptions &&
+    selectedDemoUsernameList.length > 0;
+
+  function buildDemoPayload(dryRun: boolean) {
+    const payload: Parameters<typeof users.seedDemoRoles>[0] = {
+      usernames: selectedDemoUsernameList,
+      dry_run: dryRun,
+    };
+    if (!dryRun) {
+      payload.confirm = CONFIRM_PHRASE;
+    }
+    return payload;
+  }
+
+  async function handleDemoPreview() {
+    if (selectedDemoUsernameList.length === 0) {
+      toast.error('Select at least one demo role');
+      return;
+    }
+    setDemoPreviewing(true);
+    try {
+      const res = await users.seedDemoRoles(buildDemoPayload(true));
+      setLastDemoResult(res.data);
+      toast.success(
+        `Preview: create ${res.data.created}, update ${res.data.updated}, skip ${res.data.skipped}`
+      );
+    } catch (error) {
+      toast.error(await extractApiError(error, 'Failed to preview demo role seed'));
+    } finally {
+      setDemoPreviewing(false);
+    }
+  }
+
+  async function handleDemoSeed() {
+    if (!canApplyDemo) return;
+    setDemoSeeding(true);
+    try {
+      const res = await users.seedDemoRoles(buildDemoPayload(false));
+      setLastDemoResult(res.data);
+      setDemoConfirmText('');
+      toast.success(
+        `Demo roles: created ${res.data.created}, updated ${res.data.updated}, skipped ${res.data.skipped}`
+      );
+      await loadOptions();
+    } catch (error) {
+      toast.error(await extractApiError(error, 'Failed to seed demo roles'));
+    } finally {
+      setDemoSeeding(false);
+    }
   }
 
   function buildPayload(dryRun: boolean) {
@@ -205,7 +301,7 @@ export function TestDataPanel({ embedded = false }: TestDataPanelProps) {
     return (
       <AccessRestricted
         title="Access Restricted"
-        message="Only Administrators can seed test inventory data."
+        message="Only Administrators can seed test inventory data and demo roles."
       />
     );
   }
@@ -216,7 +312,7 @@ export function TestDataPanel({ embedded = false }: TestDataPanelProps) {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Test Data</h1>
           <p className="text-sm text-muted-foreground">
-            Bootstrap shortage items into inventory, then multiply selected stock for test runs
+            Seed demo role users and inventory stock for manual test runs
           </p>
         </div>
       )}
@@ -227,7 +323,9 @@ export function TestDataPanel({ embedded = false }: TestDataPanelProps) {
           variant="outline"
           size="sm"
           onClick={() => void loadOptions()}
-          disabled={loadingOptions || previewing || seeding}
+          disabled={
+            loadingOptions || previewing || seeding || demoPreviewing || demoSeeding
+          }
         >
           {loadingOptions ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -239,7 +337,179 @@ export function TestDataPanel({ embedded = false }: TestDataPanelProps) {
       </div>
 
       <SettingsSection
-        title="1. Missing shortage items → inventory (1 unit)"
+        title="1. Demo roles / users"
+        description="Create or refresh Spec 00 workflow demo accounts (all or selected). Passwords reset to the cheat-sheet values."
+      >
+        <SettingsCard>
+          <div className="space-y-4">
+            {loadingOptions ? (
+              <p className="text-sm text-muted-foreground">Loading demo roles…</p>
+            ) : demoUsers.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No demo role definitions found.</p>
+            ) : (
+              <>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setSelectedDemoUsernames(new Set(demoUsers.map((item) => item.username)))
+                    }
+                  >
+                    Select all
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setSelectedDemoUsernames(
+                        new Set(
+                          demoUsers
+                            .filter((item) => !item.exists)
+                            .map((item) => item.username)
+                        )
+                      )
+                    }
+                  >
+                    Missing only
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedDemoUsernames(new Set())}
+                  >
+                    Clear
+                  </Button>
+                  <span className="self-center text-xs text-muted-foreground">
+                    {selectedDemoUsernames.size} of {demoUsers.length} selected
+                  </span>
+                </div>
+                <div className="max-h-72 overflow-auto rounded-md border">
+                  <table className="w-full text-left text-sm">
+                    <thead className="sticky top-0 bg-muted/80 text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2 font-medium">Include</th>
+                        <th className="px-3 py-2 font-medium">Role</th>
+                        <th className="px-3 py-2 font-medium">Username</th>
+                        <th className="px-3 py-2 font-medium">Password</th>
+                        <th className="px-3 py-2 font-medium">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {demoUsers.map((item) => (
+                        <tr key={item.username} className="border-t">
+                          <td className="px-3 py-2">
+                            <Checkbox
+                              checked={selectedDemoUsernames.has(item.username)}
+                              onCheckedChange={(value) =>
+                                toggleDemoUsername(item.username, value === true)
+                              }
+                            />
+                          </td>
+                          <td className="px-3 py-2">{item.role}</td>
+                          <td className="px-3 py-2 font-mono text-xs">{item.username}</td>
+                          <td className="px-3 py-2 font-mono text-xs">{item.password}</td>
+                          <td className="px-3 py-2">
+                            {item.role_missing
+                              ? 'Role missing'
+                              : item.exists
+                                ? item.is_active === false
+                                  ? 'Exists (inactive)'
+                                  : 'Exists'
+                                : 'Missing'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <div className="space-y-2 sm:max-w-xs sm:flex-1">
+                    <Label htmlFor="demo-seed-confirm">
+                      Type {CONFIRM_PHRASE} to apply demo roles
+                    </Label>
+                    <Input
+                      id="demo-seed-confirm"
+                      value={demoConfirmText}
+                      onChange={(event) => setDemoConfirmText(event.target.value)}
+                      placeholder={CONFIRM_PHRASE}
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void handleDemoPreview()}
+                      disabled={
+                        demoPreviewing ||
+                        demoSeeding ||
+                        selectedDemoUsernameList.length === 0
+                      }
+                    >
+                      {demoPreviewing ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <FlaskConical className="mr-2 h-4 w-4" />
+                      )}
+                      Preview
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => void handleDemoSeed()}
+                      disabled={!canApplyDemo}
+                    >
+                      {demoSeeding ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : null}
+                      {demoSeeding ? 'Seeding…' : 'Seed selected roles'}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </SettingsCard>
+      </SettingsSection>
+
+      {lastDemoResult ? (
+        <SettingsSection
+          title={lastDemoResult.dry_run ? 'Demo roles preview' : 'Last demo roles result'}
+          description={`Created ${lastDemoResult.created} · updated ${lastDemoResult.updated} · skipped ${lastDemoResult.skipped}`}
+        >
+          <SettingsCard>
+            <div className="max-h-48 overflow-auto rounded-md border">
+              <table className="w-full text-left text-sm">
+                <thead className="sticky top-0 bg-muted/80 text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">Username</th>
+                    <th className="px-3 py-2 font-medium">Role</th>
+                    <th className="px-3 py-2 font-medium">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lastDemoResult.items.map((item) => (
+                    <tr key={`${item.username}-${item.action}`} className="border-t">
+                      <td className="px-3 py-2 font-mono text-xs">{item.username}</td>
+                      <td className="px-3 py-2">{item.role}</td>
+                      <td className="px-3 py-2">
+                        {item.action}
+                        {item.reason ? ` (${item.reason})` : ''}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </SettingsCard>
+        </SettingsSection>
+      ) : null}
+
+      <SettingsSection
+        title="2. Missing shortage items → inventory (1 unit)"
         description="Active shortage catalog items not yet stocked. Adds a single AVAILABLE unit so they can be multiplied in the next tranche."
       >
         <SettingsCard>
@@ -325,7 +595,7 @@ export function TestDataPanel({ embedded = false }: TestDataPanelProps) {
       </SettingsSection>
 
       <SettingsSection
-        title="2. Multiply selected inventory stock"
+        title="3. Multiply selected inventory stock"
         description="User-defined multiplier over current quantity for the groups you select. Serials continue from last used; PN stays the same."
       >
         <SettingsCard>
@@ -489,7 +759,7 @@ export function TestDataPanel({ embedded = false }: TestDataPanelProps) {
       </SettingsSection>
 
       <SettingsSection
-        title="Apply seed"
+        title="4. Apply inventory seed"
         description="No shelf life / warranty. Serials increment from last used. Type SEED to confirm."
       >
         <SettingsCard>

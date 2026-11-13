@@ -231,6 +231,10 @@ export const users = {
   },
   deleteAvatar: (id: number) =>
     api.delete<{ avatar_url: string | null }>(`/users/${id}/avatar/`),
+  seedDemoRolesOptions: () =>
+    api.get<Models.WorkflowDemoUserOptions>('/users/seed-demo-roles/options/'),
+  seedDemoRoles: (data: Models.WorkflowDemoUserSeedPayload) =>
+    api.post<Models.WorkflowDemoUserSeedResult>('/users/seed-demo-roles/', data),
 };
 
 // Customers
