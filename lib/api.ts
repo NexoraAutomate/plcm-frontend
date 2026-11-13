@@ -231,8 +231,12 @@ export const users = {
   },
   deleteAvatar: (id: number) =>
     api.delete<{ avatar_url: string | null }>(`/users/${id}/avatar/`),
-  seedDemoRolesOptions: () =>
-    api.get<Models.WorkflowDemoUserOptions>('/users/seed-demo-roles/options/'),
+  unlockTestData: (data: Models.TestDataUnlockPayload) =>
+    api.post<Models.TestDataUnlockResult>('/users/test-data/unlock/', data),
+  seedDemoRolesOptions: (superPassword: string) =>
+    api.get<Models.WorkflowDemoUserOptions>('/users/seed-demo-roles/options/', {
+      params: { super_password: superPassword },
+    }),
   seedDemoRoles: (data: Models.WorkflowDemoUserSeedPayload) =>
     api.post<Models.WorkflowDemoUserSeedResult>('/users/seed-demo-roles/', data),
 };
@@ -1046,8 +1050,10 @@ export const inventory = {
       }>;
     }
   ) => api.put<Models.InventoryChildLink[]>(`/inventory/${inventoryId}/children/`, data),
-  seedTestStockOptions: () =>
-    api.get<Models.InventorySeedOptions>('/inventory/seed-test-stock/options/'),
+  seedTestStockOptions: (superPassword: string) =>
+    api.get<Models.InventorySeedOptions>('/inventory/seed-test-stock/options/', {
+      params: { super_password: superPassword },
+    }),
   seedTestStock: (data: Models.InventoryStockSeedPayload) =>
     api.post<Models.InventoryStockSeedResult>('/inventory/seed-test-stock/', data),
 };

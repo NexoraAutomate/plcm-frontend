@@ -1304,6 +1304,7 @@ export interface InventoryStockSeedPayload {
   inventory_ids?: number[]
   shortage_ids?: number[]
   confirm?: string
+  super_password?: string
 }
 
 export interface InventorySeedMissingShortage {
@@ -1345,11 +1346,20 @@ export interface WorkflowDemoUserOptions {
   users: WorkflowDemoUserOption[]
 }
 
+export interface TestDataUnlockPayload {
+  super_password: string
+}
+
+export interface TestDataUnlockResult {
+  unlocked: boolean
+}
+
 export interface WorkflowDemoUserSeedPayload {
   usernames?: string[]
   roles?: string[]
   dry_run?: boolean
   confirm?: string
+  super_password?: string
 }
 
 export interface WorkflowDemoUserSeedItem {

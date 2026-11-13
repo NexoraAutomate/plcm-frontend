@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlaskConical, Loader2, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { FlaskConical, Loader2, Lock, RefreshCw, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,7 @@ export type TestDataPanelProps = {
 };
 
 const CONFIRM_PHRASE = 'SEED';
+const SUPER_PASSWORD_STORAGE_KEY = 'satlife.test-data.super-password';
 
 async function extractApiError(error: unknown, fallback: string): Promise<string> {
   if (!axios.isAxiosError(error)) {
@@ -40,11 +41,35 @@ function shortageSelectionKey(item: InventorySeedMissingShortage): string {
   return `${item.inventory_type}|${item.lru_name}|${item.part_number || ''}|${item.shortage_ids.join(',')}`;
 }
 
+function readStoredSuperPassword(): string {
+  if (typeof window === 'undefined') return '';
+  try {
+    return sessionStorage.getItem(SUPER_PASSWORD_STORAGE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function writeStoredSuperPassword(value: string | null) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (!value) sessionStorage.removeItem(SUPER_PASSWORD_STORAGE_KEY);
+    else sessionStorage.setItem(SUPER_PASSWORD_STORAGE_KEY, value);
+  } catch {
+    // Ignore storage failures (private mode, etc.)
+  }
+}
+
 export function TestDataPanel({ embedded = false }: TestDataPanelProps) {
   const { hasAccess } = useAuth();
   const isAdmin = hasAccess(['Admin']);
 
-  const [loadingOptions, setLoadingOptions] = useState(true);
+  const [superPassword, setSuperPassword] = useState('');
+  const [unlockInput, setUnlockInput] = useState('');
+  const [unlocking, setUnlocking] = useState(false);
+  const [unlocked, setUnlocked] = useState(false);
+
+  const [loadingOptions, setLoadingOptions] = useState(false);
   const [missingShortages, setMissingShortages] = useState<InventorySeedMissingShortage[]>(
     []
   );
@@ -74,44 +99,100 @@ export function TestDataPanel({ embedded = false }: TestDataPanelProps) {
   const [lastDemoResult, setLastDemoResult] =
     useState<WorkflowDemoUserSeedResult | null>(null);
 
-  const loadOptions = useCallback(async () => {
-    setLoadingOptions(true);
-    try {
-      const [stockRes, demoRes] = await Promise.all([
-        inventory.seedTestStockOptions(),
-        users.seedDemoRolesOptions(),
-      ]);
-      const missing = stockRes.data.missing_shortages || [];
-      const groups = stockRes.data.inventory_groups || [];
-      const demo = demoRes.data.users || [];
-      setMissingShortages(missing);
-      setInventoryGroups(groups);
-      setSelectedShortageKeys(new Set(missing.map(shortageSelectionKey)));
-      setSelectedInventoryIds(
-        new Set(groups.filter((group) => group.quantity > 0).map((group) => group.inventory_id))
-      );
-      setDemoUsers(demo);
-      setSelectedDemoUsernames((prev) => {
-        if (prev.size === 0) {
-          return new Set(demo.map((item) => item.username));
-        }
-        const next = new Set<string>();
-        for (const item of demo) {
-          if (prev.has(item.username)) next.add(item.username);
-        }
-        return next.size > 0 ? next : new Set(demo.map((item) => item.username));
-      });
-    } catch (error) {
-      toast.error(await extractApiError(error, 'Failed to load seed options'));
-    } finally {
-      setLoadingOptions(false);
-    }
+  const lockPanel = useCallback(() => {
+    writeStoredSuperPassword(null);
+    setSuperPassword('');
+    setUnlockInput('');
+    setUnlocked(false);
+    setMissingShortages([]);
+    setInventoryGroups([]);
+    setDemoUsers([]);
+    setSelectedShortageKeys(new Set());
+    setSelectedInventoryIds(new Set());
+    setSelectedDemoUsernames(new Set());
+    setLastResult(null);
+    setLastDemoResult(null);
   }, []);
+
+  const loadOptions = useCallback(
+    async (password: string) => {
+      if (!password) return;
+      setLoadingOptions(true);
+      try {
+        const [stockRes, demoRes] = await Promise.all([
+          inventory.seedTestStockOptions(password),
+          users.seedDemoRolesOptions(password),
+        ]);
+        const missing = stockRes.data.missing_shortages || [];
+        const groups = stockRes.data.inventory_groups || [];
+        const demo = demoRes.data.users || [];
+        setMissingShortages(missing);
+        setInventoryGroups(groups);
+        setSelectedShortageKeys(new Set(missing.map(shortageSelectionKey)));
+        setSelectedInventoryIds(
+          new Set(groups.filter((group) => group.quantity > 0).map((group) => group.inventory_id))
+        );
+        setDemoUsers(demo);
+        setSelectedDemoUsernames((prev) => {
+          if (prev.size === 0) {
+            return new Set(demo.map((item) => item.username));
+          }
+          const next = new Set<string>();
+          for (const item of demo) {
+            if (prev.has(item.username)) next.add(item.username);
+          }
+          return next.size > 0 ? next : new Set(demo.map((item) => item.username));
+        });
+      } catch (error) {
+        const message = await extractApiError(error, 'Failed to load seed options');
+        toast.error(message);
+        if (
+          axios.isAxiosError(error) &&
+          (error.response?.status === 401 || error.response?.status === 403)
+        ) {
+          lockPanel();
+        }
+      } finally {
+        setLoadingOptions(false);
+      }
+    },
+    [lockPanel]
+  );
 
   useEffect(() => {
     if (!isAdmin) return;
-    void loadOptions();
+    const stored = readStoredSuperPassword();
+    if (!stored) return;
+    setSuperPassword(stored);
+    setUnlocked(true);
+    void loadOptions(stored);
   }, [isAdmin, loadOptions]);
+
+  async function handleUnlock(event: FormEvent) {
+    event.preventDefault();
+    const candidate = unlockInput.trim();
+    if (!candidate) {
+      toast.error('Enter the super password');
+      return;
+    }
+    setUnlocking(true);
+    try {
+      await users.unlockTestData({ super_password: candidate });
+      writeStoredSuperPassword(candidate);
+      setSuperPassword(candidate);
+      setUnlockInput('');
+      setUnlocked(true);
+      toast.success('Test Data unlocked');
+      await loadOptions(candidate);
+    } catch (error) {
+      toast.error(await extractApiError(error, 'Invalid super password'));
+      writeStoredSuperPassword(null);
+      setSuperPassword('');
+      setUnlocked(false);
+    } finally {
+      setUnlocking(false);
+    }
+  }
 
   const selectedShortageIds = useMemo(() => {
     const ids: number[] = [];
@@ -188,6 +269,7 @@ export function TestDataPanel({ embedded = false }: TestDataPanelProps) {
     const payload: Parameters<typeof users.seedDemoRoles>[0] = {
       usernames: selectedDemoUsernameList,
       dry_run: dryRun,
+      super_password: superPassword,
     };
     if (!dryRun) {
       payload.confirm = CONFIRM_PHRASE;
@@ -244,6 +326,7 @@ export function TestDataPanel({ embedded = false }: TestDataPanelProps) {
       location_cabinet: locationCabinet.trim(),
       location_rack: locationRack.trim(),
       dry_run: dryRun,
+      super_password: superPassword,
     };
     if (willBootstrap) {
       payload.shortage_ids = selectedShortageIds;
@@ -306,6 +389,56 @@ export function TestDataPanel({ embedded = false }: TestDataPanelProps) {
     );
   }
 
+  if (!unlocked) {
+    return (
+      <div className="space-y-8">
+        {!embedded && (
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Test Data</h1>
+            <p className="text-sm text-muted-foreground">
+              Additional super-password lock required before seeding tools are available
+            </p>
+          </div>
+        )}
+        <SettingsSection
+          title="Unlock Test Data"
+          description="Admin access alone is not enough. Enter the configured admin super password to continue."
+        >
+          <SettingsCard>
+            <form className="mx-auto max-w-md space-y-4" onSubmit={handleUnlock}>
+              <div className="flex items-start gap-3 rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
+                <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+                <p>
+                  This protects seed actions so not every Admin session can create demo users
+                  or multiply inventory stock.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="test-data-super-password">Super password</Label>
+                <Input
+                  id="test-data-super-password"
+                  type="password"
+                  value={unlockInput}
+                  onChange={(event) => setUnlockInput(event.target.value)}
+                  autoComplete="current-password"
+                  placeholder="Enter super password"
+                />
+              </div>
+              <Button type="submit" disabled={unlocking || !unlockInput.trim()}>
+                {unlocking ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <ShieldCheck className="mr-2 h-4 w-4" />
+                )}
+                {unlocking ? 'Unlocking…' : 'Unlock'}
+              </Button>
+            </form>
+          </SettingsCard>
+        </SettingsSection>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       {!embedded && (
@@ -317,12 +450,12 @@ export function TestDataPanel({ embedded = false }: TestDataPanelProps) {
         </div>
       )}
 
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
         <Button
           type="button"
           variant="outline"
           size="sm"
-          onClick={() => void loadOptions()}
+          onClick={() => void loadOptions(superPassword)}
           disabled={
             loadingOptions || previewing || seeding || demoPreviewing || demoSeeding
           }
@@ -333,6 +466,10 @@ export function TestDataPanel({ embedded = false }: TestDataPanelProps) {
             <RefreshCw className="mr-2 h-4 w-4" />
           )}
           Refresh lists
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={lockPanel}>
+          <Lock className="mr-2 h-4 w-4" />
+          Lock
         </Button>
       </div>
 
